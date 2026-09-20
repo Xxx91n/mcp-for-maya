@@ -1,10 +1,14 @@
+<p align="center">
+  <img src=".github/assets/hero.png" width="100%" alt="mcp-for-maya — Give AI agents eyes inside Autodesk Maya"/>
+</p>
+
 # mcp-for-maya
 
 > 让 AI Agent 拥有 Maya 三维空间感知能力的 MCP 服务器
 
 [English](README_en.md) | 中文
 
-[![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/)
+[![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Python](https://img.shields.io/pypi/pyversions/mcp-for-maya)](https://pypi.org/project/mcp-for-maya/)
 
 ## 这是什么
 
@@ -16,6 +20,17 @@
 
 > [!WARNING]
 > 本服务器把任意 Python 代码送进 Maya 执行——这是设计能力而非漏洞。内置的校验/限流/审计是**误操作与注入指令的安全网，不是抵御恶意客户端的边界**；接入的 Agent 是受信方。详见 [docs/threat-model.md](docs/threat-model.md)。
+
+<img src=".github/assets/section-live-demo.svg" width="100%" alt="Live Demo — captured by the product itself"/>
+
+以下素材全部由本产品工具链真实捕获，非 mock：演示场景经 `execute_code` 构建，视口截图来自 `scene_viewport_snapshot`，环绕序列来自 `camera_orbit` + `scene_render_preview`（Maya 2024 GUI 会话；场景中 RGB 三色呼应 logo 的三轴意象）。
+
+<p align="center"><img src=".github/assets/orbit.gif" width="640" alt="camera_orbit 环绕序列 — 真实 playblast 帧"/></p>
+
+<p align="center">
+<img src=".github/assets/shot-hero.png" width="49%" alt="scene_viewport_snapshot：persp 视口捕获（含 HUD）"/>
+<img src=".github/assets/shot-alt.png" width="49%" alt="scene_viewport_snapshot：侧向视角（含 HUD）"/>
+</p>
 
 ## 与 blender-mcp 对比
 
@@ -29,7 +44,7 @@
 
 资产集成在我们的路线图上（Poly Haven 薄集成，issue #2）；AI 生成与一等对象 CRUD 明确不做——后者 `execute_code` 已覆盖。
 
-## 能力矩阵
+<img src=".github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
 
 | 能力 | 工具 | 说明 |
 |------|------|------|
@@ -45,7 +60,7 @@
 
 共 20 个 MCP 工具。
 
-## 快速开始
+<img src=".github/assets/section-quick-start.svg" width="100%" alt="Quick Start"/>
 
 ### 1. 安装
 
@@ -135,7 +150,7 @@ tool_timeout_sec = 120
 
 AI 会自动调用 `scene_snapshot()` → 理解场景 → 执行建模 → `scene_review()` 审核结果。
 
-## 工作流：ICEV 循环
+<img src=".github/assets/section-icev-workflow.svg" width="100%" alt="ICEV Workflow"/>
 
 每次场景修改都遵循 **ICEV** 工作流（也内置为 Agent 流程卡，见 `skills/icev-workflow`）：
 
@@ -241,7 +256,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 > 两卡仅在 Claude Code 上评测过，未在 Codex/Gemini CLI/Cursor 验证；跨模型评测计划见 issue #3。
 
-## 审核维度
+<img src=".github/assets/section-audit-trust.svg" width="100%" alt="Audit & Trust"/>
 
 `scene_review()` 提供 11 项通用检查（0-100 分，按各项分值归一化）：
 

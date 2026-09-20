@@ -1,10 +1,14 @@
+<p align="center">
+  <img src=".github/assets/hero.png" width="100%" alt="mcp-for-maya — Give AI agents eyes inside Autodesk Maya"/>
+</p>
+
 # mcp-for-maya
 
 > MCP server giving AI agents spatial awareness of Autodesk Maya scenes
 
 English | [中文](README.md)
 
-[![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/)
+[![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Python](https://img.shields.io/pypi/pyversions/mcp-for-maya)](https://pypi.org/project/mcp-for-maya/)
 
 ## What Is This
 
@@ -16,6 +20,17 @@ Forked from [chadrik/maya-mcp-server](https://github.com/chadrik/maya-mcp-server
 
 > [!WARNING]
 > This server executes arbitrary Python inside Maya — that is a designed capability, not a bug. The built-in validation / rate-limit / audit pipeline is a **safety net for accidents and injected instructions, not a boundary against a malicious client**; the connected agent is trusted. See [docs/threat-model.md](docs/threat-model.md).
+
+<img src=".github/assets/section-live-demo.svg" width="100%" alt="Live Demo — captured by the product itself"/>
+
+Every asset below is a real capture produced by this project's own tool chain — no mockups: the demo scene was built via `execute_code`, the viewport stills come from `scene_viewport_snapshot`, and the orbit sequence comes from `camera_orbit` + `scene_render_preview` (Maya 2024 GUI session; the scene's RGB trio echoes the logo's gizmo tripod).
+
+<p align="center"><img src=".github/assets/orbit.gif" width="640" alt="camera_orbit sequence — real playblast frames"/></p>
+
+<p align="center">
+<img src=".github/assets/shot-hero.png" width="49%" alt="scene_viewport_snapshot: persp viewport capture (HUD included)"/>
+<img src=".github/assets/shot-alt.png" width="49%" alt="scene_viewport_snapshot: side angle (HUD included)"/>
+</p>
 
 ## vs blender-mcp
 
@@ -29,7 +44,7 @@ An honest three-tier comparison with [ahujasid/blender-mcp](https://github.com/a
 
 Asset integration is on our roadmap (Poly Haven thin slice, issue #2); AI generation and first-class object CRUD are explicitly out of scope — the latter is already covered by `execute_code`.
 
-## Capability Matrix
+<img src=".github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
 
 | Capability | Tools | Notes |
 |------------|-------|-------|
@@ -45,7 +60,7 @@ Asset integration is on our roadmap (Poly Haven thin slice, issue #2); AI genera
 
 20 MCP tools in total.
 
-## Quick Start
+<img src=".github/assets/section-quick-start.svg" width="100%" alt="Quick Start"/>
 
 ### 1. Install
 
@@ -133,7 +148,7 @@ Talk naturally:
 
 The agent calls `scene_snapshot()` → understands the scene → models → `scene_review()` audits the result.
 
-## Workflow: ICEV
+<img src=".github/assets/section-icev-workflow.svg" width="100%" alt="ICEV Workflow"/>
 
 Every scene modification follows the **ICEV** loop (also shipped as an agent process card, see `skills/icev-workflow`):
 
@@ -216,7 +231,7 @@ Two **Experimental** process cards ship in `skills/`:
 
 > Evaluated on Claude Code only; untested on Codex/Gemini CLI/Cursor. Cross-model evaluation is tracked in issue #3.
 
-## Audit Dimensions
+<img src=".github/assets/section-audit-trust.svg" width="100%" alt="Audit & Trust"/>
 
 `scene_review()` provides 11 universal checks (score normalized to 0-100):
 
