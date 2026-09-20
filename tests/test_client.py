@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from maya_mcp_server import maya_mcp_helper as helper
 from maya_mcp_server.client import (
     MayaClient,
     MayaConnectionError,
@@ -15,6 +17,7 @@ from maya_mcp_server.client import (
     MayaTimeoutError,
     MayaUnavailableError,
 )
+from maya_mcp_server.security import InputValidationError
 from maya_mcp_server.types import (
     CommandResponse,
     OutputBuffer,
@@ -812,3 +815,114 @@ class TestBootstrapFallback:
         assert isinstance(new_client, MayaQtClient)
         assert new_client.port == qt_port
         assert new_client.framed_channel is True
+
+
+# ============================================================================
+# D-046: result_type coercion at the transport seam
+# ============================================================================
+
+
+class _CaptureWriter:
+    """Minimal StreamWriter stand-in: captures every written byte string."""
+
+    def __init__(self) -> None:
+        self.writes: list[bytes] = []
+
+    def write(self, data: bytes) -> None:
+        self.writes.append(data)
+
+    async def drain(self) -> None:
+        return None
+
+    def is_closing(self) -> bool:
+        return False
+
+
+class _ScriptedReader:
+    """Minimal StreamReader stand-in serving one pre-canned byte blob."""
+
+    def __init__(self, blob: bytes) -> None:
+        self._buf = blob
+
+    async def readexactly(self, n: int) -> bytes:
+        chunk, self._buf = self._buf[:n], self._buf[n:]
+        if len(chunk) < n:
+            raise asyncio.IncompleteReadError(chunk, n)
+        return chunk
+
+    async def read(self, n: int = -1) -> bytes:
+        if n < 0 or n > len(self._buf):
+            n = len(self._buf)
+        chunk, self._buf = self._buf[:n], self._buf[n:]
+        return chunk
+
+
+class TestExecuteCodeResultTypeCoercion:
+    """D-046 regression net: drive the REAL _send_receive over a fake
+    transport and assert the wire payload.
+
+    0.1.1 shipped a ship-stopper: str-typed callers (scene_tools.py:124,
+    visual_tools.py:86 pass result_type="JSON") crashed inside
+    execute_code on ``result_type.value``. Every pre-existing test mocked
+    _send_receive, so the crash never surfaced in CI. These tests pin the
+    wire-level contract for BOTH channels (framed Qt + native commandPort).
+    """
+
+    @pytest.mark.asyncio
+    async def test_qt_execute_code_accepts_str_result_type(self) -> None:
+        """Qt channel: str "JSON" must serialize to params.result_type."""
+        client = MayaQtClient(host="127.0.0.1", port=1)
+        writer = _CaptureWriter()
+        response = helper.encode_frame(
+            json.dumps({"id": "req-1", "result": "{}", "error": None}).encode()
+        )
+        client._writer = writer  # type: ignore[assignment]
+        client._reader = _ScriptedReader(response)  # type: ignore[assignment]
+
+        result = await client.execute_code("{}", result_type="JSON")
+
+        assert result.error is None
+        frame = writer.writes[0]
+        request = json.loads(frame[helper.FRAME_HEADER_SIZE :].decode())
+        assert request["method"] == "execute"
+        assert request["params"]["result_type"] == "JSON"
+
+    @pytest.mark.asyncio
+    async def test_native_execute_code_accepts_str_result_type(self) -> None:
+        """Native channel: str "JSON" must format into the command template."""
+        client = MayaClient(host="127.0.0.1", port=1)
+        writer = _CaptureWriter()
+        client._writer = writer  # type: ignore[assignment]
+        client._reader = _ScriptedReader(  # type: ignore[assignment]
+            b'{"result": 1, "error": null}\x00'
+        )
+
+        result = await client.execute_code("1+1", result_type="JSON")
+
+        assert result.error is None
+        command = writer.writes[0].decode()
+        assert command.endswith("\n")
+        assert "'JSON'" in command  # execute('1+1', 'JSON')
+
+    @pytest.mark.asyncio
+    async def test_qt_execute_code_enum_still_works(self) -> None:
+        """Enum input keeps working through the real transport path."""
+        client = MayaQtClient(host="127.0.0.1", port=1)
+        writer = _CaptureWriter()
+        response = helper.encode_frame(
+            json.dumps({"id": "req-1", "result": None, "error": None}).encode()
+        )
+        client._writer = writer  # type: ignore[assignment]
+        client._reader = _ScriptedReader(response)  # type: ignore[assignment]
+
+        result = await client.execute_code("pass", result_type=ResultType.NONE)
+
+        assert result.error is None
+        request = json.loads(writer.writes[0][helper.FRAME_HEADER_SIZE :].decode())
+        assert request["params"]["result_type"] == "NONE"
+
+    @pytest.mark.asyncio
+    async def test_execute_code_rejects_invalid_str(self, maya_client: MayaClient) -> None:
+        """Invalid result_type strings surface as InputValidationError."""
+        with pytest.raises(InputValidationError, match="Invalid result_type"):
+            await maya_client.execute_code("pass", result_type="BOGUS")

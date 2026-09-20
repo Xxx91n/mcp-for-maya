@@ -320,14 +320,15 @@ class BaseMayaClient(ABC):
     async def execute_code(
         self,
         code: str,
-        result_type: ResultType = ResultType.NONE,
+        result_type: ResultType | str = ResultType.NONE,
     ) -> CommandResponse:
         """
         Execute Python code in Maya and return the result.
 
         Args:
             code: Python code to execute
-            result_type: How to handle the result
+            result_type: How to handle the result (enum or plain string —
+                both are normalized at this boundary)
                 - NONE: Execute statements, don't capture result
                 - JSON: Evaluate expression, JSON encode result
                 - RAW: Evaluate expression, return string representation
@@ -336,6 +337,17 @@ class BaseMayaClient(ABC):
             CommandResponse with result and error info.
             Note: stdout/stderr are delivered via MCP Resources, not returned here.
         """
+        # Normalize at the boundary (D-046): enum members pass through,
+        # plain strings like "JSON" are coerced. 0.1.1 crashed here on
+        # result_type.value when str-typed callers (scene_tools,
+        # visual_tools) reached this shared method.
+        try:
+            result_type = ResultType(result_type)
+        except ValueError:
+            raise InputValidationError(
+                f"Invalid result_type {result_type!r}: must be NONE, JSON, or RAW"
+            ) from None
+
         # Qt server JSON protocol over the framed channel. There is no
         # retry: execution errors are returned in the response (never
         # raised here) and surface to callers via the two-layer contract.
