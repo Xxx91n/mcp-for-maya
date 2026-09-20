@@ -36,6 +36,21 @@ unless the `mayapy` marker is explicitly selected. They are the
 reference tier: if a stub test and a mayapy test disagree, the stub is
 wrong.
 
+The tier auto-initializes `maya.standalone` once per session
+(`tests/test_mayapy_smoke.py::_maya_standalone_init`) — bare mayapy
+crashes hard on `import maya.api.OpenMaya` without it.
+
+**Prerequisite**: `maya.standalone` must import cleanly under mayapy.
+Verified blocked on at least one dev box (Maya 2024, Windows):
+`import maya.standalone` raises a native access violation
+(0xC0000005) inside module creation and `maya.exe -batch` hangs — the
+whole tier is unrunnable there. On such a box, run the Tier-2
+substance (checkpoint/rollback roundtrip, reference-edit case,
+signature collection) through a live GUI session instead — see
+`.scratch/maya-mcp-grill/harness/gui_verify.py` for the reference
+implementation. Launch mayapy from PowerShell/cmd, never Git Bash
+(MSYS environment makes mayapy SIGSEGV at startup).
+
 For a quick smoke test of the module inside Maya's Script Editor:
 
 ```python
