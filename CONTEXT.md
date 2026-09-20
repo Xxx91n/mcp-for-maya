@@ -137,3 +137,11 @@ _Avoid_: 把脆弱 GUI 断言硬写成 assert、清单散落仓库外
 **签名基线 (signature baseline)**:
 mayapy 真机内 inspect.signature 采集项目实际 cmds.* 调用面产出的 JSON 清单+allowlist，与 stub 声明自动 diff 作合约护栏；对齐 mypy stubtest 先例的 stub↔runtime 漂移检测，属冻结预算同构的 ratchet 资产——Maya 版本升级时重采集比对。签名只覆盖参数形状，时序/副作用/返回值语义归 call-form smoke 补。
 _Avoid_: 全人工逐条对文档、把签名等价当行为等价
+
+**dogfood 素材**:
+门面/文档证据素材由产品自身产出的纪律——README 截图与演示 GIF 用本项目视觉工具（scene_viewport_snapshot/camera_orbit 序列）真实捕获，而非生成图或手工 mock；是 show-don't-tell 的最强形态，素材即能力证明。采集走 repo HEAD 服务实例，属门面资产入 git（非 .scratch 过程件）。
+_Avoid_: 生成图冒充实拍、手工摆拍截屏
+
+**文本极轻共享资产 (text-light shared assets)**:
+双语 README（zh/en）共用同一套视觉资产的纪律——logo 字标用英文名、hero 等资产文字压到最少且统一英文，两版 README 零资产分叉；动因=SVG 内嵌中文在 GitHub 渲染链有缺字风险+维护成本翻倍。
+_Avoid_: 双语双变体资产、SVG 内嵌中文文案

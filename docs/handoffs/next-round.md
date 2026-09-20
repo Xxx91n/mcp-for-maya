@@ -1,85 +1,85 @@
-# Handoff — maya-mcp-grill 下一轮任务书（rev21）
+# Handoff — maya-mcp-grill 下一轮任务书（rev22）
 
 > 规范路径（T-11a/D-041④）：docs/handoffs/next-round.md；账本=docs/decision-ledger.md；.scratch 仅存本地过程件。
 
 ## 本轮验收事实（非计划）
 
-- **T-13 已结案**：`impl/t13a-result-type-coerce`（13+1 commits）+ `grill/round13-issue7-verification-spec`（2+1 commits）经审计 conditional pass 后合并 main 并 push；0.1.2 备单就绪（CHANGELOG/pyproject/__init__ 已 bump），**tag/release/yank 0.1.1/后端重启/issue #7 评论+勾选=用户门未动**
-- **审计结论（T-13 轮）**：conditional pass —— 硬验收全部独立复现（pytest 590/10、gui 5/5 真机、ruff 83/83+29/29、mypy new=0、uv build 0.1.2、stdio 探针、pre-commit 8/8、直驱 harness 4/4）；mayapy blocked(env) 亲验属实（`import maya.standalone`→AV 0xC0000005）。审计报告 `.scratch/maya-mcp-grill/reports/2026-09-20-audit-t13.md`
-- **审计返工已落（rev21 本 commit）**：ADR-0013:26 捕获路径修正注记；testing.md 补回 width/height metadata 项+`gui_session_required` batch 门挂账+`.scratch` machine-local 注记；`test_signature_baseline.py` 版本断言放宽为 `Maya \d{4}` 戳存在性
-- **真机环境**：Maya 2024 GUI 活（Qt 分帧端口每次连接动态分配，native :7001 恒在，`MAYA_MCP_GUI_ADDR` 可缺省）；旧后端 pid 3168 跑 0.1.1 待用户重启换 0.1.2；mayapy/-batch 本机 env-blocked
-- 账本 49 条（D-001..D-049）；ADR 0001..0018；CONTEXT.md 34 术语
+- **门面轮 spec 已立案**（D-050..D-054→ADR-0019）：整页 README 视觉重构为主线；纯 SVG 全线（本环境无 imagegen）；logo=眼睛×gizmo+RGB-on-dark；hero=品牌锁幅+真截图；双语=文本极轻英文共享资产；GIF=orbit 序列放次屏；资产标准套含 social preview
+- **T-13 已结案**：PR #19/#20 合并 main（f79811b），审计返工落地，0.1.2 备单就绪（CHANGELOG/pyproject/__init__ 已 bump）；**tag/release/yank/后端重启/issue#7 评论+勾选=用户门未动**
+- **基线实测（main 口径）**：pytest 590/10、gui 5/5 真机、ruff 83/83+29/29、mypy new=0、pre-commit 8/8、uv build 0.1.2
+- **README 现状**：纯文本零视觉资产（无 logo/hero/截图/GIF；badge=CI+PyPI）；README_en.md 双语并存
+- **真机环境**：Maya 进程本报告生成时未在跑（用户称已开，或为启动中）；dogfood 采集以 GUI 会话为前置；旧后端 pid 3168 仍 0.1.1；mayapy 本机 env-blocked
+- 账本 54 条（D-001..D-054）；ADR 0001..0019；CONTEXT.md 34 术语（+dogfood 素材/文本极轻共享资产）
 
 ## 真源与上下文（先读这些）
 
-- 审计报告 `.scratch/maya-mcp-grill/reports/2026-09-20-audit-t13.md`（声明→证据→结论 23 行对照表，弱化/跑偏清单）
-- T-13 实施报告 `.scratch/maya-mcp-grill/reports/2026-09-20-report.md`（§5 issue #7 逐项、§6 发布人工门七步）
-- 决策账本 docs/decision-ledger.md；ADR docs/adr/0018-issue7-real-maya-verification.md
-- issue #7 清单原文；CONTEXT.md；docs/testing.md 三层档定义
+- 决策账本 docs/decision-ledger.md（D-050..D-054=本轮 spec）
+- ADR docs/adr/0019-github-facade.md（门面决策簇全录）
+- 门面 skill 族 C:\Users\Administrator\.agents\skills\git\readme\（beautify-github-readme/readme-crafter/repo-logo/create-readme）
+- README.md+README_en.md 现状；CONTEXT.md；docs/threat-model.md 诚实边界
+- T-13 审计/实施报告 .scratch/maya-mcp-grill/reports/2026-09-20-*
 
 ## 工作约定（承袭）
 
 - GitButler 专用（but；禁 git write）；文件写 Node.js fs+字节校验；每轮独立分支
-- 每修复带回归测试；诚实档与代码档分 commit
-- 活会话权限沿用 D-047；扰动类最后执行；checkpoint 落盘限 scratch 区
-- 证据纪律 D-048：agent 执行+留证→.scratch；勾选权归用户；partial/blocked 如实标
-- 人工门：tag/release/yank/issue 勾选/后端重启/分支保护/env reviewer=用户执行
+- 诚实档与代码档分 commit；门面资产与文档变更同 PR 可但分 commit
+- 写入 markdown/SVG 前自查 $/%/反斜杠字面量不被壳层吞食（rev20 教训）
+- 人工门：tag/release/yank/social 上传/repo About/后端重启/issue 勾选=用户执行
 - atomcode 调研串行单发；ctx 缺席走 exec 直跑
 
 ## 任务链（按序）
 
-### T-14a 弱点裁决（审计 §3.2 遗留，先 grill 后动）
+### T-15a 品牌资产生产（D-051/D-052）
 
-1. **presence-baseline 追认或补强**：`signature-baseline.json` 实为 presence/method-list 基线（signature 全 null，cmds builtins 无可查签名+mayapy blocked）。裁决：更名 presence-baseline / meta 补注追认 / 健康机重采真签名——三选一立案
-2. **call-form smoke 独立层取舍**：现由 gui 档实质承担；裁决独立成档 or spec 追认现覆盖
-3. **visual_module ~10 调用对官方文档**：无独立对照表工件；裁决补表 or 并入 allowlist 理由追认
-4. **MVector(MPoint) stub 继承拆解**：allowlist 化漂移债，裁决拆 or 留
+1. **logo SVG 母本**：几何眼睛×RGB 三轴 gizmo 融合（瞳孔=三轴箭头）+RGB-on-dark；产出 1024² 母本+favicon/小尺寸派生；落地失败退回备案 B（M 字母×gizmo）
+2. **hero SVG**：左=logo 锁幅+英文 tagline、右=视口框 mock（截图槽位，先占位后填真图）
+3. **section headers + badge 审查**：能力矩阵分区小标；现有 CI/PyPI badge 保留+评估补充（license/python version）
 
-### T-14b issue #7 残余清点（v1.0 定义性门）
+### T-15b dogfood 素材采集（D-051/D-054；前置=用户 Maya 开机）
 
-5. 多客户端渲染席位：Inspector/Claude Code/Codex=用户环境项，出可执行 checklist 交用户
-6. Maya 2025/2026 矩阵：MImage 双布局已备未验；human_verify 骨架含 modelPanel -camera 挂账项
-7. mayapy env-blocked：换机或修环境；健康机上 `test_mayapy_smoke.py`+签名重采即解锁 Tier-2
-8. headless temp-file fallback：随 7 解锁
+4. repo HEAD 新起服务实例（不动 pid 3168 旧后端）→ 搭演示场景 → scene_viewport_snapshot 真截图×2 + camera_orbit 多帧序列
+5. orbit 序列 → GIF（render_motion_gif.py 管线，SVG 源留档；翻车退静态截图）；截图/GIF 入 .github/assets/
 
-### T-14c 发布链状态核对
+### T-15c README 重构（D-053）
 
-9. 0.1.2：merge 已执行；核对 tag v0.1.2/release notes/PyPI 产物/yank 0.1.1 是否用户已落；issue #7 评论+勾选状态核对（不代勾）
-10. 后端重启实证：用户重启后 `scene_*` 面经 1MCP 复测一遍收尾 D-046
+6. README.md+README_en.md 内容架构重排（readme-crafter 检查单：一屏讲清/证据前置/最短上手路径）；hero 嵌入+截图/GIF 落位+文本极轻英文资产双语共用
+7. **social preview 1280×640** 产出（上传 repo settings=人工门）
+8. **repo About 元数据**刷新建议（description/topics：mcp/maya/model-context-protocol/3d 等，gh repo edit 备单=人工门）
 
-### T-14d 登记债择题（ grill 出题，勿全吞 ）
+### T-14 顺延队列（下轮，勿认领）
 
-- 高值候选：T-06 dormant aesthetic_engine 归置（ADR-0003 挂账）；ctx 沙箱 preload 缺陷；D-011 validator
-- 长尾沿用 rev20 清单不变（PyPI yank 无先例仍适用——若 9 已执行则消）
+9. T-14a 弱点裁决 4 项（presence-baseline 名实/call-form 独立层/visual_module 对照表/MVector stub 拆解）——先 grill 后动
+10. T-14b #7 残余（多客户端=用户/2025-2026 矩阵/mayapy env-blocked/headless fallback）
+11. T-14c 0.1.2 发布链核对（tag/release/yank/issue#7 评论+勾选 全用户门）
 
 ## DoD checkbox
 
-- [ ] 弱点裁决四项各有立案结论（补做 or spec 追认，不悬置）
-- [ ] issue #7 残余项各自有主（agent 可跑项跑完留证；用户项出 checklist）
-- [ ] 0.1.2 发布链逐环核对完毕（已落核销/未落列出）
-- [ ] 重启后后端 scene_* 面复测 transcript 入库
-- [ ] 新发现缺陷照例每修带回归钉
+- [ ] logo SVG 母本+派生入库（构图经核验，心智模型零脱节）
+- [ ] hero+截图/GIF 全资产入 .github/assets/ 且 README 双语正确引用
+- [ ] README 双语重排后质量检查单过线（readme-crafter quality-checklist）
+- [ ] dogfood 素材为真机实捕（非 mock）；GIF 放次屏位
+- [ ] social preview+About 备单就绪（执行归用户）
+- [ ] 门面变更不夹带源码/测试改动（文档传播矩阵纪律）
 
 ## 负向清单
 
-- grill/spec 期不动源码；checkbox 勾选权归用户不代勾
-- 裁决项只出结论不夹带实施（实施归实现阶段）
-- 不宣称 2025/2026 已验；不把 partial 当 green；证据件留 .scratch 不入 git
-- 用户门（tag/yank/重启/勾选/多客户端环境）不代执行不催促
-- 提交前自查 markdown 内 `$`/`%`/反斜杠字面量未被壳层吞食（rev20 教训：技能名被剥、路径丢 `\` 进 git）
+- grill/spec 期不动源码；门面资产全纯 SVG（无 imagegen 硬约束）
+- SVG 不内嵌中文；GIF 翻车退静态不硬撑；social/About 上传归用户
+- dogfood 素材禁 mock/生成图冒充；采集不动用户旧后端
+- T-14 各项不提前实施；0.1.2/#7 残余各归其主
+- README 改动守传播矩阵（只修本变更致 stale 的行+新增视觉面）
 
 ## 登记债（碰到再修，勿认领）
 
-- 本轮新挂：signature-baseline 名实不符（presence≠signature）；next-round.md rev20 曾被壳层剥名（根因=写入路径模板展开，写作面须字面量自保）；testing.md 曾丢清单项（checklist 项迁移须全量映射自查）
-- 沿用 rev20：PyPI yank 流程无本仓先例（若已执行则消）；多客户端项 blocked 待用户；Maya 2025/2026 覆盖缺；MVector(MPoint) 拆解低优先
-- 沿用 rev19.1：runtime deps lock 政策缓（fastmcp/psutil/platformdirs/PySide6 浮动）；mypy 2.x 输出格式变更重验；coverage patch 门触发=T-06 归置+真机档后；macOS 单冒烟触发条件不变；pre-commit.ci 不装；ruff format E501 ignore 评估已弱
-- 沿用 rev17 长尾：T-06 休眠归置/T-07 validator/Poly Haven issue#2/ctx 沙箱 preload 缺陷/AE dormant 覆盖披露/Maya 2022+ commandPort 未公开/_suggest_layout 截断/checked-skipped 异构/orbit-shot 前缀/玄学评分/test_security:389 I001/AsyncMock/connection_guide 三连/ADR-0010 O-2/_probe_port 泄漏/native 丢 code/_visual_injected 重连/双胞胎 helpers/Scene.gui/OSError 白名单/ruff 原生 baseline(#1149)/but pr forge/pending publisher/ci↔release 重复/unavailable 消息丢 {e}/budget argv/Qt Raises
+- 本轮新挂：Maya 进程开机状态不稳定（dogfood 采集前置）；render_motion_gif.py 依赖（ffmpeg/Pillow）可用性未验；logo 具象眼睛方案落地风险（B 案备案）
+- 沿用 rev21：presence-baseline 名实不符；PyPI yank 无先例（若已执行则消）；多客户端 blocked 待用户；Maya 2025/2026 覆盖缺；MVector(MPoint) 拆解；mayapy env-blocked
+- 沿用 rev19.1/rev17 长尾全录不变（runtime deps lock/mypy 2.x 格式/T-06/T-07/Poly Haven/ctx 缺陷等）
 
 ## suggested skills
 
-- $grill-me / $grill-with-docs — T-14 裁决项出题
-- $implement / $tdd — 裁决后实施驱动
+- beautify-github-readme / readme-crafter / repo-logo（.agents/skills/git/readme/）— T-15 门面实施驱动
+- create-readme — README 文案纪律沿用（D-030）
+- $implement / $tdd — 实施驱动
 - $but（GitButler）— 全部版本控制写操作
 - $atomcode-research — 争议点调研（串行单发）
-- $handoff — 下轮翻页
-- domain-modeling / neat-freak — CONTEXT.md/ADR 维护
+- $handoff — 下轮翻页；domain-modeling / neat-freak — CONTEXT/ADR 维护
