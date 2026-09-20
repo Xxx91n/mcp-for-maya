@@ -6,14 +6,15 @@ decision; they are not evidence of a verified production path.
 """
 
 import pytest
+
 from maya_mcp_server.aesthetic_engine import (
-    PHI,
     HUMAN_EYE_HEIGHT,
+    PHI,
     analyze_60_30_10,
+    analyze_circulation_clarity,
     analyze_color_harmony,
     analyze_color_temperature,
     analyze_contrast,
-    analyze_circulation_clarity,
     analyze_golden_ratio,
     analyze_human_scale_reference,
     analyze_light_color_temperature,

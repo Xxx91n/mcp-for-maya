@@ -18,6 +18,7 @@ from maya_mcp_server.client import MayaQtClient, raise_for_error
 from maya_mcp_server.types import ResultType
 from maya_mcp_server.visual_tools import _MODULE_SOURCE
 
+
 pytestmark = pytest.mark.gui
 
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"

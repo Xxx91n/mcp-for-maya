@@ -10,10 +10,9 @@ import json
 from pathlib import Path
 
 import pytest
-from mcp.types import CallToolRequestParams
-
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools.tool import ToolResult
+from mcp.types import CallToolRequestParams
 
 from maya_mcp_server.pipeline import (
     TOOL_ANNOTATIONS,
@@ -381,7 +380,8 @@ class TestAuditJsonlContract:
         audit = AuditLogger(log)
         audit.record({"event_id": "1"})
         # read-only file forces append failure
-        import os, stat
+        import os
+        import stat
 
         os.chmod(log, stat.S_IREAD)
         try:

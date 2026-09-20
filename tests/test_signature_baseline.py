@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+
 BASELINE_PATH = Path(__file__).parent / "maya_stub" / "signature-baseline.json"
 ALLOWLIST_PATH = Path(__file__).parent / "maya_stub" / "signature-allowlist.json"
 
