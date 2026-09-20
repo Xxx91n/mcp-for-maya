@@ -197,6 +197,9 @@ def file(*args, **kwargs):
             return sc.scene_path
         return None
     if kwargs.get("rename"):
+        # Real Maya: -rename must be used by itself — no other flags.
+        if len(kwargs) > 1 or args:
+            raise RuntimeError("-rename flag must be used by itself")
         sc.scene_path = kwargs["rename"]
         return sc.scene_path
     if kwargs.get("open") or kwargs.get("o"):

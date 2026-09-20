@@ -1491,7 +1491,11 @@ def rollback_to_checkpoint(filename: str, discard_current_state: bool = False) -
 
     if scene_before:
         try:
-            cmds.file(rename=scene_before, prompt=False)
+            # -rename must be used by itself on real Maya — combining it
+            # with prompt=False raises "the -rename flag must be used by
+            # itself" (verified live on Maya 2024; the stub never
+            # modeled that constraint).
+            cmds.file(rename=scene_before)
         except Exception as e:
             return _rb_error(
                 "rebind_failed",
