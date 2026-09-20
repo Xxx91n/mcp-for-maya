@@ -16,6 +16,19 @@ import pytest
 pytestmark = pytest.mark.mayapy
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _maya_standalone_init():
+    """mayapy hard-crashes (Windows access violation) if maya.api.OpenMaya
+    is imported before maya.standalone.initialize() — initialize once per
+    tier run. Under vanilla python / the stub the import fails and this
+    is a no-op; the real_maya fixture still gates the tests."""
+    try:
+        import maya.standalone
+    except ImportError:
+        return
+    maya.standalone.initialize()
+
+
 @pytest.fixture
 def real_maya():
     cmds = pytest.importorskip("maya.cmds", reason="requires real Maya (mayapy)")
