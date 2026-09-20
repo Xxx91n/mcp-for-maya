@@ -47,9 +47,14 @@ Verified blocked on at least one dev box (Maya 2024, Windows):
 whole tier is unrunnable there. On such a box, run the Tier-2
 substance (checkpoint/rollback roundtrip, reference-edit case,
 signature collection) through a live GUI session instead — see
-`.scratch/maya-mcp-grill/harness/gui_verify.py` for the reference
+`.scratch/maya-mcp-grill/harness/gui_verify.py` (machine-local scratch
+harness — not tracked in git) for the reference
 implementation. Launch mayapy from PowerShell/cmd, never Git Bash
 (MSYS environment makes mayapy SIGSEGV at startup).
+
+Pending: the mayapy/batch run must also cover the `gui_session_required`
+headless gate (visual tools must return the structured error, not
+crash) — queued until a healthy headless Maya env exists.
 
 For a quick smoke test of the module inside Maya's Script Editor:
 
@@ -78,7 +83,8 @@ python -m pytest tests/ -m human_verify -s
 `gui` covers: framed-channel bootstrap (PySide2/Qt real session),
 str `result_type` over the real wire (D-046), viewport_snapshot PNG
 contract, render_preview net-zero side effects (panel camera +
-currentTime restored) and the camera_not_found domain error.
+currentTime restored), returned-metadata `width/height` matching
+reality, and the camera_not_found domain error.
 
 `human_verify` versioned checklist (was a docs-only list): snapshot
 orientation (verticalFlip), WYSIWYG HUD/selection match, VP2 non-black
