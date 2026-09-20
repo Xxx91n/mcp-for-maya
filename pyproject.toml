@@ -58,8 +58,11 @@ packages = ["src/maya_mcp_server"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+addopts = "--strict-markers"
 markers = [
     "mayapy: requires a real Maya interpreter (mayapy) — local manual tier, never CI",
+    "gui: requires a live Maya GUI session (MAYA_MCP_GUI_ADDR or :7001) — manual tier, real asserts (D-049a)",
+    "human_verify: manual checklist skeletons — prints steps, never asserts, always skips (D-049a)",
 ]
 
 [tool.ruff]

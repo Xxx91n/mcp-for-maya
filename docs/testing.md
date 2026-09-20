@@ -44,32 +44,37 @@ import maya_mcp_server.maya_scene_module as _mcp_scene
 _mcp_scene.get_scene_graph()
 ```
 
-## Tier 3 — visual loop, real Maya GUI (manual checklist)
+## Tier 3 — live Maya GUI session (`gui` + `human_verify` markers, D-049a)
 
-The stub layer is a contract layer — it deliberately never asserts
-pixels. The following checks require a real Maya GUI session and are
-run by hand (D-027). In Maya's Script Editor:
+Two markers split the live-GUI tier by assertability — the HIL layer of
+the SIL(stub)/PIL(mayapy)/HIL(live GUI) mapping:
+
+```bash
+# machine-checkable items — real asserts against a live session
+# (probes MAYA_MCP_GUI_ADDR=host:port, default 127.0.0.1:7001 bootstrap
+# commandPort; skips cleanly when no session is up)
+python -m pytest tests/ -m gui
+
+# human-eye checklist — tests exist, print manual steps, always skip
+# (never fake a green on viewport state)
+python -m pytest tests/ -m human_verify -s
+```
+
+`gui` covers: framed-channel bootstrap (PySide2/Qt real session),
+str `result_type` over the real wire (D-046), viewport_snapshot PNG
+contract, render_preview net-zero side effects (panel camera +
+currentTime restored) and the camera_not_found domain error.
+
+`human_verify` versioned checklist (was a docs-only list): snapshot
+orientation (verticalFlip), WYSIWYG HUD/selection match, VP2 non-black
+(2025/2026 = partial), render_preview framing vs requested camera,
+multi-client ImageContent rendering (non-Devin seats blocked on user
+env), modelPanel -camera call form on 2025/2026 (partial — only 2024
+verified locally).
+
+For ad-hoc Script Editor checks inside Maya:
 
 ```python
 import sys; sys.path.insert(0, r"D:\Aworker\maya\maya-mcp-server\src")
 import maya_mcp_server.visual_module as _mcp_visual
 ```
-
-- [ ] `viewport_snapshot()` — image orientation is correct (the
-      `verticalFlip()` call is validated here; if output is upside
-      down, remove the flip).
-- [ ] `viewport_snapshot()` — VP2/kFloat path on Maya 2025+ produces a
-      non-black image (official patch).
-- [ ] `viewport_snapshot()` — captured content actually matches the
-      active viewport (HUD/selection visible).
-- [ ] `render_preview()` — playblast artifact is produced and decoded;
-      `width/height` in metadata match reality.
-- [ ] `render_preview(camera="CAM_x")` — panel camera is restored to
-      the prior camera after the call (modelPanel camera restore).
-- [ ] `render_preview()` — current time is unchanged after the call
-      (undo bug #21 restore).
-- [ ] `render_preview()` — the `exists` pre-check on the target
-      camera behaves correctly against real `cmds.objExists`
-      (stub mirrors it; real-Maya acceptance verified here).
-- [ ] Batch/mayapy run — `pytest -m mayapy` covers the
-      `gui_session_required` gate on a real interpreter.
