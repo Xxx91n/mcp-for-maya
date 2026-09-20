@@ -134,6 +134,30 @@ class TestCmdsFacade:
         cmds = __import__("maya.cmds", fromlist=["x"])
         assert cmds.ls(type="transform") is None
 
+    def test_ls_glob_patterns(self, scene):
+        """Real-Maya glob semantics (verified live on 2024): string
+        patterns filter by name, and * never crosses the namespace ':'."""
+        cmds = __import__("maya.cmds", fromlist=["x"])
+        scene.add_mesh("GEO_box")
+        scene.add_mesh("v7ref:GEO_ref_cube")
+        scene.add_mesh("LGT_key")
+        assert set(cmds.ls("GEO_*") or []) == {"GEO_box", "GEO_boxShape"}
+        assert cmds.ls("*GEO_ref_cube*") is None  # * does not cross ':'
+        assert set(cmds.ls("*:*GEO_ref_cube*") or []) == {
+            "v7ref:GEO_ref_cube",
+            "v7ref:GEO_ref_cubeShape",
+        }
+        assert set(cmds.ls("v7ref:*") or []) == {
+            "v7ref:GEO_ref_cube",
+            "v7ref:GEO_ref_cubeShape",
+        }
+        assert set(cmds.ls("GEO_*", "LGT_*") or []) == {
+            "GEO_box",
+            "GEO_boxShape",
+            "LGT_key",
+            "LGT_keyShape",
+        }
+
     def test_getattr_tuple(self, scene):
         cmds = __import__("maya.cmds", fromlist=["x"])
         scene.add_light("LGT_key", ltype="spotLight")

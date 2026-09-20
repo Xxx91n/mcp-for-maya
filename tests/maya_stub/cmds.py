@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 
 from . import runtime
 from .scene import LIGHT_TYPES, SHAPE_TYPES
@@ -34,6 +35,18 @@ _TYPE_FILTERS = {
 _MATERIAL_TYPES = {"lambert", "phong", "blinn", "surfaceShader", "aiStandardSurface"}
 
 
+def _maya_glob(pattern: str, name: str) -> bool:
+    """Maya ls glob semantics, verified live on Maya 2024:
+    ``*`` and ``?`` match within a namespace segment only — they never
+    cross ``:``. ``ls("*x*")`` does NOT match ``ns:x``; you need
+    ``ls("*:*x*")``.
+    """
+    rx = "".join(
+        "[^:]*" if ch == "*" else "[^:]" if ch == "?" else re.escape(ch) for ch in pattern
+    )
+    return re.fullmatch(rx, name) is not None
+
+
 def ls(*args, **kwargs):
     sc = _s()
     ntype = kwargs.get("type")
@@ -53,6 +66,15 @@ def ls(*args, **kwargs):
         return names or None
 
     nodes = sc.all_nodes()
+    patterns = [a for a in args if isinstance(a, str)]
+    if patterns:
+        nodes = [
+            n
+            for n in nodes
+            if any(
+                _maya_glob(p, n.name) or _maya_glob(p, sc.long_name(n)) for p in patterns
+            )
+        ]
     if ntype is not None:
         if isinstance(ntype, (list, tuple)):
             preds = [_TYPE_FILTERS.get(t) or (lambda n, t=t: n.type == t) for t in ntype]
