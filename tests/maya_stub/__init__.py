@@ -60,6 +60,11 @@ def install(scene=None):
     maya_api = types.ModuleType("maya.api")
     om = types.ModuleType("maya.api.OpenMaya")
     om.__dict__.update({k: getattr(_om2, k) for k in dir(_om2) if not k.startswith("__")})
+    # MImage lives in OpenMaya on Maya <=2024 (moved to OpenMayaUI in
+    # 2025+). The stub carries it in BOTH places so module code can be
+    # tested against either layout — a test deletes omui.MImage to
+    # simulate the 2024 surface.
+    om.MImage = _omui.MImage
 
     omui = types.ModuleType("maya.api.OpenMayaUI")
     omui.__dict__.update({k: getattr(_omui, k) for k in dir(_omui) if not k.startswith("__")})

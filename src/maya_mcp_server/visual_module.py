@@ -50,6 +50,19 @@ try:
 except Exception as exc:  # pragma: no cover - real-Maya only
     _IMPORT_ERROR = exc
 
+# MImage lives in maya.api.OpenMaya on Maya <=2024 and moved to
+# maya.api.OpenMayaUI on 2025+ — resolve once, tolerate both layouts.
+# (Real-Maya find: the omui-only path crashed on Maya 2024 with
+# "module 'maya.api.OpenMayaUI' has no attribute 'MImage'".)
+_MImage: Any = None
+if _omui is not None:
+    _MImage = getattr(_omui, "MImage", None)
+if _MImage is None:
+    try:
+        _MImage = getattr(importlib.import_module("maya.api.OpenMaya"), "MImage", None)
+    except Exception:
+        _MImage = None
+
 try:
     _QtCore = importlib.import_module("PySide6.QtCore")
     _QtGui = importlib.import_module("PySide6.QtGui")
@@ -235,6 +248,12 @@ def viewport_snapshot(
     blocked = _gui_block()
     if blocked:
         return blocked
+    if _MImage is None:
+        return _err(
+            "capture_unsupported",
+            "MImage not found in maya.api.OpenMayaUI or maya.api.OpenMaya",
+            "report the Maya version — MImage moved modules in Maya 2025",
+        )
     try:
         cmds.refresh(force=True)
     except Exception:
@@ -242,16 +261,22 @@ def viewport_snapshot(
     try:
         view = _omui.M3dView.active3dView()
         panel = _active_model_panel()
-        img = _omui.MImage()
+        img = _MImage()
         if view.getRendererName() == view.kViewport2Renderer:
+            # VP2 needs a float target buffer or the read comes back
+            # all-black (official patch path). convertPixelFormat only
+            # exists on 2025+ — on <=2024 readColorBuffer already lands
+            # in a writeToFile-able format (verified live: identical
+            # PNG output with and without the conversion).
             img.create(
                 view.portWidth(),
                 view.portHeight(),
                 4,
-                _omui.MImage.kFloat,
+                _MImage.kFloat,
             )
             view.readColorBuffer(img)
-            img.convertPixelFormat(_omui.MImage.kByte)
+            if hasattr(img, "convertPixelFormat"):
+                img.convertPixelFormat(_MImage.kByte)
         else:
             view.readColorBuffer(img)
         # GL buffers arrive bottom-up; flip for a correctly-oriented PNG.
