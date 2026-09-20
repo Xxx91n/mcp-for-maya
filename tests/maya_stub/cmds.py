@@ -41,9 +41,7 @@ def _maya_glob(pattern: str, name: str) -> bool:
     cross ``:``. ``ls("*x*")`` does NOT match ``ns:x``; you need
     ``ls("*:*x*")``.
     """
-    rx = "".join(
-        "[^:]*" if ch == "*" else "[^:]" if ch == "?" else re.escape(ch) for ch in pattern
-    )
+    rx = "".join("[^:]*" if ch == "*" else "[^:]" if ch == "?" else re.escape(ch) for ch in pattern)
     return re.fullmatch(rx, name) is not None
 
 
@@ -71,9 +69,7 @@ def ls(*args, **kwargs):
         nodes = [
             n
             for n in nodes
-            if any(
-                _maya_glob(p, n.name) or _maya_glob(p, sc.long_name(n)) for p in patterns
-            )
+            if any(_maya_glob(p, n.name) or _maya_glob(p, sc.long_name(n)) for p in patterns)
         ]
     if ntype is not None:
         if isinstance(ntype, (list, tuple)):

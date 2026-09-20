@@ -59,8 +59,7 @@ def test_stub_cmds_functions_exist_in_real_maya(surface):
         if sym is None or not sym.get("exists"):
             (allowed if f"cmds.{name}" in allow else missing).append(name)
     assert not missing, (
-        f"stub cmds functions absent from real-Maya baseline and not "
-        f"allowlisted: {missing}"
+        f"stub cmds functions absent from real-Maya baseline and not allowlisted: {missing}"
     )
 
 
@@ -96,9 +95,7 @@ def test_stub_methods_exist_in_real_maya(surface):
                 key = f"{mod_key}.{name}.{m}"
                 if m not in real_methods and key not in allow:
                     missing.append(key)
-    assert not missing, (
-        f"stub methods absent from real-Maya baseline: {missing}"
-    )
+    assert not missing, f"stub methods absent from real-Maya baseline: {missing}"
 
 
 def test_baseline_is_version_stamped():
