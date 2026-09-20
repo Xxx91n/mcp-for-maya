@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -102,7 +103,9 @@ def test_baseline_is_version_stamped():
     """The baseline must record which Maya version it was collected on —
     drift risk scales with version skew."""
     meta = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))["baseline_meta"]
-    assert "Maya 2024" in meta["collected_on"]
+    assert re.search(r"Maya \d{4}", meta["collected_on"]), (
+        "baseline_meta.collected_on must carry a 'Maya YYYY' version stamp"
+    )
     assert "collector" in meta
 
 
