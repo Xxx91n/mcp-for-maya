@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 96" width="1200" height="96" role="img" aria-labelledby="t">
+  <title id="t">Quick Start</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1C2029"/>
+      <stop offset="1" stop-color="#14171E"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="96" rx="18" fill="url(#bg)"/>
+  <g transform="translate(68,48) scale(0.13) translate(-512,-492)"><path d="M216 492 C330 318 694 318 808 492 C694 666 330 666 216 492 Z" fill="none" stroke="#EDE9E1" stroke-width="46" stroke-linejoin="round"/><circle cx="512" cy="492" r="150" fill="#0F1218" stroke="#EDE9E1" stroke-width="32"/><line x1="512" y1="492" x2="512" y2="382" stroke="#46C276" stroke-width="32" stroke-linecap="round"/><polygon points="512,344 476,388 548,388" fill="#46C276"/><line x1="512" y1="492" x2="598.6" y2="542" stroke="#F04E45" stroke-width="32" stroke-linecap="round"/><polygon points="641,571.5 592.9,582 612.7,527.6" fill="#F04E45"/><line x1="512" y1="492" x2="425.4" y2="542" stroke="#4C8DFF" stroke-width="32" stroke-linecap="round"/><polygon points="383,571.5 411.3,527.6 431.1,582" fill="#4C8DFF"/><circle cx="512" cy="492" r="27" fill="#0D1017" stroke="#EDE9E1" stroke-width="7"/></g>
+  <text x="126" y="48" font-family="-apple-system,BlinkMacSystemFont,&#39;Segoe UI&#39;,Roboto,&#39;Helvetica Neue&#39;,Arial,sans-serif" font-size="30" font-weight="600" fill="#EDE9E1">Quick Start</text>
+  <text x="126" y="72" font-family="-apple-system,BlinkMacSystemFont,&#39;Segoe UI&#39;,Roboto,&#39;Helvetica Neue&#39;,Arial,sans-serif" font-size="14" fill="#57606F">install · connect · talk</text>
+  <g stroke-linecap="round" stroke-width="8">
+    <line x1="1076" y1="48" x2="1104" y2="48" stroke="#F04E45"/>
+    <line x1="1112" y1="48" x2="1140" y2="48" stroke="#46C276"/>
+    <line x1="1148" y1="48" x2="1176" y2="48" stroke="#4C8DFF"/>
+  </g>
+</svg>

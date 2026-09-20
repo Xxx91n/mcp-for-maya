@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-labelledby="t d">
+  <title id="t">mcp-for-maya hero</title>
+  <desc id="d">Brand lockup — eye-and-gizmo logo with wordmark and tagline — beside a stylized Maya viewport frame. The viewport frame is a compositing slot for a real captured screenshot.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1C2029"/>
+      <stop offset="1" stop-color="#11141B"/>
+    </linearGradient>
+    <clipPath id="vport"><rect x="654" y="72" width="482" height="216" rx="14"/></clipPath>
+  </defs>
+
+  <rect width="1200" height="360" rx="24" fill="url(#bg)"/>
+
+  <!-- brand lockup -->
+  <g transform="translate(170,164) scale(0.30) translate(-512,-492)">
+    <path d="M216 492 C330 318 694 318 808 492 C694 666 330 666 216 492 Z"
+          fill="none" stroke="#EDE9E1" stroke-width="46" stroke-linejoin="round"/>
+    <circle cx="512" cy="492" r="150" fill="#0F1218" stroke="#EDE9E1" stroke-width="32"/>
+    <line x1="512" y1="492" x2="512" y2="382" stroke="#46C276" stroke-width="32" stroke-linecap="round"/>
+    <polygon points="512,344 476,388 548,388" fill="#46C276"/>
+    <line x1="512" y1="492" x2="598.6" y2="542" stroke="#F04E45" stroke-width="32" stroke-linecap="round"/>
+    <polygon points="641,571.5 592.9,582 612.7,527.6" fill="#F04E45"/>
+    <line x1="512" y1="492" x2="425.4" y2="542" stroke="#4C8DFF" stroke-width="32" stroke-linecap="round"/>
+    <polygon points="383,571.5 411.3,527.6 431.1,582" fill="#4C8DFF"/>
+    <circle cx="512" cy="492" r="27" fill="#0D1017" stroke="#EDE9E1" stroke-width="7"/>
+  </g>
+
+  <text x="284" y="152" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif"
+        font-size="42" font-weight="700" fill="#F2EFE9" letter-spacing="-0.5">mcp-for-maya</text>
+  <text x="284" y="188" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif"
+        font-size="18" fill="#9AA3B2">Give AI agents eyes inside Autodesk Maya</text>
+  <text x="284" y="214" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif"
+        font-size="14" fill="#57606F">MCP server · spatial awareness · visual loop</text>
+
+  <line x1="630" y1="84" x2="630" y2="276" stroke="#262C38" stroke-width="2"/>
+
+  <!-- viewport frame (screenshot slot) -->
+  <g clip-path="url(#vport)">
+    <rect x="654" y="72" width="482" height="216" fill="#14181F"/>
+    <line x1="664" y1="148" x2="1126" y2="148" stroke="#232936" stroke-width="1.5"/>
+    <g stroke="#1F2530" stroke-width="1">
+      <line x1="664" y1="160" x2="1126" y2="160"/>
+      <line x1="664" y1="172" x2="1126" y2="172"/>
+      <line x1="664" y1="186" x2="1126" y2="186"/>
+      <line x1="664" y1="202" x2="1126" y2="202"/>
+      <line x1="664" y1="220" x2="1126" y2="220"/>
+      <line x1="664" y1="240" x2="1126" y2="240"/>
+      <line x1="664" y1="262" x2="1126" y2="262"/>
+    </g>
+    <g stroke="#1F2530" stroke-width="1">
+      <line x1="664" y1="278" x2="858.0" y2="148"/>
+      <line x1="730" y1="278" x2="868.6" y2="148"/>
+      <line x1="796" y1="278" x2="879.3" y2="148"/>
+      <line x1="862" y1="278" x2="890.0" y2="148"/>
+      <line x1="928" y1="278" x2="900.6" y2="148"/>
+      <line x1="994" y1="278" x2="911.3" y2="148"/>
+      <line x1="1060" y1="278" x2="921.9" y2="148"/>
+      <line x1="1126" y1="278" x2="932.6" y2="148"/>
+    </g>
+    <!-- wireframe cube -->
+    <g stroke="#5F7EA6" stroke-width="2" fill="#18202B" fill-opacity="0.85">
+      <polygon points="853,185 913,185 913,239 853,239"/>
+      <polygon points="853,185 879,168 939,168 913,185" fill-opacity="0.55"/>
+      <polygon points="913,185 939,168 939,222 913,239" fill-opacity="0.35"/>
+    </g>
+    <!-- wireframe cone -->
+    <g stroke="#4E6B52" stroke-width="1.8" fill="none">
+      <ellipse cx="1010" cy="232" rx="34" ry="12"/>
+      <line x1="976" y1="232" x2="1010" y2="190"/>
+      <line x1="1044" y1="232" x2="1010" y2="190"/>
+    </g>
+    <!-- corner axes widget -->
+    <g stroke-linecap="round" stroke-width="4">
+      <line x1="678" y1="262" x2="678" y2="240" stroke="#46C276"/>
+      <line x1="678" y1="262" x2="700" y2="271" stroke="#F04E45"/>
+      <line x1="678" y1="262" x2="660" y2="271" stroke="#4C8DFF"/>
+    </g>
+    <text x="676" y="98" font-family="ui-monospace,'Cascadia Mono',Consolas,monospace"
+          font-size="13" fill="#6B7688">persp</text>
+    <text x="1076" y="98" font-family="ui-monospace,'Cascadia Mono',Consolas,monospace"
+          font-size="11" fill="#4E5666">35mm</text>
+  </g>
+  <rect x="654" y="72" width="482" height="216" rx="14" fill="none" stroke="#2A3040" stroke-width="1.5"/>
+</svg>

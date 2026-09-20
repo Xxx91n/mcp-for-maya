@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-labelledby="t d">
+  <title id="t">mcp-for-maya logo</title>
+  <desc id="d">A geometric eye fused with an RGB three-axis gizmo: the pupil is a tripod of red, green and blue arrows on a dark rounded tile — spatial awareness for AI agents inside Autodesk Maya.</desc>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#20242C"/>
+      <stop offset="1" stop-color="#13161C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#tile)"/>
+  <path d="M216 492 C330 318 694 318 808 492 C694 666 330 666 216 492 Z"
+        fill="none" stroke="#EDE9E1" stroke-width="30" stroke-linejoin="round"/>
+  <circle cx="512" cy="492" r="150" fill="#0F1218" stroke="#EDE9E1" stroke-width="22"/>
+  <g>
+    <line x1="512" y1="492" x2="512" y2="384" stroke="#46C276" stroke-width="20" stroke-linecap="round"/>
+    <polygon points="512,356 488,382 536,382" fill="#46C276"/>
+    <line x1="512" y1="492" x2="598.6" y2="542" stroke="#F04E45" stroke-width="20" stroke-linecap="round"/>
+    <polygon points="629.8,560 594.3,569.5 620.3,524.5" fill="#F04E45"/>
+    <line x1="512" y1="492" x2="425.4" y2="542" stroke="#4C8DFF" stroke-width="20" stroke-linecap="round"/>
+    <polygon points="394.2,560 403.7,524.5 429.7,569.5" fill="#4C8DFF"/>
+    <circle cx="512" cy="492" r="20" fill="#0D1017" stroke="#EDE9E1" stroke-width="5"/>
+  </g>
+</svg>
