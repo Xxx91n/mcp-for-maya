@@ -48,7 +48,7 @@
 8. **GUI Tier-3 活会话项**：viewport_snapshot pixel sanity（agent 读图判）/render_preview save-restore+净零副作用实证/verticalFlip 方向/modelPanel -camera 形态（2024；2025/2026→partial）
 9. **PySide2 分帧通道**：会话已通=正向证据，正式留 transcript
 10. **headless temp-file fallback**：mayapy 环境 R-2 项
-11. **native commandPort 无 
+11. **native commandPort 无
  +500ms 读实证**：raw socket 探针（D-041 挂账项）
 12. **签名审计**：visual_module ~10 调用人工对官方文档全量+mayapy inspect.signature 采集项目调用面→stub 自动 diff→signature-baseline.json+allowlist 入库；call-form smoke 补行为层
 13. **连接扰动（最后）**：RST/FIN 杀连接语义（WinError64 真机面）
