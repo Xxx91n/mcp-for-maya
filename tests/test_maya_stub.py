@@ -91,7 +91,7 @@ class TestSceneGraph:
         wb = scene.object_bbox(box)  # local space bbox
         wm = scene.inclusive_matrix(box)
         out = MBoundingBox()
-        for c in wb.corners():
+        for c in wb._corners():
             out.expand(c * wm)
         ext = 3 * math.sqrt(2) / 2  # (|x|+|z|) extents of a 2x1 box at 45deg
         assert (out.max.x - out.min.x) == pytest.approx(ext, abs=1e-9)
@@ -105,7 +105,7 @@ class TestSceneGraph:
         wb = scene.object_bbox(box)
         wm = scene.inclusive_matrix(box)
         out = MBoundingBox()
-        for c in wb.corners():
+        for c in wb._corners():
             out.expand(c * wm)
         naive_min = wb.min * wm
         naive_max = wb.max * wm

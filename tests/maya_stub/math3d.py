@@ -161,8 +161,11 @@ class MBoundingBox:
     def is_empty(self):
         return self.min.x > self.max.x
 
-    def corners(self):
-        """The 8 bbox corners — the ONLY correct way to get a world AABB."""
+    def _corners(self):
+        """The 8 bbox corners — the ONLY correct way to get a world AABB.
+
+        Stub-internal helper: real MBoundingBox has no corners() API, so
+        this stays private to keep the signature audit honest (D-049b)."""
         out = []
         for i in range(8):
             out.append(
