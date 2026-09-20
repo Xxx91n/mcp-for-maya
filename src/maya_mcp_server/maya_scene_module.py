@@ -213,23 +213,9 @@ def get_scene_graph(detail_level="compact") -> dict:
     except Exception:
         pass
 
-    # Get all transforms using OpenMaya iterator (faster than cmds.ls for large scenes)
-    sel = om2.MSelectionList()
-    try:
-        sel.add("*")  # Select all
-    except Exception:
-        # Fallback: use cmds.ls
-        transforms = cmds.ls(type="transform", long=True) or []
-        for t in transforms:
-            try:
-                sel.add(t)
-            except Exception:
-                continue
-
-    it = om2.MItDag(om2.MItDag.kBreadthFirst)
-    it.reset(sel.getDagPath(0) if sel.length() > 0 else om2.MDagPath())
-
-    # Use MItDag for efficient traversal
+    # Collect transforms via cmds.ls — MSelectionList.add("*") also
+    # matches non-DAG nodes on real Maya (defaultRenderLayer, time1...),
+    # and getDagPath on those raises TypeError("item is not a DAG path").
     transforms = cmds.ls(type="transform", long=True) or []
 
     for tname in transforms:

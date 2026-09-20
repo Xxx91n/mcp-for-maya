@@ -158,6 +158,19 @@ class TestCmdsFacade:
             "LGT_keyShape",
         }
 
+    def test_selection_list_wildcard_includes_non_dag(self, scene):
+        """Real Maya: sel.add('*') also matches non-DAG nodes, and
+        getDagPath on those raises TypeError('item is not a DAG path')
+        — the live-2024 crash that killed scene_snapshot."""
+        om = __import__("maya.api.OpenMaya", fromlist=["x"])
+        scene.add_mesh("GEO_a")
+        sel = om.MSelectionList()
+        sel.add("*")
+        dag = sel.getDagPath(0)  # first entry is a real DAG node
+        assert dag.node() is not None
+        with pytest.raises(TypeError, match="not a DAG path"):
+            sel.getDagPath(sel.length() - 1)  # trailing non-DAG sentinel
+
     def test_getattr_tuple(self, scene):
         cmds = __import__("maya.cmds", fromlist=["x"])
         scene.add_light("LGT_key", ltype="spotLight")
