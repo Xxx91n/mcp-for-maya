@@ -129,3 +129,11 @@ _Avoid_: 仅口头休眠、无锚点标注、把 dormant 测试算进生产覆�
 **棘爪 (ratchet pawl)**:
 冻结预算之外的防侵蚀单向机制——预算只降不升之外还须堵“抑制项只增不减”的侧门：mypy 落地为 warn_unused_ignores+warn_unused_configs（不再必要的 ignore/override 立即显形）、lint 落地为 noqa 审计与预算下调须同 commit 说明；无棘爪的 ratchet 会因抑制面静默膨胀而失效。
 _Avoid_: 只设预算不设棘爪
+
+**human_verify 骨架测试**:
+人眼验收项的版本化形态——pytest 中 test 函数存在、标 human_verify marker、body 只打印待人工确认步骤而不写 assert；使 GUI 真机清单（截图方向/渲染正确性等脆弱断言面）进版本库可复跑，又不制造假红假绿。与 gui marker（机器可断项真断言）同属 manual-tier 层，按 RC 节奏跑不卡 CI。
+_Avoid_: 把脆弱 GUI 断言硬写成 assert、清单散落仓库外
+
+**签名基线 (signature baseline)**:
+mayapy 真机内 inspect.signature 采集项目实际 cmds.* 调用面产出的 JSON 清单+allowlist，与 stub 声明自动 diff 作合约护栏；对齐 mypy stubtest 先例的 stub↔runtime 漂移检测，属冻结预算同构的 ratchet 资产——Maya 版本升级时重采集比对。签名只覆盖参数形状，时序/副作用/返回值语义归 call-form smoke 补。
+_Avoid_: 全人工逐条对文档、把签名等价当行为等价
