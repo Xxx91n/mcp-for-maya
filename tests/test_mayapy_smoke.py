@@ -13,7 +13,21 @@ from __future__ import annotations
 
 import pytest
 
+
 pytestmark = pytest.mark.mayapy
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _maya_standalone_init():
+    """mayapy hard-crashes (Windows access violation) if maya.api.OpenMaya
+    is imported before maya.standalone.initialize() — initialize once per
+    tier run. Under vanilla python / the stub the import fails and this
+    is a no-op; the real_maya fixture still gates the tests."""
+    try:
+        import maya.standalone
+    except ImportError:
+        return
+    maya.standalone.initialize()
 
 
 @pytest.fixture
@@ -82,8 +96,11 @@ def test_checkpoint_rollback_reference_edit_roundtrip(real_maya, tmp_path):
     assert rb["scene_rebound_to"] is not None
     assert rb["safety_snapshot"] != "skipped_by_user"
     assert not cmds.objExists("GEO_after")
-    # flattened reference content must survive the roundtrip
-    survivors = cmds.ls("*GEO_ref_cube*") or []
+    # flattened reference content must survive the roundtrip.
+    # Live-verified glob semantics: * never crosses the namespace
+    # colon on real Maya — check both the flattened and the
+    # still-namespaced shapes.
+    survivors = (cmds.ls("*GEO_ref_cube*") or []) + (cmds.ls("*:*GEO_ref_cube*") or [])
     assert survivors, "referenced node content lost after rollback"
 
 

@@ -11,15 +11,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from maya_mcp_server.cos_formatter import format_measure_cos, format_scene_cos
 from maya_mcp_server.scene_tools import (
     TokenBudget,
-    mark_dirty,
+    _caches,
     _get_cache,
     _injected_sessions,
-    _caches,
+    mark_dirty,
     register_scene_tools,
 )
-from maya_mcp_server.cos_formatter import format_scene_cos, format_measure_cos
 
 
 class TestTokenBudget:

@@ -269,6 +269,7 @@ class TestTokenBucket:
 
     def test_refills_over_time(self) -> None:
         import time
+
         from maya_mcp_server.security import TokenBucket
 
         b = TokenBucket(capacity=2, refill_per_sec=50)
@@ -448,6 +449,7 @@ class TestAuditLogger:
     def test_posix_0600(self, tmp_path) -> None:
         import os
         import stat
+
         from maya_mcp_server.security import AuditLogger
 
         log = tmp_path / "audit.jsonl"

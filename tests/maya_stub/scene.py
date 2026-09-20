@@ -314,7 +314,7 @@ class Scene:
                 c2node = c_local * rel  # p * L_c * (rest)
                 if c.type in SHAPE_TYPES and c.bbox is not None:
                     cb = MBoundingBox(*c.bbox)
-                    for corner in cb.corners():
+                    for corner in cb._corners():
                         box.expand(corner * c2node)
                 walk(c, c2node)
 

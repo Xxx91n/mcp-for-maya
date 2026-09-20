@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import pytest
+
 from maya_mcp_server.cos_formatter import (
-    format_scene_cos,
+    format_assert_cos,
     format_inspect_cos,
     format_measure_cos,
-    format_assert_cos,
+    format_scene_cos,
     format_zone_map_cos,
 )
 

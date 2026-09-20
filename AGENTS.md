@@ -40,6 +40,8 @@ tests/
 ├── test_maya_scene_module.py    # module-level regressions on the stub
 ├── test_maya_stub.py            # stub self-verification (math must stay honest)
 ├── test_mayapy_smoke.py         # real-Maya tier, manual local only (-m mayapy)
+├── test_gui_session.py          # live-GUI tier, real asserts (-m gui; MAYA_MCP_GUI_ADDR probe) (D-049a)
+├── test_human_verify.py         # versioned manual checklist (-m human_verify; prints steps, always skips)
 ├── test_prepare_code.py
 ├── test_scene_cache.py
 ├── test_scene_tools.py

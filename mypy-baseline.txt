@@ -40,7 +40,6 @@ src/maya_mcp_server/maya_scene_module.py:0: error: Missing type arguments for ge
 src/maya_mcp_server/maya_scene_module.py:0: error: Missing type arguments for generic type "dict"  [type-arg]
 src/maya_mcp_server/maya_scene_module.py:0: error: Function is missing a type annotation for one or more parameters  [no-untyped-def]
 src/maya_mcp_server/maya_scene_module.py:0: error: Missing type arguments for generic type "dict"  [type-arg]
-src/maya_mcp_server/maya_scene_module.py:0: error: Module "maya.api.OpenMaya" does not explicitly export attribute "MItDag"  [attr-defined]
 src/maya_mcp_server/maya_scene_module.py:0: error: Argument 2 to "getPoint" of "MFnMesh" has incompatible type "int"; expected "MSpace"  [arg-type]
 src/maya_mcp_server/maya_scene_module.py:0: error: "Collection[str]" has no attribute "append"  [attr-defined]
 src/maya_mcp_server/maya_scene_module.py:0: error: Need type annotation for "type_counts"  [var-annotated]

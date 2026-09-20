@@ -326,7 +326,27 @@ class TestRollback:
         ]
         assert mutating
         for c in mutating:
-            assert c["kwargs"].get("prompt") is False, c
+            if c["kwargs"].get("rename"):
+                # Real Maya rejects flag combos with -rename ("the
+                # -rename flag must be used by itself") — verified live
+                # on Maya 2024. Rename carries no prompt flag at all.
+                assert list(c["kwargs"]) == ["rename"], c
+            else:
+                assert c["kwargs"].get("prompt") is False, c
+
+    def test_rollback_rename_is_standalone(self, saved_scene):
+        """D-046-round live find: cmds.file(rename=X, prompt=False)
+        raises '-rename must be used by itself' on real Maya — the S2
+        rebind must call rename with no other flags."""
+        saved_scene.scene.add_mesh("GEO_a")
+        saved_scene.module.save_checkpoint("v1")
+        saved_scene.scene.file_calls.clear()
+        rb = saved_scene.module.rollback_to_checkpoint("cp_v1.ma")
+        assert rb["success"] is True, rb
+        renames = [c for c in saved_scene.scene.file_calls if c["kwargs"].get("rename")]
+        assert renames, "saved-scene rollback must rebind via rename"
+        for c in renames:
+            assert list(c["kwargs"]) == ["rename"], c
 
     def test_rollback_to_preserved_prev_file(self, saved_scene, tmp_path):
         saved_scene.scene.add_mesh("GEO_v1")

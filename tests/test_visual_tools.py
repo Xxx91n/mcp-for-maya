@@ -167,6 +167,47 @@ class TestInjectionAndGates:
         res = json.loads(out)
         assert res["error"]["code"] == "gui_session_required"
 
+
+class TestMImageModuleLayout:
+    """MImage moved modules across Maya versions: maya.api.OpenMaya on
+    <=2024, maya.api.OpenMayaUI on 2025+. Real-Maya find (D-046 round):
+    the omui-only path crashed on Maya 2024 with
+    "module 'maya.api.OpenMayaUI' has no attribute 'MImage'"."""
+
+    def test_mimage_prefers_openmayaui(self, maya_env):
+        """2025+ layout: _MImage resolves to the OpenMayaUI class."""
+        maya_env.scene.setup_gui()
+        module = maya_stub.load_visual_module()
+        assert module._MImage is sys.modules["maya.api.OpenMayaUI"].MImage
+
+    def test_mimage_falls_back_to_openmaya_2024(self, maya_env, monkeypatch):
+        """2024 layout: OpenMayaUI lacks MImage -> resolves via
+        maya.api.OpenMaya and capture still works. The 2024 class also
+        lacks convertPixelFormat (verified live) — strip it too."""
+        maya_env.scene.setup_gui()
+        omui = sys.modules["maya.api.OpenMayaUI"]
+        monkeypatch.delattr(omui, "MImage")
+        monkeypatch.delattr(
+            sys.modules["maya.api.OpenMaya"].MImage, "convertPixelFormat", raising=False
+        )
+        module = maya_stub.load_visual_module()
+        assert module._MImage is sys.modules["maya.api.OpenMaya"].MImage
+        result = module.viewport_snapshot(max_size=64, format="png")
+        assert "error" not in result
+
+    def test_mimage_absent_maps_domain_error(self, maya_env, monkeypatch):
+        """No MImage anywhere -> structured capture_unsupported error,
+        not an AttributeError traceback."""
+        maya_env.scene.setup_gui()
+        omui = sys.modules["maya.api.OpenMayaUI"]
+        om = sys.modules["maya.api.OpenMaya"]
+        monkeypatch.delattr(omui, "MImage")
+        monkeypatch.delattr(om, "MImage")
+        module = maya_stub.load_visual_module()
+        assert module._MImage is None
+        result = module.viewport_snapshot()
+        assert result["error"]["code"] == "capture_unsupported"
+
     async def test_both_tools_registered(self, vtools):
         assert set(vtools.fns) == {
             "scene_viewport_snapshot",

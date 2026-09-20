@@ -91,7 +91,7 @@ class TestSceneGraph:
         wb = scene.object_bbox(box)  # local space bbox
         wm = scene.inclusive_matrix(box)
         out = MBoundingBox()
-        for c in wb.corners():
+        for c in wb._corners():
             out.expand(c * wm)
         ext = 3 * math.sqrt(2) / 2  # (|x|+|z|) extents of a 2x1 box at 45deg
         assert (out.max.x - out.min.x) == pytest.approx(ext, abs=1e-9)
@@ -105,7 +105,7 @@ class TestSceneGraph:
         wb = scene.object_bbox(box)
         wm = scene.inclusive_matrix(box)
         out = MBoundingBox()
-        for c in wb.corners():
+        for c in wb._corners():
             out.expand(c * wm)
         naive_min = wb.min * wm
         naive_max = wb.max * wm
@@ -133,6 +133,43 @@ class TestCmdsFacade:
     def test_ls_empty_returns_none(self, scene):
         cmds = __import__("maya.cmds", fromlist=["x"])
         assert cmds.ls(type="transform") is None
+
+    def test_ls_glob_patterns(self, scene):
+        """Real-Maya glob semantics (verified live on 2024): string
+        patterns filter by name, and * never crosses the namespace ':'."""
+        cmds = __import__("maya.cmds", fromlist=["x"])
+        scene.add_mesh("GEO_box")
+        scene.add_mesh("v7ref:GEO_ref_cube")
+        scene.add_mesh("LGT_key")
+        assert set(cmds.ls("GEO_*") or []) == {"GEO_box", "GEO_boxShape"}
+        assert cmds.ls("*GEO_ref_cube*") is None  # * does not cross ':'
+        assert set(cmds.ls("*:*GEO_ref_cube*") or []) == {
+            "v7ref:GEO_ref_cube",
+            "v7ref:GEO_ref_cubeShape",
+        }
+        assert set(cmds.ls("v7ref:*") or []) == {
+            "v7ref:GEO_ref_cube",
+            "v7ref:GEO_ref_cubeShape",
+        }
+        assert set(cmds.ls("GEO_*", "LGT_*") or []) == {
+            "GEO_box",
+            "GEO_boxShape",
+            "LGT_key",
+            "LGT_keyShape",
+        }
+
+    def test_selection_list_wildcard_includes_non_dag(self, scene):
+        """Real Maya: sel.add('*') also matches non-DAG nodes, and
+        getDagPath on those raises TypeError('item is not a DAG path')
+        — the live-2024 crash that killed scene_snapshot."""
+        om = __import__("maya.api.OpenMaya", fromlist=["x"])
+        scene.add_mesh("GEO_a")
+        sel = om.MSelectionList()
+        sel.add("*")
+        dag = sel.getDagPath(0)  # first entry is a real DAG node
+        assert dag.node() is not None
+        with pytest.raises(TypeError, match="not a DAG path"):
+            sel.getDagPath(sel.length() - 1)  # trailing non-DAG sentinel
 
     def test_getattr_tuple(self, scene):
         cmds = __import__("maya.cmds", fromlist=["x"])

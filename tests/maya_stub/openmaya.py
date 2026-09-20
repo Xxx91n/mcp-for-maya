@@ -54,6 +54,15 @@ class MDagPath:
         return MDagPath(self.node().children[i])
 
 
+class _NonDagNode:
+    """Sentinel for a non-DAG selection item (defaultRenderLayer, time1…).
+
+    Real MSelectionList.add("*") matches dependency-graph nodes too —
+    getDagPath on those raises TypeError('item is not a DAG path'),
+    the exact crash a dead iterator block caused on live Maya 2024.
+    """
+
+
 class MSelectionList:
     def __init__(self):
         self._nodes = []
@@ -61,6 +70,7 @@ class MSelectionList:
     def add(self, name):
         if name == "*":
             self._nodes.extend(runtime.scene.all_nodes())
+            self._nodes.append(_NonDagNode())  # wildcard matches non-DAG too
             return
         self._nodes.append(runtime.scene.resolve(name))
 
@@ -68,6 +78,8 @@ class MSelectionList:
         return len(self._nodes)
 
     def getDagPath(self, i):
+        if isinstance(self._nodes[i], _NonDagNode):
+            raise TypeError("item is not a DAG path")
         return MDagPath(self._nodes[i])
 
 
