@@ -145,3 +145,7 @@ _Avoid_: 生成图冒充实拍、手工摆拍截屏
 **文本极轻共享资产 (text-light shared assets)**:
 双语 README（zh/en）共用同一套视觉资产的纪律——logo 字标用英文名、hero 等资产文字压到最少且统一英文，两版 README 零资产分叉；动因=SVG 内嵌中文在 GitHub 渲染链有缺字风险+维护成本翻倍。
 _Avoid_: 双语双变体资产、SVG 内嵌中文文案
+
+**非对称纯色断言 (asymmetric pure-color assertion)**:
+视口读回正确性的地面真值锁定法——渲染已知非对称纯色布局（如左上红块其余黑）截屏断言，同时锁定垂直朝向与 RGB/BGR 通道序；非对称是硬约束（满屏纯色锁不了"翻没翻"），色管用容差带非精确等值（OCIO 可偏移纯色）。与 stub 自验证同构：先验证测量仪器，再用仪器测东西。
+_Avoid_: 版本号分支猜朝向、universal swizzle、满屏纯色 fixture、精确等值断言
