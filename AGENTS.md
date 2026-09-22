@@ -48,10 +48,12 @@ tests/
 ├── test_scene_tools_json.py     # tool-layer JSON arg passing + error passthrough
 ├── test_visual_tools.py         # T-08 visual loop contract tests (D-023..D-027)
 ├── test_security.py
-└── test_session_manager.py
+├── test_session_manager.py
+├── test_module_teardown.py   # T-16a overwrite teardown protocol + Qt signal semantics (D-058, upstream #4)
+└── test_version_unification.py # T-16e serverInfo=product version (D-060③)
 
 docs/
-├── adr/                   # ADR-0001..0016 architecture decision records
+├── adr/                   # ADR-0001..0022 architecture decision records
 ├── decision-ledger.md     # grill decision ledger — canonical path since T-11a (D-041)
 ├── handoffs/              # round handoffs — canonical (next-round.md standing task book)
 ├── testing.md             # real-Maya manual tier checklist
