@@ -86,6 +86,19 @@ _Avoid_: 流水日志
 向共享的用户启动文件（userSetup.py）做幂等合并写入的单元——`# >>> mcp-for-maya >>>` … `# <<< mcp-for-maya <<<` 包裹；不存在则建、有块则原位替换、不可解析则拒绝；不提供整文件覆写参数，写入前留时间戳备份。
 _Avoid_: 覆写安装
 
+
+**模块卸载协议 (module teardown protocol)**:
+create_module 虚拟模块被 overwrite 替换前的生命周期钩子——替换 sys.modules 条目之前 getattr(旧模块,'_mcp_teardown',None) 判空调用，模块自带资源（listen socket/Qt server/线程）由归属方自释放；纪律=钩子幂等+逐项 try/except+Qt 对象 deleteLater+断信号连接非仅关 socket。importlib 语义实锤根因：sys.modules 替换不触发任何清理。
+_Avoid_: 直接顶掉模块对象、调用方两步点修当长期方案、状态过继旧引用
+
+**双语判别探针 (bilingual discriminating probe)**:
+commandPort 端口类型探测的零副作用载荷形态——eval("1/2") 在 MEL（标准命令、int 除法→0）与 Python3（builtin→0.5）两侧皆合法且返回值可区分，替代会刷 syntax error 的裸 Python 探针 1+1；约束=eval 内保 int/int 操作数，MEL 侧回传形状须真机定型。commandPort 只回传返回值不回传 stdout（print 载荷无效），// 在 Python 非注释是 SyntaxError（死案留档）。
+_Avoid_: print() 载荷、// 伪注释载荷、MEL python() 反向包裹（报错转嫁 Python 端口）
+
+**端口豁免集 (port exemption set)**:
+判别为非 Python 的 commandPort/第三方端口入会话级永久豁免集（端口从 LISTEN 消失才解禁）——probe minimization+指纹缓存范式，终结对同一已识别端口的周期重探；与失败冷却不同层：冷却管“疑似可成但失败”，豁免集管“已判明非我族类”。
+_Avoid_: 对非 Python 端口周期重探、豁免集跨进程持久（端口复用语义不符）
+
 ### 工程词汇
 
 **绞杀者 (strangler)**:
@@ -149,3 +162,7 @@ _Avoid_: 双语双变体资产、SVG 内嵌中文文案
 **非对称纯色断言 (asymmetric pure-color assertion)**:
 视口读回正确性的地面真值锁定法——渲染已知非对称纯色布局（如左上红块其余黑）截屏断言，同时锁定垂直朝向与 RGB/BGR 通道序；非对称是硬约束（满屏纯色锁不了"翻没翻"），色管用容差带非精确等值（OCIO 可偏移纯色）。与 stub 自验证同构：先验证测量仪器，再用仪器测东西。
 _Avoid_: 版本号分支猜朝向、universal swizzle、满屏纯色 fixture、精确等值断言
+
+**双环境包 (dual-runtime package)**:
+宿主进程与注入目标解释器是两个独立运行时的包形态——requires-python 只声明宿主依赖图（Py>=3.10），注入端（Maya 内嵌 Python）须独立声明支持 floor（Maya>=2023 即 Py>=3.9）并在注入代码内做双层守卫：版本检测在前报可操作消息、能力检测（hasattr）在后防 fork/patched 解释器。声明即契约：不为已声明不支持的环境写兼容 shim。
+_Avoid_: 宿主 requires-python 当注入端契约、守卫缺位让用户吃 traceback、为 EOL 运行时写兼容层
