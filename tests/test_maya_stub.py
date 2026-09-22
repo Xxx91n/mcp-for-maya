@@ -117,6 +117,15 @@ class TestMVectorSplit:
         assert MPoint(MPoint(1, 2, 3, 0.5)).w == 0.5
         assert MVector(MVector(7, 8, 9)).z == 9.0
 
+    def test_point_vector_equality_edge(self):
+        """Boundary pin: real API __eq__ is element-wise over xyz —
+        MVector(1,2,3) == MPoint(1,2,3) is True (rhs treated as a
+        sequence; w is ignored by the vector's comparator). Same
+        element-wise semantics as real OpenMaya."""
+        assert MVector(1, 2, 3) == MPoint(1, 2, 3)
+        assert MPoint(1, 2, 3) == MVector(1, 2, 3)
+        assert MVector(1, 2, 3) != MPoint(1, 2, 4)
+
     def test_vector_methods_surface(self):
         v = MVector(3, 4, 0)
         assert v.length() == pytest.approx(5.0)

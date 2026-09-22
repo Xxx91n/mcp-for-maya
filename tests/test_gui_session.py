@@ -253,6 +253,8 @@ eds = cmds.lsUI(editors=True)
 ct0 = cmds.currentTime(q=True)
 cmds.currentTime(1.0, edit=True)
 ct1 = cmds.currentTime(q=True)
+cmds.currentTime(ct0, edit=True)  # net-zero restore (D-026 discipline)
+ct2 = cmds.currentTime(q=True)
 {
     "focus_str_or_none": focus is None or isinstance(focus, str),
     "modelPanels_list_of_str": isinstance(mps, list)
@@ -261,6 +263,7 @@ ct1 = cmds.currentTime(q=True)
     "modelPanel_camera_q_str": cam_q is None or isinstance(cam_q, str),
     "lsUI_editors_list": isinstance(eds, list),
     "currentTime_float": isinstance(ct0, float) and float(ct1) == 1.0,
+    "currentTime_restored": float(ct2) == float(ct0),
     "about_batch_bool": isinstance(cmds.about(batch=True), bool),
     "renderer": omui.M3dView.active3dView().getRendererName(),
     "has_convertPixelFormat": hasattr(om.MImage, "convertPixelFormat"),
@@ -281,6 +284,7 @@ async def test_callform_surface_probe(gui_client):
         "modelPanel_camera_q_str",
         "lsUI_editors_list",
         "currentTime_float",
+        "currentTime_restored",
         "about_batch_bool",
     ):
         assert r[key] is True, f"call-form broke: {key} -> {r[key]}"

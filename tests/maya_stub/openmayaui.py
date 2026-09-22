@@ -27,7 +27,7 @@ def _default_pattern(x, y, w, h):
 
 class MImage:
     kByte = 1
-    kFloat = 5
+    kFloat = 2  # real pixelType enum (callform matrix row 22)
 
     def __init__(self):
         self.width = 0
@@ -113,7 +113,6 @@ class MImage:
         """Physically reverse buffer row order (real MImage.verticalFlip)."""
         if self._rows is not None:
             self._rows = self._rows[::-1]
-        self.flipped = not getattr(self, "flipped", False)
         return True
 
     def _fill_from_viewport(self, w, h):
@@ -199,7 +198,6 @@ class M3dView:
         if img.width == 0 or img.height == 0:
             img.create(*self._scene.viewport_size, img.channels, img.format)
         img._fill_from_viewport(img.width, img.height)
-        img._filled = True
         return True
 
     def widget(self):
