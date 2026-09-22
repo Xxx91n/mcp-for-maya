@@ -294,8 +294,13 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 ## 环境要求
 
-- Autodesk Maya **2024+**（Maya 自带 Python 3.10+）；视觉闭环两个工具需要 **GUI 会话**（headless/mayapy 返回结构化能力错误）。
-- 宿主 Python **≥3.10**；Windows / Linux / macOS。
+| 环境 | 要求 |
+|------|------|
+| 宿主（运行 MCP server） | Python **≥3.10**（`requires-python`）；Windows / Linux / macOS |
+| Maya 侧注入（helper） | Maya **≥2023**（自带 Python ≥3.9，依赖 `ast.unparse`；低于此版本注入时会收到明确报错） |
+| 实证版本 | Maya **2024** GUI |
+
+视觉闭环两个工具需要 **GUI 会话**（headless/mayapy 返回结构化能力错误）。
 
 ## 开发
 

@@ -11,6 +11,16 @@ from collections import deque
 from typing import Any
 
 
+# Dual-runtime floor (D-060 / upstream #3): this module is injected into
+# Maya's own interpreter - Maya >= 2023 ships Python >= 3.9. Refuse early
+# with an actionable message instead of dying later inside ast.unparse.
+if sys.version_info < (3, 9):  # noqa: UP036 - injected side runs Maya's own interpreter, not the host's
+    raise RuntimeError(
+        "mcp-for-maya requires Maya 2023+ (Python >= 3.9) on the Maya side; "
+        f"detected Python {sys.version.split()[0]}"
+    )
+
+
 # Try importing Qt from PySide2 (Maya 2022-2023) or PySide6 (Maya 2024+)
 try:
     from PySide2.QtCore import QCoreApplication  # type: ignore[import-not-found]
@@ -63,6 +73,12 @@ def prepare_code_for_result_capture(
         return code, False
 
     if not tree.body:
+        return code, False
+
+    # ast.unparse is 3.9+; on patched/forked interpreters where
+    # sys.version_info lies, degrade to no-capture rather than crashing on
+    # AttributeError (D-060, second layer of the floor guard).
+    if not hasattr(ast, "unparse"):
         return code, False
 
     last_stmt = tree.body[-1]

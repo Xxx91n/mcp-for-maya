@@ -1,5 +1,12 @@
 """Tests for prepare_code_for_result_capture function."""
 
+import ast
+import sys
+import types
+
+import pytest
+
+from maya_mcp_server.bootstrap import get_helper_module_code
 from maya_mcp_server.maya_mcp_helper import prepare_code_for_result_capture
 
 
@@ -480,3 +487,24 @@ class TestResultExecution:
 
         assert namespace["result"] == 6
         assert "_mcp_result" not in namespace
+
+
+class TestFloorGuard:
+    """D-060① dual-runtime floor: the injected helper requires
+    Maya >= 2023 (Python >= 3.9) on the Maya side."""
+
+    def test_unparse_missing_degrades_to_no_capture(self, monkeypatch) -> None:
+        """hasattr(ast,'unparse') is the fact-floor for patched interpreters."""
+        monkeypatch.delattr(ast, "unparse")
+        code, transformed = prepare_code_for_result_capture("x = 1\nx")
+        assert transformed is False
+        assert code == "x = 1\nx"
+
+    def test_helper_refuses_python_below_39(self, monkeypatch) -> None:
+        """sys.version_info < (3,9) fails loud with the Maya 2023+ pointer."""
+        fake_sys = types.ModuleType("sys")
+        fake_sys.version_info = (3, 7, 17)
+        fake_sys.version = "3.7.17 (fake)"
+        monkeypatch.setitem(sys.modules, "sys", fake_sys)
+        with pytest.raises(RuntimeError, match="Maya 2023"):
+            exec(get_helper_module_code(), {})

@@ -269,8 +269,13 @@ Releases are milestone-driven — no fixed cadence promised. Roadmap lives in Gi
 
 ## Requirements
 
-- Autodesk Maya **2024+** (bundled Python 3.10+); the two visual-loop tools need a **GUI session** (headless/mayapy returns a structured capability error).
-- Host Python **≥3.10**; Windows / Linux / macOS.
+| Environment | Requirement |
+|-------------|-------------|
+| Host (runs the MCP server) | Python **>= 3.10** (`requires-python`); Windows / Linux / macOS |
+| Injected helper (runs inside Maya) | Maya **>= 2023** (bundled Python >= 3.9; relies on `ast.unparse` — older versions get an explicit refusal at injection) |
+| Verified against | Maya **2024** GUI |
+
+The two visual-loop tools need a **GUI session** (headless/mayapy returns a structured capability error).
 
 ## Development
 
