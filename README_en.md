@@ -308,3 +308,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the PR flow and [CHANGELOG.md](CHANGE
 ## Credits
 
 Forked from [chadrik/maya-mcp-server](https://github.com/chadrik/maya-mcp-server) — upstream MIT copyright retained (see LICENSE); this project adds the scene-intelligence layer on top of its connection stack.
+
+How each upstream open issue maps to a disposition and release version in this fork: [docs/upstream-issue-status.md](docs/upstream-issue-status.md).

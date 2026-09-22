@@ -333,3 +333,5 @@ python -m maya_mcp_server -vv    # DEBUG 日志运行（-v=INFO, -vv=DEBUG）
 ## 致谢
 
 Fork 自 [chadrik/maya-mcp-server](https://github.com/chadrik/maya-mcp-server)——保留其 MIT 版权声明（见 LICENSE），在其连接层之上扩展场景智能层。
+
+上游 open issue 在本仓的处置与修复版本对照见 [docs/upstream-issue-status.md](docs/upstream-issue-status.md)。
