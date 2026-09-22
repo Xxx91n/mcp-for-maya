@@ -1,83 +1,66 @@
-# next-round.md — rev24 常驻任务书（T-16 上游 issue 修复轮 + 顺延队列）
+# next-round.md — rev25（T-17：T-16 落地收口 + 上游回应链）
 
-生成：2026-09-22 grill round16（上游 issue+版本双轨合并裁决）定稿后
-数据源：docs/decision-ledger.md D-057~D-060；ADR-0021
-前置事实：T-14a 已审计 PASS 并落地主干（tip d07b056）；五门绿 pytest 598/24、ruff 83/83+28/28、mypy new:0、sdist 313KB/wheel 134KB、pre-commit 8/8
+生成：2026-09-22 grill 后整理环节｜Spec：ADR-0022 + docs/decision-ledger.md D-061~D-065｜前置：ADR-0021、.scratch/t16/handoffs/2026-09-22-handoff.md（审计 nits 清单原始件）
 
-## 上手 30 秒
+## 本轮裁决锚点
 
-- 仓库：D:\Aworker\maya\maya-mcp-server；dist 名 mcp-for-maya / import 名 maya_mcp_server
-- VC 一律用 GitButler（but）；**幻影簿记仍在**：5 条 .github/assets @2x→裸名 R 残留属索引假象（HEAD==磁盘已证），严禁 but discard；一切写操作前 git ls-tree 对账
-- 测试分层：stub=默认 CI；gui/human_verify/mayapy=manual-tier 真机档（-m 标志，默认 skip）
-- 真机窗口依赖用户 Maya 2024 GUI 开机；T-16b/T-16f 卡在窗口上
+- D-062：立即落地 T-16+spec 分支；0.1.2 守 D-049 真机门（等 T-16f）；0.1.1 yank 随 0.1.2 同发
+- D-063：上游回应=技术+署名型，一 issue 一评，发布归人工门
+- D-064：分段回应（#2/#7 现在可发；#1/#3/#4/#5 等 0.1.2）+ docs/ upstream 对照表入库
+- D-065：N1~N3 随落地同批修、N4 登记债、N5 归 T-16f、N6 删 2 孤儿文件
 
-## 任务链
+## 任务清单
 
-### T-16a — create_module teardown 协议（上游 #4 修复）[D-058]
+### T-17a — T-16 落地 + N1~N3 同批修 + N6 孤儿删除（D-062, D-065）
 
-- maya_bootstrap.create_module：overwrite 分支替换 sys.modules 前 getattr(old,'_mcp_teardown',None) 判空调用；teardown 异常捕获不阻塞替换、警告进返回 JSON
-- maya_mcp_helper 实现幂等 _mcp_teardown：逐项独立 try/except、Qt 对象 deleteLater 语义、stop_qt_server 须断 newConnection 信号连接非仅关 socket；可选 __build__ 构建标记
-- stub 回归三例：teardown 被调+资源 closed / teardown 抛异常替换仍完成 / 无钩子判空不崩
-- 同步面：maya_bootstrap 消费方全 grep；联动规范查 AGENTS.md（client.py bootstrap 路径）
+1. `but land` 落 impl/t16-upstream-issues + grill/round16-upstream-issues-spec 进主干（栈序：spec 在下 impl 在上，land 一次收两支）
+2. N1：client.py:590-592 _bootstrap 热更新点收 create_module 返回值，teardown warning 走 log 不静默吞（~4 行）
+3. N2：ADR-0009 追加 superseded-by-0021 注记（≤2022 语义已被 floor 改变）
+4. N3：AGENTS.md tests/ 清单补 2 个新测试文件（test_port_filter/test_teardown 类——以 impl 分支实际文件名为准）；adr 描述 0016→0022
+5. N6：删 .github/assets-src/*.py 两个 untracked facade 孤儿（仅限此两件；zz 区 5 条 @2x R 幻影簿记严禁 discard）
+6. 门禁复跑：pytest/ruff 预算/mypy 基线/pre-commit 全绿后收
 
-### T-16b — 探测双语化+豁免集+端口过滤（上游 #1 修复）[D-059]
+### T-17b — upstream issue 对照表入库（D-064）
 
-- _detect_port_type 探针载荷 1+1 → eval("1/2")（判别：回传含 0.5=Python / 0 或静默=MEL）；eval 内必须 int/int
-- session_manager 增非 Python 端口会话级永久豁免集（端口从 LISTEN 消失才解禁）；与 _failed_ports 冷却分层共存
-- env/config 端口 include/exclude 过滤（上游 workaround 产品化）
-- **真机验证前提**：MEL commandPort 对 eval("1/2") 的回传形状与静默性未定型——T-16f 窗口内 nc/探活定型；翻车退化为豁免集单走
-- 回归：stub/单元层覆盖判别分支与豁免集生命周期
+- docs/ 下新页（建议 docs/upstream-issue-status.md）：6 issue×我方处置×含修复版本×验证状态
+- 数据源=账本+CHANGELOG 同源；#1/#4 验证状态列写「stub 审计绿，真机 T-16f 待定」不超前宣称
+- README 双语加一行指针（可选，实现窗定落位）
 
-### T-16c — 双环境包 floor 声明（上游 #3 处置）[D-060①]
+### T-17c — #2/#7 上游回应备稿（D-063, D-064）
 
-- 文档支持矩阵：宿主 Py>=3.10 / 注入端 Maya>=2023（Py>=3.9）/ 实证面=2024（README 双语+testing.md）
-- helper 注入前置双层守卫：sys.version_info<(3,9) 报友好消息（点明 Maya 2023+）→ hasattr(ast,'unparse') 兜底
-- 不为 2022/Py3.7 写兼容码
+- 英文草稿两条（上游英文仓）：模板=根因→修法→「mcp-for-maya ≥0.1.0 已含」耐久陈述→fork 披露→回哺句
+- #7 稿须注明「call-form 等传输路径加固随 0.1.2」诚实边界
+- 备稿落 docs/ 或 .scratch 随实现窗定；**发布动作归用户**（或显式授权 gh）
 
-### T-16d — 多实例文档（上游 #5 处置）[D-060②]
+### T-17d — #1/#3/#4/#5 回应备稿（D-063, D-064）
 
-- README 双语+testing.md：原理段（commandPort=绑死 host:port 单监听 socket）+per-instance 拓扑示例+自动扫描主路径/add_session 兜底+症状化 troubleshooting+commandPort 不跨会话持久→userSetup.py 持久化明示
+- 四条草稿现在可备，发布等 0.1.2 之后（届时 T-16f 已过有真机背书）
+- #3 稿形态=边界声明（dual-runtime floor+显式能力错误），非修复公告
+- #1 稿：若 T-16f 翻车则如实写豁免集方案，不宣称探针修好
 
-### T-16e — serverInfo 版本统一 [D-060③]
+### T-16f — 真机窗口批（顺延，Maya 开机即收）（D-056⑤, D-059, D-060, N5）
 
-- server.py：FastMCP(version=)——importlib.metadata.version("mcp-for-maya") 为主、PackageNotFoundError fallback __version__
-- 一致性断言测试：__version__==importlib.metadata 版本（防 T-13 前漂移复发）
+- VP2 非对称纯色断言钉 _VP2_READBACK_BOTTOM_UP+callform surface probe+currentTime 净零
+- MEL commandPort `eval("1/2")` 回传形状定型（探针案生死前提；翻车→豁免集单走如实降级）
+- #4 重连 teardown 活实证+hasattr(MImage,'convertPixelFormat') 复核
+- 窗口一到一批全收，细节见 rev24 存档
 
-### T-16f — 真机 GUI 验证窗口批（一次开机全收）[依赖用户 Maya 开机]
+## 顺延队列（原主不动）
 
-- VP2 非对称纯色断言钉 _VP2_READBACK_BOTTOM_UP（T-14a 遗留）
-- callform surface probe（currentTime 净零自证）
-- **新增**：MEL commandPort 的 eval("1/2") 回传形状定型（T-16b 前提）
-- #4 活实证：重连已引导会话→断言旧 _qt_server 被 teardown 而非孤儿化
-- hasattr(MImage,'convertPixelFormat') 顺带实证（T-14a 遗留已证 C++-only，复核即可）
+- T-14c 发布链人工门：0.1.2 tag/release/0.1.1 yank/issue#7 勾选/social 上传/About——注意 0.1.0 是否同 yank 未裁决（0.1.0 同带病），发布时须呈报
+- 登记债（不自动认领）：N4 五条 smell（D-065）+ T-06 dormant/T-07 注册表/依赖锁定/coverage patch 门/macOS 冒烟/mayapy env-blocked
 
-## 顺延队列（非本轮，保持原主）
+## 铁律提醒
 
-- **T-14c 发布链**：tag v0.1.2/release/yank 0.1.1/issue#7 评论+勾选/social preview 上传/repo About=全人工门
-- **T-14b #7 残余**：多客户端矩阵（用户环境）/Maya 2025-2026/mayapy env-blocked 修复/headless fallback
-- **登记债**（不自动认领）：T-06 dormant aesthetic_engine 归置、Poly Haven issue#2、validator issue/T-07、依赖锁定、mypy 2.x 输出、coverage patch 门、macOS 冒烟、ctx preload、Maya 2022+ commandPort 文档（部分被 T-16c/d 覆盖）
-
-## DoD（本轮收口标准）
-
-- [ ] T-16a~e 全落地：teardown 协议+双语探针+豁免集+端口过滤+floor 守卫+多实例文档+版本统一
-- [ ] stub/单元回归全绿；pytest/ruff/mypy/build/pre-commit 五门复跑
-- [ ] T-16f 真机窗口实证（Maya 开机后）：eval 探针定型+VP2 断言+重连 teardown 活证
-- [ ] #1 探针案翻车则如实退化豁免集单走，不虚报双侧零副作用
-- [ ] CHANGELOG pending-release 同步（上游 issue 修复叙事）
-
-## 负向清单
-
-- grill/spec 期不动源码（本轮已出 spec，实施归实现阶段）
-- 不做状态过继独立方案/原地重 exec/客户端两步当长期解（D-058 否决项）
-- 不为 Maya 2022 写兼容 shim（声明即契约）
-- 不把 serverInfo 双轨文档化当解（是缺陷非设计）
-- 不趁轮次顺手消费登记债
-- 发布/推送/勾选类人工门一律留给用户
+- 幻影簿记：zz 区 5 条 @2x R 残留严禁 discard，写操作前 git ls-tree 对账
+- 对外文案纪律：#1/#4 在 T-16f 前必须带 pending-real-Maya-confirmation 措辞
+- 上游回应发布=外部副作用=人工门
 
 ## suggested skills
 
-- $implement / $tdd — T-16a~e 实施（teardown/探针/守卫/文档/版本各成小 commit）
-- $handoff — 翻页与交接
-- $but — 全部 VC 写操作（先 git ls-tree 对账幻影）
-- $atomcode-research — 争议点调研（串行单发）
-- grill-with-docs — 下轮裁决启动器
+- `$implement` / `$tdd` — T-17a 修复面
+- `$but` — 落地与全部 VC 写操作
+- `$handoff` — 再翻页
+- `$atomcode-research` — 回应文案措辞争议时（串行单发）
+- `$domain-modeling` / `$neat-freak` — 对照表与文档同步
+- `$grill-with-docs` — 下轮裁决启动器

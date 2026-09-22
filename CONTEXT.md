@@ -166,3 +166,15 @@ _Avoid_: 版本号分支猜朝向、universal swizzle、满屏纯色 fixture、�
 **双环境包 (dual-runtime package)**:
 宿主进程与注入目标解释器是两个独立运行时的包形态——requires-python 只声明宿主依赖图（Py>=3.10），注入端（Maya 内嵌 Python）须独立声明支持 floor（Maya>=2023 即 Py>=3.9）并在注入代码内做双层守卫：版本检测在前报可操作消息、能力检测（hasattr）在后防 fork/patched 解释器。声明即契约：不为已声明不支持的环境写兼容 shim。
 _Avoid_: 宿主 requires-python 当注入端契约、守卫缺位让用户吃 traceback、为 EOL 运行时写兼容层
+
+**技术+署名回应 (technical response with attribution)**:
+休眠上游 issue 区的合宜发言形态——根因分析+修复路径+fork 实现指针+血缘披露+回哺意愿句，第一功能是给卡住的用户留路标、引流仅为副产品；区别于引流型（promotion-first，spam 邻域）与纯技术型（对 stranded 用户无导航价值）。纪律：一 issue 一评不追评、事实陈述非广告、发布归人工门。
+_Avoid_: 宣传置顶措辞、连环追评、把回应当广告位
+
+**耐久陈述 (durable claim)**:
+对外文案中不随 yank/后续发布而失效的版本陈述写法——以「≥X.Y.Z 已含」锚定引入版本而非「最新版已修」锚定当前位；前者在旧版被 yank、新版接续后依然为真，后者随发布节奏变质为误导。回应/对照表/release notes 的版本指针一律走耐久形态。
+_Avoid_: 「最新版修复」式瞬态措辞、指向即将 yank 版本的硬推
+
+**upstream issue 对照表 (upstream issue tracking table)**:
+docs/ 下公开登记上游 open issue 与本仓处置映射的表（issue×处置×版本号×验证状态）——对外回应的固定锚点+透明度叙事资产；须与决策账本/CHANGELOG 同源，任何一格失真即破坏其存在理由。
+_Avoid_: 与账本漂移的二手表、缺验证状态列的过度宣称
