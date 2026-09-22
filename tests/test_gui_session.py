@@ -200,8 +200,7 @@ async def test_vp2_pure_color_orientation_and_channels(visual_module):
     )
     renderer = await _cmds(
         client,
-        "import maya.api.OpenMayaUI as omui; "
-        "omui.M3dView.active3dView().getRendererName()",
+        "import maya.api.OpenMayaUI as omui; omui.M3dView.active3dView().getRendererName()",
     )
     print(f"\\nVP2 evidence: convertPixelFormat={has_cpf} renderer={renderer}")
     try:

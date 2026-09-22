@@ -129,9 +129,7 @@ class MImage:
                 if self.format == self.kFloat:
                     row.append((float(bl), float(g), float(r), float(a)))
                 else:
-                    row.append(
-                        tuple(max(0, min(255, int(round(c * 255)))) for c in (bl, g, r, a))
-                    )
+                    row.append(tuple(max(0, min(255, int(round(c * 255)))) for c in (bl, g, r, a)))
             rows.append(row)
         self._rows = rows
 

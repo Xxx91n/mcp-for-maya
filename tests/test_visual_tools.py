@@ -357,7 +357,7 @@ class TestVp2ReadbackTruth:
         floats = img.floatPixels()
         px = bytearray(64 * 64 * 4)
         for i in range(0, len(px), 4):
-            px[i] = int(floats[i + 2] * 255)      # R
+            px[i] = int(floats[i + 2] * 255)  # R
             px[i + 1] = int(floats[i + 1] * 255)  # G
             px[i + 2] = int(floats[i + 0] * 255)  # B
             px[i + 3] = 255
