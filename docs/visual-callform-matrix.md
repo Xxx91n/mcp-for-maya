@@ -1,5 +1,5 @@
 <!-- D-056③ evidence layer: independent call-form comparison table for
-     visual_module. The signature-allowlist holds verdicts + anchors
+     visual_module. The presence-allowlist holds verdicts + anchors
      pointing here; this table is the single source of truth.
      Every row verified against official Maya docs via atomcode
      research on 2026-09-22 (see source list at bottom). -->
