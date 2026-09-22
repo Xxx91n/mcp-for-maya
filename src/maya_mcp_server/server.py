@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import logging
 from typing import Any
 
@@ -37,9 +38,27 @@ logger = logging.getLogger(__name__)
 # Security configuration
 _security_config = SecurityConfig()
 
+
+def _product_version() -> str:
+    """Product version for the handshake's serverInfo (D-060).
+
+    serverInfo.version is the implementation version per the MCP spec
+    (protocolVersion travels separately) - left unset, FastMCP leaks its
+    own framework version. Dist metadata is authoritative; the __version__
+    literal is the source-tree fallback when the package isn't installed.
+    """
+    try:
+        return importlib.metadata.version("mcp-for-maya")
+    except importlib.metadata.PackageNotFoundError:
+        from maya_mcp_server import __version__
+
+        return __version__
+
+
 # Initialize FastMCP server with instructions for cross-tool workflows
 mcp = FastMCP(
     "Maya MCP Server",
+    version=_product_version(),
     instructions=(
         "This server provides tools to interact with Autodesk Maya 3D sessions.\n\n"
         "## Connection & Setup\n"
