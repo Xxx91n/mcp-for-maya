@@ -51,6 +51,11 @@ Homepage = "https://github.com/Xxx91n/mcp-for-maya"
 Repository = "https://github.com/Xxx91n/mcp-for-maya"
 Issues = "https://github.com/Xxx91n/mcp-for-maya/issues"
 
+[tool.hatch.build.targets.sdist]
+# .github/ holds GitHub-facade source assets (~2.5MB) — dead weight in the
+# source distribution. Wheel stays unchanged (it only ships src/ anyway).
+exclude = [".github"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/maya_mcp_server"]
 
