@@ -40,12 +40,12 @@ Verdicts:
 | 16 | `omui.M3dView.active3dView()` | `M3dView.active3dView()` -> M3dView | match | https://help.autodesk.com/cloudhelp/2023/ENU/MAYA-API-REF/py_ref/class_open_maya_u_i_1_1_m3d_view.html | 2023* | 2026-09-22 |
 | 17 | `view.getRendererName()` / `view.kViewport2Renderer` | `getRendererName()` -> string; `kViewport2Renderer` class const | match | same as #16 | 2023* | 2026-09-22 |
 | 18 | `view.portWidth()` / `view.portHeight()` | `portWidth()`/`portHeight()` -> int | match | same as #16 | 2023* | 2026-09-22 |
-| 19 | `view.readColorBuffer(img)` | `readColorBuffer(MImage&)` — deprecated (MRenderTargetManager recommended), still functional | deprecated-available | same as #16 | 2023* | 2026-09-22 |
+| 19 | `view.readColorBuffer(img, True)` | `readColorBuffer(MImage&, readRGBA=False)` — deprecated (MRenderTargetManager recommended), still functional; readRGBA=True yields RGBA order + isRGBA()=True (live-verified 2024.0.0.4640) | match | same as #16 | 2024 | 2026-09-22 |
 | 20 | `om.MImage.create(w, h, 4, kFloat)` | `create(width, height, channels=4, type=kByte)` -> self | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/py_ref/class_open_maya_1_1_m_image.html | 2024 | 2026-09-22 |
 | 21 | `img.getSize()` | `getSize()` -> [width, height] | match | same as #20 | 2024 | 2026-09-22 |
 | 22 | `img.pixelType()` | `pixelType()` -> int (kUnknown=0 / kByte=1 / kFloat=2) | match | same as #20 | 2024 | 2026-09-22 |
 | 23 | `img.isRGBA()` | `isRGBA()` -> bool (RGBA vs BGRA storage order) | match | same as #20 | 2024 | 2026-09-22 |
-| 24 | `img.floatPixels()` | `floatPixels()` -> long (C++ float* pointer, w*h*4 floats) | match — pointer wrapped via MScriptUtil fallback in `_float_pixels` | same as #20 | 2024 | 2026-09-22 |
+| 24 | `img.floatPixels()` | `floatPixels()` -> int (raw address; MScriptUtil removed in 2024 so it is unreadable in-process) | superseded — module no longer calls it; RGBA comes from readColorBuffer's readRGBA flag | same as #20 | 2024 | 2026-09-22 |
 | 25 | `img.setPixels(bytes, w, h)` | `setPixels(pixels, width, height)` -> self | match | same as #20 | 2024 | 2026-09-22 |
 | 26 | `img.setRGBA(True)` | `setRGBA(bool)` -> self — channel-order MARKER, not a rearranger | match | same as #20 | 2024 | 2026-09-22 |
 | 27 | `img.verticalFlip()` | `verticalFlip()` -> bool | match | same as #20 | 2024 | 2026-09-22 |

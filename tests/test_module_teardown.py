@@ -188,5 +188,7 @@ class TestQtTeardownSemantics:
         assert sock.deleted is True
 
 
-def test_build_marker_present() -> None:
-    assert isinstance(helper.__build__, str) and helper.__build__
+def test_source_stamp_not_baked_in() -> None:
+    """The sha stamp is injected by the client at bootstrap time, never
+    baked into the helper source (a baked/manual stamp can go stale)."""
+    assert getattr(helper, "_mcp_source_sha", None) is None

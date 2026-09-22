@@ -52,6 +52,10 @@ _Avoid_: 恢复
 untitled（未保存）场景经显式 name 参数产出的标记性快照；不参与 S2 回滚语义——rollback 打开后停留快照路径（S1），返回 scene_rebound_to=null、original_file_status="no_original_file"。untitled 场景不带 name 的 checkpoint 调用默认报错。 快照落 <Maya workspace>/checkpoints/。
 _Avoid_: 无名场景快照
 
+**脏场景守卫 (dirty-scene guard)**:
+对用户运行中会话执行场景变更类操作前的只读前置探针——先查 file modified 标志与场景名，命中未保存改动即停手并把处置权交回用户（存盘/授权丢弃/中止三选一），干净才放行新建场景。存在理由：脏场景上不带 force 会弹模态保存框挂死 UI 线程，带 force 则静默丢弃用户工作——两条路都致命，故唯一合宜姿势是"探针先行、人决脏场景"。
+_Avoid_: 无条件 file(new,force)、在用户当前场景直跑会留残的 fixture、把场景状态当可信前提
+
 ### 连接与注入
 
 **引导通道 (bootstrap channel)**:
@@ -178,3 +182,11 @@ _Avoid_: 「最新版修复」式瞬态措辞、指向即将 yank 版本的硬�
 **upstream issue 对照表 (upstream issue tracking table)**:
 docs/ 下公开登记上游 open issue 与本仓处置映射的表（issue×处置×版本号×验证状态）——对外回应的固定锚点+透明度叙事资产；须与决策账本/CHANGELOG 同源，任何一格失真即破坏其存在理由。
 _Avoid_: 与账本漂移的二手表、缺验证状态列的过度宣称
+
+**fix-forward（同窗修复）**:
+发布冻结窗口（tag/RC 签发前）内新发现低风险高收益缺陷的处置姿势——修进待发版本而非带病发布记 known-issue；判据=修复量小、可与待发版本同过一次验证窗（机会成本为零）、且"修复版遗留同族缺陷"的披露负担大于修复成本。tag 一旦签发则切换为"只加不减"的事后语义。
+_Avoid_: 无 RC 锚点却按 post-RC 严苛门槛拒修、为赶发布把已知同族缺陷带病上架
+
+**逐版核实 (per-release verification)**:
+发布面决策（yank/安全公告/弃用声明）的判定单位是单个 release 而非缺陷家族——同一缺陷在不同版本间可能被其间修复改变存在性，须对每个候选版本做实物核验（如 git show 对应 tag）再定处置，reason 写该版的具体故障模式。
+_Avoid_: 凭"同族"推定批量处置、在未确认后继版本可用前先行 yank
