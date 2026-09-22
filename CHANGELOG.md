@@ -29,11 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flag must be used by itself"), which previously left the scene bound
   to `cp_*.ma` with `rebind_failed`.
 - Visual capture: `MImage` resolves across Maya API layouts
-  (`maya.api.OpenMaya` on ≤2024, `maya.api.OpenMayaUI` on 2025+), and
-  `convertPixelFormat` is only called when present (2024 lacks it —
-  `readColorBuffer` already yields a writable format). When neither
-  module provides `MImage`, tools return a structured
-  `capture_unsupported` error instead of `AttributeError`.
+  (`maya.api.OpenMaya` on ≤2024, `maya.api.OpenMayaUI` on 2025+). The VP2
+  kFloat readback is normalized in-process — `floatPixels()` →
+  BGRA→RGBA swizzle per `isRGBA()` → `setPixels` → `setRGBA(True)` —
+  and flips only under the assertion-pinned `_VP2_READBACK_BOTTOM_UP`
+  condition (D-056⑤); `convertPixelFormat` is a C++-only API and is
+  never called. When neither module provides `MImage`, tools return a
+  structured `capture_unsupported` error instead of `AttributeError`.
 - Runtime `__version__` matches `pyproject.toml` (was 0.1.0 vs 0.1.1).
 
 ### Testing
@@ -43,10 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cleanly without one; `human_verify` holds explicit manual-confirmation
   skeletons — agents execute and leave evidence, sign-off is human
   (D-049a).
-- Signature-baseline ratchet (D-049b): `tests/maya_stub/
-  signature-baseline.json` collected on live Maya 2024 + allowlist +
+- Presence-baseline ratchet (D-049b/D-056①): `tests/maya_stub/
+  presence-baseline.json` collected on live Maya 2024 + allowlist +
   auto-diff tests — a stub symbol missing from real Maya now fails the
-  build unless explicitly allowlisted with a reason.
+  build unless explicitly allowlisted with a reason. (Renamed from
+  signature-baseline: cmds builtins carry no inspectable signature, so
+  presence + method lists are the auditable contract.)
 - Stub honesty: `ls` string patterns filter by name and `*` never
   crosses the namespace `:`; `cmds.file(rename=...)` enforces the
   standalone-flag constraint; `MSelectionList.add("*")` appends a

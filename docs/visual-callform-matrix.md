@@ -64,7 +64,7 @@ Real `MImage` lives in `maya.api.OpenMaya` on Maya <=2024 and moves to
 layout (a test deletes `omui.MImage` to simulate 2024).
 
 Verdict: **stub-only dual-location — justified, converged via
-dual-resolution.** Anchored here from `signature-allowlist.json`.
+dual-resolution.** Anchored here from `presence-allowlist.json`.
 
 ## Sources (atomcode research, serialized single run, 2026-09-22)
 
