@@ -537,15 +537,18 @@ class MayaClient(BaseMayaClient):
             return self._port_type
 
         try:
-            # Try a simple Python expression
-            response = await self._send_receive("1+1")
+            # Bilingual probe (D-059 / upstream #1): eval("1/2") is legal on
+            # both sides - Python 3 answers 0.5 (true division) while MEL's
+            # eval() integer-divides to 0 - so a MEL commandPort answers
+            # without a Script Editor error. Operands must stay int/int:
+            # 1.0/2 would collapse the discriminant.
+            response = await self._send_receive('eval("1/2")')
 
-            # If we get "2" back, it's Python
             result_str = str(response.result if response.result is not None else "").strip()
-            if result_str == "2":
+            if "0.5" in result_str:
                 self._port_type = PortType.PYTHON
             else:
-                # Likely MEL - would return an error or different format
+                # Answered but not 0.5 ("0", silence, other shapes): MEL
                 self._port_type = PortType.MEL
 
         except Exception:

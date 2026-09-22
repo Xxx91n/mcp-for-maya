@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from typing import Any
 
@@ -13,6 +14,7 @@ from maya_mcp_server.types import (
     COMMUNICATION_PORT_MAX,
     COMMUNICATION_PORT_MIN,
     ClientType,
+    PortType,
     SessionInfo,
 )
 from maya_mcp_server.utils import get_maya_listening_ports, is_loopback_host
@@ -24,6 +26,28 @@ logger = logging.getLogger(__name__)
 _CONFIG_PORT_TIMEOUT = 60.0
 
 
+def _parse_port_filter(raw: str | None) -> set[int] | None:
+    """Parse a port filter spec: comma-separated ports or "a-b" ranges.
+
+    "7001,7005-7010" -> {7001, 7005, ..., 7010}. Returns None for empty or
+    missing input. Malformed entries raise ValueError so a typo fails loud
+    at startup instead of silently scanning everything (D-059).
+    """
+    if not raw:
+        return None
+    ports: set[int] = set()
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            lo, _, hi = part.partition("-")
+            ports.update(range(int(lo), int(hi) + 1))
+        else:
+            ports.add(int(part))
+    return ports or None
+
+
 class SessionManager:
     """Manages multiple Maya session connections."""
 
@@ -32,6 +56,8 @@ class SessionManager:
         scan_interval: float = 10.0,
         client_type: ClientType = ClientType.QT,
         failed_port_retry_after: float = 60.0,
+        include_ports: set[int] | None = None,
+        exclude_ports: set[int] | None = None,
     ):
         """
         Initialize the session manager.
@@ -41,10 +67,27 @@ class SessionManager:
             client_type: Type of client to use for Maya communication
             failed_port_retry_after: Cooldown before a failed config port is
                 probed again (D-013 _failed_ports dedup)
+            include_ports: If set, only these config ports are probed
+                (D-059; falls back to MAYA_MCP_INCLUDE_PORTS)
+            exclude_ports: Config ports never probed (D-059; falls back to
+                MAYA_MCP_EXCLUDE_PORTS). Env values use "7001,7005-7010" syntax
         """
         self.scan_interval = scan_interval
         self.client_type = client_type
         self.failed_port_retry_after = failed_port_retry_after
+        # config ports positively identified as non-Python: never re-probed
+        # while they keep LISTENing (D-059 exemption set)
+        self._non_python_ports: set[str] = set()
+        self.include_ports = (
+            include_ports
+            if include_ports is not None
+            else _parse_port_filter(os.environ.get("MAYA_MCP_INCLUDE_PORTS"))
+        )
+        self.exclude_ports = (
+            exclude_ports
+            if exclude_ports is not None
+            else _parse_port_filter(os.environ.get("MAYA_MCP_EXCLUDE_PORTS"))
+        )
         # key: "host:port" (communication port)
         self._sessions: dict[str, BaseMayaClient] = {}
         # map config key -> session key
@@ -98,6 +141,7 @@ class SessionManager:
         self._sessions.clear()
         self._config_to_session.clear()
         self._failed_ports.clear()
+        self._non_python_ports.clear()
         self._stream_capture_installed.clear()
         logger.info("Session manager stopped")
 
@@ -160,6 +204,18 @@ class SessionManager:
             if config_key in self._config_to_session:
                 continue
 
+            # Permanent exemption (D-059): ports that answered the probe as
+            # non-Python are never re-probed while they keep LISTENing
+            if config_key in self._non_python_ports:
+                continue
+
+            # Include/exclude filter (D-059, upstream #1 workaround
+            # productized): bounds which listener ports get probed at all
+            if self.include_ports is not None and port not in self.include_ports:
+                continue
+            if self.exclude_ports is not None and port in self.exclude_ports:
+                continue
+
             # Deduplicate failed probes: retry only after the cooldown
             failed_at = self._failed_ports.get(config_key)
             if failed_at is not None and (now - failed_at) < self.failed_port_retry_after:
@@ -184,6 +240,12 @@ class SessionManager:
         for key in [k for k in self._failed_ports if k not in listening_config_keys]:
             del self._failed_ports[key]
 
+        # Same lifecycle for the exemption set (D-059): a port leaves it
+        # only once it disappears from LISTEN, so whatever shows up on it
+        # next gets probed fresh
+        for key in [k for k in self._non_python_ports if k not in listening_config_keys]:
+            self._non_python_ports.discard(key)
+
     async def _probe_port(self, host: str, port: int) -> BaseMayaClient | None:
         """
         Probe a port to check if it's a Maya command port.
@@ -204,6 +266,21 @@ class SessionManager:
             await client.disconnect()
             return new_client
         except MayaConnectionError:
+            # D-059: a port that answered the probe as definitively
+            # non-Python (e.g. a MEL commandPort) goes on the session-level
+            # exemption set - one log line per port per session, then the
+            # scanner never touches it again while it keeps LISTENing
+            if getattr(client, "_port_type", None) is PortType.MEL:
+                config_key = self._session_key(host, port)
+                self._non_python_ports.add(config_key)
+                logger.info(
+                    f"Port {config_key} answered as non-Python "
+                    f"({PortType.MEL.value}); exempted from probing for this session"
+                )
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
             return None
         except Exception as e:
             logger.debug(f"Error probing {host}:{port}: {e}")
@@ -369,6 +446,12 @@ class SessionManager:
             # bootstrap() returns a NEW client on the dedicated working
             # channel - that is the session, not the config-port client
             new_client = await client.bootstrap(client_type=self.client_type.value)
+        except MayaConnectionError:
+            # D-059: an explicit add on a port that turns out non-Python
+            # still earns the exemption so the scanner leaves it alone
+            if getattr(client, "_port_type", None) is PortType.MEL:
+                self._non_python_ports.add(config_key)
+            raise
         finally:
             try:
                 await client.disconnect()

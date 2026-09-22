@@ -9,7 +9,7 @@ import pytest
 from maya_mcp_server.client import MayaClient, MayaConnectionError
 from maya_mcp_server.security import SessionLookupError
 from maya_mcp_server.session_manager import SessionManager
-from maya_mcp_server.types import ClientType, SessionInfo
+from maya_mcp_server.types import ClientType, PortType, SessionInfo
 
 
 # ============================================================================
@@ -766,3 +766,137 @@ class TestLoopbackScanEnforcement:
         await mgr._scan_for_sessions()
 
         probe.assert_called_once_with("127.0.0.1", 7001)
+
+
+class TestNonPythonExemption:
+    """D-059: ports answering the probe as non-Python earn a session-level
+    permanent exemption - lifted only when the port disappears from LISTEN."""
+
+    def _mel_client(self, mocker) -> MagicMock:
+        client = MagicMock()
+        client.connect = AsyncMock()
+        client.bootstrap = AsyncMock(
+            side_effect=MayaConnectionError("Cannot bootstrap non-Python port (detected: mel)")
+        )
+        client._port_type = PortType.MEL
+        client.disconnect = AsyncMock()
+        return client
+
+    @pytest.mark.asyncio
+    async def test_probe_mel_port_marks_exemption(
+        self, session_manager: SessionManager, mocker
+    ) -> None:
+        client = self._mel_client(mocker)
+        mocker.patch("maya_mcp_server.session_manager.MayaClient", return_value=client)
+
+        assert await session_manager._probe_port("127.0.0.1", 7001) is None
+        assert "127.0.0.1:7001" in session_manager._non_python_ports
+        client.disconnect.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_probe_unknown_port_not_exempted(
+        self, session_manager: SessionManager, mocker
+    ) -> None:
+        client = self._mel_client(mocker)
+        client._port_type = PortType.UNKNOWN
+        mocker.patch("maya_mcp_server.session_manager.MayaClient", return_value=client)
+
+        assert await session_manager._probe_port("127.0.0.1", 7001) is None
+        assert session_manager._non_python_ports == set()
+
+    @pytest.mark.asyncio
+    async def test_add_session_mel_port_marks_exemption(
+        self, session_manager: SessionManager, mocker
+    ) -> None:
+        client = self._mel_client(mocker)
+        mocker.patch("maya_mcp_server.session_manager.MayaClient", return_value=client)
+
+        with pytest.raises(MayaConnectionError):
+            await session_manager.add_session("127.0.0.1", 7001)
+        assert "127.0.0.1:7001" in session_manager._non_python_ports
+
+    @pytest.mark.asyncio
+    async def test_exempt_port_skipped_in_scan(
+        self, session_manager: SessionManager, mocker
+    ) -> None:
+        session_manager._non_python_ports.add("127.0.0.1:7001")
+        probe = mocker.patch.object(session_manager, "_probe_port", new_callable=AsyncMock)
+        mocker.patch(
+            "maya_mcp_server.session_manager.get_maya_listening_ports",
+            return_value=[{"address": "127.0.0.1", "port": 7001, "process_id": 1}],
+        )
+
+        await session_manager._scan_for_sessions()
+
+        probe.assert_not_called()
+        assert "127.0.0.1:7001" in session_manager._non_python_ports
+
+    @pytest.mark.asyncio
+    async def test_exemption_lifts_when_port_stops_listening(
+        self, session_manager: SessionManager, mocker
+    ) -> None:
+        session_manager._non_python_ports.add("127.0.0.1:7001")
+        mocker.patch("maya_mcp_server.session_manager.get_maya_listening_ports", return_value=[])
+
+        await session_manager._scan_for_sessions()
+
+        assert "127.0.0.1:7001" not in session_manager._non_python_ports
+
+
+class TestPortFilter:
+    """D-059: include/exclude port filter (upstream #1 workaround
+    productized as MAYA_MCP_INCLUDE_PORTS / MAYA_MCP_EXCLUDE_PORTS)."""
+
+    def test_parse_port_filter(self) -> None:
+        from maya_mcp_server.session_manager import _parse_port_filter
+
+        assert _parse_port_filter(None) is None
+        assert _parse_port_filter("") is None
+        assert _parse_port_filter("7001") == {7001}
+        assert _parse_port_filter("7001, 7005-7007") == {7001, 7005, 7006, 7007}
+        with pytest.raises(ValueError):
+            _parse_port_filter("not-a-port")
+
+    def test_env_fallback(self, monkeypatch) -> None:
+        monkeypatch.setenv("MAYA_MCP_INCLUDE_PORTS", "7001,7003")
+        monkeypatch.setenv("MAYA_MCP_EXCLUDE_PORTS", "7009")
+        mgr = SessionManager()
+        assert mgr.include_ports == {7001, 7003}
+        assert mgr.exclude_ports == {7009}
+
+    def test_ctor_overrides_env(self, monkeypatch) -> None:
+        monkeypatch.setenv("MAYA_MCP_INCLUDE_PORTS", "1")
+        mgr = SessionManager(include_ports={42})
+        assert mgr.include_ports == {42}
+
+    @pytest.mark.asyncio
+    async def test_include_limits_probe(self, mocker) -> None:
+        mgr = SessionManager(include_ports={7001})
+        probe = mocker.patch.object(mgr, "_probe_port", new_callable=AsyncMock)
+        mocker.patch(
+            "maya_mcp_server.session_manager.get_maya_listening_ports",
+            return_value=[
+                {"address": "127.0.0.1", "port": 7001, "process_id": 1},
+                {"address": "127.0.0.1", "port": 7002, "process_id": 1},
+            ],
+        )
+
+        await mgr._scan_for_sessions()
+
+        probe.assert_awaited_once_with("127.0.0.1", 7001)
+
+    @pytest.mark.asyncio
+    async def test_exclude_skips_port(self, mocker) -> None:
+        mgr = SessionManager(exclude_ports={7002})
+        probe = mocker.patch.object(mgr, "_probe_port", new_callable=AsyncMock)
+        mocker.patch(
+            "maya_mcp_server.session_manager.get_maya_listening_ports",
+            return_value=[
+                {"address": "127.0.0.1", "port": 7001, "process_id": 1},
+                {"address": "127.0.0.1", "port": 7002, "process_id": 1},
+            ],
+        )
+
+        await mgr._scan_for_sessions()
+
+        probe.assert_awaited_once_with("127.0.0.1", 7001)

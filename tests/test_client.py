@@ -21,6 +21,7 @@ from maya_mcp_server.security import InputValidationError
 from maya_mcp_server.types import (
     CommandResponse,
     OutputBuffer,
+    PortType,
     ResultType,
     SessionInfo,
 )
@@ -926,3 +927,60 @@ class TestExecuteCodeResultTypeCoercion:
         """Invalid result_type strings surface as InputValidationError."""
         with pytest.raises(InputValidationError, match="Invalid result_type"):
             await maya_client.execute_code("pass", result_type="BOGUS")
+
+
+class TestDetectPortType:
+    """D-059: eval("1/2") is a bilingual probe - Python answers 0.5 while
+    MEL eval() integer-divides to 0, so a MEL commandPort replies without
+    a Script Editor error (upstream issue #1)."""
+
+    @pytest.mark.asyncio
+    async def test_python_port_answers_05(self, maya_client: MayaClient, mocker) -> None:
+        spy = mocker.patch.object(
+            maya_client,
+            "_send_receive",
+            new_callable=AsyncMock,
+            return_value=CommandResponse(result="0.5", error=None),
+        )
+        assert await maya_client._detect_port_type() is PortType.PYTHON
+        spy.assert_awaited_once_with('eval("1/2")')
+
+    @pytest.mark.asyncio
+    async def test_embedded_05_still_python(self, maya_client: MayaClient, mocker) -> None:
+        mocker.patch.object(
+            maya_client,
+            "_send_receive",
+            new_callable=AsyncMock,
+            return_value=CommandResponse(result="Result: 0.5", error=None),
+        )
+        assert await maya_client._detect_port_type() is PortType.PYTHON
+
+    @pytest.mark.asyncio
+    async def test_mel_port_answers_0(self, maya_client: MayaClient, mocker) -> None:
+        mocker.patch.object(
+            maya_client,
+            "_send_receive",
+            new_callable=AsyncMock,
+            return_value=CommandResponse(result="0", error=None),
+        )
+        assert await maya_client._detect_port_type() is PortType.MEL
+
+    @pytest.mark.asyncio
+    async def test_silent_answer_is_mel(self, maya_client: MayaClient, mocker) -> None:
+        mocker.patch.object(
+            maya_client,
+            "_send_receive",
+            new_callable=AsyncMock,
+            return_value=CommandResponse(result="", error=None),
+        )
+        assert await maya_client._detect_port_type() is PortType.MEL
+
+    @pytest.mark.asyncio
+    async def test_probe_exception_is_unknown(self, maya_client: MayaClient, mocker) -> None:
+        mocker.patch.object(
+            maya_client,
+            "_send_receive",
+            new_callable=AsyncMock,
+            side_effect=MayaTimeoutError("timeout"),
+        )
+        assert await maya_client._detect_port_type() is PortType.UNKNOWN
