@@ -241,27 +241,35 @@ def _encode_file(path: str, max_size: int, out_format: str, quality: int) -> tup
 _VP2_READBACK_BOTTOM_UP = True
 
 
-def _float_pixels(img: Any) -> Any:
-    """floatPixels() -> flat float sequence (w*h*channels).
+def _float_pixels(img: Any, w: int, h: int) -> Any:
+    """floatPixels() -> flat float sequence of w*h*4.
 
-    API 2.0 hands back a buffer object on current versions; tolerate
-    memoryview, flat sequences, and the legacy raw-pointer shape (wrapped
-    via MScriptUtil) so the call form stays version-agnostic.
-    """
+    Official return shape is a raw C++ float* (long); tolerate buffer
+    objects and flat sequences too, and wrap pointers via MScriptUtil,
+    so the call form stays version-agnostic."""
     data = img.floatPixels()
+    n = w * h * 4
     try:
-        return memoryview(data).cast("f")
+        mv = memoryview(data)
+        if mv.nbytes >= n * 4:
+            return mv.cast("f")[:n]
     except TypeError:
         pass
-    try:
-        return list(data)
-    except TypeError:
-        pass
-    # Raw pointer shape: wrap via MScriptUtil.getFloatArrayItem.
+    if isinstance(data, (list, tuple)) and len(data) >= n:
+        return data
+    # Raw pointer shape: wrap via MScriptUtil (official API 2.0 idiom).
     om = importlib.import_module("maya.api.OpenMaya")
-    w, h = img.getSize()
-    util = om.MScriptUtil
-    return [util.getFloatArrayItem(data, i) for i in range(w * h * 4)]
+    try:
+        ptr = om.MScriptUtil(data).asFloat4Ptr()
+        get4 = om.MScriptUtil.getFloat4ArrayItem
+        out = []
+        for i in range(w * h):
+            out.extend(get4(ptr, i))
+        return out
+    except Exception:
+        pass
+    get = om.MScriptUtil.getFloatArrayItem
+    return [get(data, i) for i in range(n)]
 
 
 def _f2b(v: float) -> int:
@@ -270,16 +278,20 @@ def _f2b(v: float) -> int:
 
 
 def _float_to_byte_rgba(fimg: Any) -> Any:
-    """<=2024 VP2 path (no convertPixelFormat): floatPixels() hands back
+    """VP2 float readback -> byte MImage with a truthful RGBA marker.
+
+    convertPixelFormat is C++-only — absent from the Python API 2.0
+    MImage member list on every documented version, so there is no
+    conversion branch to wait for (D-056⑤). floatPixels() hands back
     floats in the image's stored channel order — swizzle to RGBA when
     isRGBA() reports BGRA, quantize to bytes, then mark the order via
     setRGBA(True) so writeToFile interprets the bytes correctly.
 
     setRGBA is a channel-order MARKER, not a rearrange API — the swizzle
-    must match the marker or R/B swap in the output (D-056⑤).
+    must match the marker or R/B swap in the output.
     """
     w, h = fimg.getSize()
-    floats = _float_pixels(fimg)
+    floats = _float_pixels(fimg, w, h)
     order = (0, 1, 2, 3) if fimg.isRGBA() else (2, 1, 0, 3)
     px = bytearray(w * h * 4)
     for i in range(0, w * h * 4, 4):
@@ -298,15 +310,12 @@ def _vp2_color_image(view: Any) -> Any:
     """VP2 readback -> byte MImage, channel order normalized to RGBA.
 
     VP2 requires a kFloat target or readColorBuffer returns all-black
-    (official patch path). convertPixelFormat only exists on 2025+;
-    on <=2024 the float buffer goes through the manual swizzle.
+    (official patch path). The float buffer then goes through the
+    manual swizzle — convertPixelFormat never existed in Python.
     """
     img = _MImage()
     img.create(view.portWidth(), view.portHeight(), 4, _MImage.kFloat)
     view.readColorBuffer(img)
-    if hasattr(img, "convertPixelFormat"):
-        img.convertPixelFormat(_MImage.kByte)
-        return img
     return _float_to_byte_rgba(img)
 
 

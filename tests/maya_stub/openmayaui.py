@@ -109,16 +109,6 @@ class MImage:
         ]
         return self
 
-    def convertPixelFormat(self, format):
-        """2025+ API: float<->byte conversion, channel order preserved."""
-        if self._rows is not None:
-            if format == self.kByte and self.format == self.kFloat:
-                self._rows = [
-                    [tuple(max(0, min(255, int(round(c * 255)))) for c in px) for px in row]
-                    for row in self._rows
-                ]
-        self.format = format
-
     def verticalFlip(self):
         """Physically reverse buffer row order (real MImage.verticalFlip)."""
         if self._rows is not None:

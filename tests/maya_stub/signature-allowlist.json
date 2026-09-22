@@ -1,5 +1,7 @@
 {
-  "_comment": "Intentional stub-vs-real-Maya divergences (D-049b). Every entry must carry a reason — prefer fixing the divergence over allowing it. Class-level entries exempt their methods too. Baseline: presence-baseline.json, collected on Maya 2024.",
-  "omui.MImage": "MImage lives in maya.api.OpenMaya on Maya <=2024; OpenMayaUI gains it in 2025+. The stub models BOTH locations so visual_module's _MImage dual-resolution can be exercised against either layout (a test deletes omui.MImage to simulate 2024).",
-  "om.MImage.convertPixelFormat": "convertPixelFormat is a 2025+ MImage API — real Maya 2024 om.MImage lacks it (verified live: identical PNG output without conversion). The stub's om.MImage shares the omui fake class which models the 2025+ shape; visual_module feature-detects via hasattr."
+  "_comment": "Intentional stub-vs-real-Maya divergences (D-049b). Entries carry verdict + ref: ref anchors into the evidence layer (docs/visual-callform-matrix.md — the single source of truth, D-056③); verdict is the conclusion. Prefer fixing the divergence over allowing it. Class-level entries exempt their methods too. Baseline: presence-baseline.json, collected on Maya 2024.",
+  "omui.MImage": {
+    "verdict": "stub-only dual-location — real MImage lives in maya.api.OpenMaya on <=2024 and moves to OpenMayaUI in 2025+; the stub models both so _MImage dual-resolution is exercised against either layout",
+    "ref": "docs/visual-callform-matrix.md#omuimimage-dual-location"
+  }
 }

@@ -183,14 +183,12 @@ class TestMImageModuleLayout:
 
     def test_mimage_falls_back_to_openmaya_2024(self, maya_env, monkeypatch):
         """2024 layout: OpenMayaUI lacks MImage -> resolves via
-        maya.api.OpenMaya and capture still works. The 2024 class also
-        lacks convertPixelFormat (verified live) — strip it too."""
+        maya.api.OpenMaya and capture still works. (convertPixelFormat
+        is C++-only — absent from Python API 2.0 on every documented
+        version, so the stub no longer models it: D-056⑤.)"""
         maya_env.scene.setup_gui()
         omui = sys.modules["maya.api.OpenMayaUI"]
         monkeypatch.delattr(omui, "MImage")
-        monkeypatch.delattr(
-            sys.modules["maya.api.OpenMaya"].MImage, "convertPixelFormat", raising=False
-        )
         module = maya_stub.load_visual_module()
         assert module._MImage is sys.modules["maya.api.OpenMaya"].MImage
         result = module.viewport_snapshot(max_size=64, format="png")
@@ -328,15 +326,15 @@ def _cell_mean(rows, w, h, x0, y0, x1, y1):
 
 class TestVp2ReadbackTruth:
     """The stub models the documented VP2 defect shape: readColorBuffer
-    fills BGRA + bottom-up. A red block painted top-left must land
-    top-left and RED — a missed flip puts it bottom-left, a missed
-    swizzle/setRGBA makes it blue."""
+    fills BGRA + bottom-up, and Python MImage has no convertPixelFormat
+    (C++-only API) so the floatPixels swizzle path is always taken. A
+    red block painted top-left must land top-left and RED — a missed
+    flip puts it bottom-left, a missed swizzle/setRGBA makes it blue."""
 
-    async def test_swizzle_path_lands_red_top_left(self, vtools, monkeypatch):
-        """<=2024 path: convertPixelFormat absent -> floatPixels manual
-        BGRA->RGBA swizzle + setPixels + setRGBA(True)."""
+    async def test_swizzle_path_lands_red_top_left(self, vtools):
+        """floatPixels -> BGRA->RGBA swizzle -> quantize -> setPixels ->
+        setRGBA(True) — the only Python path on every version."""
         vtools.env.scene.viewport_pattern = _top_left_red
-        monkeypatch.delattr(vtools.module._MImage, "convertPixelFormat", raising=False)
         out = await vtools.fns["scene_viewport_snapshot"](format="png", max_size=2000)
         raw = base64.b64decode(out[0].data)
         w, h, rows = png_decode(raw)
@@ -346,18 +344,41 @@ class TestVp2ReadbackTruth:
         assert tr > 180 and tb < 80, f"top-left must be RED, got {(tr, tg, tb)}"
         assert br < 60 and bb < 60, f"bottom-left must stay black, got {(br, bg, bb)}"
 
-    async def test_convert_path_lands_red_top_left(self, vtools):
-        """2025+ path: convertPixelFormat present -> official conversion,
-        conditional flip still applies."""
+    async def test_missing_setrgba_marker_swaps_channels(self, vtools, monkeypatch):
+        """Regression proof the pin has teeth: if the marker lie slips
+        back in (RGBA bytes stored while BGRA flagged), the block goes
+        BLUE — the assertion must see it."""
         vtools.env.scene.viewport_pattern = _top_left_red
-        assert hasattr(vtools.module._MImage, "convertPixelFormat")
-        out = await vtools.fns["scene_viewport_snapshot"](format="png", max_size=2000)
-        raw = base64.b64decode(out[0].data)
-        w, h, rows = png_decode(raw)
-        tr, tg, tb = _cell_mean(rows, w, h, w // 16, h // 16, w // 8, h // 8)
-        br, bg, bb = _cell_mean(rows, w, h, w // 16, h * 13 // 16, w // 8, h * 7 // 8)
-        assert tr > 180 and tb < 80, f"top-left must be RED, got {(tr, tg, tb)}"
-        assert br < 60 and bb < 60, f"bottom-left must stay black, got {(br, bg, bb)}"
+        # simulate the defect directly: writeToFile with marker unset
+        omui = sys.modules["maya.api.OpenMayaUI"]
+        img = omui.MImage()
+        img.create(64, 64, 4, omui.MImage.kFloat)
+        omui.M3dView.active3dView().readColorBuffer(img)
+        floats = img.floatPixels()
+        px = bytearray(64 * 64 * 4)
+        for i in range(0, len(px), 4):
+            px[i] = int(floats[i + 2] * 255)      # R
+            px[i + 1] = int(floats[i + 1] * 255)  # G
+            px[i + 2] = int(floats[i + 0] * 255)  # B
+            px[i + 3] = 255
+        out_img = omui.MImage()
+        out_img.create(64, 64, 4, omui.MImage.kByte)
+        out_img.setPixels(bytes(px), 64, 64)
+        # NB: deliberately NOT calling setRGBA(True) — marker stays BGRA
+        import tempfile
+
+        fd, tmp = tempfile.mkstemp(suffix=".png")
+        os.close(fd)
+        try:
+            out_img.writeToFile(tmp, "png")
+            with open(tmp, "rb") as fh:
+                w, h, rows = png_decode(fh.read())
+        finally:
+            os.remove(tmp)
+        # unflipped bottom-up buffer lands the block at bottom-LEFT,
+        # and the BGRA marker lie turns red into BLUE there
+        br, bg, bb = _cell_mean(rows, w, h, 2, h * 7 // 8, 8, h * 15 // 16)
+        assert bb > br + 60, f"marker lie must swap to BLUE, got {(br, bg, bb)}"
 
 
 # ------------------------------------------------------------

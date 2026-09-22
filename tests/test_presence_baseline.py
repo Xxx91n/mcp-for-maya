@@ -111,10 +111,28 @@ def test_baseline_is_version_stamped():
 
 
 def test_allowlist_entries_have_reasons():
+    """D-056③: entries carry verdict + evidence anchor. The comparison
+    table is the single source of truth; the allowlist is conclusions —
+    verify the ref actually resolves to a header in the table."""
     allow = _allowlist()
-    for key, reason in allow.items():
+    repo = Path(__file__).parent.parent
+    for key, entry in allow.items():
         if key == "_comment":
             continue
-        assert isinstance(reason, str) and len(reason) > 20, (
-            f"allowlist entry {key} needs a real reason"
+        assert isinstance(entry, dict), f"{key}: verdict+ref object required (D-056③)"
+        verdict = entry.get("verdict", "")
+        assert isinstance(verdict, str) and len(verdict) > 20, (
+            f"allowlist entry {key} needs a real verdict"
         )
+        ref = entry.get("ref", "")
+        assert isinstance(ref, str) and ref.startswith("docs/") and "#" in ref, (
+            f"{key}: ref must anchor into a docs/ evidence file"
+        )
+        path, _, anchor = ref.partition("#")
+        doc = repo / path
+        assert doc.exists(), f"{key}: ref target {path} missing"
+        slugs = {
+            re.sub(r"[^a-z0-9 -]", "", h.lower()).replace(" ", "-")
+            for h in re.findall(r"^#+\s+(.+)$", doc.read_text(encoding="utf-8"), re.M)
+        }
+        assert anchor in slugs, f"{key}: anchor #{anchor} resolves to no header in {path}"
