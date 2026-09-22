@@ -1,66 +1,60 @@
-# next-round.md — rev25（T-17：T-16 落地收口 + 上游回应链）
+# next-round.md — rev26（T-18：T-16f 真机验证窗 + 0.1.2 发布链激活）
 
-生成：2026-09-22 grill 后整理环节｜Spec：ADR-0022 + docs/decision-ledger.md D-061~D-065｜前置：ADR-0021、.scratch/t16/handoffs/2026-09-22-handoff.md（审计 nits 清单原始件）
+生成：2026-09-22 grill 后整理环节｜Spec：ADR-0023 + docs/decision-ledger.md D-066~D-069｜前置：ADR-0022、.scratch/t17/handoffs/2026-09-22-audit-handoff.md（N7/N8/O1/O2 原始件）
 
-## 本轮裁决锚点
+## 环境实况（本轮核验）
 
-- D-062：立即落地 T-16+spec 分支；0.1.2 守 D-049 真机门（等 T-16f）；0.1.1 yank 随 0.1.2 同发
-- D-063：上游回应=技术+署名型，一 issue 一评，发布归人工门
-- D-064：分段回应（#2/#7 现在可发；#1/#3/#4/#5 等 0.1.2）+ docs/ upstream 对照表入库
-- D-065：N1~N3 随落地同批修、N4 登记债、N5 归 T-16f、N6 删 2 孤儿文件
+- `origin/main`=b3f4133：T-16+T-17 全批次+dependabot mypy 合并；CI 全绿；工作区干净（zz 无变更、幻影已自清）
+- **Maya 2024(24.0.0.4640) 运行中**：PID 18236，`:7001 sourceType=python` LISTENING（userSetup.py 开）——T-16f 窗口已开
+- PyPI：0.1.0/0.1.1 在售未 yank；上游 6 issue 评论数=0
+- 备稿在库：docs/upstream-issue-response-drafts.md（六条分区标注）；对照表 docs/upstream-issue-status.md
 
 ## 任务清单
 
-### T-17a — T-16 落地 + N1~N3 同批修 + N6 孤儿删除（D-062, D-065）
+### T-18a — T-16f 真机验证批（D-067, D-056⑤, D-058, D-059, N5）
 
-1. `but land` 落 impl/t16-upstream-issues + grill/round16-upstream-issues-spec 进主干（栈序：spec 在下 impl 在上，land 一次收两支）
-2. N1：client.py:590-592 _bootstrap 热更新点收 create_module 返回值，teardown warning 走 log 不静默吞（~4 行）
-3. N2：ADR-0009 追加 superseded-by-0021 注记（≤2022 语义已被 floor 改变）
-4. N3：AGENTS.md tests/ 清单补 2 个新测试文件（test_port_filter/test_teardown 类——以 impl 分支实际文件名为准）；adr 描述 0016→0022
-5. N6：删 .github/assets-src/*.py 两个 untracked facade 孤儿（仅限此两件；zz 区 5 条 @2x R 幻影簿记严禁 discard）
-6. 门禁复跑：pytest/ruff 预算/mypy 基线/pre-commit 全绿后收
+1. **前置探针**：`execute_code` 跑 `cmds.file(q=True,modified=True)`+`file(q=True,sceneName=True)`——**脏则停手报用户三选一**（存盘/授权丢弃/中止）；干净才 `file(new=True,force=True)`
+2. **MEL 对照端口**：`commandPort(":7002",query=True)` 探占用（占则换高位）→开 `sourceType="mel"`→批末 try/finally 关闭+幂等先 close 再 open；仅用 `:port` 形式；预期首次连接 "Allow" 弹窗（用户在场点过）
+3. **跑批**：`pytest -m gui`（VP2 非对称纯色断言钉 _VP2_READBACK_BOTTOM_UP+BGR/RGB+callform surface probe+render_preview 净零+bootstrap framed Qt）+ MEL `eval("1/2")` 回传形状定型 + #4 create_module(overwrite) 重连 teardown 活证（commandPort -query/回调计数自证孤儿不再泄漏）+ `hasattr(MImage,'convertPixelFormat')` 复核
+4. **报告**：断连时段显式标注；翻车如实——#1 探针翻车→D-059 豁免集退路；其余翻车→fix-forward（D-068 外延：pre-RC 窗口修而不带病发）；不可速修→门守住呈报用户
 
-### T-17b — upstream issue 对照表入库（D-064）
+### T-18b — 同窗清账（D-068）
 
-- docs/ 下新页（建议 docs/upstream-issue-status.md）：6 issue×我方处置×含修复版本×验证状态
-- 数据源=账本+CHANGELOG 同源；#1/#4 验证状态列写「stub 审计绿，真机 T-16f 待定」不超前宣称
-- README 双语加一行指针（可选，实现窗定落位）
+- **N7**：client.py `_bootstrap` 热更新点查 `error` 键——module_create_failed 不再吞且不误报 "module updated"（对照 write_module raise 于 client.py:766-773；~3 行+1 回归测试）
+- **N8**：AGENTS.md tests/ 清单补 `test_check_ruff_budget.py`+`test_presence_baseline.py`（磁盘 23 vs 清单 21）
+- **O2**：#5 备稿补 root-cause 段（docs 类 issue 的根因=README 未文档化，一句话）
+- 门禁复跑：pytest/ruff 预算/mypy 基线/pre-commit 全绿
 
-### T-17c — #2/#7 上游回应备稿（D-063, D-064）
+### T-18c — 发布包备制（D-068，人工门前置作业）
 
-- 英文草稿两条（上游英文仓）：模板=根因→修法→「mcp-for-maya ≥0.1.0 已含」耐久陈述→fork 披露→回哺句
-- #7 稿须注明「call-form 等传输路径加固随 0.1.2」诚实边界
-- 备稿落 docs/ 或 .scratch 随实现窗定；**发布动作归用户**（或显式授权 gh）
+- **O1**：CHANGELOG `[Unreleased]` 并入 `[0.1.2]` 订正真实日期+顶部留空 Unreleased 段
+- upstream-issue-status.md 验证列去 pending（按 T-18a 实测结果）；#1/#3/#4/#5 备稿去 pending 措辞
+- **逐版核实**：`git show v0.1.0:...`/`v0.1.1:...` 确认各版带病面→yank reason 文案（一句话故障模式）
+- 备发布包：v0.1.2 tag 说明+release notes（取 CHANGELOG 段原文）+yank 命令序列
 
-### T-17d — #1/#3/#4/#5 回应备稿（D-063, D-064）
+### T-18d — #2/#7 发帖（D-069）
 
-- 四条草稿现在可备，发布等 0.1.2 之后（届时 T-16f 已过有真机背书）
-- #3 稿形态=边界声明（dual-runtime floor+显式能力错误），非修复公告
-- #1 稿：若 T-16f 翻车则如实写豁免集方案，不宣称探针修好
+- 终稿贴出→**用户过目**→gh 评论发出（过目=授权前置）；不依赖 T-18a 可与并行
+- 一 issue 一评；措辞改动须回草稿重过目
 
-### T-16f — 真机窗口批（顺延，Maya 开机即收）（D-056⑤, D-059, D-060, N5）
+### 人工门（用户执行，agent 备单）
 
-- VP2 非对称纯色断言钉 _VP2_READBACK_BOTTOM_UP+callform surface probe+currentTime 净零
-- MEL commandPort `eval("1/2")` 回传形状定型（探针案生死前提；翻车→豁免集单走如实降级）
-- #4 重连 teardown 活实证+hasattr(MImage,'convertPixelFormat') 复核
-- 窗口一到一批全收，细节见 rev24 存档
+push tag v0.1.2 → release workflow → **盯 publish CI 绿+验 PyPI 页面**（invalid-publisher 前科）→ 逐版核实后 yank（附 reason）→ #1/#3/#4/#5 评论（同过目授权流程）→ 可选 v0.1.1 Release 加 yanked 标注
 
 ## 顺延队列（原主不动）
 
-- T-14c 发布链人工门：0.1.2 tag/release/0.1.1 yank/issue#7 勾选/social 上传/About——注意 0.1.0 是否同 yank 未裁决（0.1.0 同带病），发布时须呈报
-- 登记债（不自动认领）：N4 五条 smell（D-065）+ T-06 dormant/T-07 注册表/依赖锁定/coverage patch 门/macOS 冒烟/mayapy env-blocked
+N4 五条 smell 债 / T-06 dormant 引擎归置 / T-07 注册表 / 依赖锁定 / coverage patch 门 / macOS 冒烟 / T-14b #7 残余矩阵 / social+About 门面人工项
 
-## 铁律提醒
+## 铁律
 
-- 幻影簿记：zz 区 5 条 @2x R 残留严禁 discard，写操作前 git ls-tree 对账
-- 对外文案纪律：#1/#4 在 T-16f 前必须带 pending-real-Maya-confirmation 措辞
-- 上游回应发布=外部副作用=人工门
+- 脏场景未授权绝不 `file(new,force)`；临时端口用后即关不常开、禁 IP:port 形式
+- yank 不早于 0.1.2 确认 PyPI 可用；tag 前可改 tag 后只加不减
+- 一切评论发出必过用户目；幻影簿记禁 discard（虽已自清，写操作前仍 git ls-tree 对账）
+- VC 全走 `but`；grill/实现分离
 
 ## suggested skills
 
-- `$implement` / `$tdd` — T-17a 修复面
-- `$but` — 落地与全部 VC 写操作
-- `$handoff` — 再翻页
-- `$atomcode-research` — 回应文案措辞争议时（串行单发）
-- `$domain-modeling` / `$neat-freak` — 对照表与文档同步
-- `$grill-with-docs` — 下轮裁决启动器
+- `$implement` / `$tdd` — T-18a/b 执行与修复面
+- `$but` — 全部 VC 写操作
+- `$handoff` — 窗口结束再翻页
+- `$atomcode-research` — 争议调研（串行单发）
