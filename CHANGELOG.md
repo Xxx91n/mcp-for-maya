@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`importlib.metadata.version("mcp-for-maya")` with a `__version__`
   source-tree fallback) instead of leaking the FastMCP framework
   version (D-060).
+- The `_bootstrap` hot-update path now logs a failing `_mcp_teardown`
+  carried in `create_module`'s `warning` field instead of dropping the
+  response on the one path that triggers the hook (D-065/N1).
 
 ### Docs
 
@@ -40,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   3.9; verified on Maya 2024) and a multi-instance commandPort section
   covering per-instance topology, auto-scan vs `add_session`, and
   userSetup.py persistence (upstream #5, D-060).
+- `docs/upstream-issue-status.md` maps the six upstream open issues to
+  this fork's disposition, fix version, and verification status;
+  human-gated comment drafts live in
+  `docs/upstream-issue-response-drafts.md` (D-064).
 
 ## [0.1.2] - 2026-09-20
 
