@@ -63,18 +63,20 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 >
 > Fixed in our fork ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/),
 > **>= 0.1.2**): the probe payload is now the bilingual `eval("1/2")` —
-> Python 3 answers `0.5`, MEL's `eval()` integer-divides to `0`, and both
-> sides answer without an error. Ports detected as non-Python join a
-> session-level permanent exemption set (re-enabled only if the port leaves
-> LISTEN), which ends the periodic re-probing entirely. On top of that,
+> Python 3 answers `0.5`; on a live Maya 2024 MEL port it returns a
+> syntax-error body (verified on a real session — MEL's `eval` expects
+> a command string, not an expression), which still classifies the port as
+> MEL. Ports detected as non-Python join a session-level permanent
+> exemption set (re-enabled only if the port leaves LISTEN), so the probe
+> costs at most one Script Editor error line per port per session — then
+> the re-probe spam ends entirely. On top of that,
 > `MAYA_MCP_INCLUDE_PORTS` / `MAYA_MCP_EXCLUDE_PORTS` (or the matching
 > `SessionManager` ctor args) bound which ports get probed at all —
 > productizing the workaround reported in this thread.
 >
-> Honest caveat: the MEL-side socket reply shape is verified on our Maya
-> stub and pending confirmation on a live Maya session; should it regress
-> there, the exemption set alone still bounds the symptom to one probe per
-> port per session.
+> Verified on a live Maya 2024 session: the MEL-port reply shape is pinned
+> in our test suite, and the exemption set bounds residual Script Editor
+> noise to one line per port.
 >
 > Full status mapping: https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/upstream-issue-status.md
 >
@@ -125,8 +127,9 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > blocking the replacement.
 >
 > Verification status: covered by stub-tier tests including the Qt signal
-> semantics; live reconnect + port-rebind evidence on a real Maya session
-> is still pending (tracked).
+> semantics, and verified on a live Maya 2024 session — the teardown
+> hook fired exactly once across a reconnect, the old listener port was
+> released, and the replacement server bound cleanly.
 >
 > Full status mapping: https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/upstream-issue-status.md
 >
@@ -136,6 +139,10 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 
 ## Issue #5 — post after 0.1.2
 
+> Root cause: the README never documented multi-instance commandPort
+> topology — one bound host:port listener per port — so running a
+> second Maya instance on the same port silently failed to bind.
+>
 > Covered in our fork's docs ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/),
 > >= 0.1.2): the README (both languages) and `docs/testing.md` now carry a
 > multi-instance section — the mechanics (a commandPort is one bound

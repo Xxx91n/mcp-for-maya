@@ -236,87 +236,33 @@ def _encode_file(path: str, max_size: int, out_format: str, quality: int) -> tup
 # EMPIRICAL pin, not a version branch (D-056⑤): the gui-tier asymmetric
 # pure-color assertion (top-left red block must land top-left) is the
 # arbiter — flip this constant only if that test disagrees on a real
-# session. True matches every live observation so far (incl. the facade
-# dogfood captures, which verified orientation with the old code path).
-_VP2_READBACK_BOTTOM_UP = True
-
-
-def _float_pixels(img: Any, w: int, h: int) -> Any:
-    """floatPixels() -> flat float sequence of w*h*4.
-
-    Official return shape is a raw C++ float* (long); tolerate buffer
-    objects and flat sequences too, and wrap pointers via MScriptUtil,
-    so the call form stays version-agnostic."""
-    data = img.floatPixels()
-    n = w * h * 4
-    try:
-        mv = memoryview(data)
-        if mv.nbytes >= n * 4:
-            return mv.cast("f")[:n]
-    except TypeError:
-        pass
-    if isinstance(data, (list, tuple)) and len(data) >= n:
-        return data
-    # Raw pointer shape: wrap via MScriptUtil (official API 2.0 idiom).
-    om = importlib.import_module("maya.api.OpenMaya")
-    try:
-        ptr = om.MScriptUtil(data).asFloat4Ptr()
-        get4 = om.MScriptUtil.getFloat4ArrayItem
-        out = []
-        for i in range(w * h):
-            out.extend(get4(ptr, i))
-        return out
-    except Exception:
-        pass
-    get = om.MScriptUtil.getFloatArrayItem
-    return [get(data, i) for i in range(n)]
-
-
-def _f2b(v: float) -> int:
-    """Float 0..1 -> byte 0..255 with clamp (OCIO can drift pure colors)."""
-    return max(0, min(255, int(round(v * 255))))
-
-
-def _float_to_byte_rgba(fimg: Any) -> Any:
-    """VP2 float readback -> byte MImage with a truthful RGBA marker.
-
-    convertPixelFormat is C++-only — absent from the Python API 2.0
-    MImage member list on every documented version, so there is no
-    conversion branch to wait for (D-056⑤). floatPixels() hands back
-    floats in the image's stored channel order — swizzle to RGBA when
-    isRGBA() reports BGRA, quantize to bytes, then mark the order via
-    setRGBA(True) so writeToFile interprets the bytes correctly.
-
-    setRGBA is a channel-order MARKER, not a rearrange API — the swizzle
-    must match the marker or R/B swap in the output.
-    """
-    w, h = fimg.getSize()
-    floats = _float_pixels(fimg, w, h)
-    order = (0, 1, 2, 3) if fimg.isRGBA() else (2, 1, 0, 3)
-    px = bytearray(w * h * 4)
-    for i in range(0, w * h * 4, 4):
-        px[i] = _f2b(floats[i + order[0]])
-        px[i + 1] = _f2b(floats[i + order[1]])
-        px[i + 2] = _f2b(floats[i + order[2]])
-        px[i + 3] = _f2b(floats[i + order[3]])
-    out = _MImage()
-    out.create(w, h, 4, _MImage.kByte)
-    out.setPixels(bytes(px), w, h)
-    out.setRGBA(True)
-    return out
+# session.
+# T-18a re-pin (Maya 2024.0.0.4640, VP2): readColorBuffer hands back
+# TOP-DOWN rows on this box - the GL bottom-up assumption did not hold,
+# and the flip put the probe block bottom-left. The constant stays the
+# arbiter for GPUs/drivers that may still differ.
+_VP2_READBACK_BOTTOM_UP = False
 
 
 def _vp2_color_image(view: Any) -> Any:
-    """VP2 readback -> byte MImage, channel order normalized to RGBA.
+    """VP2 readback -> float MImage, channel order RGBA at the source.
 
     VP2 requires a kFloat target or readColorBuffer returns all-black
-    (official patch path). The float buffer then goes through the
-    manual swizzle — convertPixelFormat never existed in Python.
+    (official patch path). readColorBuffer's readRGBA flag hands back
+    RGBA-ordered floats, so writeToFile's built-in float->byte
+    conversion emits a correct PNG with no Python-side pixel copy —
+    MScriptUtil was removed in Maya 2024 and the float* pointer-wrap
+    path is gone for good (D-056⑤, live-verified on 2024.0.0.4640).
+    Versions lacking the flag fall back to the default BGRA read;
+    writeToFile still honors the image's channel-order marker on write.
     """
     img = _MImage()
     img.create(view.portWidth(), view.portHeight(), 4, _MImage.kFloat)
-    view.readColorBuffer(img)
-    return _float_to_byte_rgba(img)
+    try:
+        view.readColorBuffer(img, True)
+    except TypeError:
+        view.readColorBuffer(img)
+    return img
 
 
 # ---------------------------------------------------------------------------
@@ -357,7 +303,7 @@ def viewport_snapshot(
         else:
             img = _MImage()
             view.readColorBuffer(img)
-            # GL buffers arrive bottom-up; flip for a correctly-oriented PNG.
+            # Flip only if the readback arrives bottom-up (empirical pin).
             img.verticalFlip()
 
         fd, tmp = tempfile.mkstemp(prefix="_mcp_visual_", suffix=".png")

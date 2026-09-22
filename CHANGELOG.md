@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-22
+
+> First real-Maya verification round: everything below was found by
+> running the shipped 0.1.1 code against a live Maya 2024 GUI session.
+> The stub suite was green on all of it — each fix ships with the stub
+> modeling the real semantic that was missing. A second live pass (T-18a)
+> re-verified the whole gui tier on Maya 2024.0.0.4640.
+
 ### Fixed
 
 - `create_module(overwrite=True)` now invokes the old module's
@@ -16,11 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   restores stream capture. Reconnect-time helper reloads no longer orphan
   a listening `QtCommandServer` (upstream #4, D-058).
 - Port-type probing switched from `1+1` to the bilingual
-  `eval("1/2")` payload - legal in both MEL (integer division -> `0`)
-  and Python 3 (`0.5`), so a MEL commandPort answers without a Script
-  Editor error. Ports that answer as non-Python join a session-level
-  permanent exemption set (lifted only when the port leaves LISTEN),
-  ending the periodic re-probe spam (upstream #1, D-059).
+  `eval("1/2")` payload — Python 3 answers `0.5`, anything else
+  classifies MEL. Live-verified on Maya 2024: a real MEL port replies
+  with a syntax-error body (MEL `eval` wants a command string), which
+  still classifies correctly — the Script Editor sees at most one
+  error line per probe. Ports that answer as non-Python join a
+  session-level permanent exemption set (lifted only when the port
+  leaves LISTEN), ending the periodic re-probe spam (upstream #1, D-059).
 - Probe filtering productized: `MAYA_MCP_INCLUDE_PORTS` /
   `MAYA_MCP_EXCLUDE_PORTS` env vars (or the `SessionManager`
   `include_ports` / `exclude_ports` ctor args) bound which discovered
@@ -35,27 +45,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `_bootstrap` hot-update path now logs a failing `_mcp_teardown`
   carried in `create_module`'s `warning` field instead of dropping the
   response on the one path that triggers the hook (D-065/N1).
+- `_bootstrap` hot-update now surfaces a failed `create_module` — the
+  `module_create_failed` error arrives inside the result payload (the
+  native commandPort wrap), and it was swallowed behind a false "module
+  updated" log (N7). It now raises `MayaExecutionError` like
+  `write_module` does.
+- Bootstrap no longer rewrites a >10K helper module on every connect:
+  the injected module's `__build__` marker is compared first and the
+  hot-update write is skipped when it matches. The big write is what
+  tripped the commandPort stale-response quirk and intermittently
+  stranded the just-started Qt server (connect refused on a live bind);
+  skipping it removes the flake. A bounded connect+ping retry still
+  covers genuinely slow Qt servers (T-18a, live-verified).
+- Fallback hygiene: when the Qt channel is unavailable, the bootstrap
+  now stops the orphaned Qt listener before opening the fallback
+  commandPort, and the dedicated fallback port is closed on
+  `disconnect()` instead of leaking (T-18a).
 
-### Docs
-
-- README (bilingual) + `docs/testing.md`: dual-runtime support matrix
-  (host Python >= 3.10; injected helper needs Maya >= 2023 / Python >=
-  3.9; verified on Maya 2024) and a multi-instance commandPort section
-  covering per-instance topology, auto-scan vs `add_session`, and
-  userSetup.py persistence (upstream #5, D-060).
-- `docs/upstream-issue-status.md` maps the six upstream open issues to
-  this fork's disposition, fix version, and verification status;
-  human-gated comment drafts live in
-  `docs/upstream-issue-response-drafts.md` (D-064).
-
-## [0.1.2] - 2026-09-20
-
-> First real-Maya verification round: everything below was found by
-> running the shipped 0.1.1 code against a live Maya 2024 GUI session.
-> The stub suite was green on all of it — each fix ships with the stub
-> modeling the real semantic that was missing.
-
-### Fixed
 
 - `execute_code` coerces `result_type` to `ResultType` at the client
   entry — bare `"JSON"` strings passed by `scene_tools`/`visual_tools`
@@ -73,13 +79,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to `cp_*.ma` with `rebind_failed`.
 - Visual capture: `MImage` resolves across Maya API layouts
   (`maya.api.OpenMaya` on ≤2024, `maya.api.OpenMayaUI` on 2025+). The VP2
-  kFloat readback is normalized in-process — `floatPixels()` →
-  BGRA→RGBA swizzle per `isRGBA()` → `setPixels` → `setRGBA(True)` —
-  and flips only under the assertion-pinned `_VP2_READBACK_BOTTOM_UP`
-  condition (D-056⑤); `convertPixelFormat` is a C++-only API and is
-  never called. When neither module provides `MImage`, tools return a
-  structured `capture_unsupported` error instead of `AttributeError`.
+  kFloat readback now asks for RGBA at the source
+  (`readColorBuffer(img, readRGBA=True)`) and lets `writeToFile` do the
+  float→byte conversion — the `floatPixels()` pointer-wrap path was
+  removed entirely because `MScriptUtil` no longer exists in Maya 2024
+  (D-056⑤; `convertPixelFormat` is a C++-only API and is never called).
+  Row orientation stays under the assertion-pinned
+  `_VP2_READBACK_BOTTOM_UP` constant — re-pinned to `False` on
+  2024.0.0.4640, where readColorBuffer hands back top-down rows (T-18a).
+  When neither module provides `MImage`, tools return a structured
+  `capture_unsupported` error instead of `AttributeError`.
 - Runtime `__version__` matches `pyproject.toml` (was 0.1.0 vs 0.1.1).
+
+### Docs
+
+- README (bilingual) + `docs/testing.md`: dual-runtime support matrix
+  (host Python >= 3.10; injected helper needs Maya >= 2023 / Python >=
+  3.9; verified on Maya 2024) and a multi-instance commandPort section
+  covering per-instance topology, auto-scan vs `add_session`, and
+  userSetup.py persistence (upstream #5, D-060).
+- `docs/upstream-issue-status.md` maps the six upstream open issues to
+  this fork's disposition, fix version, and verification status;
+  human-gated comment drafts live in
+  `docs/upstream-issue-response-drafts.md` (D-064).
 
 ### Testing
 

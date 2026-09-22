@@ -50,7 +50,10 @@ tests/
 ├── test_security.py
 ├── test_session_manager.py
 ├── test_module_teardown.py   # T-16a overwrite teardown protocol + Qt signal semantics (D-058, upstream #4)
-└── test_version_unification.py # T-16e serverInfo=product version (D-060③)
+├── test_version_unification.py # T-16e serverInfo=product version (D-060③)
+├── test_aesthetic_engine.py     # dormant-engine unit coverage (D-038; not a production-path claim)
+├── test_check_ruff_budget.py    # ruff-budget comparator guard (per-rule ratchet, D-044/T-10b)
+└── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
 ├── adr/                   # ADR-0001..0022 architecture decision records

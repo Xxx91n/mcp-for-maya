@@ -326,14 +326,15 @@ def _cell_mean(rows, w, h, x0, y0, x1, y1):
 
 class TestVp2ReadbackTruth:
     """The stub models the documented VP2 defect shape: readColorBuffer
-    fills BGRA + bottom-up, and Python MImage has no convertPixelFormat
-    (C++-only API) so the floatPixels swizzle path is always taken. A
+    fills BGRA + top-down by default; the module asks for RGBA at the
+    source (readRGBA=True) and lets writeToFile do float->byte — the
+    floatPixels pointer path is gone (MScriptUtil removed in 2024). A
     red block painted top-left must land top-left and RED — a missed
-    flip puts it bottom-left, a missed swizzle/setRGBA makes it blue."""
+    flip puts it bottom-left, a channel-order lie makes it blue."""
 
-    async def test_swizzle_path_lands_red_top_left(self, vtools):
-        """floatPixels -> BGRA->RGBA swizzle -> quantize -> setPixels ->
-        setRGBA(True) — the only Python path on every version."""
+    async def test_rgb_readback_lands_red_top_left(self, vtools):
+        """readColorBuffer(img, readRGBA=True) -> writeToFile — the only
+        pointer-free path; the assertion arbitrates orientation."""
         vtools.env.scene.viewport_pattern = _top_left_red
         out = await vtools.fns["scene_viewport_snapshot"](format="png", max_size=2000)
         raw = base64.b64decode(out[0].data)
@@ -375,10 +376,10 @@ class TestVp2ReadbackTruth:
                 w, h, rows = png_decode(fh.read())
         finally:
             os.remove(tmp)
-        # unflipped bottom-up buffer lands the block at bottom-LEFT,
-        # and the BGRA marker lie turns red into BLUE there
-        br, bg, bb = _cell_mean(rows, w, h, 2, h * 7 // 8, 8, h * 15 // 16)
-        assert bb > br + 60, f"marker lie must swap to BLUE, got {(br, bg, bb)}"
+        # unflipped buffer lands the block at top-LEFT (real readback is
+        # top-down - T-18a re-pin), and the BGRA marker lie turns it BLUE
+        tr, tg, tb = _cell_mean(rows, w, h, 2, h // 16, 8, h // 8)
+        assert tb > tr + 60, f"marker lie must swap to BLUE, got {(tr, tg, tb)}"
 
 
 # ------------------------------------------------------------

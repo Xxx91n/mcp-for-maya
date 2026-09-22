@@ -19,6 +19,7 @@ from maya_mcp_server.bootstrap import (
 from maya_mcp_server.maya_mcp_helper import (
     FRAME_HEADER_SIZE,
     MAX_FRAME_SIZE,
+    __build__,
     encode_frame,
 )
 from maya_mcp_server.security import (
@@ -51,6 +52,7 @@ CONNECT_RETRY_DELAYS = (0.5, 1.0, 2.0)
 # Post-connect liveness gate: a Qt server in headless Maya can accept TCP
 # while readyRead never fires; bound the probe so bootstrap fails fast.
 QT_PROBE_TIMEOUT = 5.0  # seconds
+QT_CONNECT_ATTEMPTS = 3  # connect+ping retries before native fallback
 
 
 class MayaUnavailableError(PipelineError):
@@ -148,6 +150,9 @@ class BaseMayaClient(ABC):
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
         self._lock = asyncio.Lock()
+        # Set by bootstrap()'s native-fallback path: a commandPort we opened
+        # for this client and must close again on disconnect (T-18a).
+        self._dedicated_port: int | None = None
         # Output buffers for stdout/stderr capture
         self._stdout_buffer: str = ""
         self._stderr_buffer: str = ""
@@ -184,7 +189,22 @@ class BaseMayaClient(ABC):
 
     async def disconnect(self) -> None:
         """Close connection to Maya."""
-        # FIXME: shut down the maya command port running in Maya
+        dedicated = getattr(self, "_dedicated_port", None)
+        if dedicated is not None and self._writer:
+            # T-18a: close the dedicated commandPort bootstrap() opened for
+            # this client - it previously stayed open forever (the FIXME).
+            # Fire-and-forget: Maya drops this socket when the port dies.
+            try:
+                self._writer.write(
+                    (
+                        "import maya.cmds as cmds; "
+                        f'cmds.commandPort(name=":{dedicated}", close=True)\n'
+                    ).encode()
+                )
+                await self._writer.drain()
+            except Exception:
+                pass
+            self._dedicated_port = None
         if self._writer:
             self._writer.close()
             try:
@@ -537,10 +557,12 @@ class MayaClient(BaseMayaClient):
             return self._port_type
 
         try:
-            # Bilingual probe (D-059 / upstream #1): eval("1/2") is legal on
-            # both sides - Python 3 answers 0.5 (true division) while MEL's
-            # eval() integer-divides to 0 - so a MEL commandPort answers
-            # without a Script Editor error. Operands must stay int/int:
+            # Bilingual probe (D-059 / upstream #1): Python 3 answers 0.5
+            # (true division); everything else classifies MEL. T-18a live
+            # pin (Maya 2024.0.0.4640, zh locale): a real MEL port answers
+            # eval("1/2") with a syntax-error body, not silent 0 - the
+            # discriminant is "0.5 vs anything else", and the Script
+            # Editor does log the error. Operands must stay int/int:
             # 1.0/2 would collapse the discriminant.
             response = await self._send_receive('eval("1/2")')
 
@@ -579,6 +601,21 @@ class MayaClient(BaseMayaClient):
                 str(check_result.result if check_result.result is not None else "").strip()
                 == "True"
             ):
+                # Build-marker gate (T-18a live find): the hot-update write
+                # pushes >10K through the native commandPort, tripping its
+                # stale-response quirk and intermittently stranding the
+                # just-started Qt server (connect refused on a live bind).
+                # When the injected helper already matches this build the
+                # rewrite is a no-op - skip it instead.
+                build_resp = await self._send_receive(
+                    "getattr(__import__('maya_mcp'), '__build__', None)"
+                )
+                installed_build = build_resp.result
+                if isinstance(installed_build, str):
+                    installed_build = installed_build.strip()
+                if installed_build and installed_build == __build__:
+                    logger.info("Maya mcp module already current")
+                    return
                 logger.info("Maya session already bootstrapped, updating module...")
                 # Re-execute bootstrap code to get latest create_module function
                 bootstrap_code = get_bootstrap_code()
@@ -600,8 +637,20 @@ class MayaClient(BaseMayaClient):
                         update_result = json.loads(update_result)
                     except (json.JSONDecodeError, TypeError):
                         update_result = None
-                if isinstance(update_result, dict) and update_result.get("warning"):
-                    logger.warning(f"Module 'maya_mcp': {update_result['warning']}")
+                if isinstance(update_result, dict):
+                    # N7: a failed create_module carries its error inside
+                    # the result payload (same wrap write_module unpacks)
+                    # - surface it instead of logging a false "updated".
+                    inner_error = update_result.get("error")
+                    if inner_error:
+                        if isinstance(inner_error, dict):
+                            raise MayaExecutionError(
+                                f"{inner_error.get('code', 'module_error')}: "
+                                f"{inner_error.get('message', 'module update failed')}"
+                            )
+                        raise MayaExecutionError(str(inner_error))
+                    if update_result.get("warning"):
+                        logger.warning(f"Module 'maya_mcp': {update_result['warning']}")
                 logger.info("Maya mcp module updated")
                 return
 
@@ -681,23 +730,36 @@ class MayaClient(BaseMayaClient):
                     timeout=self.timeout,
                     buffer_size=self.buffer_size,
                 )
-                try:
-                    await qt_client.connect()
-                    # Liveness gate (D-013): in headless Maya a Qt listener can
-                    # accept TCP while readyRead never fires - a zombie channel.
-                    # Probe the framed protocol before registering the session.
-                    alive = await asyncio.wait_for(qt_client.ping(), timeout=QT_PROBE_TIMEOUT)
-                    if not alive:
-                        raise MayaUnavailableError(
-                            "Qt server accepted the connection but does not respond"
-                        )
-                except Exception as e:
-                    logger.warning(f"Qt channel unusable ({e}); falling back")
-                    qt_error = e
+                # Maya's main thread can lag the Qt event loop during busy
+                # windows (file ops, VP2 redraws); the T-18a live batch showed
+                # a single-shot probe falling back to native intermittently.
+                # Bounded retry keeps the framed channel for a slow-but-alive
+                # server without masking a truly dead one.
+                last_err: Exception | None = None
+                for _attempt in range(QT_CONNECT_ATTEMPTS):
                     try:
-                        await qt_client.disconnect()
-                    except Exception:
-                        pass
+                        if not qt_client.is_connected:
+                            await qt_client.connect()
+                        # Liveness gate (D-013): in headless Maya a Qt listener
+                        # can accept TCP while readyRead never fires - a zombie
+                        # channel. Probe the framed protocol before registering.
+                        alive = await asyncio.wait_for(qt_client.ping(), timeout=QT_PROBE_TIMEOUT)
+                        if not alive:
+                            raise MayaUnavailableError(
+                                "Qt server accepted the connection but does not respond"
+                            )
+                        last_err = None
+                        break
+                    except Exception as e:
+                        last_err = e
+                        try:
+                            await qt_client.disconnect()
+                        except Exception:
+                            pass
+                        await asyncio.sleep(0.5)
+                if last_err is not None:
+                    logger.warning(f"Qt channel unusable ({last_err}); falling back")
+                    qt_error = last_err
                     qt_client = None
 
             if qt_client is not None:
@@ -710,6 +772,14 @@ class MayaClient(BaseMayaClient):
                     f"Qt server unavailable ({qt_error}); "
                     "falling back to a dedicated native commandPort"
                 )
+                # T-18a live find: a Qt server that was started but never
+                # connected stays listening forever (orphan). Release it
+                # before opening the fallback port - use-and-close hygiene
+                # for temporary listeners (ADR-0023 port discipline).
+                try:
+                    await self._send_receive(self.STOP_QT_SERVER, raise_on_error=False)
+                except Exception:
+                    pass
                 result = await self._send_receive(self.START_COMMAND_PORT, {"port": new_port})
                 logger.info(f"Dedicated commandPort created: {result}")
                 await asyncio.sleep(0.5)
@@ -719,6 +789,9 @@ class MayaClient(BaseMayaClient):
                     timeout=self.timeout,
                     buffer_size=self.buffer_size,
                 )
+                # T-18a: remember the dedicated port so disconnect() can
+                # close it - fallback commandPorts stayed open forever.
+                new_client._dedicated_port = new_port
         else:
             raise InputValidationError(f"Unknown client_type {client_type!r}")
         # Connect to the new dedicated port (the Qt branch already probed it)

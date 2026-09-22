@@ -109,7 +109,7 @@ def test_callform_checklist_gui_tier():
         "cmds.refresh(force=True) -> None",
         "M3dView.getRendererName() -> 'vp2Renderer' under VP2",
         "cmds.playblast(completeFilename=F, frame=[t]) -> F verbatim",
-        "om.MImage.floatPixels() -> pointer (long), wrapped via MScriptUtil",
+        "view.readColorBuffer(img, True) -> RGBA float img (no pointer)",
     )
     pytest.skip("human-eye check — steps printed above")
 

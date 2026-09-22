@@ -143,8 +143,10 @@ Machine-assertable (gui):
 - `cmds.refresh(force=True)` -> None
 - `omui.M3dView.active3dView().getRendererName()` -> `'vp2Renderer'`
   under VP2
-- `om.MImage.floatPixels()` -> pointer (`long`), not a sequence —
-  wrapped via `MScriptUtil` fallback in `_float_pixels`
+- `view.readColorBuffer(img, readRGBA=True)` -> RGBA-ordered float
+  MImage on 2024 (`isRGBA()` -> True); `writeToFile` does the
+  float->byte conversion — no Python pointer read (`MScriptUtil` is
+  gone in Maya 2024, `floatPixels()` returns a bare `int` address)
 - `hasattr(om.MImage, 'convertPixelFormat')` -> False on 2024 Python
   (C++-only API — evidence print in the VP2 gui test, not a gate)
 

@@ -993,12 +993,17 @@ class TestBootstrapHotUpdateWarning:
     still replaced, but a failed cleanup must not pass silently."""
 
     @staticmethod
-    def _hot_update_responses(warning):
+    def _hot_update_responses(warning, build=None):
+        """CHECK_BOOTSTRAP -> build probe -> exec(bootstrap) -> create_module.
+
+        build=None makes the installed helper look older/absent so the
+        update path always reaches create_module in these tests."""
         create_result = {"success": True, "message": "Module 'maya_mcp' created"}
         if warning is not None:
             create_result["warning"] = warning
         return [
             CommandResponse(result="True", error=None),
+            CommandResponse(result=build, error=None),
             CommandResponse(result=None, error=None),
             CommandResponse(result=create_result, error=None),
         ]
@@ -1033,3 +1038,51 @@ class TestBootstrapHotUpdateWarning:
         with caplog.at_level(logging.WARNING, logger="maya_mcp_server.client"):
             await maya_client._bootstrap()
         assert not any("Module 'maya_mcp'" in r.message for r in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_module_create_failed_raises_not_swallowed(
+        self, maya_client: MayaClient, mocker, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """N7: a module_create_failed payload on the hot-update path must
+        raise - it arrives inside result (the native commandPort wrap),
+        not response.error - instead of logging a false "updated"."""
+        maya_client._port_type = PortType.PYTHON
+        payload = {
+            "error": {
+                "code": "module_create_failed",
+                "message": "Failed to compile/execute module 'maya_mcp': SyntaxError: x",
+            }
+        }
+        responses = [
+            CommandResponse(result="True", error=None),
+            CommandResponse(result=None, error=None),  # build probe: absent
+            CommandResponse(result=None, error=None),
+            CommandResponse(result=payload, error=None),
+        ]
+        mocker.patch.object(
+            maya_client, "_send_receive", new_callable=AsyncMock, side_effect=responses
+        )
+        with caplog.at_level(logging.INFO, logger="maya_mcp_server.client"):
+            with pytest.raises(MayaExecutionError, match="module_create_failed"):
+                await maya_client._bootstrap()
+        assert not any("module updated" in r.message for r in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_matching_build_skips_rewrite(self, maya_client: MayaClient, mocker) -> None:
+        """T-18a: when the injected helper's __build__ already matches,
+        the >10K hot-update write is skipped - that write is what trips
+        the commandPort stale-response quirk (orphaned Qt servers)."""
+        from maya_mcp_server.maya_mcp_helper import __build__ as expected
+
+        maya_client._port_type = PortType.PYTHON
+        spy = mocker.patch.object(
+            maya_client,
+            "_send_receive",
+            new_callable=AsyncMock,
+            side_effect=[
+                CommandResponse(result="True", error=None),
+                CommandResponse(result=expected, error=None),
+            ],
+        )
+        await maya_client._bootstrap()
+        assert spy.await_count == 2  # CHECK_BOOTSTRAP + build probe only
