@@ -134,9 +134,9 @@ _Avoid_: 只设预算不设棘爪
 人眼验收项的版本化形态——pytest 中 test 函数存在、标 human_verify marker、body 只打印待人工确认步骤而不写 assert；使 GUI 真机清单（截图方向/渲染正确性等脆弱断言面）进版本库可复跑，又不制造假红假绿。与 gui marker（机器可断项真断言）同属 manual-tier 层，按 RC 节奏跑不卡 CI。
 _Avoid_: 把脆弱 GUI 断言硬写成 assert、清单散落仓库外
 
-**签名基线 (signature baseline)**:
-mayapy 真机内 inspect.signature 采集项目实际 cmds.* 调用面产出的 JSON 清单+allowlist，与 stub 声明自动 diff 作合约护栏；对齐 mypy stubtest 先例的 stub↔runtime 漂移检测，属冻结预算同构的 ratchet 资产——Maya 版本升级时重采集比对。签名只覆盖参数形状，时序/副作用/返回值语义归 call-form smoke 补。
-_Avoid_: 全人工逐条对文档、把签名等价当行为等价
+**presence 基线 (presence baseline)**:
+GUI 真机会话内 inspect.signature 尝试+dir() 采集项目实际 cmds.* 调用面产出的 JSON 清单+allowlist——cmds builtins 无 inspectable signature，契约实为 presence+方法名表，故名 presence-baseline.json（D-056①）；与 stub 声明自动 diff 作合约护栏，对齐 mypy stubtest 先例的 stub↔runtime 漂移检测，属冻结预算同构的 ratchet 资产——Maya 版本升级时重采集比对。presence 只覆盖存在性，时序/副作用/返回值语义归 call-form 清单补（证据层=docs/visual-callform-matrix.md）。
+_Avoid_: 全人工逐条对文档、把 presence 等价当行为等价
 
 **dogfood 素材**:
 门面/文档证据素材由产品自身产出的纪律——README 截图与演示 GIF 用本项目视觉工具（scene_viewport_snapshot/camera_orbit 序列）真实捕获，而非生成图或手工 mock；是 show-don't-tell 的最强形态，素材即能力证明。采集走 repo HEAD 服务实例，属门面资产入 git（非 .scratch 过程件）。

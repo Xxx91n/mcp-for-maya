@@ -73,3 +73,5 @@
 - $but（GitButler）— 全部版本控制写操作（幻影簿记期先 git ls-tree 对账）
 - $atomcode-research — 争议点调研（串行单发）
 - $handoff — 下轮翻页；domain-modeling / neat-freak — CONTEXT/ADR 维护
+
+[^r2-skill-names]: R-2 注脚（语义重建免责）：本档所列技能名/技能路径系复原——原始字面量在壳层被吞后不可考，返工方当时仅口头披露。名称语义保真，但路径字面量以 `~/.agents/skills/` 现状为准。（T-15 审计新发现#2，T-14a 落纸）
