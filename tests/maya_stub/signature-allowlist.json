@@ -1,6 +1,5 @@
 {
   "_comment": "Intentional stub-vs-real-Maya divergences (D-049b). Every entry must carry a reason — prefer fixing the divergence over allowing it. Class-level entries exempt their methods too. Baseline: presence-baseline.json, collected on Maya 2024.",
   "omui.MImage": "MImage lives in maya.api.OpenMaya on Maya <=2024; OpenMayaUI gains it in 2025+. The stub models BOTH locations so visual_module's _MImage dual-resolution can be exercised against either layout (a test deletes omui.MImage to simulate 2024).",
-  "om.MImage.convertPixelFormat": "convertPixelFormat is a 2025+ MImage API — real Maya 2024 om.MImage lacks it (verified live: identical PNG output without conversion). The stub's om.MImage shares the omui fake class which models the 2025+ shape; visual_module feature-detects via hasattr.",
-  "om.MVector.distanceTo": "Real MVector does not inherit MPoint — distanceTo is an MPoint API. The stub's MVector(MPoint) inherits it for shared xyz math; production code never calls mvector.distanceTo. Untangling the stub inheritance is deferred — the drift is shape-only."
+  "om.MImage.convertPixelFormat": "convertPixelFormat is a 2025+ MImage API — real Maya 2024 om.MImage lacks it (verified live: identical PNG output without conversion). The stub's om.MImage shares the omui fake class which models the 2025+ shape; visual_module feature-detects via hasattr."
 }

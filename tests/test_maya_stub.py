@@ -7,7 +7,7 @@ import math
 
 import maya_stub
 import pytest
-from maya_stub.math3d import MBoundingBox, MPoint, euler_from_matrix, trs_matrix
+from maya_stub.math3d import MBoundingBox, MPoint, MVector, euler_from_matrix, trs_matrix
 
 
 @pytest.fixture
@@ -47,6 +47,86 @@ class TestMatrixMath:
         b = trs_matrix(t=(0, 5, 0))
         p = MPoint(0, 0, 0) * (a * b)
         assert (p.x, p.y, p.z) == (1, 5, 0)
+
+
+class TestMVectorSplit:
+    """D-056④: real MVector is NOT an MPoint subclass — len==3, no w,
+    cross product via ^; MPoint len==4 with w. The stub's MVector(MPoint)
+    inheritance made isinstance/len()/w all lie (stub-green, real-red).
+    Conversion ctors mirror the real API: MVector(MPoint) drops w,
+    MPoint(MVector) sets w=1.0."""
+
+    def test_mvector_is_not_an_mpoint(self):
+        mv = MVector(1, 2, 3)
+        assert not isinstance(mv, MPoint)
+        assert not hasattr(mv, "w")
+        assert not hasattr(mv, "distanceTo")
+
+    def test_len_contract(self):
+        assert len(MVector(1, 2, 3)) == 3
+        assert len(MPoint(1, 2, 3)) == 4
+
+    def test_index_bounds(self):
+        mv = MVector(1, 2, 3)
+        assert (mv[0], mv[1], mv[2]) == (1.0, 2.0, 3.0)
+        with pytest.raises(IndexError):
+            _ = mv[3]
+        mp = MPoint(1, 2, 3)
+        assert mp[3] == 1.0  # w lives at index 3 on a point
+
+    def test_cross_product(self):
+        z = MVector(1, 0, 0) ^ MVector(0, 1, 0)
+        assert isinstance(z, MVector)
+        assert (z.x, z.y, z.z) == (0.0, 0.0, 1.0)
+
+    def test_dot_and_scalar_mul(self):
+        assert MVector(1, 0, 0) * MVector(0, 1, 0) == pytest.approx(0.0)
+        assert MVector(1, 2, 3) * MVector(4, 5, 6) == pytest.approx(32.0)
+        v = MVector(1, 2, 3) * 2.0
+        assert isinstance(v, MVector)
+        assert (v.x, v.y, v.z) == (2.0, 4.0, 6.0)
+
+    def test_vector_matrix_transform_drops_translation(self):
+        """w=0 semantics: rotation+scale apply, translation does NOT,
+        and no perspective divide."""
+        m = trs_matrix(t=(10, 0, 0), r=(0, 90, 0))
+        v = MVector(1, 0, 0) * m
+        assert isinstance(v, MVector)
+        assert v.x == pytest.approx(0, abs=1e-9)
+        assert v.z == pytest.approx(-1, abs=1e-9)
+
+    def test_point_minus_point_is_vector(self):
+        d = MPoint(5, 0, 0) - MPoint(1, 0, 0)
+        assert isinstance(d, MVector)
+        assert (d.x, d.y, d.z) == (4.0, 0.0, 0.0)
+
+    def test_point_minus_vector_is_point(self):
+        p = MPoint(5, 0, 0) - MVector(2, 0, 0)
+        assert isinstance(p, MPoint)
+        assert (p.x, p.y, p.z) == (3.0, 0.0, 0.0)
+
+    def test_conversion_ctors(self):
+        mv = MVector(MPoint(1, 2, 3))
+        assert isinstance(mv, MVector)
+        assert (mv.x, mv.y, mv.z) == (1.0, 2.0, 3.0)
+        mp = MPoint(MVector(4, 5, 6))
+        assert isinstance(mp, MPoint)
+        assert mp.w == 1.0  # real API: MPoint(MVector) pins w to 1.0
+        assert (mp.x, mp.y, mp.z) == (4.0, 5.0, 6.0)
+        # copy ctors preserve source values
+        assert MPoint(MPoint(1, 2, 3, 0.5)).w == 0.5
+        assert MVector(MVector(7, 8, 9)).z == 9.0
+
+    def test_vector_methods_surface(self):
+        v = MVector(3, 4, 0)
+        assert v.length() == pytest.approx(5.0)
+        n = v.normal()
+        assert isinstance(n, MVector)
+        assert n.length() == pytest.approx(1.0)
+        assert MVector(1, 0, 0).angle(MVector(0, 1, 0)) == pytest.approx(math.pi / 2)
+        assert MVector(1, 0, 0).isParallel(MVector(2, 0, 0))
+        assert not MVector(1, 0, 0).isParallel(MVector(0, 1, 0))
+        assert MVector(1, 0, 0).isEquivalent(MVector(1 + 1e-7, 0, 0))
 
 
 class TestSceneGraph:
