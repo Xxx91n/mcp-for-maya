@@ -366,8 +366,6 @@ class TestVp2ReadbackTruth:
         out_img.create(64, 64, 4, omui.MImage.kByte)
         out_img.setPixels(bytes(px), 64, 64)
         # NB: deliberately NOT calling setRGBA(True) — marker stays BGRA
-        import tempfile
-
         fd, tmp = tempfile.mkstemp(suffix=".png")
         os.close(fd)
         try:

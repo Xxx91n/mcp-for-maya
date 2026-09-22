@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 from unittest.mock import AsyncMock, MagicMock
@@ -1068,12 +1069,15 @@ class TestBootstrapHotUpdateWarning:
         assert not any("module updated" in r.message for r in caplog.records)
 
     @pytest.mark.asyncio
-    async def test_matching_build_skips_rewrite(self, maya_client: MayaClient, mocker) -> None:
-        """T-18a: when the injected helper's __build__ already matches,
-        the >10K hot-update write is skipped - that write is what trips
-        the commandPort stale-response quirk (orphaned Qt servers)."""
-        from maya_mcp_server.maya_mcp_helper import __build__ as expected
+    async def test_matching_source_sha_skips_rewrite(self, maya_client: MayaClient, mocker) -> None:
+        """T-18a/F3: when the injected helper's _mcp_source_sha already
+        matches sha256 of the current source, the >10K hot-update write is
+        skipped - that write is what trips the commandPort stale-response
+        quirk (orphaned Qt servers). The stamp is a content hash, so a
+        forgotten manual bump cannot silently mask a stale helper."""
+        from maya_mcp_server.bootstrap import get_helper_module_code
 
+        expected = hashlib.sha256(get_helper_module_code().encode()).hexdigest()[:16]
         maya_client._port_type = PortType.PYTHON
         spy = mocker.patch.object(
             maya_client,
@@ -1085,4 +1089,53 @@ class TestBootstrapHotUpdateWarning:
             ],
         )
         await maya_client._bootstrap()
-        assert spy.await_count == 2  # CHECK_BOOTSTRAP + build probe only
+        assert spy.await_count == 2  # CHECK_BOOTSTRAP + sha probe only
+
+    @pytest.mark.asyncio
+    async def test_bootstrap_stamps_source_sha(self, maya_client: MayaClient, mocker) -> None:
+        """The injected module carries _mcp_source_sha = sha256(source)[:16]
+        appended post-hash - self-describing, nothing to bump manually."""
+        from maya_mcp_server.bootstrap import get_helper_module_code
+
+        maya_client._port_type = PortType.PYTHON
+        spy = mocker.patch.object(
+            maya_client,
+            "_send_receive",
+            new_callable=AsyncMock,
+            side_effect=[
+                CommandResponse(result="False", error=None),
+                CommandResponse(result=None, error=None),
+                CommandResponse(result=None, error=None),
+            ],
+        )
+        await maya_client._bootstrap()
+        create_call = spy.await_args_list[-1]
+        sent_code = create_call.args[1]["code"]  # _send_receive(cmd, params)
+        src = get_helper_module_code()
+        sha = hashlib.sha256(src.encode()).hexdigest()[:16]
+        assert sent_code.startswith(src)
+        assert f"_mcp_source_sha = '{sha}'" in sent_code
+
+    @pytest.mark.asyncio
+    async def test_native_bootstrap_tags_dedicated_port(
+        self, maya_client: MayaClient, mocker
+    ) -> None:
+        """F1 (audit): the explicit client_type=native branch must tag the
+        dedicated commandPort so disconnect() closes it - the leak was
+        only fixed on the Qt-fallback branch."""
+        maya_client._port_type = PortType.PYTHON
+        mocker.patch.object(
+            maya_client,
+            "_send_receive",
+            new_callable=AsyncMock,
+            side_effect=[
+                CommandResponse(result="True", error=None),  # CHECK_BOOTSTRAP
+                CommandResponse(result="x" * 16, error=None),  # sha mismatch -> rewrite
+                CommandResponse(result=None, error=None),  # exec bootstrap
+                CommandResponse(result={}, error=None),  # create_module
+                CommandResponse(result=None, error=None),  # START_COMMAND_PORT
+            ],
+        )
+        mocker.patch.object(MayaClient, "connect", new_callable=AsyncMock)
+        new_client = await maya_client.bootstrap(client_type="native")
+        assert getattr(new_client, "_dedicated_port", None) is not None

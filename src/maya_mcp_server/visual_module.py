@@ -259,7 +259,7 @@ def _vp2_color_image(view: Any) -> Any:
     img = _MImage()
     img.create(view.portWidth(), view.portHeight(), 4, _MImage.kFloat)
     try:
-        view.readColorBuffer(img, True)
+        view.readColorBuffer(img, readRGBA=True)
     except TypeError:
         view.readColorBuffer(img)
     return img
@@ -303,8 +303,10 @@ def viewport_snapshot(
         else:
             img = _MImage()
             view.readColorBuffer(img)
-            # Flip only if the readback arrives bottom-up (empirical pin).
-            img.verticalFlip()
+            # Same empirical pin governs both readback flavors (F4):
+            # unconditional flip here contradicted the re-pin.
+            if _VP2_READBACK_BOTTOM_UP:
+                img.verticalFlip()
 
         fd, tmp = tempfile.mkstemp(prefix="_mcp_visual_", suffix=".png")
         os.close(fd)

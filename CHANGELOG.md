@@ -51,16 +51,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updated" log (N7). It now raises `MayaExecutionError` like
   `write_module` does.
 - Bootstrap no longer rewrites a >10K helper module on every connect:
-  the injected module's `__build__` marker is compared first and the
-  hot-update write is skipped when it matches. The big write is what
-  tripped the commandPort stale-response quirk and intermittently
-  stranded the just-started Qt server (connect refused on a live bind);
-  skipping it removes the flake. A bounded connect+ping retry still
-  covers genuinely slow Qt servers (T-18a, live-verified).
+  the injected module's `_mcp_source_sha` stamp (a content hash of the
+  helper source, self-stamped at inject time — no manual marker to
+  forget) is compared first and the hot-update write is skipped when it
+  matches. The big write is what tripped the commandPort stale-response
+  quirk and intermittently stranded the just-started Qt server (connect
+  refused on a live bind); skipping it removes the flake. A bounded
+  connect+ping retry still covers genuinely slow Qt servers (T-18a,
+  live-verified).
 - Fallback hygiene: when the Qt channel is unavailable, the bootstrap
-  now stops the orphaned Qt listener before opening the fallback
-  commandPort, and the dedicated fallback port is closed on
-  `disconnect()` instead of leaking (T-18a).
+  reaps the orphan Qt listener it just started (a pre-existing listener
+  is left alone — it may serve other clients), and the dedicated
+  commandPort — on either the explicit native branch or the fallback
+  path — is closed on `disconnect()` instead of leaking (T-18a).
 
 
 - `execute_code` coerces `result_type` to `ResultType` at the client

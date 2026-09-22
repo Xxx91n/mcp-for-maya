@@ -43,10 +43,6 @@ CAPTURE_VARIABLE = "_mcp_result"
 # StreamWriter buffer size limit (5MB) to prevent memory exhaustion
 _MAX_STREAM_BUFFER_SIZE = 5_242_880
 
-# Build marker (D-058): bumped when the injected helper changes so a
-# post-overwrite assert can prove the reload actually took effect.
-__build__ = "2026-09-22"
-
 
 def prepare_code_for_result_capture(
     code: str, capture_variable: str = CAPTURE_VARIABLE

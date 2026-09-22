@@ -83,7 +83,8 @@ class MImage:
 
     def setPixels(self, data, width, height):
         """Fill the buffer from a flat byte sequence in buffer order
-        (row 0 = top) using the CURRENT channel-order marker."""
+        (row 0 = top); bytes are stored verbatim - the RGBA/BGRA
+        marker only affects readback/writeToFile, not the fill."""
         self.width, self.height = int(width), int(height)
         self.format = self.kByte
         data = bytes(data)

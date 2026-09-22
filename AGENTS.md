@@ -56,7 +56,7 @@ tests/
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
-├── adr/                   # ADR-0001..0022 architecture decision records
+├── adr/                   # ADR-0001..0023 architecture decision records
 ├── decision-ledger.md     # grill decision ledger — canonical path since T-11a (D-041)
 ├── handoffs/              # round handoffs — canonical (next-round.md standing task book)
 ├── testing.md             # real-Maya manual tier checklist
