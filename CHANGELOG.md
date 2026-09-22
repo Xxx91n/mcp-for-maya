@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `create_module(overwrite=True)` now invokes the old module's
+  `_mcp_teardown` hook before evicting it from `sys.modules`; the
+  injected helper ships an idempotent teardown that disconnects the Qt
+  `newConnection` signal, deleteLater's the listener and sockets, and
+  restores stream capture. Reconnect-time helper reloads no longer orphan
+  a listening `QtCommandServer` (upstream #4, D-058).
+- Port-type probing switched from `1+1` to the bilingual
+  `eval("1/2")` payload - legal in both MEL (integer division -> `0`)
+  and Python 3 (`0.5`), so a MEL commandPort answers without a Script
+  Editor error. Ports that answer as non-Python join a session-level
+  permanent exemption set (lifted only when the port leaves LISTEN),
+  ending the periodic re-probe spam (upstream #1, D-059).
+- Probe filtering productized: `MAYA_MCP_INCLUDE_PORTS` /
+  `MAYA_MCP_EXCLUDE_PORTS` env vars (or the `SessionManager`
+  `include_ports` / `exclude_ports` ctor args) bound which discovered
+  ports are probed at all.
+- `maya_mcp_helper` refuses injection on Maya < 2023 (Python < 3.9)
+  with an actionable message, and missing `ast.unparse` degrades to
+  no-result-capture instead of `AttributeError` (upstream #3, D-060).
+- `serverInfo.version` now reports the product version
+  (`importlib.metadata.version("mcp-for-maya")` with a `__version__`
+  source-tree fallback) instead of leaking the FastMCP framework
+  version (D-060).
+
+### Docs
+
+- README (bilingual) + `docs/testing.md`: dual-runtime support matrix
+  (host Python >= 3.10; injected helper needs Maya >= 2023 / Python >=
+  3.9; verified on Maya 2024) and a multi-instance commandPort section
+  covering per-instance topology, auto-scan vs `add_session`, and
+  userSetup.py persistence (upstream #5, D-060).
+
 ## [0.1.2] - 2026-09-20
 
 > First real-Maya verification round: everything below was found by
