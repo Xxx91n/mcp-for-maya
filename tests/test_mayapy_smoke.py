@@ -2,7 +2,7 @@
 
 Run inside a real Maya interpreter:
 
-    set PYTHONPATH=<repo>\src;<repo>\tests
+    set PYTHONPATH=<repo>/src;<repo>/tests
     mayapy -m pytest tests/ -m mayapy
 
 Under vanilla python (or the stub) these skip — they exist so docs/testing.md
@@ -116,3 +116,57 @@ def test_visual_module_batch_gate_in_real_maya(real_maya):
         assert "error" in res, res
         assert res["error"]["code"] == "gui_session_required", res
         assert "suggestion" in res["error"]
+
+
+# ---------------------------------------------------------------------------
+# D-056② call-form bookings — viewport-independent shapes asserted on a
+# healthy mayapy. Env-blocked on the current box; dormant, not claimed.
+# ---------------------------------------------------------------------------
+
+
+def test_callform_camera_returns_transform_shape_list(real_maya):
+    """cmds.camera(name=X) -> [transform, shape] — the X1 rename
+    authority contract."""
+    cam = real_maya.camera(name="CAM_cf_probe")
+    try:
+        assert isinstance(cam, list) and len(cam) == 2
+        assert real_maya.objectType(cam[1]) == "camera"
+    finally:
+        real_maya.delete("CAM_cf_probe")
+
+
+def test_callform_ls_camera_includes_shapes(real_maya):
+    """cmds.ls(type='camera') returns shape nodes, incl. perspShape."""
+    cams = real_maya.ls(type="camera") or []
+    assert "perspShape" in cams
+
+
+def test_callform_file_rename_prompt_form(real_maya, tmp_path):
+    """cmds.file(rename=X) + sceneName query — the rename+prompt form
+    that hung 0.1.1 (positional form hit the prompt dialog)."""
+    target = tmp_path / "cf_scene.ma"
+    real_maya.file(rename=str(target))
+    name = real_maya.file(q=True, sceneName=True) or ""
+    assert name.replace("\\", "/").endswith("cf_scene.ma")
+
+
+def test_callform_selection_star_pulls_non_dag(real_maya):
+    """MSelectionList.add('*') also matches non-DAG nodes on real Maya —
+    getDagPath raises TypeError('item is not a DAG path') on them
+    (the live-2024 crash that killed scene_snapshot)."""
+    om = pytest.importorskip("maya.api.OpenMaya")
+    real_maya.polyCube(name="GEO_cf_probe")
+    sel = om.MSelectionList()
+    sel.add("*")
+    hit_non_dag = False
+    for i in range(sel.length()):
+        try:
+            sel.getDagPath(i)
+        except TypeError:
+            hit_non_dag = True
+    assert hit_non_dag, "'*' must pull non-DAG entries on real Maya"
+
+
+def test_callform_about_batch_is_true(real_maya):
+    """Under mayapy the batch gate trigger fires: about(batch=True)."""
+    assert real_maya.about(batch=True) is True

@@ -239,3 +239,54 @@ async def test_vp2_pure_color_orientation_and_channels(visual_module):
         )
     finally:
         await _cmds(client, _VP2_PROBE_CLEANUP)
+
+
+_CALLFORM_PROBE = """
+import maya.cmds as cmds
+import maya.api.OpenMaya as om
+import maya.api.OpenMayaUI as omui
+focus = cmds.getPanel(withFocus=True)
+mps = cmds.getPanel(type="modelPanel") or []
+mp = mps[0] if mps else None
+otype = cmds.objectTypeUI(mp) if mp else None
+cam_q = cmds.modelPanel(mp, q=True, camera=True) if mp else None
+eds = cmds.lsUI(editors=True)
+ct0 = cmds.currentTime(q=True)
+cmds.currentTime(1.0, edit=True)
+ct1 = cmds.currentTime(q=True)
+{
+    "focus_str_or_none": focus is None or isinstance(focus, str),
+    "modelPanels_list_of_str": isinstance(mps, list)
+    and all(isinstance(x, str) for x in mps),
+    "objectTypeUI_str": otype is None or isinstance(otype, str),
+    "modelPanel_camera_q_str": cam_q is None or isinstance(cam_q, str),
+    "lsUI_editors_list": isinstance(eds, list),
+    "currentTime_float": isinstance(ct0, float) and float(ct1) == 1.0,
+    "about_batch_bool": isinstance(cmds.about(batch=True), bool),
+    "renderer": omui.M3dView.active3dView().getRendererName(),
+    "has_convertPixelFormat": hasattr(om.MImage, "convertPixelFormat"),
+}
+"""
+
+
+async def test_callform_surface_probe(gui_client):
+    """D-056②: machine-asserted call-form shapes on the live wire —
+    every row mirrors docs/visual-callform-matrix.md."""
+    r = await _cmds(gui_client, _CALLFORM_PROBE)
+    if isinstance(r, str):
+        r = json.loads(r)
+    for key in (
+        "focus_str_or_none",
+        "modelPanels_list_of_str",
+        "objectTypeUI_str",
+        "modelPanel_camera_q_str",
+        "lsUI_editors_list",
+        "currentTime_float",
+        "about_batch_bool",
+    ):
+        assert r[key] is True, f"call-form broke: {key} -> {r[key]}"
+    # evidence prints, not gates
+    print(
+        f"\\ncallform evidence: renderer={r['renderer']} "
+        f"convertPixelFormat={r['has_convertPixelFormat']}"
+    )

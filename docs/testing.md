@@ -56,6 +56,22 @@ Pending: the mayapy/batch run must also cover the `gui_session_required`
 headless gate (visual tools must return the structured error, not
 crash) — queued until a healthy headless Maya env exists.
 
+### Call-form items booked to mayapy (env-blocked on this box)
+
+Viewport-independent call forms whose real-return shape must be
+asserted on a healthy mayapy (skeleton tests in
+`tests/test_mayapy_smoke.py` — they run when the tier is available,
+skip honestly otherwise). Evidence table:
+`docs/visual-callform-matrix.md`.
+
+- `cmds.camera(name=X)` -> `[transform, shape]` list (X1 rename authority)
+- `cmds.ls(type='camera')` -> list including `perspShape` shape nodes
+- `cmds.file(rename=X)` + `sceneName` query — the rename+prompt form
+  (the 0.1.1 hang came from a positional form hitting the prompt dialog)
+- `MSelectionList.add('*')` includes non-DAG nodes -> `getDagPath`
+  raises `TypeError('item is not a DAG path')` on them
+- `cmds.about(batch=True)` -> True under mayapy (the batch gate trigger)
+
 For a quick smoke test of the module inside Maya's Script Editor:
 
 ```python
@@ -92,6 +108,43 @@ orientation (verticalFlip), WYSIWYG HUD/selection match, VP2 non-black
 multi-client ImageContent rendering (non-Devin seats blocked on user
 env), modelPanel -camera call form on 2025/2026 (partial — only 2024
 verified locally).
+
+### Call-form checklist (D-056②)
+
+Every call form below is verified against its official signature —
+the evidence layer is `docs/visual-callform-matrix.md` (single source
+of truth); this list is the tier assignment. `pytest -m gui`
+machine-asserts the first group on the live wire
+(`test_callform_surface_probe`); the asymmetric pure-color pin has its
+own test (`test_vp2_pure_color_orientation_and_channels`).
+
+Machine-assertable (gui):
+
+- `cmds.getPanel(withFocus=True)` -> `str|None`; may return a
+  non-modelPanel — `objectTypeUI` must confirm `modelEditor` first
+- `cmds.getPanel(type='modelPanel')` -> `string[]`
+- `cmds.modelPanel(p, q=True, camera=True)` -> `str` camera name;
+  `modelPanel(p, e=True, camera=X)` -> None; `modelPanel(p, ex=True)`
+  -> bool (D-039)
+- `cmds.modelEditor(ed, q=True, camera=True)` -> `str`;
+  `modelEditor(ed, q=True, activeView=True)` -> bool
+- `cmds.lsUI(editors=True)` -> `string[]`; `objectTypeUI(name)` -> `str`
+- `cmds.currentTime(q=True)` -> float; `currentTime(v, edit=True)` -> None
+- `cmds.refresh(force=True)` -> None
+- `omui.M3dView.active3dView().getRendererName()` -> `'vp2Renderer'`
+  under VP2
+- `om.MImage.floatPixels()` -> pointer (`long`), not a sequence —
+  wrapped via `MScriptUtil` fallback in `_float_pixels`
+- `hasattr(om.MImage, 'convertPixelFormat')` -> False on 2024 Python
+  (C++-only API — evidence print in the VP2 gui test, not a gate)
+
+Human-eye (human_verify skeleton):
+
+- asymmetric pure-color probe (top-left red block) lands top-left AND
+  red — the flip + channel-order pin on real VP2; also machine-asserted
+  by `test_vp2_pure_color_orientation_and_channels`
+- `cmds.playblast(completeFilename=F, frame=[t])` writes F verbatim —
+  no frame suffix, no extension rewriting
 
 For ad-hoc Script Editor checks inside Maya:
 

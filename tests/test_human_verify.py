@@ -88,3 +88,42 @@ def test_modelpanel_camera_flag_2025_2026():
         "this box only has Maya 2024 — mark partial until then",
     )
     pytest.skip("needs Maya 2025/2026 — partial on this machine")
+
+
+def test_callform_checklist_gui_tier():
+    """D-056②: the viewport-dependent call-form checklist, versioned.
+
+    Official signatures + verdicts live in docs/visual-callform-matrix.md
+    (evidence layer); docs/testing.md Tier-3 holds the same list. The
+    machine-assertable subset runs under `pytest -m gui` as
+    test_callform_surface_probe — this entry keeps the eyeball tier
+    honest about what it covers."""
+    _steps(
+        "cmds.getPanel(withFocus=True) -> str|None; may return a",
+        "  non-modelPanel — confirm via objectTypeUI == 'modelEditor'",
+        "cmds.getPanel(type='modelPanel') -> list of str",
+        "cmds.modelPanel(p, q, camera) -> str; e+camera -> None; ex -> bool",
+        "cmds.modelEditor(ed, q, camera/activeView) -> str/bool",
+        "cmds.lsUI(editors=True) -> list; objectTypeUI(name) -> str",
+        "cmds.currentTime(q) -> float; currentTime(v, edit) -> None",
+        "cmds.refresh(force=True) -> None",
+        "M3dView.getRendererName() -> 'vp2Renderer' under VP2",
+        "cmds.playblast(completeFilename=F, frame=[t]) -> F verbatim",
+        "om.MImage.floatPixels() -> pointer (long), wrapped via MScriptUtil",
+    )
+    pytest.skip("human-eye check — steps printed above")
+
+
+def test_callform_checklist_mayapy_tier():
+    """D-056②: viewport-independent call forms are booked to mayapy —
+    skeleton asserts exist in test_mayapy_smoke.py and run whenever a
+    healthy interpreter is available (env-blocked on this box)."""
+    _steps(
+        "run mayapy -m pytest tests/ -m mayapy on a healthy box",
+        "cmds.camera(name=X) -> [transform, shape] list",
+        "cmds.ls(type='camera') -> includes 'perspShape' shape",
+        "cmds.file(rename=X)+sceneName — rename+prompt form (0.1.1 hang)",
+        "MSelectionList.add('*') pulls non-DAG -> getDagPath TypeError",
+        "cmds.about(batch=True) -> True under mayapy",
+    )
+    pytest.skip("mayapy env-blocked on this box — booked, not claimed")
