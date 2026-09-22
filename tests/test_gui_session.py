@@ -147,3 +147,95 @@ async def test_render_preview_missing_camera_domain_error(visual_module):
     result = await _vcall(visual_module, "render_preview", camera="no_such_cam_xyz_2024")
     assert "error" in result
     assert result["error"]["code"] == "camera_not_found"
+
+
+_VP2_PROBE_SETUP = """
+import maya.cmds as cmds
+import maya.api.OpenMaya as om
+for n in ("GEO_vp2_probe", "MAT_vp2_red", "MAT_vp2_redSG"):
+    if cmds.objExists(n):
+        cmds.delete(n)
+cube = cmds.polyCube(w=6, h=6, d=6, name="GEO_vp2_probe")[0]
+mat = cmds.shadingNode("lambert", asShader=True, name="MAT_vp2_red")
+cmds.setAttr(mat + ".color", 1.0, 0.0, 0.0, type="double3")
+sg = cmds.sets(renderable=True, noSurfaceShader=True, empty=True, name="MAT_vp2_redSG")
+cmds.connectAttr(mat + ".outColor", sg + ".surfaceShader", f=True)
+cmds.sets(cube, e=True, forceElement=sg)
+sel = om.MSelectionList()
+sel.add("persp")
+m = sel.getDagPath(0).inclusiveMatrix()
+eye = om.MPoint(0, 0, 0) * m
+fwd = om.MVector(0, 0, -1) * m
+up = om.MVector(0, 1, 0) * m
+right = om.MVector(1, 0, 0) * m
+pos = eye + fwd * 30 - right * 12 + up * 9
+cmds.move(pos.x, pos.y, pos.z, cube)
+cmds.refresh(force=True)
+{"probe": "GEO_vp2_probe"}
+"""
+
+_VP2_PROBE_CLEANUP = """
+import maya.cmds as cmds
+for n in ("GEO_vp2_probe", "MAT_vp2_red", "MAT_vp2_redSG"):
+    if cmds.objExists(n):
+        cmds.delete(n)
+True
+"""
+
+
+async def test_vp2_pure_color_orientation_and_channels(visual_module):
+    """D-056⑤ anchor on REAL Maya: asymmetric pure-color probe pins the
+    VP2 readback flip + channel order.
+
+    A red cube placed camera-space top-left must land top-left and RED
+    in the PNG. A missed/wrong flip puts it bottom-left; a BGRA/RGBA
+    swap makes it blue. Tolerance bands only — no exact equality (OCIO
+    can drift pure colors). Also records hasattr(MImage,
+    convertPixelFormat) as evidence (not a gate).
+    """
+    client = visual_module
+    has_cpf = await _cmds(
+        client,
+        "import maya.api.OpenMaya as om; hasattr(om.MImage, 'convertPixelFormat')",
+    )
+    renderer = await _cmds(
+        client,
+        "import maya.api.OpenMayaUI as omui; "
+        "omui.M3dView.active3dView().getRendererName()",
+    )
+    print(f"\\nVP2 evidence: convertPixelFormat={has_cpf} renderer={renderer}")
+    try:
+        await _cmds(client, _VP2_PROBE_SETUP)
+        result = await _vcall(client, "viewport_snapshot", max_size=800, format="png")
+        assert "error" not in result
+        raw = base64.b64decode(result["data_b64"])
+        assert raw.startswith(PNG_MAGIC)
+
+        from PySide6.QtGui import QImage
+
+        qimg = QImage.fromData(raw)
+        assert not qimg.isNull()
+        w, h = qimg.width(), qimg.height()
+
+        def cell(x0, y0, x1, y1):
+            rs = gs = bs = n = 0
+            for y in range(y0, y1):
+                for x in range(x0, x1):
+                    c = qimg.pixelColor(x, y)
+                    rs += c.red()
+                    gs += c.green()
+                    bs += c.blue()
+                    n += 1
+            return rs / n, gs / n, bs / n
+
+        tr, tg, tb = cell(w // 16, h // 16, w // 8, h // 8)
+        br, bg, bb = cell(w // 16, h * 13 // 16, w // 8, h * 7 // 8)
+        assert tr > 120 and tr > tb + 40, (
+            f"top-left must be RED (channel-order truth), got {(tr, tg, tb)}"
+        )
+        assert br < tr - 40 and bb < 140, (
+            f"bottom-left must not carry the red block (orientation truth), "
+            f"top-left={(tr, tg, tb)} bottom-left={(br, bg, bb)}"
+        )
+    finally:
+        await _cmds(client, _VP2_PROBE_CLEANUP)

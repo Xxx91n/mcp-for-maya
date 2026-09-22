@@ -23,6 +23,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import maya_stub
 import pytest
+from maya_stub.fakeqt import png_decode
 
 from maya_mcp_server.maya_mcp_helper import prepare_code_for_result_capture
 from maya_mcp_server.types import CommandResponse, OutputBuffer, ResultType
@@ -293,6 +294,70 @@ class TestSnapshotContract:
 
         with pytest.raises(InputValidationError):
             await vtools.fns["scene_viewport_snapshot"](max_size=8)
+
+
+# ------------------------------------------------------------
+# VP2 readback truth (D-056⑤) — asymmetric pure-color pin
+# ------------------------------------------------------------
+
+
+def _top_left_red(x, y, w, h):
+    """Asymmetric pattern: pure red block top-left quarter, black rest.
+
+    Asymmetry is the point — only a layout like this can lock whether
+    the readback was flipped and whether channels were swapped (a
+    fullscreen solid cannot)."""
+    if x < w // 4 and y < h // 4:
+        return (1.0, 0.0, 0.0, 1.0)
+    return (0.0, 0.0, 0.0, 1.0)
+
+
+def _cell_mean(rows, w, h, x0, y0, x1, y1):
+    """Mean (r,g,b) over a cell of decoded PNG rows (top-down coords)."""
+    rs = gs = bs = n = 0
+    for y in range(y0, y1):
+        row = rows[y]
+        for x in range(x0, x1):
+            i = x * 3
+            rs += row[i]
+            gs += row[i + 1]
+            bs += row[i + 2]
+            n += 1
+    return rs / n, gs / n, bs / n
+
+
+class TestVp2ReadbackTruth:
+    """The stub models the documented VP2 defect shape: readColorBuffer
+    fills BGRA + bottom-up. A red block painted top-left must land
+    top-left and RED — a missed flip puts it bottom-left, a missed
+    swizzle/setRGBA makes it blue."""
+
+    async def test_swizzle_path_lands_red_top_left(self, vtools, monkeypatch):
+        """<=2024 path: convertPixelFormat absent -> floatPixels manual
+        BGRA->RGBA swizzle + setPixels + setRGBA(True)."""
+        vtools.env.scene.viewport_pattern = _top_left_red
+        monkeypatch.delattr(vtools.module._MImage, "convertPixelFormat", raising=False)
+        out = await vtools.fns["scene_viewport_snapshot"](format="png", max_size=2000)
+        raw = base64.b64decode(out[0].data)
+        w, h, rows = png_decode(raw)
+        # tolerance bands, not exact equality (OCIO may drift pure colors)
+        tr, tg, tb = _cell_mean(rows, w, h, w // 16, h // 16, w // 8, h // 8)
+        br, bg, bb = _cell_mean(rows, w, h, w // 16, h * 13 // 16, w // 8, h * 7 // 8)
+        assert tr > 180 and tb < 80, f"top-left must be RED, got {(tr, tg, tb)}"
+        assert br < 60 and bb < 60, f"bottom-left must stay black, got {(br, bg, bb)}"
+
+    async def test_convert_path_lands_red_top_left(self, vtools):
+        """2025+ path: convertPixelFormat present -> official conversion,
+        conditional flip still applies."""
+        vtools.env.scene.viewport_pattern = _top_left_red
+        assert hasattr(vtools.module._MImage, "convertPixelFormat")
+        out = await vtools.fns["scene_viewport_snapshot"](format="png", max_size=2000)
+        raw = base64.b64decode(out[0].data)
+        w, h, rows = png_decode(raw)
+        tr, tg, tb = _cell_mean(rows, w, h, w // 16, h // 16, w // 8, h // 8)
+        br, bg, bb = _cell_mean(rows, w, h, w // 16, h * 13 // 16, w // 8, h * 7 // 8)
+        assert tr > 180 and tb < 80, f"top-left must be RED, got {(tr, tg, tb)}"
+        assert br < 60 and bb < 60, f"bottom-left must stay black, got {(br, bg, bb)}"
 
 
 # ------------------------------------------------------------

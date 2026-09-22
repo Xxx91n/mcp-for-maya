@@ -2,13 +2,27 @@
 
 Models the M3dView/MImage surface the _mcp_visual module uses:
 active3dView + portWidth/portHeight + getRendererName +
-readColorBuffer + MImage create/convert/flip/writeToFile.
+readColorBuffer + MImage create/pixels/flip/writeToFile.
+
+Pixel model (D-056⑤): readColorBuffer fills the image with GL-truth —
+buffer rows are bottom-up (row 0 = bottom of the image) and channels
+are stored BGRA (MImage's de-facto order; isRGBA() reports the flag).
+verticalFlip() physically reverses row order; writeToFile emits buffer
+order to file rows, interpreting channels via the RGBA/BGRA marker —
+so forgetting setRGBA(True) after a manual RGBA fill really does swap
+R/B in the output, and skipping the flip really does produce an
+upside-down PNG. The scene pattern comes from Scene.viewport_pattern
+(x, y in TOP-DOWN image coords -> (r, g, b, a) floats 0..1).
 """
 
 from __future__ import annotations
 
 from . import runtime
-from .fakeqt import png_bytes
+from .fakeqt import png_bytes, png_pixels
+
+
+def _default_pattern(x, y, w, h):
+    return (90 / 255.0, 120 / 255.0, 160 / 255.0, 1.0)
 
 
 class MImage:
@@ -20,26 +34,143 @@ class MImage:
         self.height = 0
         self.channels = 4
         self.format = self.kByte
-        self.flipped = False
-        self._filled = False
+        self._rgba = False  # BGRA is MImage's de-facto storage order
+        self._rows = None  # buffer rows, row 0 = BOTTOM (GL order)
 
     def create(self, width, height, channels=4, format=kByte):
         self.width = int(width)
         self.height = int(height)
         self.channels = int(channels)
         self.format = format
+        self._rows = None
+
+    # ---- size / format introspection ----
+
+    def getSize(self):
+        return (self.width, self.height)
+
+    def pixelType(self):
+        return self.format
+
+    def depth(self):
+        return self.channels
+
+    def isRGBA(self):
+        return self._rgba
+
+    def setRGBA(self, flag):
+        """Channel-order MARKER, not a rearranger — real setRGBA()."""
+        self._rgba = bool(flag)
+        return self
+
+    # ---- raw buffer access ----
+
+    def _flat(self, cast):
+        if self._rows is None:
+            raise RuntimeError("MImage has no image data")
+        return [cast(c) for row in self._rows for px in row for c in px]
+
+    def pixels(self):
+        """Flat byte sequence in buffer order (bottom-up, current order)."""
+        if self.format == self.kFloat:
+            return bytes(self._flat(lambda c: max(0, min(255, int(round(c * 255))))))
+        return bytes(self._flat(lambda c: max(0, min(255, int(round(c))))))
+
+    def floatPixels(self):
+        """Flat float sequence in buffer order (bottom-up, BGRA)."""
+        return [float(c) for c in self._flat(float)]
+
+    def setPixels(self, data, width, height):
+        """Fill the buffer from a flat byte sequence in GL buffer order
+        (row 0 = bottom) using the CURRENT channel-order marker."""
+        self.width, self.height = int(width), int(height)
+        self.format = self.kByte
+        data = bytes(data)
+        n = self.width * self.height * self.channels
+        if len(data) < n:
+            raise RuntimeError("setPixels data too short")
+        self._rows = [
+            [tuple(data[(y * self.width + x) * 4 + c] for c in range(4)) for x in range(self.width)]
+            for y in range(self.height)
+        ]
+        return self
+
+    def setFloatPixels(self, data, width, height, channels=4):
+        self.width, self.height = int(width), int(height)
+        self.channels = int(channels)
+        self.format = self.kFloat
+        data = list(data)
+        self._rows = [
+            [
+                tuple(float(data[(y * self.width + x) * self.channels + c]) for c in range(4))
+                for x in range(self.width)
+            ]
+            for y in range(self.height)
+        ]
+        return self
 
     def convertPixelFormat(self, format):
+        """2025+ API: float<->byte conversion, channel order preserved."""
+        if self._rows is not None:
+            if format == self.kByte and self.format == self.kFloat:
+                self._rows = [
+                    [tuple(max(0, min(255, int(round(c * 255)))) for c in px) for px in row]
+                    for row in self._rows
+                ]
         self.format = format
 
     def verticalFlip(self):
-        self.flipped = not self.flipped
+        """Physically reverse buffer row order (real MImage.verticalFlip)."""
+        if self._rows is not None:
+            self._rows = self._rows[::-1]
+        self.flipped = not getattr(self, "flipped", False)
+        return True
+
+    def _fill_from_viewport(self, w, h):
+        """GL-truth fill: BGRA channel order, bottom-up row order."""
+        sc = runtime.scene
+        pattern = getattr(sc, "viewport_pattern", None) or _default_pattern
+        rows = []
+        for b in range(h):
+            y_top = h - 1 - b  # buffer row 0 = bottom of the image
+            row = []
+            for x in range(w):
+                r, g, bl, a = pattern(x, y_top, w, h)
+                if self.format == self.kFloat:
+                    row.append((float(bl), float(g), float(r), float(a)))
+                else:
+                    row.append(
+                        tuple(max(0, min(255, int(round(c * 255)))) for c in (bl, g, r, a))
+                    )
+            rows.append(row)
+        self._rows = rows
 
     def writeToFile(self, path, outputType="png"):
-        if not self._filled and self.width == 0:
-            raise RuntimeError("MImage has no image data")
+        if self._rows is None:
+            if self.width == 0:
+                raise RuntimeError("MImage has no image data")
+            # allocated but never filled — keep old uniform fill behavior
+            with open(path, "wb") as fh:
+                fh.write(png_bytes(self.width, self.height))
+            return True
+        # writeToFile emits buffer order to file rows; channels are
+        # interpreted via the RGBA marker (a lie here swaps R/B out).
+        rows_rgb = []
+        for row in self._rows:
+            out = bytearray()
+            for px in row:
+                if self.format == self.kFloat:
+                    px = tuple(max(0, min(255, int(round(c * 255)))) for c in px)
+                else:
+                    px = tuple(max(0, min(255, int(c))) for c in px)
+                if self._rgba:
+                    r, g, b = px[0], px[1], px[2]
+                else:
+                    b, g, r = px[0], px[1], px[2]
+                out += bytes((r, g, b))
+            rows_rgb.append(bytes(out))
         with open(path, "wb") as fh:
-            fh.write(png_bytes(self.width, self.height))
+            fh.write(png_pixels(self.width, self.height, rows_rgb))
         return True
 
 
@@ -79,6 +210,7 @@ class M3dView:
         # Empty image: real VP1 path sizes it to the viewport.
         if img.width == 0 or img.height == 0:
             img.create(*self._scene.viewport_size, img.channels, img.format)
+        img._fill_from_viewport(img.width, img.height)
         img._filled = True
         return True
 

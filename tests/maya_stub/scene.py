@@ -102,6 +102,11 @@ class Scene:
         self.playblast_calls = []  # recorded playblast kwargs
         self.playblast_empty = False  # headless quirk: silent zero-byte artifact
         self.refresh_calls = 0  # cmds.refresh invocations
+        # viewport pixel source for readColorBuffer fills (D-056⑤):
+        # callable(x, y, w, h) -> (r,g,b,a) floats 0..1 in TOP-DOWN image
+        # coords; None => uniform gray-blue. Tests install an asymmetric
+        # pattern (top-left red block) to pin flip/channel-order honesty.
+        self.viewport_pattern = None
 
     def setup_gui(self):
         """Seed a stock GUI layout: four model panels + default cameras.
