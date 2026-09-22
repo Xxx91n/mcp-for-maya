@@ -33,6 +33,10 @@ CAPTURE_VARIABLE = "_mcp_result"
 # StreamWriter buffer size limit (5MB) to prevent memory exhaustion
 _MAX_STREAM_BUFFER_SIZE = 5_242_880
 
+# Build marker (D-058): bumped when the injected helper changes so a
+# post-overwrite assert can prove the reload actually took effect.
+__build__ = "2026-09-22"
+
 
 def prepare_code_for_result_capture(
     code: str, capture_variable: str = CAPTURE_VARIABLE
@@ -466,6 +470,10 @@ class ClientChannel:
             self.socket.disconnectFromHost()
         except Exception:
             pass
+        try:
+            self.socket.deleteLater()
+        except Exception:
+            pass
 
 
 class QtCommandServer:
@@ -502,10 +510,20 @@ class QtCommandServer:
     def stop(self) -> None:
         """Stop the server and close all client channels."""
         self._running = False
+        # Unwire the signal, not just the sockets: after a module reload the
+        # new copy must not see this orphaned instance still firing (D-058).
+        try:
+            self._server.newConnection.disconnect(self._on_new_connection)
+        except (TypeError, RuntimeError):
+            pass
         for channel in list(self._channels.values()):
             channel.close()
         self._channels.clear()
         self._server.close()
+        try:
+            self._server.deleteLater()
+        except Exception:
+            pass
 
     @property
     def port(self) -> int:
@@ -622,3 +640,33 @@ def get_qt_server_port() -> str:
             {"error": {"code": "server_not_running", "message": "Server not running"}}
         )
     return json.dumps({"port": _qt_server.port})
+
+
+def _mcp_teardown() -> str:
+    """Idempotent module teardown (D-058 / upstream issue #4).
+
+    create_module(overwrite=True) invokes this hook on the OLD module
+    object before evicting it from sys.modules. Every resource is released
+    inside its own try/except so one failure cannot skip the rest; calling
+    it twice is a no-op.
+    """
+    global _qt_server
+    errors: list[str] = []
+
+    try:
+        if _qt_server is not None:
+            _qt_server.stop()
+    except Exception as e:
+        errors.append(f"qt_server: {type(e).__name__}: {e}")
+    finally:
+        _qt_server = None
+
+    try:
+        uninstall_stream_capture()
+    except Exception as e:
+        errors.append(f"stream_capture: {type(e).__name__}: {e}")
+
+    result: dict[str, Any] = {"success": not errors}
+    if errors:
+        result["errors"] = errors
+    return json.dumps(result)

@@ -68,6 +68,19 @@ def create_module(name: str, code: str, overwrite: bool = False) -> str:
                 }
             }
         )
+    # Teardown protocol (D-058 / upstream #4): replacing the sys.modules
+    # entry would orphan the old module's globals - give it a chance to
+    # release resources (e.g. a listening QtCommandServer) first. A failing
+    # hook must not block the replacement; it surfaces as a warning.
+    old_module = sys.modules.get(name)
+    teardown_warning = None
+    if overwrite and old_module is not None:
+        teardown = getattr(old_module, "_mcp_teardown", None)
+        if callable(teardown):
+            try:
+                teardown()
+            except Exception as e:
+                teardown_warning = f"_mcp_teardown of '{name}' raised {type(e).__name__}: {e}"
     sys.modules[name] = module
 
     # Walk up the tree and ensure each parent references its child.
@@ -79,4 +92,7 @@ def create_module(name: str, code: str, overwrite: bool = False) -> str:
         if parent_name in sys.modules:
             setattr(sys.modules[parent_name], parts[i], sys.modules[child_name])
 
-    return json.dumps({"success": True, "message": f"Module '{name}' created"})
+    result = {"success": True, "message": f"Module '{name}' created"}
+    if teardown_warning is not None:
+        result["warning"] = teardown_warning
+    return json.dumps(result)

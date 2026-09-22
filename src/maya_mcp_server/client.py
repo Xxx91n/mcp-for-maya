@@ -756,6 +756,11 @@ class MayaClient(BaseMayaClient):
                         f"{inner_error.get('message', 'module creation failed')}"
                     )
                 raise MayaExecutionError(str(inner_error))
+            # D-058: an overwrite whose old-module teardown failed still
+            # succeeded - surface the warning instead of dropping it
+            warning = result.get("warning")
+            if warning:
+                logger.warning(f"Module '{name}': {warning}")
             message = result.get("message")
             if message:
                 return str(message)
@@ -854,6 +859,9 @@ class MayaQtClient(BaseMayaClient):
         )
         result = response.result if response.result is not None else {}
         if isinstance(result, dict):
+            warning = result.get("warning")
+            if warning:
+                logger.warning(f"Module '{name}': {warning}")
             return str(result.get("message", f"Module '{name}' created"))
         return f"Module '{name}' created"
 
