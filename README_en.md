@@ -118,6 +118,20 @@ import maya.cmds as cmds
 cmds.evalDeferred('cmds.commandPort(name=":7001", sourceType="python")', lowestPriority=True)
 ```
 
+#### Multiple Maya instances
+
+A `commandPort` is a single listening socket bound to one `host:port` — a second instance fails to bind the same port, so **each Maya instance needs its own port**. Typical topology:
+
+| Maya instance | commandPort | Notes |
+|---------------|-------------|-------|
+| Instance A | `:7001` python | primary |
+| Instance B | `:7002` python | second instance |
+| Instance A | `:7011` mel | MEL port (auto-detected and exempted — no error spam) |
+
+Run `cmds.commandPort(name=":<port>", sourceType="python")` inside each instance (its Script Editor or its own `userSetup.py`). **Auto-scan** is the primary path — the server periodically enumerates listening Maya ports and bootstraps them; if a session is missed, `add_session(host, port)` is the manual fallback. If scanning probes a non-Maya TCP service on the box, bound the probe set with `MAYA_MCP_INCLUDE_PORTS=7001,7002` (comma-separated, `7005-7010` ranges allowed) or exclude offenders via `MAYA_MCP_EXCLUDE_PORTS=<port>`.
+
+Note: a `commandPort` does **not** persist across sessions — it dies with Maya; for persistence write it into `userSetup.py` (Option C).
+
 #### Troubleshooting
 
 | Problem | Fix |
@@ -126,6 +140,8 @@ cmds.evalDeferred('cmds.commandPort(name=":7001", sourceType="python")', lowestP
 | Port in use | close other Maya instances or pick another port |
 | userSetup.py not loading | check it sits in the right scripts dir, restart Maya |
 | Firewall blocks | ensure localhost:7001 is reachable |
+| Second Maya instance not listed | each instance needs its own `commandPort` (same port = bind conflict); if scanning still misses it, call `add_session(host, port)` |
+| Script Editor spams syntax errors | legacy symptom of probing a MEL port — current versions auto-exempt non-Python ports; if it persists, exclude the port via `MAYA_MCP_EXCLUDE_PORTS` |
 
 ### 3. Configure the MCP client
 

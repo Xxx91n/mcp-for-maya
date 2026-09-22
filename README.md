@@ -120,6 +120,20 @@ import maya.cmds as cmds
 cmds.evalDeferred('cmds.commandPort(name=":7001", sourceType="python")', lowestPriority=True)
 ```
 
+#### 多实例并行
+
+`commandPort` 是绑死 `host:port` 的单监听 socket——同端口第二个实例 bind 会失败，因此**每个 Maya 实例需要自己的端口**。典型拓扑：
+
+| Maya 实例 | commandPort | 说明 |
+|-----------|-------------|------|
+| 实例 A | `:7001` python | 主工作实例 |
+| 实例 B | `:7002` python | 第二实例 |
+| 实例 A | `:7011` mel | MEL 端口（自动识别并豁免，不再反复刷错） |
+
+在每个实例各自的脚本编辑器（或各自 `userSetup.py`）里执行 `cmds.commandPort(name=":<port>", sourceType="python")`。**自动扫描**是主路径——服务端周期枚举本机 Maya 监听端口并完成引导；扫不到时用 `add_session(host, port)` 手动兜底。若扫描误探本机其它 TCP 服务，可用 `MAYA_MCP_INCLUDE_PORTS=7001,7002`（逗号分隔，支持 `7005-7010` 区间）收敛探测范围，或用 `MAYA_MCP_EXCLUDE_PORTS=<port>` 排除特定端口。
+
+注意：`commandPort` **不随会话持久**——Maya 重启即失效；持久化请写入 `userSetup.py`（见方式三）。
+
 #### 故障排查
 
 | 问题 | 解决方案 |
@@ -128,6 +142,8 @@ cmds.evalDeferred('cmds.commandPort(name=":7001", sourceType="python")', lowestP
 | 端口被占用 | 关闭其他 Maya 实例，或换端口 |
 | userSetup.py 不生效 | 确认文件在正确的 scripts 目录，重启 Maya |
 | 防火墙拦截 | 确保 localhost:7001 可访问 |
+| 第二个 Maya 实例不出现 | 每个实例需独立 `commandPort`（同端口 bind 冲突）；仍扫不到用 `add_session(host, port)` 手动添加 |
+| Script Editor 反复刷语法错误 | 旧版探测 MEL 端口的症状：新版会自动豁免非 Python 端口；仍异常时用 `MAYA_MCP_EXCLUDE_PORTS` 排除该端口 |
 
 ### 3. 配置 MCP 客户端
 

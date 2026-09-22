@@ -2,6 +2,16 @@
 
 Two test tiers exist. They are deliberately separate.
 
+## Environment floor
+
+| Side | Requirement |
+|------|-------------|
+| Host (this package) | Python >= 3.10 (`requires-python`) |
+| Injected helper (inside Maya) | Maya >= 2023 i.e. Python >= 3.9 — the `ast.unparse` floor is enforced with a friendly refusal at injection time |
+| Empirically verified | Maya 2024 GUI (Tier 3) |
+
+Multi-instance note (D-060): each Maya instance binds its own `commandPort` on a distinct port — a second instance on the same port fails to bind. The scanner probes all listening ports; MEL commandPorts are positively identified by the bilingual `eval("1/2")` probe and permanently exempted while they keep LISTENing (upstream issue #1). Bound or exclude probe targets via `MAYA_MCP_INCLUDE_PORTS` / `MAYA_MCP_EXCLUDE_PORTS` (comma-separated ports or `a-b` ranges).
+
 ## Tier 1 — stub tests (CI-safe, no Maya needed)
 
 ```bash
