@@ -587,9 +587,21 @@ class MayaClient(BaseMayaClient):
                 # Now use the fresh create_module to update the helper module
                 helper_code = get_helper_module_code()
                 cmd = "create_module({name!r}, {code!r}, {overwrite!r})"
-                await self._send_receive(
+                update_response = await self._send_receive(
                     cmd, {"name": "maya_mcp", "code": helper_code, "overwrite": True}
                 )
+                # D-058: the overwrite above is the one path that triggers
+                # _mcp_teardown - a failed cleanup surfaces as a "warning"
+                # key in create_module's payload; log it instead of
+                # dropping the response (N1).
+                update_result = update_response.result
+                if isinstance(update_result, str):
+                    try:
+                        update_result = json.loads(update_result)
+                    except (json.JSONDecodeError, TypeError):
+                        update_result = None
+                if isinstance(update_result, dict) and update_result.get("warning"):
+                    logger.warning(f"Module 'maya_mcp': {update_result['warning']}")
                 logger.info("Maya mcp module updated")
                 return
 

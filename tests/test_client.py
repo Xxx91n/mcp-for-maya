@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -984,3 +985,51 @@ class TestDetectPortType:
             side_effect=MayaTimeoutError("timeout"),
         )
         assert await maya_client._detect_port_type() is PortType.UNKNOWN
+
+
+class TestBootstrapHotUpdateWarning:
+    """N1 (D-058 tail): the _bootstrap hot-update overwrite path must
+    surface a _mcp_teardown warning from create_module - the module is
+    still replaced, but a failed cleanup must not pass silently."""
+
+    @staticmethod
+    def _hot_update_responses(warning):
+        create_result = {"success": True, "message": "Module 'maya_mcp' created"}
+        if warning is not None:
+            create_result["warning"] = warning
+        return [
+            CommandResponse(result="True", error=None),
+            CommandResponse(result=None, error=None),
+            CommandResponse(result=create_result, error=None),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_teardown_warning_is_logged(
+        self, maya_client: MayaClient, mocker, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        maya_client._port_type = PortType.PYTHON
+        warning = "_mcp_teardown of 'maya_mcp' raised RuntimeError: boom"
+        mocker.patch.object(
+            maya_client,
+            "_send_receive",
+            new_callable=AsyncMock,
+            side_effect=self._hot_update_responses(warning),
+        )
+        with caplog.at_level(logging.WARNING, logger="maya_mcp_server.client"):
+            await maya_client._bootstrap()
+        assert any(warning in r.message for r in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_clean_update_logs_no_module_warning(
+        self, maya_client: MayaClient, mocker, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        maya_client._port_type = PortType.PYTHON
+        mocker.patch.object(
+            maya_client,
+            "_send_receive",
+            new_callable=AsyncMock,
+            side_effect=self._hot_update_responses(None),
+        )
+        with caplog.at_level(logging.WARNING, logger="maya_mcp_server.client"):
+            await maya_client._bootstrap()
+        assert not any("Module 'maya_mcp'" in r.message for r in caplog.records)
