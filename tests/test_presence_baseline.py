@@ -1,17 +1,18 @@
-"""D-049b signature/presence audit — ratchet against stub drift.
+"""D-049b presence audit — ratchet against stub drift.
 
 The maya stub may only model API that EXISTS in the real-Maya baseline
-(tests/maya_stub/signature-baseline.json) or is explicitly allowlisted
+(tests/maya_stub/presence-baseline.json) or is explicitly allowlisted
 with a reason (signature-allowlist.json). A stub symbol missing from
 both means the stub models something real Maya doesn't have — the exact
 class of drift that let 0.1.1 ship str-result_type, omui.MImage-on-2024
 and cmds.file(rename+prompt) bugs while CI stayed green.
 
 Baseline collected on Maya 2024 over the live session via
-inspect.signature + dir() (mayapy is broken on that box — see
+inspect.signature attempt + dir() (mayapy is broken on that box — see
 baseline_meta). cmds builtins carry no inspectable signature, so the
-auditable contract is presence + method-name lists. Re-collect on any
-Maya version bump.
+auditable contract is presence + method-name lists — the file is named
+presence-baseline accordingly (D-056). Re-collect on any Maya version
+bump.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from pathlib import Path
 import pytest
 
 
-BASELINE_PATH = Path(__file__).parent / "maya_stub" / "signature-baseline.json"
+BASELINE_PATH = Path(__file__).parent / "maya_stub" / "presence-baseline.json"
 ALLOWLIST_PATH = Path(__file__).parent / "maya_stub" / "signature-allowlist.json"
 
 

@@ -2,7 +2,8 @@
   "baseline_meta": {
     "collected_on": "Maya 2024 GUI session via framed channel",
     "collector": ".scratch/maya-mcp-grill/harness/gui_verify.py::collect_signatures",
-    "note": "mayapy tier blocked on this box (import maya.standalone -> AV). cmds builtins carry no inspect.signature \u2014 presence + method lists are the auditable contract."
+    "note": "mayapy tier blocked on this box (import maya.standalone -> AV). cmds builtins carry no inspect.signature — presence + method lists are the auditable contract. Renamed signature-baseline->presence-baseline (D-056): the file never carried signatures.",
+    "content_type": "presence-callable"
   },
   "symbols": {
     "cmds.about": {
