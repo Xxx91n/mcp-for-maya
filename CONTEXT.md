@@ -207,3 +207,11 @@ _Avoid_: 无图凑数行、外链视频当主图（PyPI 不渲染）、把审计
 **冻结采集会话 (frozen capture session)**:
 门面素材的采集纪律——一个冻结环境（同 Maya 会话/同 VP2 设置/同灯光/同 HUD 状态）一个 session 一次出齐全部素材（hero/shots/orbit/social/例表图）；跨 session 补拍会产生视口风格漂移（SSAO/阴影/背景不一致），补拍仅作缺陷返工路径非常规分批；Maya 采集窗以 MAYA_UI_LANGUAGE=en_US 英文 UI 启动（系统环境变量，禁写 Maya.env）。
 _Avoid_: 分批零散补拍、中文 UI 配英文默认门面、会话间设置漂移
+
+**精确性替代艺术性 (precision-over-artistry)**:
+脚本驱动 DCC 演示题材的选型准则——纯代码建模（execute_code）只在几何逻辑清晰的题材上可达作品级：钟表机芯/渐开线齿轮/模块建筑/阵列装配，精度本身就是卖点；有机角色/雕塑类必翻车（拉伸球拼装是工具约束非 prompt 问题，HN/3daistudio/BigGo/Reddit 四源收敛）。有机题材的诚实出路=Poly Haven 导入（归管线展示非建模展示）。
+_Avoid_: 用脚本硬做角色生物、把密度当难度、假齿轮不自啮合
+
+**视觉模块预算 (visual module budget)**:
+README 可视区的图片密度红线——≤4 个视觉模块（合成横幅+例表实拍+orbit 通栏+可选架构图）、单图 <500KB、orbit GIF <10MB（GitHub 限制线）；依据=Utrecht「don not overdo it」官方教程+巨型 GIF 拖垮整页双源翻车实证（import-http#7/GitLab 论坛）+awesome-readme 收录案例零多图堆砌正面案例。与冻结采集会话互补：一个管拍、一个管放。
+_Avoid_: 截图散落正文各处、GIF 锁进表格窄列、图片堆砌显自信
