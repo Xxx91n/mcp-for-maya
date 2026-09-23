@@ -290,7 +290,7 @@ Two **Experimental** process cards ship in `skills/`:
 
 This project follows [Semantic Versioning](https://semver.org/):
 
-- **0.x (current 0.1.0, Alpha)**: the tool surface may still change; minor bumps carry features, no compatibility freeze.
+- **0.x (current 0.2.0, Alpha)**: the tool surface may still change; minor bumps carry features, no compatibility freeze.
 - **Beta**: promoted once feature-complete and external testing begins (classifier moves to `4 - Beta`).
 - **1.0.0**: public-API freeze commitment, promoted together with the `5 - Production/Stable` classifier in one commit.
 

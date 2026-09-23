@@ -317,7 +317,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 遵循 [Semantic Versioning](https://semver.org/)：
 
-- **0.x（当前 0.1.0，Alpha）**：工具面仍可能调整；minor bump 承载新功能，不承诺兼容冻结。
+- **0.x（当前 0.2.0，Alpha）**：工具面仍可能调整；minor bump 承载新功能，不承诺兼容冻结。
 - **Beta**：feature-complete 且开始外部测试后晋升（classifier 同步升 `4 - Beta`）。
 - **1.0.0**：公共 API 冻结承诺，与 `5 - Production/Stable` classifier 同一提交晋升。
 
