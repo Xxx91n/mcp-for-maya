@@ -20,6 +20,31 @@ LIGHT_TYPES = {
 }
 SHAPE_TYPES = LIGHT_TYPES | {"mesh", "camera", "locator", "nurbsCurve", "joint"}
 
+# Type-defined attrs the stub seeds on creation - objExists("n.attr")
+# answers like real Maya only if the type's standard attrs exist.
+# Deliberately faithful: lambert has NO specularRoughness, blinn/phong
+# have it; metalness exists only on aiStandardSurface/standardSurface.
+_MATERIAL_TYPES = {
+    "lambert",
+    "blinn",
+    "phong",
+    "phongE",
+    "aiStandardSurface",
+    "standardSurface",
+    "surfaceShader",
+    "StingrayPBS",
+}
+_COMMON_MAT_ATTRS = {
+    "color": (0.5, 0.5, 0.5),
+    "ambientColor": (0.0, 0.0, 0.0),
+    "normalCamera": (0.0, 0.0, 1.0),
+    "diffuse": 0.8,
+    "outColor": (0.0, 0.0, 0.0),
+}
+_SPECULAR_ATTRS = {"specularRoughness": 0.5, "specularColor": (0.5, 0.5, 0.5)}
+_METAL_ATTRS = {"metalness": 0.0, "baseColor": (0.5, 0.5, 0.5)}
+_SG_ATTRS = {"surfaceShader": None, "displacementShader": None, "volumeShader": None}
+
 
 class Node:
     __slots__ = (
@@ -107,6 +132,13 @@ class Scene:
         # coords; None => uniform gray-blue. Tests install an asymmetric
         # pattern (top-left red block) to pin flip/channel-order honesty.
         self.viewport_pattern = None
+        # asset-import surface (D-075): plugin registry, MEL record,
+        # and the fixture that cmds.file(i=True) materializes.
+        self.plugins_available = {"fbxmaya"}  # loadable plug-ins
+        self.loaded_plugins = {"fbxmaya"}    # already-loaded plug-ins
+        self.mel_calls = []  # recorded maya.mel.eval invocations
+        self.fbx_fixture = None  # {"meshes":[...], "materials":[...]}
+        self.fbx_fixture_error = None  # truthy => import raises this
 
     def setup_gui(self):
         """Seed a stock GUI layout: four model panels + default cameras.
@@ -142,6 +174,15 @@ class Scene:
         if name in self.nodes and not exists_ok:
             name = self._unique_name(name)
         node = Node(self, name, ntype, parent)
+        if ntype in _MATERIAL_TYPES:
+            node.attrs.update(_COMMON_MAT_ATTRS)
+        if ntype in {"blinn", "phong", "phongE"}:
+            node.attrs.update(_SPECULAR_ATTRS)
+        if ntype in {"aiStandardSurface", "standardSurface"}:
+            node.attrs.update(_METAL_ATTRS)
+            node.attrs.update(_SPECULAR_ATTRS)
+        if ntype == "shadingEngine":
+            node.attrs.update(_SG_ATTRS)
         self.nodes.setdefault(name, []).append(node)
         if parent is not None:
             parent.children.append(node)
@@ -324,6 +365,17 @@ class Scene:
                 walk(c, c2node)
 
         walk(node, MMatrix())
+        return box
+
+    def world_bbox(self, node):
+        """exactWorldBoundingBox equivalent: object_bbox corners x world."""
+        box = MBoundingBox()
+        local = self.object_bbox(node)
+        if local.is_empty:
+            return box
+        m = self.inclusive_matrix(node)
+        for corner in local._corners():
+            box.expand(corner * m)
         return box
 
     # ---- persistence (stub cmds.file exportAll/open) ----

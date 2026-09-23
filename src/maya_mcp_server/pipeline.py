@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Tool annotations \u2014 the single matrix (D-018). All 20 tools, all four hints.
+# Tool annotations \u2014 the single matrix (D-018). All 22 tools, all four hints.
 # readOnlyHint also drives the read/write rate-limit bucket.
 # ---------------------------------------------------------------------------
 
@@ -57,6 +57,19 @@ _WRITE_DESTRUCTIVE = mt.ToolAnnotations(
     destructiveHint=True,
     idempotentHint=False,
     openWorldHint=False,
+)
+
+_READ_NET = mt.ToolAnnotations(
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True,
+)
+_WRITE_NET_IDEMPOTENT = mt.ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True,
 )
 
 TOOL_ANNOTATIONS: dict[str, mt.ToolAnnotations] = {
@@ -80,6 +93,11 @@ TOOL_ANNOTATIONS: dict[str, mt.ToolAnnotations] = {
     "camera_create": _WRITE_SAFE,
     "camera_orbit": _WRITE_SAFE,
     "add_session": _WRITE_SAFE,
+    # Poly Haven asset pipeline: openWorld - first tools reaching the
+    # network (D-075); https + host whitelist + md5 + size caps host-side
+    "asset_search": _READ_NET,
+    # idempotent via same-name GRP_asset_<id> dedup (force=True opts out)
+    "asset_import": _WRITE_NET_IDEMPOTENT,
     # dangerous tools: arbitrary code execution / startup-file writes (3)
     "execute_code": _WRITE_DESTRUCTIVE,
     "write_module": _WRITE_DESTRUCTIVE,

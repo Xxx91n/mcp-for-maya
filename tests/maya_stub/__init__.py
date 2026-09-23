@@ -33,6 +33,7 @@ from .scene import Scene
 
 
 _MODULES = (
+    "maya.mel",
     "maya.api.OpenMayaUI",
     "maya.api.OpenMaya",
     "maya.api",
@@ -74,7 +75,17 @@ def install(scene=None):
     maya_api.OpenMaya = om
     maya_api.OpenMayaUI = omui
 
+    maya_mel = types.ModuleType("maya.mel")
+
+    def _mel_eval(command):
+        sc.mel_calls.append(command)
+        return None
+
+    maya_mel.eval = _mel_eval
+    maya.mel = maya_mel
+
     sys.modules["maya"] = maya
+    sys.modules["maya.mel"] = maya_mel
     sys.modules["maya.cmds"] = maya_cmds
     sys.modules["maya.api"] = maya_api
     sys.modules["maya.api.OpenMaya"] = om
@@ -108,11 +119,20 @@ def load_visual_module():
     return vm
 
 
+def load_asset_module():
+    """Import asset_module fresh, bound to the installed stub."""
+    sys.modules.pop("maya_mcp_server.asset_module", None)
+    import maya_mcp_server.asset_module as am
+
+    return am
+
+
 __all__ = [
     "Scene",
     "install",
     "uninstall",
     "load_scene_module",
     "load_visual_module",
+    "load_asset_module",
     "runtime",
 ]

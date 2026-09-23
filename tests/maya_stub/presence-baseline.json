@@ -2,7 +2,7 @@
   "baseline_meta": {
     "collected_on": "Maya 2024 GUI session via framed channel",
     "collector": ".scratch/maya-mcp-grill/harness/gui_verify.py::collect_signatures",
-    "note": "mayapy tier blocked on this box (import maya.standalone -> AV). cmds builtins carry no inspect.signature — presence + method lists are the auditable contract. Renamed signature-baseline->presence-baseline (D-056): the file never carried signatures.",
+    "note": "mayapy tier blocked on this box (import maya.standalone -> AV). cmds builtins carry no inspect.signature — presence + method lists are the auditable contract. Renamed signature-baseline->presence-baseline (D-056): the file never carried signatures. Extended 2026-09-23 (T-19a): +10 cmds symbols probed live on the same Maya 2024 GUI session via commandPort hasattr()",
     "content_type": "presence-callable"
   },
   "symbols": {
@@ -806,6 +806,56 @@
     },
     "omui.MImage": {
       "exists": false
+    },
+    "cmds.connectAttr": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.createNode": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.disconnectAttr": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.exactWorldBoundingBox": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.loadPlugin": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.objectType": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.pluginInfo": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.polyEvaluate": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.setAttr": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.shadingNode": {
+      "exists": true,
+      "signature": null,
+      "callable": true
     }
   }
 }
