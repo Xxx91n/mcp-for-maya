@@ -124,6 +124,16 @@ def listRelatives(ref, parent=False, children=False, type=None, fullPath=False, 
         if node.parent is None:
             return None
         return [sc.long_name(node.parent) if fullPath else node.parent.name]
+    if kw.get("allDescendents") or kw.get("ad"):
+        out = []
+
+        def _walk(n):
+            for c in n.children:
+                out.append(sc.long_name(c) if fullPath else c.name)
+                _walk(c)
+
+        _walk(node)
+        return out or None
     if children or shapes:
         kids = list(node.children)
         if type is not None:

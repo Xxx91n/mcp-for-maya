@@ -98,16 +98,19 @@ def _audit_asset_download(
     audit: AuditLogger | None,
     session_key: str | None,
     descriptor: dict[str, Any],
+    import_result: dict[str, Any],
 ) -> None:
-    """Record the download half as a supplementary audit event (D-075).
+    """Record the download+import halves as a supplementary event (D-075).
 
     URL / size / files_hash live result-side, so the generic per-call
     event cannot see them; this writes a second JSONL row through the
-    shared AuditLogger (never blocks tool execution).
+    shared AuditLogger (never blocks tool execution). Emitted after the
+    Maya import so the row can carry the real import outcome.
     """
     if audit is None:
         return
     try:
+        import_ok = isinstance(import_result, dict) and "error" not in import_result
         event = build_audit_event(
             session_id=session_key or "_default",
             tool_name="asset_import",
@@ -115,7 +118,7 @@ def _audit_asset_download(
                 "asset_id": descriptor.get("asset_id"),
                 "resolution": descriptor.get("resolution"),
             },
-            outcome="success",
+            outcome="success" if import_ok else "error",
             duration_ms=0.0,
         )
         event["asset_download"] = {
@@ -123,6 +126,8 @@ def _audit_asset_download(
             "size_bytes": descriptor.get("size_bytes"),
             "files_hash": descriptor.get("files_hash"),
             "source": descriptor.get("source"),
+            "import_group": import_result.get("group"),
+            "import_error": import_result.get("error"),
         }
         audit.record(event)
     except Exception as e:
@@ -231,7 +236,6 @@ def register_asset_tools(mcp: Any, audit: AuditLogger | None = None) -> None:
             descriptor = polyhaven.download_asset(asset_id, resolution=resolution)
         except polyhaven.AssetError as e:
             return json.dumps(e.to_dict(), indent=2)
-        _audit_asset_download(audit, session_key, descriptor)
 
         result = await _exec_asset(
             client,
@@ -243,6 +247,7 @@ def register_asset_tools(mcp: Any, audit: AuditLogger | None = None) -> None:
                 force=bool(force),
             ),
         )
+        _audit_asset_download(audit, session_key, descriptor, result)
         mark_dirty(session_key)
         if isinstance(result, dict) and "error" not in result:
             result["download"] = {

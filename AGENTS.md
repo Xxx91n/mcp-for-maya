@@ -62,18 +62,21 @@ tests/
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
-├── adr/                   # ADR-0001..0023 architecture decision records
+├── adr/                   # ADR-0001..0024 architecture decision records
 ├── decision-ledger.md     # grill decision ledger — canonical path since T-11a (D-041)
 ├── handoffs/              # round handoffs — canonical (next-round.md standing task book)
 ├── testing.md             # real-Maya manual tier checklist
 └── threat-model.md        # threat model + security boundaries
 
 .github/
-├── workflows/ci.yml       # lint (ruff budget gate) + test matrix ubuntu/windows x 3.10/3.x
+├── workflows/ci.yml       # lint (ruff budget gate) + README skeleton check + test matrix ubuntu/windows x 3.10/3.x
 ├── workflows/release.yml  # tag v* -> test -> build -> publish (trusted publisher; env: pypi)
 ├── dependabot.yml         # weekly github-actions bumps, minor+patch grouped
 ├── ruff-baseline.json     # frozen lint budget {"src":{"RULE":N},"tests":{...}} — per-rule ratchet down only (T-10b/D-044)
-└── scripts/check_ruff_budget.py  # budget comparator used by the lint job
+├── scripts/check_ruff_budget.py  # budget comparator used by the lint job
+├── scripts/check_readme_skeleton.py  # README/zh-CN title-skeleton parity check (D-072)
+├── assets-src/            # reproducible capture scripts for README imagery (scene_build.py + capture.py; T-19c)
+└── assets/                # published README imagery (populated only after sign-off)
 ```
 
 ## Key Architecture Decisions

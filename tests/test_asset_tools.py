@@ -216,3 +216,7 @@ class TestAssetImport:
         assert row["size_bytes"] == 9
         assert "Camera_01_1k.fbx" in row["files_hash"]
         assert row["files_hash"]["Camera_01_1k.fbx"]["md5"] == "m1"
+        # emitted after the Maya import, carrying its outcome
+        assert rows[0]["outcome"] == "success"
+        assert row["import_group"] == "GRP_asset_Camera_01"
+        assert row["import_error"] is None

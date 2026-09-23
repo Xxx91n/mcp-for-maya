@@ -129,12 +129,45 @@ def _check_url(url: str) -> None:
         )
 
 
+class _WhitelistRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Re-validate every 30x Location target against the whitelist.
+
+    urllib follows redirects implicitly; without this a whitelisted URL
+    could bounce to an arbitrary host (or downgrade https -> http) and
+    still fetch. Each hop runs the same scheme+host check, hops capped.
+    """
+
+    max_redirections = 3
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> Any:
+        _check_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_WhitelistRedirectHandler())
+
+
+# Indirection so tests can fake the network at one seam (kept compatible
+# with the urlopen(req, timeout=...) signature).
+def _urlopen(req: urllib.request.Request, timeout: float) -> Any:
+    return _OPENER.open(req, timeout=timeout)
+
+
 def _fetch(url: str, *, timeout: float, max_bytes: int) -> bytes:
     """HTTPS GET against the whitelist with UA + size cap."""
     _check_url(url)
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _urlopen(req, timeout=timeout) as resp:
+            _check_url(resp.geturl() or url)
             length = resp.headers.get("Content-Length")
             if length is not None and int(length) > max_bytes:
                 raise AssetError(

@@ -130,6 +130,18 @@ class TestDedup:
         assert res.get("deduped") is not True
         assert res["group"].startswith("GRP_asset_Camera_01")
 
+    def test_force_reimport_leaves_no_dg_orphans(self, asset_env):
+        asset_env.module.import_asset(asset_env.descriptor)
+        asset_env.module.import_asset(asset_env.descriptor, force=True)
+        # a leaked first-import shading net (file_*/MAT_*/SG_* helpers,
+        # FBX materials) resurfaces as auto-suffixed duplicates: name
+        # ends in digits AND its stripped base name still exists
+        names = asset_env.cmds.ls() or []
+        leaked = [
+            n for n in names if n != n.rstrip("0123456789") and n.rstrip("0123456789") in names
+        ]
+        assert not leaked, f"DG orphans leaked on force re-import: {leaked}"
+
 
 # ------------------------------------------------------------------
 # polycount gate
@@ -142,8 +154,11 @@ class TestPolycountGate:
         res = asset_env.module.import_asset(asset_env.descriptor)
         assert res["error"]["code"] == "polycount_exceeded"
         assert "150000" in res["error"]["message"]
-        # rejected import must not leave debris behind
+        # rejected import must not leave debris behind - neither the
+        # DAG group nor its FBX-imported shading net (body/bodySG)
         assert not asset_env.cmds.objExists("GRP_asset_Camera_01")
+        assert asset_env.cmds.ls("body") is None
+        assert asset_env.cmds.ls("bodySG") is None
 
     def test_override_keeps_import(self, asset_env):
         asset_env.scene.fbx_fixture["meshes"][0]["faces"] = 150000

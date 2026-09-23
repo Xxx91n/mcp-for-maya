@@ -1,6 +1,6 @@
 """Security pipeline primitives for maya-mcp-server.
 
-All 20 MCP tools funnel through the SecurityPipeline middleware
+All 22 MCP tools funnel through the SecurityPipeline middleware
 (pipeline.py): input validation -> rate limit -> pattern scan ->
 dispatch -> audit. This module is a safety net for confused-deputy
 scenarios, NOT a security boundary (see SECURITY.md).

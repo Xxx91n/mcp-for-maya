@@ -107,6 +107,45 @@ def _face_count(meshes: list[str]) -> int:
     return total
 
 
+def _stale_dg_nodes(grp: str, asset_id: str) -> list[str]:
+    """DG nodes an import of this asset would orphan when its group is
+    deleted: our file_*/MAT_*/SG_* helpers plus the shading net reached
+    through the group's mesh shapes (instObjGroups -> SG -> material).
+    """
+    stale: set[str] = set()
+    for pat in (f"file_{asset_id}_*", f"MAT_{asset_id}_*", f"SG_{asset_id}_*"):
+        stale.update(cmds.ls(pat) or [])
+    desc = cmds.listRelatives(grp, allDescendents=True, fullPath=True) or []
+    for d in desc:
+        try:
+            if not cmds.objectType(d, isAType="mesh"):
+                continue
+        except Exception:
+            continue
+        for sg in cmds.listConnections(d + ".instObjGroups[0]", type="shadingEngine") or []:
+            stale.add(sg)
+            for src in cmds.listConnections(sg + ".surfaceShader") or []:
+                stale.add(src)
+    return sorted(stale)
+
+
+def _delete_group_tree(grp: str, asset_id: str) -> None:
+    """Delete the import group AND its shading-network DG nodes.
+
+    cmds.delete(grp) alone leaves file/bump/p2d helpers and imported
+    materials/SGs as root-level DG orphans (force re-import and
+    polycount rejection both hit this path).
+    """
+    stale = _stale_dg_nodes(grp, asset_id)
+    cmds.delete(grp)
+    for n in stale:
+        try:
+            if cmds.objExists(n):
+                cmds.delete(n)
+        except Exception:
+            pass
+
+
 def _imported_materials(new_nodes: list[str]) -> list[str]:
     mats = []
     for n in new_nodes:
@@ -369,7 +408,7 @@ def import_asset(
                 "message": "already imported; pass force=True to re-import",
             }
         if cmds.objExists(grp):
-            cmds.delete(grp)
+            _delete_group_tree(grp, asset_id)
 
         fbx_path = descriptor.get("fbx_path")
         if not isinstance(fbx_path, str) or not fbx_path:
@@ -451,7 +490,7 @@ def import_asset(
         faces = _face_count(meshes)
         if faces > int(max_polycount) and not allow_high_polycount:
             try:
-                cmds.delete(grp)
+                _delete_group_tree(grp, asset_id)
             except Exception:
                 pass
             return _err(
