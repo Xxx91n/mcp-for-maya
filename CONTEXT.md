@@ -72,6 +72,11 @@ bootstrap 后创建的专用通道；默认=自研 Qt TCP server（多客户端�
 资产生态接入策略——只接低成本外部源（首片 Poly Haven，免费 CC0 API），挂到 scene_plan 做 zone 语义 + bbox 尺寸推荐；不做自建资产库/爬虫。
 _Avoid_: 资产市场
 
+
+**asset_descriptor**:
+宿主侧资产下载与 Maya 侧导入之间的受验证交接契约——下载完成返回的结构化对象（本地首选文件路径+源 URL+CC0 license+依赖路径清单），参照 dcc-asset-polyhaven 形态；发现/下载（宿主、有网）与导入（Maya、本地文件）职责分界即以此对象为缝。
+_Avoid_: 把 URL 直接递给 Maya 侧下载（Maya 零网络面）、下载与导入揉成单步无交接物
+
 ### 安全姿态
 
 **受信方**:
@@ -190,3 +195,15 @@ _Avoid_: 无 RC 锚点却按 post-RC 严苛门槛拒修、为赶发布把已知�
 **逐版核实 (per-release verification)**:
 发布面决策（yank/安全公告/弃用声明）的判定单位是单个 release 而非缺陷家族——同一缺陷在不同版本间可能被其间修复改变存在性，须对每个候选版本做实物核验（如 git show 对应 tag）再定处置，reason 写该版的具体故障模式。
 _Avoid_: 凭"同族"推定批量处置、在未确认后继版本可用前先行 yank
+
+**便利性镜像 (convenience mirror)**:
+第二语言 README 的权威定位——英文 README.md 为唯一 source-of-truth，README.zh-CN.md 为镜像：zh 文件头 HTML 注释锚定英文版 commit hash 作新鲜度审计，CI 挂标题骨架校验防漂移；镜像可滞后、不许分叉。
+_Avoid_: 双文件对等维护（对等必漂移）、留 README_en.md stub（双英文文件=混乱源）
+
+**prompt→结果例表**:
+README 叙事单元——| Prompt | Result | 表把用户指令与真实实拍结果配对（4-6 行甜区，每行内嵌图）；每行天然是 dogfood 证明；构图分工：建模/导入行单图、审计行 before/after 双帧读作"证据"非"作品"；门面资产保持纯美感，差异化叙事由例表承担。
+_Avoid_: 无图凑数行、外链视频当主图（PyPI 不渲染）、把审计行也做成纯美图丢失差异化
+
+**冻结采集会话 (frozen capture session)**:
+门面素材的采集纪律——一个冻结环境（同 Maya 会话/同 VP2 设置/同灯光/同 HUD 状态）一个 session 一次出齐全部素材（hero/shots/orbit/social/例表图）；跨 session 补拍会产生视口风格漂移（SSAO/阴影/背景不一致），补拍仅作缺陷返工路径非常规分批；Maya 采集窗以 MAYA_UI_LANGUAGE=en_US 英文 UI 启动（系统环境变量，禁写 Maya.env）。
+_Avoid_: 分批零散补拍、中文 UI 配英文默认门面、会话间设置漂移

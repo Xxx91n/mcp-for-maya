@@ -1,60 +1,68 @@
-# next-round.md — rev26（T-18：T-16f 真机验证窗 + 0.1.2 发布链激活）
+# next-round.md — rev27（T-19：README 门面升级 + Poly Haven 资产导入 → 0.2.0）
 
-生成：2026-09-22 grill 后整理环节｜Spec：ADR-0023 + docs/decision-ledger.md D-066~D-069｜前置：ADR-0022、.scratch/t17/handoffs/2026-09-22-audit-handoff.md（N7/N8/O1/O2 原始件）
+生成：2026-09-23 grill 后整理环节｜Spec：ADR-0024 + docs/decision-ledger.md D-071~D-077｜前置：ADR-0023、.scratch/t18/handoffs/2026-09-22-audit-handoff.md（T-18 闭环实录）
 
 ## 环境实况（本轮核验）
 
-- `origin/main`=b3f4133：T-16+T-17 全批次+dependabot mypy 合并；CI 全绿；工作区干净（zz 无变更、幻影已自清）
-- **Maya 2024(24.0.0.4640) 运行中**：PID 18236，`:7001 sourceType=python` LISTENING（userSetup.py 开）——T-16f 窗口已开
-- PyPI：0.1.0/0.1.1 在售未 yank；上游 6 issue 评论数=0
-- 备稿在库：docs/upstream-issue-response-drafts.md（六条分区标注）；对照表 docs/upstream-issue-status.md
+- `origin/main`=0d0f242：v0.1.2 已发 PyPI、0.1.0/0.1.1 已 yank、上游 6 条评论全发；工作区干净
+- **Maya 当前未运行**——采集窗需用户以英文 UI 启动（MAYA_UI_LANGUAGE=en_US 系统环境变量，**禁写 Maya.env**）
+- 采集管线先例：.scratch/facade/dogfood_capture.py（stdio→repo HEAD server→建场景→捕获）
+- 现状资产：README.md=中文337行（GitHub+PyPI 默认面）、README_en.md=英文312行；shot-hero/shot-alt/orbit.gif=原始体场景待重拍
 
 ## 任务清单
 
-### T-18a — T-16f 真机验证批（D-067, D-056⑤, D-058, D-059, N5）
+### T-19a — Poly Haven 资产导入功能核（D-074/D-075）
 
-1. **前置探针**：`execute_code` 跑 `cmds.file(q=True,modified=True)`+`file(q=True,sceneName=True)`——**脏则停手报用户三选一**（存盘/授权丢弃/中止）；干净才 `file(new=True,force=True)`
-2. **MEL 对照端口**：`commandPort(":7002",query=True)` 探占用（占则换高位）→开 `sourceType="mel"`→批末 try/finally 关闭+幂等先 close 再 open；仅用 `:port` 形式；预期首次连接 "Allow" 弹窗（用户在场点过）
-3. **跑批**：`pytest -m gui`（VP2 非对称纯色断言钉 _VP2_READBACK_BOTTOM_UP+BGR/RGB+callform surface probe+render_preview 净零+bootstrap framed Qt）+ MEL `eval("1/2")` 回传形状定型 + #4 create_module(overwrite) 重连 teardown 活证（commandPort -query/回调计数自证孤儿不再泄漏）+ `hasattr(MImage,'convertPixelFormat')` 复核
-4. **报告**：断连时段显式标注；翻车如实——#1 探针翻车→D-059 豁免集退路；其余翻车→fix-forward（D-068 外延：pre-RC 窗口修而不带病发）；不可速修→门守住呈报用户
+1. **asset_search**：Poly Haven API（api.polyhaven.com，免 key，**必填 User-Agent**）→ 元数据列表（限 20 条保 total_count）；注解={readOnlyHint+idempotentHint+openWorldHint:true, destructiveHint:false}
+2. **asset_import**：descriptor 入（本地路径+源URL+CC0+依赖路径）→ 宿主侧 https 下载（白名单 api.polyhaven.com+dl.polyhaven.com、尺寸/超时护栏、默认 1k 贴图档）→ platformdirs 缓存（key={asset}/{res}/{file}、文件名 sanitize）→ files_hash 校验 → fbxmaya.mll 幂等 loadPlugin → Maya cmds.file(i=True, unit=meters 显式) 导入 → **纹理自动接线**（PH 命名约定 diffuse/rough/nor_gl→file 节点、normal 过 normalMap——主工程量）→ dimensions sanity check → 归组命名 → 回报 bbox/元数据；注解={readOnly:false,destructive:false,openWorld:true}（idempotentHint 仅当同名去重才标）
+3. **护栏**：polycount>100k 默认拒（参数可覆盖+审计披露）；坏 FBX 容错（PH 部分 FBX 本身有损）；无网=显式 network_unavailable 域错（非 isError）禁静默陈旧缓存；cache 命中审计标 source:cache；审计记 URL/size/files_hash
+4. **联动面**：pipeline.py TOOL_ANNOTATIONS、server.py instructions、threat-model.md §5 矩阵、AGENTS.md（工具数 20→22+联动表）、tests/（stub 层：API mock+下载+导入链路；PH FBX 真测归真机窗）
 
-### T-18b — 同窗清账（D-068）
+### T-19b — README 英文默认化（D-072；与 T-19a 可并行）
 
-- **N7**：client.py `_bootstrap` 热更新点查 `error` 键——module_create_failed 不再吞且不误报 "module updated"（对照 write_module raise 于 client.py:766-773；~3 行+1 回归测试）
-- **N8**：AGENTS.md tests/ 清单补 `test_check_ruff_budget.py`+`test_presence_baseline.py`（磁盘 23 vs 清单 21）
-- **O2**：#5 备稿补 root-cause 段（docs 类 issue 的根因=README 未文档化，一句话）
-- 门禁复跑：pytest/ruff 预算/mypy 基线/pre-commit 全绿
+- README.md←英文正文（唯一 source-of-truth）、README.zh-CN.md←中文镜像（头注锚英文 commit hash）、**删 README_en.md 不留 stub**；两文件顶部语言选择器置于一切内容前（当前语言加粗不链接）
+- CI 挂标题骨架校验（EN↔zh 标题序列一一对应）入 lint job；AGENTS.md 联动表 README_en.md→README.zh-CN.md 六处
+- pyproject readme 字段不动；PyPI 页随 0.2.0 发版自动转英（不为刷页单独发版）
 
-### T-18c — 发布包备制（D-068，人工门前置作业）
+### T-19c — 演示场景构建+采集窗（D-071/D-073/D-076/D-077；前置=用户开 Maya en_US）
 
-- **O1**：CHANGELOG `[Unreleased]` 并入 `[0.1.2]` 订正真实日期+顶部留空 Unreleased 段
-- upstream-issue-status.md 验证列去 pending（按 T-18a 实测结果）；#1/#3/#4/#5 备稿去 pending 措辞
-- **逐版核实**：`git show v0.1.0:...`/`v0.1.1:...` 确认各版带病面→yank reason 文案（一句话故障模式）
-- 备发布包：v0.1.2 tag 说明+release notes（取 CHANGELOG 段原文）+yank 命令序列
+1. **场景**（agent 经本 MCP 工具实况迭代，看截图调构图）：展厅环境（地台/射灯阵/围栏/zone 分区以材质与灯光色温暗示**禁线框彩色描边**）+主展品机械虹膜雕塑（revolve 机壳+光圈叶片阵列+透镜玻璃+曲线线缆）+第二展品脚本复刻 Utah 茶壶+第三展品 asset_import 真导入（建议 Camera_01 vintage rangefinder=光学之眼呼应）——**禁原始体堆叠观感，复杂多边形+曲线硬约束**
+2. **工艺**：VP2 全开 SSAO/MSAA/DoF/depth-map 软阴影/暗色自定义背景+相机父级约束 rim 光（orbit 每角度稳定）；前中后三层+对比度集中 focal point
+3. **出片**（一个冻结 session 一次出齐）：hero.png 嵌新无 HUD 中景雕塑+shot-hero/shot-alt 带 HUD+orbit.gif 5-15s 环绕+social-preview.png 1280×640/<1MB 实底+例表 4 图（第4行 before/after 双帧）；HUD 分层=hero 关/shot 留
+4. **结晶**：定稿后场景构建+采集脚本固化入 .github/assets-src/+复现 README（Maya 版本/PH 资产 ID/VP2 参数）+采集 transcript 留档
+5. **验收门**：全套素材贴图呈报用户过目签字才入库（发布 checklist 显式 gate）
 
-### T-18d — #2/#7 发帖（D-069）
+### T-19d — README 内容收口（D-071/D-076；等 T-19c 素材）
 
-- 终稿贴出→**用户过目**→gh 评论发出（过目=授权前置）；不依赖 T-18a 可与并行
-- 一 issue 一评；措辞改动须回草稿重过目
+- prompt→结果例表 4 行（| Prompt | Result | 每行内嵌实拍）：①Build a showroom displaying a mechanical iris sculpture ②Rebuild the Utah teapot and place it on a pedestal ③Find a CC0 vintage camera on Poly Haven and import it ④Audit this scene and fix violations
+- 能力矩阵 20→22 工具+资产行；blender-mcp 对比表重分档（资产生态=部分对齐：Poly Haven vs 其 4 源，如实写）；双语同改（EN 先行 zh 镜像跟随同 PR）
+
+### T-19e — 门禁+0.2.0 备料（D-075/D-077）
+
+- 门禁：pytest/ruff 预算/mypy 基线/pre-commit 全绿+真机窗覆盖 asset_import 路径（下载→导入→接线→断网降级域错）
+- CHANGELOG 0.2.0 段（新功能=minor bump）；关闭/更新本仓 roadmap issue #2
+- 发布备料：tag/release notes/人工门清单
 
 ### 人工门（用户执行，agent 备单）
 
-push tag v0.1.2 → release workflow → **盯 publish CI 绿+验 PyPI 页面**（invalid-publisher 前科）→ 逐版核实后 yank（附 reason）→ #1/#3/#4/#5 评论（同过目授权流程）→ 可选 v0.1.1 Release 加 yanked 标注
+开 Maya（en_US）→素材过目签字→0.2.0 push tag→release workflow→盯 publish CI+验 PyPI→可选上游/social 跟进
 
 ## 顺延队列（原主不动）
 
-N4 五条 smell 债 / T-06 dormant 引擎归置 / T-07 注册表 / 依赖锁定 / coverage patch 门 / macOS 冒烟 / T-14b #7 残余矩阵 / social+About 门面人工项
+N4 五条 smell 债 / T-06 dormant 引擎归置 / T-07 注册表 / 依赖锁定 / coverage patch 门 / macOS 冒烟 / T-14b #7 残余 / sha 戳 post-inject / stub setFloatPixels / nested retry / Arnold 静帧可选项（届时走账本裁决）
 
 ## 铁律
 
-- 脏场景未授权绝不 `file(new,force)`；临时端口用后即关不常开、禁 IP:port 形式
-- yank 不早于 0.1.2 确认 PyPI 可用；tag 前可改 tag 后只加不减
-- 一切评论发出必过用户目；幻影簿记禁 discard（虽已自清，写操作前仍 git ls-tree 对账）
-- VC 全走 `but`；grill/实现分离
+- dogfood 不破：全部素材产品工具链实拍禁 mock/生成图；脏场景守卫沿用（探针先行脏则停）
+- 复刻限公版/CC0 对象禁版权角色；有机生物/角色不进脚本复刻题材
+- 素材未过目不入库；半旧半新素材禁混用（一次 session 出齐）
+- 资产导入安全骨架不降级（白名单/护栏/审计）；Maya 零网络面
+- VC 全走 but；grill/实现分离
 
 ## suggested skills
 
-- `$implement` / `$tdd` — T-18a/b 执行与修复面
+- `$implement` / `$tdd` — T-19a 功能核与测试面
 - `$but` — 全部 VC 写操作
-- `$handoff` — 窗口结束再翻页
+- `$handoff` — 翻页
 - `$atomcode-research` — 争议调研（串行单发）
+- `$domain-modeling` — 术语增量入 CONTEXT.md 时
