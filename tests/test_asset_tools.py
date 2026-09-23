@@ -93,9 +93,7 @@ def tools(maya_env, monkeypatch, tmp_path):
 
     from maya_mcp_server import polyhaven
 
-    monkeypatch.setattr(
-        polyhaven, "download_asset", lambda *a, **kw: dict(descriptor)
-    )
+    monkeypatch.setattr(polyhaven, "download_asset", lambda *a, **kw: dict(descriptor))
     monkeypatch.setattr(
         polyhaven,
         "search_assets",
@@ -110,9 +108,7 @@ def tools(maya_env, monkeypatch, tmp_path):
     client = ExecClient(module)
     manager = MagicMock()
     manager.get_client = AsyncMock(return_value=client)
-    monkeypatch.setattr(
-        "maya_mcp_server.server.get_session_manager", lambda: manager
-    )
+    monkeypatch.setattr("maya_mcp_server.server.get_session_manager", lambda: manager)
 
     audit = AuditLogger(tmp_path / "audit.jsonl")
     mock_mcp = MagicMock()
@@ -147,9 +143,7 @@ class TestAssetSearch:
         assert res["total_count"] == 1
         assert res["results"][0]["id"] == "Camera_01"
 
-    async def test_search_domain_error_not_raised(
-        self, tools, monkeypatch
-    ):
+    async def test_search_domain_error_not_raised(self, tools, monkeypatch):
         from maya_mcp_server import polyhaven
 
         def boom(**kw):
@@ -189,15 +183,11 @@ class TestAssetImport:
         with pytest.raises(InputValidationError):
             await tools.fns["asset_import"](asset_id="ok", resolution="3k")
 
-    async def test_import_download_error_is_domain_json(
-        self, tools, monkeypatch
-    ):
+    async def test_import_download_error_is_domain_json(self, tools, monkeypatch):
         from maya_mcp_server import polyhaven
 
         def boom(*a, **kw):
-            raise polyhaven.AssetError(
-                "network_unavailable", "cannot reach dl.polyhaven.org"
-            )
+            raise polyhaven.AssetError("network_unavailable", "cannot reach dl.polyhaven.org")
 
         monkeypatch.setattr(polyhaven, "download_asset", boom)
         out = await tools.fns["asset_import"](asset_id="Camera_01")
@@ -210,18 +200,14 @@ class TestAssetImport:
         res = json.loads(out)
         assert res["error"]["code"] == "polycount_exceeded"
         # override keeps it
-        out2 = await tools.fns["asset_import"](
-            asset_id="Camera_01", allow_high_polycount=True
-        )
+        out2 = await tools.fns["asset_import"](asset_id="Camera_01", allow_high_polycount=True)
         res2 = json.loads(out2)
         assert "error" not in res2, res2
 
     async def test_audit_records_download_details(self, tools):
         await tools.fns["asset_import"](asset_id="Camera_01")
         lines = [
-            json.loads(line)
-            for line in tools.audit_path.read_text().splitlines()
-            if line.strip()
+            json.loads(line) for line in tools.audit_path.read_text().splitlines() if line.strip()
         ]
         rows = [line for line in lines if line.get("asset_download")]
         assert rows, "supplementary asset_download audit row missing"

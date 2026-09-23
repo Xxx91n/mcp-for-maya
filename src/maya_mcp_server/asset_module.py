@@ -166,9 +166,7 @@ def _assign(sg: str, meshes: list[str]) -> list[str]:
 def _connect_p2d(file_node: str) -> str | None:
     """Standard place2dTexture boilerplate for a file node."""
     try:
-        p2d = cmds.shadingNode(
-            "place2dTexture", asUtility=True, name=file_node + "_p2d"
-        )
+        p2d = cmds.shadingNode("place2dTexture", asUtility=True, name=file_node + "_p2d")
     except Exception:
         return None
     pairs = [
@@ -224,24 +222,18 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
     if role == "roughness":
         for attr in ("specularRoughness", "roughness"):
             if cmds.objExists(mat + "." + attr):
-                cmds.connectAttr(
-                    file_node + ".outColorR", mat + "." + attr, force=True
-                )
+                cmds.connectAttr(file_node + ".outColorR", mat + "." + attr, force=True)
                 return True
         return False
     if role == "metalness":
         if cmds.objExists(mat + ".metalness"):
-            cmds.connectAttr(
-                file_node + ".outColorR", mat + ".metalness", force=True
-            )
+            cmds.connectAttr(file_node + ".outColorR", mat + ".metalness", force=True)
             return True
         return False
     if role == "normal" or role == "normal_dx":
         if not cmds.objExists(mat + ".normalCamera"):
             return False
-        bump = cmds.shadingNode(
-            "bump2d", asUtility=True, name=file_node + "_bump"
-        )
+        bump = cmds.shadingNode("bump2d", asUtility=True, name=file_node + "_bump")
         for attr, val in (("bumpInterp", 1), ("useAsNormal", 1)):
             try:
                 cmds.setAttr(bump + "." + attr, val)
@@ -252,24 +244,16 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
         return True
     if role == "ao":
         if cmds.objExists(mat + ".ambientColor"):
-            cmds.connectAttr(
-                file_node + ".outColorR", mat + ".ambientColor", force=True
-            )
+            cmds.connectAttr(file_node + ".outColorR", mat + ".ambientColor", force=True)
             return True
         return False
     if role == "displacement":
         if not sg or not cmds.objExists(sg + ".displacementShader"):
             return False
         try:
-            disp = cmds.shadingNode(
-                "displacementShader", asUtility=True, name=file_node + "_disp"
-            )
-            cmds.connectAttr(
-                file_node + ".outAlpha", disp + ".displacement", force=True
-            )
-            cmds.connectAttr(
-                disp + ".displacement", sg + ".displacementShader", force=True
-            )
+            disp = cmds.shadingNode("displacementShader", asUtility=True, name=file_node + "_disp")
+            cmds.connectAttr(file_node + ".outAlpha", disp + ".displacement", force=True)
+            cmds.connectAttr(disp + ".displacement", sg + ".displacementShader", force=True)
             return True
         except Exception:
             return False
@@ -289,7 +273,11 @@ def _wire_textures(
     single = len(texture_parts) == 1
     for part, maps in sorted(texture_parts.items()):
         rec: dict[str, Any] = {
-            "part": part, "materials": [], "wired": [], "unwired": [], "assigned": []
+            "part": part,
+            "materials": [],
+            "wired": [],
+            "unwired": [],
+            "assigned": [],
         }
         targets = _match_material(part, mats)
         sg = None
@@ -298,9 +286,7 @@ def _wire_textures(
             # assign part-named meshes (all meshes when single-part).
             mat, sg = _new_material(asset_id, part)
             targets = [mat]
-            sel = meshes if single else [
-                m for m in meshes if part.lower() in _short(m).lower()
-            ]
+            sel = meshes if single else [m for m in meshes if part.lower() in _short(m).lower()]
             rec["assigned"] = _assign(sg, sel)
         elif sgs:
             sg = sgs[0]
@@ -463,9 +449,7 @@ def import_asset(
                 "pass allow_high_polycount=True to keep the import (decision is audited)",
             )
 
-        wiring = _wire_textures(
-            descriptor.get("texture_parts") or {}, new_nodes, meshes, asset_id
-        )
+        wiring = _wire_textures(descriptor.get("texture_parts") or {}, new_nodes, meshes, asset_id)
 
         bbox = _world_bbox(grp)
         dims = []
@@ -484,9 +468,7 @@ def import_asset(
                 "possible unit mismatch (asset authored in meters)"
             )
         if mx > 100000:
-            warnings.append(
-                f"suspicious_huge: max dim {mx}{unit} - check scale"
-            )
+            warnings.append(f"suspicious_huge: max dim {mx}{unit} - check scale")
 
         return {
             "asset_id": asset_id,

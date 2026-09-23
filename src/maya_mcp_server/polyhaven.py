@@ -249,9 +249,7 @@ def split_texture_key(key: str) -> tuple[str, str] | None:
     return None
 
 
-def _pick_entry(
-    variants: Any, resolution: str
-) -> tuple[str, str, dict[str, Any]] | None:
+def _pick_entry(variants: Any, resolution: str) -> tuple[str, str, dict[str, Any]] | None:
     """Pick (resolution, fmt, entry): requested res first, then lower res."""
     if not isinstance(variants, dict):
         return None

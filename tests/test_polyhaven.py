@@ -45,9 +45,7 @@ def fake_urlopen(routes: dict, record: list | None = None):
             record.append(
                 {
                     "url": url,
-                    "ua": req.get_header("User-agent")
-                    if hasattr(req, "get_header")
-                    else None,
+                    "ua": req.get_header("User-agent") if hasattr(req, "get_header") else None,
                 }
             )
         v = routes.get(url)
@@ -117,9 +115,7 @@ def files_payload():
 
 
 def files_routes(files_payload):
-    routes = {
-        "https://api.polyhaven.com/files/Camera_01": json.dumps(files_payload).encode()
-    }
+    routes = {"https://api.polyhaven.com/files/Camera_01": json.dumps(files_payload).encode()}
     contents = {
         "https://dl.polyhaven.org/x/Camera_01_1k.fbx": b"FBX!!",
         "https://dl.polyhaven.org/x/body_diff_1k.jpg": b"DIFF",
@@ -146,12 +142,8 @@ class TestSearch:
             }
             for i in range(30)
         }
-        routes = {
-            "https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()
-        }
-        monkeypatch.setattr(
-            urllib.request, "urlopen", fake_urlopen(routes)
-        )
+        routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen(routes))
         out = polyhaven.search_assets(query="vintage", limit=20)
         assert len(out["results"]) == 15  # only vintage assets match
         assert out["total_count"] == 15
@@ -162,9 +154,7 @@ class TestSearch:
             f"asset_{i:02d}": {"name": f"Asset {i}", "categories": [], "tags": []}
             for i in range(50)
         }
-        routes = {
-            "https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()
-        }
+        routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen(routes))
         out = polyhaven.search_assets(query="asset", limit=99)
         assert len(out["results"]) == 20  # hard cap
@@ -173,9 +163,7 @@ class TestSearch:
     def test_search_sends_user_agent(self, monkeypatch):
         record = []
         routes = {"https://api.polyhaven.com/assets?t=models": b"{}"}
-        monkeypatch.setattr(
-            urllib.request, "urlopen", fake_urlopen(routes, record)
-        )
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen(routes, record))
         polyhaven.search_assets()
         assert record and "mcp-for-maya" in (record[0]["ua"] or "")
 
@@ -193,9 +181,7 @@ class TestGuards:
 
     def test_http_scheme_rejected(self):
         with pytest.raises(AssetError) as ei:
-            polyhaven._fetch(
-                "http://dl.polyhaven.org/x.fbx", timeout=1, max_bytes=10
-            )
+            polyhaven._fetch("http://dl.polyhaven.org/x.fbx", timeout=1, max_bytes=10)
         assert ei.value.code == "url_not_allowed"
 
     def test_network_unavailable_domain_error(self, monkeypatch):
@@ -212,9 +198,7 @@ class TestGuards:
         assert ei.value.suggestion
 
     def test_404_maps_to_asset_not_found(self, monkeypatch):
-        err = urllib.error.HTTPError(
-            "https://api.polyhaven.com/files/nope", 404, "nf", {}, None
-        )
+        err = urllib.error.HTTPError("https://api.polyhaven.com/files/nope", 404, "nf", {}, None)
         monkeypatch.setattr(
             urllib.request,
             "urlopen",
@@ -295,9 +279,7 @@ class TestSelectFiles:
 
 
 class TestDownload:
-    def test_download_descriptor_shape(
-        self, monkeypatch, tmp_path, files_payload
-    ):
+    def test_download_descriptor_shape(self, monkeypatch, tmp_path, files_payload):
         monkeypatch.setattr(
             urllib.request,
             "urlopen",
@@ -319,20 +301,14 @@ class TestDownload:
         assert fbx_entry["md5"] == hashlib.md5(b"FBX!!").hexdigest()
         assert fbx_entry["sha256"] == hashlib.sha256(b"FBX!!").hexdigest()
         # manifest written into the cache dir
-        manifest = json.loads(
-            (Path(d["cache_dir"]) / "manifest.json").read_text()
-        )
+        manifest = json.loads((Path(d["cache_dir"]) / "manifest.json").read_text())
         assert manifest["asset_id"] == "Camera_01"
         assert len(manifest["files"]) == 5
 
-    def test_second_call_is_cache_hit(
-        self, monkeypatch, tmp_path, files_payload
-    ):
+    def test_second_call_is_cache_hit(self, monkeypatch, tmp_path, files_payload):
         record = []
         routes = files_routes(files_payload)
-        monkeypatch.setattr(
-            urllib.request, "urlopen", fake_urlopen(routes, record)
-        )
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen(routes, record))
         polyhaven.download_asset("Camera_01", cache_root=str(tmp_path))
         file_urls_first = [r["url"] for r in record if "/x/" in r["url"]]
         assert len(file_urls_first) == 5
@@ -345,9 +321,7 @@ class TestDownload:
         assert file_urls_second == []
         assert any("/files/Camera_01" in r["url"] for r in record)
 
-    def test_no_silent_stale_cache(
-        self, monkeypatch, tmp_path, files_payload
-    ):
+    def test_no_silent_stale_cache(self, monkeypatch, tmp_path, files_payload):
         # populate cache once
         monkeypatch.setattr(
             urllib.request,
@@ -360,17 +334,13 @@ class TestDownload:
         monkeypatch.setattr(
             urllib.request,
             "urlopen",
-            lambda req, timeout=None: (_ for _ in ()).throw(
-                urllib.error.URLError("offline")
-            ),
+            lambda req, timeout=None: (_ for _ in ()).throw(urllib.error.URLError("offline")),
         )
         with pytest.raises(AssetError) as ei:
             polyhaven.download_asset("Camera_01", cache_root=str(tmp_path))
         assert ei.value.code == "network_unavailable"
 
-    def test_md5_mismatch_rejected(
-        self, monkeypatch, tmp_path, files_payload
-    ):
+    def test_md5_mismatch_rejected(self, monkeypatch, tmp_path, files_payload):
         payload = dict(files_payload)
         payload["fbx"] = {
             "1k": {
@@ -400,9 +370,7 @@ class TestDownload:
                 }
             }
         }
-        routes = {
-            "https://api.polyhaven.com/files/bad": json.dumps(payload).encode()
-        }
+        routes = {"https://api.polyhaven.com/files/bad": json.dumps(payload).encode()}
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen(routes))
         with pytest.raises(AssetError) as ei:
             polyhaven.download_asset("bad", cache_root=str(tmp_path))

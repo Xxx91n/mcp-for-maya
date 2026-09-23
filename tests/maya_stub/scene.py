@@ -135,7 +135,7 @@ class Scene:
         # asset-import surface (D-075): plugin registry, MEL record,
         # and the fixture that cmds.file(i=True) materializes.
         self.plugins_available = {"fbxmaya"}  # loadable plug-ins
-        self.loaded_plugins = {"fbxmaya"}    # already-loaded plug-ins
+        self.loaded_plugins = {"fbxmaya"}  # already-loaded plug-ins
         self.mel_calls = []  # recorded maya.mel.eval invocations
         self.fbx_fixture = None  # {"meshes":[...], "materials":[...]}
         self.fbx_fixture_error = None  # truthy => import raises this

@@ -25,10 +25,7 @@ def skeleton(path: Path) -> list[int]:
     "# comment" would otherwise masquerade as H1 headings.
     """
     text = re.sub(r"^```.*?^```", "", path.read_text(encoding="utf-8"), flags=re.M | re.S)
-    return [
-        len(m.group(1))
-        for m in re.finditer(r"^(#{1,6})\s", text, re.M)
-    ]
+    return [len(m.group(1)) for m in re.finditer(r"^(#{1,6})\s", text, re.M)]
 
 
 def main() -> int:
@@ -49,12 +46,8 @@ def main() -> int:
     if "[English](README.md) | **简体中文**" not in zh_text:
         print("::error::README.zh-CN.md missing top language selector")
         failed = True
-    if not re.search(
-        r"synced-with:\s*README\.md\s*@\s*[0-9a-f]{7,40}", zh_text
-    ):
-        print(
-            "::error::README.zh-CN.md missing synced-with anchor comment"
-        )
+    if not re.search(r"synced-with:\s*README\.md\s*@\s*[0-9a-f]{7,40}", zh_text):
+        print("::error::README.zh-CN.md missing synced-with anchor comment")
         failed = True
 
     en_sk, zh_sk = skeleton(en), skeleton(zh)

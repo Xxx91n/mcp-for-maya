@@ -284,9 +284,7 @@ def file(*args, **kwargs):
             mref = ms.get("material")
             if mref in mat_nodes:
                 sg = mat_nodes[mref][1]
-                sc.connections.setdefault(
-                    shape.name + ".instObjGroups[0]", []
-                ).append(sg.name)
+                sc.connections.setdefault(shape.name + ".instObjGroups[0]", []).append(sg.name)
                 sc.set_members[sg.name].append(sc.long_name(shape))
         sc.fbx_created = created
         if kwargs.get("returnNewNodes") or kwargs.get("rnn"):
@@ -748,15 +746,19 @@ def exactWorldBoundingBox(*refs, **kwargs):
             box = b
         else:
             for i, v in enumerate((b.min.x, b.min.y, b.min.z)):
-                box.min = type(box.min)(*[
-                    min(cur, v) if j == i else cur
-                    for j, cur in enumerate((box.min.x, box.min.y, box.min.z))
-                ])
+                box.min = type(box.min)(
+                    *[
+                        min(cur, v) if j == i else cur
+                        for j, cur in enumerate((box.min.x, box.min.y, box.min.z))
+                    ]
+                )
             for i, v in enumerate((b.max.x, b.max.y, b.max.z)):
-                box.max = type(box.max)(*[
-                    max(cur, v) if j == i else cur
-                    for j, cur in enumerate((box.max.x, box.max.y, box.max.z))
-                ])
+                box.max = type(box.max)(
+                    *[
+                        max(cur, v) if j == i else cur
+                        for j, cur in enumerate((box.max.x, box.max.y, box.max.z))
+                    ]
+                )
     if box is None or box.is_empty:
         return [0.0] * 6
     return [box.min.x, box.min.y, box.min.z, box.max.x, box.max.y, box.max.z]

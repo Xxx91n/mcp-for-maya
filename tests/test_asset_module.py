@@ -70,17 +70,14 @@ class TestImportHappyPath:
         assert res["bbox"] is not None
         # group really exists and parents the mesh
         assert asset_env.cmds.objExists(res["group"])
-        parent = asset_env.cmds.listRelatives(
-            "|" + res["group"] + "|Camera_01_body", parent=True
-        )
+        parent = asset_env.cmds.listRelatives("|" + res["group"] + "|Camera_01_body", parent=True)
         assert parent == [res["group"]]
 
     def test_unit_globals_set_via_mel(self, asset_env):
         asset_env.module.import_asset(asset_env.descriptor)
-        assert any(
-            "FBXImportConvertUnitString m" in c
-            for c in asset_env.scene.mel_calls
-        ), asset_env.scene.mel_calls
+        assert any("FBXImportConvertUnitString m" in c for c in asset_env.scene.mel_calls), (
+            asset_env.scene.mel_calls
+        )
 
     def test_plugin_load_idempotent(self, asset_env):
         asset_env.scene.loaded_plugins = set()  # present but unloaded
@@ -150,9 +147,7 @@ class TestPolycountGate:
 
     def test_override_keeps_import(self, asset_env):
         asset_env.scene.fbx_fixture["meshes"][0]["faces"] = 150000
-        res = asset_env.module.import_asset(
-            asset_env.descriptor, allow_high_polycount=True
-        )
+        res = asset_env.module.import_asset(asset_env.descriptor, allow_high_polycount=True)
         assert "error" not in res, res
         assert res["polycount"] == 150000
 
@@ -178,28 +173,21 @@ class TestTextureWiring:
         f_diff = sc.resolve("file_Camera_01_body_diff")
         assert f_diff.attrs.get("colorSpace") == "sRGB"
         assert "file_Camera_01_body_diff" in sc.connections.get(
-            "|body.color", []  # DG material sits at root -> long name key
+            "|body.color",
+            [],  # DG material sits at root -> long name key
         )
         # normal goes through a bump2d into normalCamera
-        bump_targets = [
-            k for k in sc.connections if k.endswith(".bumpValue")
-        ]
+        bump_targets = [k for k in sc.connections if k.endswith(".bumpValue")]
         assert bump_targets, sc.connections
         bump_node = bump_targets[0].split(".")[0]
         assert sc.resolve(bump_node).type == "bump2d"
-        assert "file_Camera_01_body_nor_gl" in sc.connections[
-            bump_targets[0]
-        ]
-        assert bump_node in [
-            c for c in sc.connections.get("|body.normalCamera", [])
-        ]
+        assert "file_Camera_01_body_nor_gl" in sc.connections[bump_targets[0]]
+        assert bump_node in [c for c in sc.connections.get("|body.normalCamera", [])]
         # normal map file is Raw, not sRGB
         f_nor = sc.resolve("file_Camera_01_body_nor_gl")
         assert f_nor.attrs.get("colorSpace") == "Raw"
 
-    def test_unmatched_part_creates_material_and_assigns(
-        self, asset_env, tmp_path
-    ):
+    def test_unmatched_part_creates_material_and_assigns(self, asset_env, tmp_path):
         # a second texture family with no matching imported material
         extra = tmp_path / "strap_metallic_1k.jpg"
         extra.write_bytes(b"METL")

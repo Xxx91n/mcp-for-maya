@@ -166,9 +166,7 @@ def register_asset_tools(mcp: Any, audit: AuditLogger | None = None) -> None:
                 f"invalid asset_type {asset_type!r}: expected 'models', 'hdris', or 'textures'"
             )
         try:
-            result = polyhaven.search_assets(
-                query=query, asset_type=asset_type, limit=limit
-            )
+            result = polyhaven.search_assets(query=query, asset_type=asset_type, limit=limit)
         except polyhaven.AssetError as e:
             return json.dumps(e.to_dict(), indent=2)
         return json.dumps(result, indent=2)

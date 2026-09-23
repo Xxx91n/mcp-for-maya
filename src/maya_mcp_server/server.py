@@ -137,11 +137,7 @@ register_visual_tools(mcp)
 # One AuditLogger shared by the pipeline (per-call events) and the
 # asset tools (result-side download detail: URL/size/files_hash, D-075).
 _audit_logger = (
-    AuditLogger(
-        Path(_security_config.audit_log_path)
-        if _security_config.audit_log_path
-        else None
-    )
+    AuditLogger(Path(_security_config.audit_log_path) if _security_config.audit_log_path else None)
     if _security_config.audit_enabled
     else None
 )
