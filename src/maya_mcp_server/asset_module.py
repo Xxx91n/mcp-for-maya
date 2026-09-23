@@ -226,26 +226,31 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
                 return True
         return False
     if role == "metalness":
-        if cmds.objExists(mat + ".metalness"):
-            cmds.connectAttr(file_node + ".outColorR", mat + ".metalness", force=True)
-            return True
+        for attr in ("metalness", "reflectivity"):
+            if cmds.objExists(mat + "." + attr):
+                cmds.connectAttr(file_node + ".outColorR", mat + "." + attr, force=True)
+                return True
         return False
     if role == "normal" or role == "normal_dx":
         if not cmds.objExists(mat + ".normalCamera"):
             return False
+        # Canonical network per fbxmaya itself (verified live Maya 2024):
+        # file.outAlpha -> bump2d.bumpValue; bump2d.outNormal -> mat.normalCamera;
+        # bumpInterp=1 selects tangent-space normals. outColor -> bumpValue is
+        # rejected by real Maya (color -> float is not connectable).
         bump = cmds.shadingNode("bump2d", asUtility=True, name=file_node + "_bump")
-        for attr, val in (("bumpInterp", 1), ("useAsNormal", 1)):
-            try:
-                cmds.setAttr(bump + "." + attr, val)
-            except Exception:
-                pass
-        cmds.connectAttr(file_node + ".outColor", bump + ".bumpValue", force=True)
+        cmds.setAttr(bump + ".bumpInterp", 1)
+        cmds.connectAttr(file_node + ".outAlpha", bump + ".bumpValue", force=True)
         cmds.connectAttr(bump + ".outNormal", mat + ".normalCamera", force=True)
         return True
     if role == "ao":
-        if cmds.objExists(mat + ".ambientColor"):
-            cmds.connectAttr(file_node + ".outColorR", mat + ".ambientColor", force=True)
-            return True
+        # AO darkens, so it must drive a multiplier - ambientColor *adds*
+        # light (live dogfood finding: feeding AO there washes the model
+        # flat white). material.diffuse is the scalar color multiplier.
+        for attr in ("diffuse",):
+            if cmds.objExists(mat + "." + attr):
+                cmds.connectAttr(file_node + ".outColorR", mat + "." + attr, force=True)
+                return True
         return False
     if role == "displacement":
         if not sg or not cmds.objExists(sg + ".displacementShader"):
@@ -290,7 +295,13 @@ def _wire_textures(
             rec["assigned"] = _assign(sg, sel)
         elif sgs:
             sg = sgs[0]
+        # Prefer OpenGL normals when PH ships both gl and dx variants —
+        # one bump input per material; dx is redundant for standard flow.
+        if "nor_gl" in maps and "nor_dx" in maps:
+            rec["unwired"].append(part + "_nor_dx (nor_gl preferred)")
         for suffix, path in sorted(maps.items()):
+            if suffix == "nor_dx" and "nor_gl" in maps:
+                continue
             kind = _MAP_KINDS.get(suffix)
             if kind is None or not isinstance(path, str) or not os.path.isfile(path):
                 rec["unwired"].append(part + "_" + suffix)

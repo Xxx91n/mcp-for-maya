@@ -187,6 +187,28 @@ class TestTextureWiring:
         f_nor = sc.resolve("file_Camera_01_body_nor_gl")
         assert f_nor.attrs.get("colorSpace") == "Raw"
 
+    def test_arm_wires_ao_to_diffuse(self, asset_env, tmp_path):
+        # Live dogfood findings (T-19c): ARM packed map must not connect
+        # scalar outColorR into the triple ambientColor - real Maya
+        # rejects float -> double3; and ambientColor *adds* light so AO
+        # there washes the model flat. AO -> material.diffuse (scalar
+        # multiplier) is the legal, semantically correct target.
+        arm = tmp_path / "body_arm_1k.jpg"
+        arm.write_bytes(b"ARM")
+        d = dict(asset_env.descriptor)
+        d["texture_parts"] = dict(d["texture_parts"])
+        d["texture_parts"]["body"] = dict(d["texture_parts"]["body"])
+        d["texture_parts"]["body"]["arm"] = str(arm)
+        res = asset_env.module.import_asset(d)
+        assert "error" not in res, res
+        parts = {p["part"]: p for p in res["texture_wiring"]["parts"]}
+        wired = "\n".join(parts["body"]["wired"])
+        assert "body_arm->body" in wired
+        sc = asset_env.scene
+        assert "file_Camera_01_body_arm" in sc.connections.get("|body.diffuse", [])
+        f_arm = sc.resolve("file_Camera_01_body_arm")
+        assert f_arm.attrs.get("colorSpace") == "Raw"
+
     def test_unmatched_part_creates_material_and_assigns(self, asset_env, tmp_path):
         # a second texture family with no matching imported material
         extra = tmp_path / "strap_metallic_1k.jpg"

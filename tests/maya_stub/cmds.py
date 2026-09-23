@@ -696,13 +696,25 @@ def setAttr(ref, *args, **kwargs):
     return None
 
 
+_SCALAR_OUT_SUFFIXES = ("outColorR", "outColorG", "outColorB", "outAlpha")
+
+
 def connectAttr(src, dst, **kwargs):
     """cmds.connectAttr - records dst -> [src_node] on the graph."""
     sc = _s()
     src_node = sc.resolve(str(src).split(".")[0])
     dst_ref = str(dst)
     dst_node_name, dst_attr = dst_ref.split(".", 1)
-    sc.resolve(dst_node_name)  # raises if missing, like real Maya
+    dst_node = sc.resolve(dst_node_name)  # raises if missing, like real Maya
+    # Real Maya rejects scalar -> triple connects (e.g. outColorR -> ambientColor).
+    src_attr = str(src).split(".", 1)[-1]
+    if src_attr in _SCALAR_OUT_SUFFIXES and isinstance(
+        getattr(dst_node, "attrs", {}).get(dst_attr), tuple
+    ):
+        raise RuntimeError(
+            f"Connection not made: '{src}' -> '{dst}'. "
+            "Data types of source and destination are not compatible."
+        )
     sc.connections.setdefault(dst_node_name + "." + dst_attr, []).append(src_node.name)
     return None
 
