@@ -34,6 +34,16 @@
 <img src=".github/assets/shot-alt.png" width="49%" alt="scene_viewport_snapshot：侧向视角（含 HUD）"/>
 </p>
 
+回路细节——全部帧经 `scene_render_preview` 渲染（960×540）：
+
+| 展厅 + 虹膜雕塑，由 `execute_code` 构建 | 脚本复刻茶壶，置于独立台座 |
+|---|---|
+| <img src=".github/assets/row1-showroom.png" width="480" alt="程序化展厅：弧形舞台、虹膜雕塑、分区环"/> | <img src=".github/assets/row2-teapot.png" width="480" alt="暖主光下的脚本茶壶"/> |
+| Poly Haven `Camera_01` 经 `asset_import` 导入——26,987 面、贴图接线 | `scene_review` 回路：违规 → 自动修复，评分 46.7 → 100 |
+| <img src=".github/assets/row3-camera.png" width="480" alt="导入的 Poly Haven 旁轴相机，贴图加载"/> | <img src=".github/assets/row4-audit-before.png" width="239" alt="scene_review 修复前：默认名网格重叠"/><img src=".github/assets/row4-audit-after.png" width="239" alt="scene_review 修复后：分离、改名、满分"/> |
+
+每一帧都可用 [`.github/assets-src/`](.github/assets-src/README.md) 里的脚本复现。
+
 ## 与 blender-mcp 对比
 
 对标 [ahujasid/blender-mcp](https://github.com/ahujasid/blender-mcp)（2026-09 实测），诚实三档：

@@ -32,6 +32,16 @@ Every asset below is a real capture produced by this project's own tool chain �
 <img src=".github/assets/shot-alt.png" width="49%" alt="scene_viewport_snapshot: side angle (HUD included)"/>
 </p>
 
+The loop in detail — all frames rendered through `scene_render_preview` (960×540):
+
+| Showroom + iris sculpture, built via `execute_code` | Scripted teapot replica on its pedestal |
+|---|---|
+| <img src=".github/assets/row1-showroom.png" width="480" alt="procedural showroom: cove stage, iris sculpture, zone rings"/> | <img src=".github/assets/row2-teapot.png" width="480" alt="scripted teapot replica under warm key light"/> |
+| Poly Haven `Camera_01` via `asset_import` — 26,987 faces, textures wired | `scene_review` loop: violations → auto-fix, score 46.7 → 100 |
+| <img src=".github/assets/row3-camera.png" width="480" alt="imported Poly Haven rangefinder camera, textures loaded"/> | <img src=".github/assets/row4-audit-before.png" width="239" alt="scene_review before: overlapping default-named meshes"/><img src=".github/assets/row4-audit-after.png" width="239" alt="scene_review after: separated, renamed, score 100"/> |
+
+Reproduce every frame with the scripts in [`.github/assets-src/`](.github/assets-src/README.md).
+
 ## vs blender-mcp
 
 An honest three-tier comparison with [ahujasid/blender-mcp](https://github.com/ahujasid/blender-mcp) (measured 2026-09):
