@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any
 
 from maya_mcp_server.client import raise_for_error
-from maya_mcp_server.pipeline import TOOL_ANNOTATIONS
 from maya_mcp_server.cos_formatter import (
     format_assert_cos,
     format_inspect_cos,
@@ -20,6 +19,7 @@ from maya_mcp_server.cos_formatter import (
     format_scene_cos,
     format_zone_map_cos,
 )
+from maya_mcp_server.pipeline import TOOL_ANNOTATIONS
 from maya_mcp_server.scene_cache import SceneCache
 from maya_mcp_server.security import InputValidationError
 
@@ -72,7 +72,8 @@ async def _ensure_module_injected(client: Any, session_key: str | None) -> None:
     # channel carries length-prefixed frames up to 16 MiB, so GUI sessions
     # inject directly via write_module (D-013).
     if len(source) > 15000 and not getattr(client, "framed_channel", False):
-        import tempfile as _tf, os as _os
+        import os as _os
+        import tempfile as _tf
 
         _ResultType = __import__("maya_mcp_server.types", fromlist=["ResultType"]).ResultType
         # Write source to temp file on the CLIENT side, then read it from Maya

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import importlib.metadata
 import logging
+from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
 
+from maya_mcp_server.asset_tools import register_asset_tools
 from maya_mcp_server.client import raise_for_error
 from maya_mcp_server.connection_guide import (
     get_agent_connection_instructions,
@@ -19,6 +21,7 @@ from maya_mcp_server.connection_guide import (
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS, SecurityPipeline
 from maya_mcp_server.scene_tools import mark_dirty, register_scene_tools
 from maya_mcp_server.security import (
+    AuditLogger,
     InputValidationError,
     PipelineError,
     SecurityConfig,
@@ -105,6 +108,11 @@ mcp = FastMCP(
         "## Scene Planning\n"
         "- scene_plan: Holistic scene planning with organization validation,\n"
         "  layout optimization, conflict prevention\n\n"
+        "## Asset Tools (Poly Haven CC0)\n"
+        "- asset_search: Search the Poly Haven index (host-side; no session)\n"
+        "- asset_import: Download (https whitelist + md5 + cache) and\n"
+        "  import FBX into Maya with texture auto-wiring; idempotent via\n"
+        "  GRP_asset_<id> dedup\n\n"
         "## General Tools\n"
         "- list_sessions: Discover active Maya sessions\n"
         "  (if empty, call maya_setup_guide for connection help)\n"
@@ -126,9 +134,18 @@ mcp = FastMCP(
 register_scene_tools(mcp)
 register_visual_tools(mcp)
 
+# One AuditLogger shared by the pipeline (per-call events) and the
+# asset tools (result-side download detail: URL/size/files_hash, D-075).
+_audit_logger = (
+    AuditLogger(Path(_security_config.audit_log_path) if _security_config.audit_log_path else None)
+    if _security_config.audit_enabled
+    else None
+)
+register_asset_tools(mcp, audit=_audit_logger)
+
 # Unified security pipeline: every tool call passes through validation,
 # rate limiting, pattern scanning, and audit logging (D-018/ADR-0005).
-mcp.add_middleware(SecurityPipeline(config=_security_config))
+mcp.add_middleware(SecurityPipeline(config=_security_config, audit=_audit_logger))
 
 # Global session manager - initialized when server starts
 _session_manager: SessionManager | None = None

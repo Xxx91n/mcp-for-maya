@@ -102,6 +102,21 @@ def nodeType(ref):
     return _s().resolve(ref).type
 
 
+def objectType(ref, **kwargs):
+    """cmds.objectType(ref, isAType=t): type query + ancestry check.
+
+    DAG membership (isAType='dagNode') = transforms + shape types -
+    DG nodes (materials, file textures, shadingEngines) are NOT DAG.
+    """
+    node = _s().resolve(ref)
+    isa = kwargs.get("isAType") or kwargs.get("isa")
+    if isa is None:
+        return node.type
+    if isa == "dagNode":
+        return node.type == "transform" or node.type in SHAPE_TYPES
+    return node.type == isa
+
+
 def listRelatives(ref, parent=False, children=False, type=None, fullPath=False, shapes=False, **kw):
     sc = _s()
     node = sc.resolve(ref)
@@ -109,6 +124,16 @@ def listRelatives(ref, parent=False, children=False, type=None, fullPath=False, 
         if node.parent is None:
             return None
         return [sc.long_name(node.parent) if fullPath else node.parent.name]
+    if kw.get("allDescendents") or kw.get("ad"):
+        out = []
+
+        def _walk(n):
+            for c in n.children:
+                out.append(sc.long_name(c) if fullPath else c.name)
+                _walk(c)
+
+        _walk(node)
+        return out or None
     if children or shapes:
         kids = list(node.children)
         if type is not None:
@@ -153,10 +178,27 @@ def listConnections(ref, type=None, **kwargs):
     return targets or None
 
 
-def sets(ref, query=False, **kwargs):
+def sets(*args, **kwargs):
+    """Stub cmds.sets: create shadingEngine (renderable+empty), assign
+    members (edit+forceElement), or query membership."""
     sc = _s()
-    if query:
-        return sc.set_members.get(sc.resolve(ref).name, []) or None
+    if kwargs.get("renderable") and (kwargs.get("empty") or kwargs.get("em")):
+        name = kwargs.get("name") or "shadingEngine1"
+        node = sc.add_node(name, "shadingEngine")
+        sc.set_members.setdefault(node.name, [])
+        return node.name
+    if kwargs.get("edit") or kwargs.get("e"):
+        sg = kwargs.get("forceElement") or kwargs.get("fe")
+        if sg is None:
+            return None
+        sgn = sc.resolve(sg).name
+        for a in args:
+            node = sc.resolve(a)
+            sc.set_members.setdefault(sgn, []).append(sc.long_name(node))
+            sc.connections.setdefault(node.name + ".instObjGroups[0]", []).append(sgn)
+        return None
+    if kwargs.get("query") or kwargs.get("q"):
+        return sc.set_members.get(sc.resolve(args[0]).name, []) or None
     return None
 
 
@@ -229,6 +271,35 @@ def file(*args, **kwargs):
         sc.restore(json.loads(text.split("\n", 1)[1]))
         sc.scene_path = path
         return sc.scene_path
+    if kwargs.get("i") or kwargs.get("import"):
+        # FBX import: materialize the test fixture as real scene nodes.
+        # fbx_fixture_error simulates a corrupt/damaged file (real Maya
+        # raises on unreadable FBX); a None fixture imports nothing.
+        if sc.fbx_fixture_error:
+            raise RuntimeError(sc.fbx_fixture_error)
+        fx = sc.fbx_fixture or {}
+        created = []
+        mat_nodes = {}
+        for ms in fx.get("materials", []):
+            mat = sc.add_node(ms["name"], ms.get("type", "phong"))
+            sg = sc.add_node(ms["name"] + "SG", "shadingEngine")
+            sc.connections[sg.name + ".surfaceShader"] = [mat.name]
+            sc.set_members.setdefault(sg.name, [])
+            mat_nodes[ms["name"]] = (mat, sg)
+            created += ["|" + mat.name, "|" + sg.name]
+        for ms in fx.get("meshes", []):
+            tr = sc.add_mesh(ms["name"], num_polygons=ms.get("faces", 6))
+            shape = tr.children[0]
+            created += [sc.long_name(tr), sc.long_name(shape)]
+            mref = ms.get("material")
+            if mref in mat_nodes:
+                sg = mat_nodes[mref][1]
+                sc.connections.setdefault(shape.name + ".instObjGroups[0]", []).append(sg.name)
+                sc.set_members[sg.name].append(sc.long_name(shape))
+        sc.fbx_created = created
+        if kwargs.get("returnNewNodes") or kwargs.get("rnn"):
+            return list(created)
+        return args[0] if args else None
     if kwargs.get("exportAll"):
         path = args[0]
         with open(path, "w", encoding="utf-8") as fh:
@@ -587,3 +658,129 @@ def playblast(**kw):
     with open(path, "wb") as fh:
         fh.write(png_bytes(int(w), int(h)))
     return path
+
+
+# ---- asset-import surface (D-075: _mcp_asset commands) ----
+
+
+def pluginInfo(name, **kwargs):
+    """cmds.pluginInfo(name, q=True, loaded=True) -> bool."""
+    sc = _s()
+    if kwargs.get("query") or kwargs.get("q"):
+        if kwargs.get("loaded") or kwargs.get("l"):
+            return name in sc.loaded_plugins
+    return None
+
+
+def loadPlugin(name, **kwargs):
+    """cmds.loadPlugin - loads only if the plugin is 'available'."""
+    sc = _s()
+    if name not in sc.plugins_available:
+        raise RuntimeError(f'Plug-in, "{name}", was not found')
+    sc.loaded_plugins.add(name)
+    return [name]
+
+
+def shadingNode(ntype, **kwargs):
+    """cmds.shadingNode - create a DG node; name kwarg honored."""
+    sc = _s()
+    name = kwargs.get("name") or ntype + "1"
+    node = sc.add_node(name, ntype)
+    return node.name
+
+
+def createNode(ntype, **kwargs):
+    sc = _s()
+    name = kwargs.get("name") or ntype + "1"
+    node = sc.add_node(name, ntype)
+    return node.name
+
+
+def setAttr(ref, *args, **kwargs):
+    """cmds.setAttr - records the value on node.attrs."""
+    sc = _s()
+    node_ref, attr = str(ref).split(".", 1)
+    node = sc.resolve(node_ref)
+    value = args[0] if len(args) == 1 else (list(args) if args else None)
+    node.attrs[attr.split("[")[0]] = value
+    return None
+
+
+_SCALAR_OUT_SUFFIXES = ("outColorR", "outColorG", "outColorB", "outAlpha")
+
+
+def connectAttr(src, dst, **kwargs):
+    """cmds.connectAttr - records dst -> [src_node] on the graph."""
+    sc = _s()
+    src_node = sc.resolve(str(src).split(".")[0])
+    dst_ref = str(dst)
+    dst_node_name, dst_attr = dst_ref.split(".", 1)
+    dst_node = sc.resolve(dst_node_name)  # raises if missing, like real Maya
+    # Real Maya rejects scalar -> triple connects (e.g. outColorR -> ambientColor).
+    src_attr = str(src).split(".", 1)[-1]
+    if src_attr in _SCALAR_OUT_SUFFIXES and isinstance(
+        getattr(dst_node, "attrs", {}).get(dst_attr), tuple
+    ):
+        raise RuntimeError(
+            f"Connection not made: '{src}' -> '{dst}'. "
+            "Data types of source and destination are not compatible."
+        )
+    sc.connections.setdefault(dst_node_name + "." + dst_attr, []).append(src_node.name)
+    return None
+
+
+def disconnectAttr(src, dst, **kwargs):
+    sc = _s()
+    src_node = sc.resolve(str(src).split(".")[0])
+    dst_ref = str(dst)
+    key = dst_ref
+    if key in sc.connections and src_node.name in sc.connections[key]:
+        sc.connections[key].remove(src_node.name)
+    return None
+
+
+def polyEvaluate(ref, **kwargs):
+    """cmds.polyEvaluate(node, face=True) -> polygon count of the shape."""
+    sc = _s()
+    node = sc.resolve(ref)
+    if node.type != "mesh":
+        shapes = [c for c in node.children if c.type == "mesh"]
+        if not shapes:
+            raise RuntimeError("No mesh under " + str(ref))
+        node = shapes[0]
+    if kwargs.get("face") or kwargs.get("f"):
+        return node.num_polygons
+    if kwargs.get("vertex") or kwargs.get("v"):
+        return node.num_vertices
+    return node.num_polygons
+
+
+def exactWorldBoundingBox(*refs, **kwargs):
+    """cmds.exactWorldBoundingBox -> [xmin,ymin,zmin,xmax,ymax,zmax]."""
+    sc = _s()
+    box = None
+    for ref in refs:
+        node = sc.resolve(ref)
+        b = sc.world_bbox(node)
+        if b.is_empty:
+            continue
+        if box is None:
+            box = b
+        else:
+            for i, v in enumerate((b.min.x, b.min.y, b.min.z)):
+                box.min = type(box.min)(
+                    *[
+                        min(cur, v) if j == i else cur
+                        for j, cur in enumerate((box.min.x, box.min.y, box.min.z))
+                    ]
+                )
+            for i, v in enumerate((b.max.x, b.max.y, b.max.z)):
+                box.max = type(box.max)(
+                    *[
+                        max(cur, v) if j == i else cur
+                        for j, cur in enumerate((box.max.x, box.max.y, box.max.z))
+                    ]
+                )
+    if box is None or box.is_empty:
+        return [0.0] * 6
+    return [box.min.x, box.min.y, box.min.z, box.max.x, box.max.y, box.max.z]

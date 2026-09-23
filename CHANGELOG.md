@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-23
+
+### Added
+
+- **Poly Haven asset library (T-19a, D-074/D-075)** — two new tools
+  bringing the count to 22:
+  - `asset_search` — host-side Poly Haven index query
+    (`api.polyhaven.com/assets`); read-only, needs no Maya session.
+  - `asset_import` — downloads the model (FBX + textures) via
+    HTTPS into a platformdirs cache, then imports into Maya.
+  - Host-side guardrails in `polyhaven.py`: HTTPS + host whitelist
+    (`api.polyhaven.com`, `dl.polyhaven.org`, `dl.polyhaven.com`),
+    mandatory User-Agent, timeout, per-file 256 MiB / per-call 512 MiB
+    caps, official per-file md5 verification + sha256 audit records,
+    manifest-based cache reuse with fresh-metadata revalidation
+    (no silent stale-cache serving — offline yields the structured
+    `network_unavailable` error).
+  - Maya-side `_mcp_asset` (lazy-injected, zero network by design):
+    fbxmaya plug-in gate, `FBXImportConvertUnitString=m` unit lock,
+    `GRP_asset_<asset_id>` grouping with same-name dedup (repeat
+    imports report the existing group; `force=True` opts out),
+    default 100k-face polycount gate (`allow_high_polycount`
+    override, audited), post-import dims sanity warnings, texture
+    auto-wiring by filename suffix (`diff/rough/metal/nor_gl/ao/disp/
+    arm`) with sRGB/Raw color spaces and bump2d normal maps.
+  - Both tools carry audit rows incl. download URL/size/hash detail,
+    and are the first tools annotated `openWorldHint=True`
+    (threat-model §4/§5 updated accordingly).
+- **README restructure (T-19b, D-072)** — `README.md` is now the
+  English source-of-truth; the Chinese text moved to
+  `README.zh-CN.md` (convenience mirror carrying a `synced-with`
+  commit anchor); `README_en.md` deleted. Language selectors sit
+  above all content, and CI now runs a heading-skeleton parity check
+  (.github/scripts/check_readme_skeleton.py) in the lint job.
+
+### Fixed
+
+- Stub/`maya.cmds` surface extended for the asset path
+  (`maya.mel.eval`, `pluginInfo`, `loadPlugin`, `shadingNode`,
+  `createNode`, `setAttr`, `connectAttr`, `disconnectAttr`,
+  `polyEvaluate`, `exactWorldBoundingBox`, `sets` create/edit,
+  `objectType isAType=dagNode`, FBX-import fixture via `cmds.file`)
+  — all verified present on real Maya 2024 and recorded in
+  `presence-baseline.json`.
+- `ruff --fix` import-sort cleanups in `scene_tools.py` /
+  `aesthetic_engine.py`; frozen budget ratcheted down
+  (src E401/I001 -> 0).
+
 ## [0.1.2] - 2026-09-22
 
 > First real-Maya verification round: everything below was found by

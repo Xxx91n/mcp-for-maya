@@ -51,9 +51,10 @@ problem.
 | Error contract | host failures raise coded exceptions (isError); Maya-domain failures return `{error:{code,message,suggestion?}}` | pipeline.py, maya_scene_module.py |
 | Checkpoint/rollback | exportAll memory snapshots, auto safety snapshot before rollback, S2 rebind | maya_scene_module.py |
 | userSetup.py merge | marker-block upsert, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
-| Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 20 tools | pipeline.py |
+| Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 22 tools | pipeline.py |
+| Asset egress whitelist | asset_search/asset_import reach https only on api.polyhaven.com + dl.polyhaven.org/.com, mandatory User-Agent, size+timeout caps, per-file md5 verify, platformdirs cache | polyhaven.py |
 
-All 20 tools pass through one FastMCP middleware pipeline:
+All 22 tools pass through one FastMCP middleware pipeline:
 validate → rate-limit → pattern-scan → dispatch → audit.
 
 ## 4. Port and network exposure
@@ -72,6 +73,12 @@ validate → rate-limit → pattern-scan → dispatch → audit.
 - The two `maya://sessions/*/info|output` MCP **resources** are read-only
   lookups served from the session registry; they do not pass through the
   tool pipeline (no rate limit, no audit row). They execute no Maya code.
+- `asset_search`/`asset_import` (D-075) make OUTBOUND https requests
+  from the MCP host to api.polyhaven.com + dl.polyhaven.org/.com only
+  (scheme + host whitelist enforced in polyhaven.py; mandatory UA;
+  per-file md5 + size caps). Maya itself stays zero-network: it only
+  ever sees host-local file paths. The whitelist is a safety net for
+  accidents/confused deputies, not a boundary.
 
 ## 5. Tool annotations (MCP hints)
 
@@ -86,8 +93,16 @@ authoritative and this table must match it row for row:
 | readOnly=T, destructive=F, idempotent=T | `list_sessions`, `scene_snapshot`, `scene_inspect`, `scene_measure`, `scene_assert`, `scene_validate`, `scene_checkpoint_list`, `scene_aesthetics`, `scene_review`, `scene_viewport_snapshot`, `scene_render_preview` |
 | readOnly=F, destructive=F, idempotent=F | `scene_checkpoint`, `scene_rollback`, `scene_plan`, `camera_create`, `camera_orbit`, `add_session` |
 | readOnly=F, destructive=T, idempotent=F | `execute_code`, `write_module`, `maya_setup_guide` |
+| readOnly=T, destructive=F, idempotent=T, openWorld=T | `asset_search` |
+| readOnly=F, destructive=F, idempotent=T, openWorld=T | `asset_import` |
 
-- openWorldHint=false everywhere: no tool reaches the open network.
+- openWorldHint=false everywhere EXCEPT the two asset tools (D-075):
+  asset_search (host-side Poly Haven index query) and asset_import
+  (host downloads -> Maya imports local paths). Both are restricted
+  to the PH whitelist in polyhaven.py; openWorldHint is a hint, not
+  the enforcement - the whitelist is.
+- asset_import is idempotent because GRP_asset_<id> dedup is real
+  (repeat calls report the existing group; force=True opts out).
 - `scene_viewport_snapshot` / `scene_render_preview` are readOnly
   under the net-zero side-effect discipline (camera/current-time
   restored on every path, D-026) - the visible transient is documented

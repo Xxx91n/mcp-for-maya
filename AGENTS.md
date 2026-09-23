@@ -19,10 +19,13 @@ src/maya_mcp_server/
 ├── cos_formatter.py       # Chain-of-Symbol notation formatter
 ├── maya_scene_module.py   # Maya-side module (injected via write_module)
 ├── visual_module.py       # Maya-side _mcp_visual (lazy inject, GUI only)
+├── asset_tools.py         # asset_search/asset_import MCP tools (D-074/D-075)
+├── asset_module.py        # Maya-side _mcp_asset importer (lazy inject)
+├── polyhaven.py           # Poly Haven host client: whitelist/md5/cache (D-075)
 ├── spatial_types.py       # Data type definitions
 ├── connection_guide.py    # Connection bootstrap; userSetup.py managed marker-block (D-017)
 ├── security.py            # Validation, token-bucket rate limits, pattern scan, JSONL audit
-├── pipeline.py            # FastMCP middleware: all 20 tools -> validate/rate-limit/scan/audit
+├── pipeline.py            # FastMCP middleware: all 22 tools -> validate/rate-limit/scan/audit
 ├── types.py               # Core types (ResultType, ClientType, SessionInfo)
 ├── bootstrap.py           # Server bootstrap
 ├── utils.py               # Utility functions (cross-platform process detection)
@@ -52,22 +55,28 @@ tests/
 ├── test_module_teardown.py   # T-16a overwrite teardown protocol + Qt signal semantics (D-058, upstream #4)
 ├── test_version_unification.py # T-16e serverInfo=product version (D-060③)
 ├── test_aesthetic_engine.py     # dormant-engine unit coverage (D-038; not a production-path claim)
+├── test_polyhaven.py        # T-19a host client: whitelist/md5/cache/domain errors (D-075)
+├── test_asset_module.py     # T-19a _mcp_asset importer on the stub scene
+├── test_asset_tools.py      # T-19a tool layer: dedup/domain errors/audit detail
 ├── test_check_ruff_budget.py    # ruff-budget comparator guard (per-rule ratchet, D-044/T-10b)
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
-├── adr/                   # ADR-0001..0023 architecture decision records
+├── adr/                   # ADR-0001..0024 architecture decision records
 ├── decision-ledger.md     # grill decision ledger — canonical path since T-11a (D-041)
 ├── handoffs/              # round handoffs — canonical (next-round.md standing task book)
 ├── testing.md             # real-Maya manual tier checklist
 └── threat-model.md        # threat model + security boundaries
 
 .github/
-├── workflows/ci.yml       # lint (ruff budget gate) + test matrix ubuntu/windows x 3.10/3.x
+├── workflows/ci.yml       # lint (ruff budget gate) + README skeleton check + test matrix ubuntu/windows x 3.10/3.x
 ├── workflows/release.yml  # tag v* -> test -> build -> publish (trusted publisher; env: pypi)
 ├── dependabot.yml         # weekly github-actions bumps, minor+patch grouped
 ├── ruff-baseline.json     # frozen lint budget {"src":{"RULE":N},"tests":{...}} — per-rule ratchet down only (T-10b/D-044)
-└── scripts/check_ruff_budget.py  # budget comparator used by the lint job
+├── scripts/check_ruff_budget.py  # budget comparator used by the lint job
+├── scripts/check_readme_skeleton.py  # README/zh-CN title-skeleton parity check (D-072)
+├── assets-src/            # reproducible capture scripts for README imagery (scene_build.py + capture.py; T-19c)
+└── assets/                # published README imagery (populated only after sign-off)
 ```
 
 ## Key Architecture Decisions
@@ -180,14 +189,15 @@ Failure to update dependent files will cause integration failures.
 
 | Module Modified | Must Also Update | Reason |
 |----------------|------------------|--------|
-| `maya_scene_module.py` (scene_plan) | `scene_tools.py`, `server.py`, `README.md`, `README_en.md` | Scene planning tool needs MCP tool + docs |
+| `maya_scene_module.py` (scene_plan) | `scene_tools.py`, `server.py`, `README.md`, `README.zh-CN.md` | Scene planning tool needs MCP tool + docs |
 | `maya_scene_module.py` (aesthetic functions) | `aesthetic_engine.py`, `scene_tools.py`, `tests/test_aesthetic_engine.py` | Aesthetic engine is dual-implemented (standalone + Maya-side); tool descriptions must match; tests must cover |
 | `maya_scene_module.py` (lighting functions) | `scene_tools.py`, `tests/test_aesthetic_engine.py` | Lighting data fields must match tool expectations |
 | `maya_scene_module.py` (scene_review) | `scene_tools.py` (scene_review docstring), `server.py` (instructions) | Review check names must match tool args; instructions must list all checks |
-| `maya_scene_module.py` (new function) | `scene_tools.py` (new tool), `server.py` (instructions), `README.md`, `README_en.md`, `tests/` | Every new Maya function needs a corresponding MCP tool, docs, and tests |
+| `maya_scene_module.py` (new function) | `scene_tools.py` (new tool), `server.py` (instructions), `README.md`, `README.zh-CN.md`, `tests/` | Every new Maya function needs a corresponding MCP tool, docs, and tests |
 | `visual_module.py` (capture paths) | `visual_tools.py`, `server.py` (instructions), `docs/adr/0013-visual-loop-architecture.md`, `tests/test_visual_tools.py` | Capture contract, annotations, and ADR must stay in sync |
-| `visual_tools.py` (tool surface) | `pipeline.py` (TOOL_ANNOTATIONS), `server.py` (instructions), `docs/threat-model.md` (§5 matrix), `README.md`, `README_en.md` | Tool surface changes require annotation + docs sync |
-| `scene_tools.py` (new tool) | `server.py` (instructions), `README.md`, `README_en.md`, `AGENTS.md` | Tool surface changes require documentation sync |
+| `visual_tools.py` (tool surface) | `pipeline.py` (TOOL_ANNOTATIONS), `server.py` (instructions), `docs/threat-model.md` (§5 matrix), `README.md`, `README.zh-CN.md` | Tool surface changes require annotation + docs sync |
+| `asset_tools.py` / `polyhaven.py` / `asset_module.py` (asset surface) | `pipeline.py` (TOOL_ANNOTATIONS), `server.py` (instructions + shared audit), `docs/threat-model.md` (§4/§5), `tests/test_polyhaven.py`, `tests/test_asset_module.py`, `tests/test_asset_tools.py`, `tests/maya_stub/` (new cmds surface), `README.md`, `README.zh-CN.md`, `AGENTS.md` | Asset tools split host (download/cache) vs Maya-side (import/wire); every piece must stay in sync |
+| `scene_tools.py` (new tool) | `server.py` (instructions), `README.md`, `README.zh-CN.md`, `AGENTS.md` | Tool surface changes require documentation sync |
 | `aesthetic_engine.py` | `maya_scene_module.py` (mirror functions), `tests/test_aesthetic_engine.py` | **DORMANT** (T-11b/D-038, ADR-0003 status note): zero production refs - Maya-side inline `_score_*` is the live implementation; kept for the T-06 consolidation decision |
 | `scene_cache.py` | `scene_tools.py` (cache invalidation), `session_manager.py` (mark_dirty) | Cache behavior must be consistent |
 | `security.py` | `pipeline.py` (enforcement point), `tests/test_security.py`, `tests/test_pipeline.py` | Security rules enforced by the middleware pipeline, not per-tool |
@@ -206,7 +216,7 @@ When modifying ANY aesthetic-related code, update ALL of these:
 4. **`maya_scene_module.py`** — `scene_review()` aesthetics section (must read new format)
 5. **`server.py`** — MCP instructions (aesthetic dimension descriptions)
 6. **`tests/test_aesthetic_engine.py`** — Unit tests for all dimensions
-7. **`README.md`** + **`README_en.md`** — Feature descriptions
+7. **`README.md`** + **`README.zh-CN.md`** — Feature descriptions
 8. **`AGENTS.md`** — This checklist (if new dimensions added)
 
 ### Lighting Module Change Checklist
@@ -226,7 +236,7 @@ When modifying `scene_review()`:
 1. **`maya_scene_module.py`** — `scene_review()` function
 2. **`scene_tools.py`** — `scene_review` tool docstring (check names must match)
 3. **`server.py`** — Instructions (list all review checks)
-4. **`README.md`** + **`README_en.md`** — Review capabilities description
+4. **`README.md`** + **`README.zh-CN.md`** — Review capabilities description
 5. **`tests/`** — Review tests
 
 ### Naming Convention Rules

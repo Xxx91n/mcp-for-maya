@@ -29,6 +29,8 @@ jobs:
         run: uvx ruff@0.15.20 check . --output-format=json --exit-zero > ruff-report.json
       - name: compare vs frozen budget
         run: python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json
+      - name: README mirror skeleton check (D-072)
+        run: python .github/scripts/check_readme_skeleton.py
       - name: pre-commit fallback (all files)
         run: |
           pip install pre-commit

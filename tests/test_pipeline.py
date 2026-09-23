@@ -65,7 +65,7 @@ def _read_events(path: Path) -> list[dict]:
 
 
 class TestToolAnnotations:
-    """All 20 tools carry the four hints (D-018/ADR-0005 matrix)."""
+    """All 22 tools carry the four hints (D-018/ADR-0005 + D-075 matrix)."""
 
     EXPECTED = {
         "list_sessions",
@@ -88,9 +88,11 @@ class TestToolAnnotations:
         "scene_plan",
         "scene_viewport_snapshot",
         "scene_render_preview",
+        "asset_search",
+        "asset_import",
     }
 
-    def test_all_20_tools_covered(self):
+    def test_all_22_tools_covered(self):
         assert set(TOOL_ANNOTATIONS) == self.EXPECTED
 
     def test_four_hints_all_set(self):
@@ -98,7 +100,10 @@ class TestToolAnnotations:
             assert ann.readOnlyHint is not None, name
             assert ann.destructiveHint is not None, name
             assert ann.idempotentHint is not None, name
-            assert ann.openWorldHint is False, name
+            if name in ("asset_search", "asset_import"):
+                assert ann.openWorldHint is True, name
+            else:
+                assert ann.openWorldHint is False, name
 
     def test_dangerous_tools_marked_destructive(self):
         for name in ("execute_code", "write_module", "maya_setup_guide"):
@@ -127,6 +132,23 @@ class TestToolAnnotations:
         assert ann.destructiveHint is False
         assert ann.idempotentHint is False
         assert ann.readOnlyHint is False
+
+    def test_asset_search_annotations(self):
+        """asset_search: read-only, idempotent, openWorld (D-075)."""
+        ann = TOOL_ANNOTATIONS["asset_search"]
+        assert ann.readOnlyHint is True
+        assert ann.destructiveHint is False
+        assert ann.idempotentHint is True
+        assert ann.openWorldHint is True
+
+    def test_asset_import_annotations(self):
+        """asset_import: write-class, non-destructive, idempotent via
+        same-name dedup, openWorld (D-075)."""
+        ann = TOOL_ANNOTATIONS["asset_import"]
+        assert ann.readOnlyHint is False
+        assert ann.destructiveHint is False
+        assert ann.idempotentHint is True
+        assert ann.openWorldHint is True
 
     def test_unknown_tool_defaults_write_class(self):
         assert tool_annotations("nope").readOnlyHint is False
