@@ -3,13 +3,5 @@
   "omui.MImage": {
     "verdict": "stub-only dual-location — real MImage lives in maya.api.OpenMaya on <=2024 and moves to OpenMayaUI in 2025+; the stub models both so _MImage dual-resolution is exercised against either layout",
     "ref": "docs/visual-callform-matrix.md#omuimimage-dual-location"
-  },
-  "cmds.polyCube": {
-    "verdict": "real maya.cmds built-in serving the D-082d VP2 direction probe's disposable marker cube; presence-baseline re-collection pending (no live GUI session this round)",
-    "ref": "docs/visual-callform-matrix.md#vp2-direction-probe-d-082d"
-  },
-  "cmds.undoInfo": {
-    "verdict": "real maya.cmds built-in serving the D-082d probe's net-zero undo discipline (stateWithoutFlush suspend/restore); baseline re-collection pending",
-    "ref": "docs/visual-callform-matrix.md#vp2-direction-probe-d-082d"
   }
 }

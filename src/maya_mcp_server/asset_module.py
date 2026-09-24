@@ -287,11 +287,23 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
         # file.outAlpha -> bump2d.bumpValue; bump2d.outNormal -> mat.normalCamera;
         # bumpInterp=1 selects tangent-space normals. outColor -> bumpValue is
         # rejected by real Maya (color -> float is not connectable).
-        bump = cmds.shadingNode("bump2d", asUtility=True, name=file_node + "_bump")
-        cmds.setAttr(bump + ".bumpInterp", 1)
-        cmds.connectAttr(file_node + ".outAlpha", bump + ".bumpValue", force=True)
-        cmds.connectAttr(bump + ".outNormal", mat + ".normalCamera", force=True)
-        return True
+        bump = None
+        try:
+            bump = cmds.shadingNode("bump2d", asUtility=True, name=file_node + "_bump")
+            cmds.setAttr(bump + ".bumpInterp", 1)
+            cmds.connectAttr(file_node + ".outAlpha", bump + ".bumpValue", force=True)
+            cmds.connectAttr(bump + ".outNormal", mat + ".normalCamera", force=True)
+            return True
+        except Exception:
+            # D-083: a half-wired bump2d node must not be left
+            # orphaned in the scene on failure.
+            if bump is not None:
+                try:
+                    if cmds.objExists(bump):
+                        cmds.delete(bump)
+                except Exception:
+                    pass
+            return False
     if role == "ao":
         # AO darkens, so it must drive a multiplier - ambientColor *adds*
         # light (live dogfood finding: feeding AO there washes the model

@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from maya_mcp_server.client import raise_for_error
+from maya_mcp_server.client import ensure_module_injected, raise_for_error
 from maya_mcp_server.cos_formatter import (
     format_assert_cos,
     format_inspect_cos,
@@ -57,57 +57,18 @@ def mark_dirty(session_key: str | None = None) -> None:
 async def _ensure_module_injected(client: Any, session_key: str | None) -> None:
     """Ensure _mcp_scene module is injected into Maya session.
 
-    Reads the module source from disk and writes it via write_module.
-    Only injects once per session.
+    Delegates to client.ensure_module_injected (D-083); reads the module
+    source from disk and writes it via write_module. Only injects once
+    per session.
     """
-    key = session_key or "_default"
-    if key in _injected_sessions:
-        return
-
-    # Read module source
-    source = _MODULE_SOURCE.read_text(encoding="utf-8")
-
-    # For large modules on the NATIVE (headless/bootstrap) channel, use
-    # file-based injection to avoid command port buffer issues. The Qt
-    # channel carries length-prefixed frames up to 16 MiB, so GUI sessions
-    # inject directly via write_module (D-013).
-    if len(source) > 15000 and not getattr(client, "framed_channel", False):
-        import os as _os
-        import tempfile as _tf
-
-        import platformdirs as _pd
-
-        _ResultType = __import__("maya_mcp_server.types", fromlist=["ResultType"]).ResultType
-        # D-082a hygiene: mkstemp under the platformdirs user cache (no
-        # predictable shared-temp path), 0600 perms, try/finally unlink.
-        _dir = _os.path.join(_pd.user_cache_dir("mcp-for-maya"), "inject")
-        _os.makedirs(_dir, exist_ok=True)
-        _fd, _tmp = _tf.mkstemp(prefix="_mcp_scene_src_", suffix=".py", dir=_dir)
-        try:
-            with _os.fdopen(_fd, "w", encoding="utf-8") as f:
-                f.write(source)
-            _os.chmod(_tmp, 0o600)
-            _tmp_safe = _tmp.replace("\\", "/")
-            await client.execute_code(
-                "import types, sys, json; _c=open(json.loads("
-                + json.dumps(json.dumps(_tmp_safe))
-                + ")).read(); _m=types.ModuleType('_mcp_scene'); _m.__file__='<mcp:_mcp_scene>'; exec(compile(_c,'_mcp_scene.py','exec'),_m.__dict__); sys.modules['_mcp_scene']=_m",
-                _ResultType.NONE,
-            )
-        finally:
-            try:
-                _os.remove(_tmp)
-            except OSError:
-                pass
-    else:
-        await client.write_module("_mcp_scene", source, overwrite=True)
-    # Pre-import the module so subsequent calls use expression-only syntax
-    await client.execute_code(
-        "import _mcp_scene",
-        __import__("maya_mcp_server.types", fromlist=["ResultType"]).ResultType.NONE,
+    await ensure_module_injected(
+        client,
+        session_key,
+        module_name="_mcp_scene",
+        source_path=_MODULE_SOURCE,
+        tmp_prefix="_mcp_scene_src_",
+        injected_sessions=_injected_sessions,
     )
-    _injected_sessions.add(key)
-    logger.info(f"Injected _mcp_scene module into session {key}")
 
 
 async def _execute_scene_code(

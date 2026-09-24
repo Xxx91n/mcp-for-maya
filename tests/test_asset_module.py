@@ -314,6 +314,66 @@ class TestDisplacement:
 
 
 # ------------------------------------------------------------------
+# bump2d orphan cleanup (D-083) — same contract as displacement:
+# a wiring failure at ANY point after shadingNode must not leave the
+# half-created bump2d node behind.
+# ------------------------------------------------------------------
+
+
+class TestBumpOrphan:
+    @pytest.mark.parametrize("fail_dst", [".bumpValue", ".normalCamera"])
+    def test_bump_connect_failure_leaves_no_orphan(
+        self, asset_env, monkeypatch, tmp_path, fail_dst
+    ):
+        """D-083 — a connectAttr that dies mid-wiring must delete the
+        half-created bump2d, on BOTH connect paths (file -> bump and
+        bump -> mat.normalCamera)."""
+        tex = tmp_path / "x_nor.jpg"
+        tex.write_bytes(b"X")
+        fn = asset_env.module._file_node(str(tex), "file_orphan", "Raw")
+        real_connect = asset_env.cmds.connectAttr
+
+        def boom(src, dst, **kw):
+            if str(dst).endswith(fail_dst):
+                raise RuntimeError(f"{fail_dst} not connectable")
+            return real_connect(src, dst, **kw)
+
+        monkeypatch.setattr(asset_env.cmds, "connectAttr", boom)
+        ok = asset_env.module._wire_map(fn, "normal", "body", None)
+        assert ok is False
+        assert not asset_env.cmds.objExists("file_orphan_bump")
+
+    def test_bump_setattr_failure_leaves_no_orphan(self, asset_env, monkeypatch, tmp_path):
+        """D-083 — setAttr(bumpInterp) dying between node creation and
+        wiring must still delete the bump2d."""
+        tex = tmp_path / "x_nor.jpg"
+        tex.write_bytes(b"X")
+        fn = asset_env.module._file_node(str(tex), "file_orphan", "Raw")
+        real_setattr = asset_env.cmds.setAttr
+
+        def boom(ref, *a, **kw):
+            if str(ref).endswith(".bumpInterp"):
+                raise RuntimeError("bumpInterp not settable")
+            return real_setattr(ref, *a, **kw)
+
+        monkeypatch.setattr(asset_env.cmds, "setAttr", boom)
+        ok = asset_env.module._wire_map(fn, "normal", "body", None)
+        assert ok is False
+        assert not asset_env.cmds.objExists("file_orphan_bump")
+
+    def test_bump_no_normalcamera_creates_nothing(self, asset_env, tmp_path):
+        """Early-return path — a material without normalCamera reports
+        unwired and creates NO bump2d node (mirrors the no-SG disp case)."""
+        tex = tmp_path / "x_nor.jpg"
+        tex.write_bytes(b"X")
+        fn = asset_env.module._file_node(str(tex), "file_orphan", "Raw")
+        ok = asset_env.module._wire_map(fn, "normal", "no_such_mat", None)
+        assert ok is False
+        assert not asset_env.cmds.objExists("file_orphan_bump")
+        assert asset_env.cmds.ls("*_bump") is None
+
+
+# ------------------------------------------------------------------
 # standardSurface migration (D-082e) — attribute-aware mapping
 # ------------------------------------------------------------------
 

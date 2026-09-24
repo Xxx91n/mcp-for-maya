@@ -2,7 +2,7 @@
   "baseline_meta": {
     "collected_on": "Maya 2024 GUI session via framed channel",
     "collector": ".scratch/maya-mcp-grill/harness/gui_verify.py::collect_signatures",
-    "note": "mayapy tier blocked on this box (import maya.standalone -> AV). cmds builtins carry no inspect.signature — presence + method lists are the auditable contract. Renamed signature-baseline->presence-baseline (D-056): the file never carried signatures. Extended 2026-09-23 (T-19a): +10 cmds symbols probed live on the same Maya 2024 GUI session via commandPort hasattr()",
+    "note": "mayapy tier blocked on this box (import maya.standalone -> AV). cmds builtins carry no inspect.signature — presence + method lists are the auditable contract. Renamed signature-baseline->presence-baseline (D-056): the file never carried signatures. Extended 2026-09-23 (T-19a): +10 cmds symbols probed live on the same Maya 2024 GUI session via commandPort hasattr(). Re-collected 2026-09-24 (T-22/D-085③): +2 cmds symbols (polyCube, undoInfo) probed live on the same Maya 2024 GUI session via commandPort hasattr()/callable() — clears the two provisional allowlist entries.",
     "content_type": "presence-callable"
   },
   "symbols": {
@@ -853,6 +853,16 @@
       "callable": true
     },
     "cmds.shadingNode": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.polyCube": {
+      "exists": true,
+      "signature": null,
+      "callable": true
+    },
+    "cmds.undoInfo": {
       "exists": true,
       "signature": null,
       "callable": true

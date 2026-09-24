@@ -178,6 +178,7 @@ semgrep scan --config auto src/
 - `execute_code` with `result_type="JSON"` may receive `dict` directly (not `str`). The client handles both.
 - Stream capture auto-installs on first `get_client()` call.
 - `import X; X.func()` pattern can fail with `prepare_code_for_result_capture`. Pre-import with `execute_code("import X", NONE)` then use expression-only calls.
+- Git Bash on Windows: never discard stderr via `2> nul` — `nul` is a reserved device name that bash treats as a plain filename, creating a real `nul` file (same trap for `con`/`aux`/`prn`); a stray `nul` inside the repo crashes `but status` outright (os error 1). Use `2>/dev/null` instead.
 
 
 ## Cross-Module Dependency Rules (联动规范)
