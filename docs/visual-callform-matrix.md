@@ -71,9 +71,10 @@ dual-resolution.** Anchored here from `presence-allowlist.json`.
 Added 2026-09-24 for the per-session runtime orientation probe in
 `visual_module._probe_vp2_direction`. These call forms are standard
 maya.cmds built-ins per the CommandsPython reference; live presence
-re-collection into `presence-baseline.json` is pending (no GUI session
-available this round) — `cmds.polyCube` and `cmds.undoInfo` are
-allowlisted against this section until re-collection.
+re-collection into `presence-baseline.json` landed 2026-09-24
+(T-22/D-085③): `cmds.polyCube` and `cmds.undoInfo` probed
+exists+callable on Maya 2024 and the provisional allowlist entries
+were removed.
 
 | Call site | Official contract | Use in probe |
 |---|---|---|
