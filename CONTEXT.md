@@ -215,3 +215,16 @@ _Avoid_: 用脚本硬做角色生物、把密度当难度、假齿轮不自啮�
 **视觉模块预算 (visual module budget)**:
 README 可视区的图片密度红线——≤4 个视觉模块（合成横幅+例表实拍+orbit 通栏+可选架构图）、单图 <500KB、orbit GIF <10MB（GitHub 限制线）；依据=Utrecht「don not overdo it」官方教程+巨型 GIF 拖垮整页双源翻车实证（import-http#7/GitLab 论坛）+awesome-readme 收录案例零多图堆砌正面案例。与冻结采集会话互补：一个管拍、一个管放。
 _Avoid_: 截图散落正文各处、GIF 锁进表格窄列、图片堆砌显自信
+
+
+**实证反审计 (evidence-based counter-audit)**:
+对外部审计指控的回应姿势——每条指控先对当前树/真机取证再表态：成立则修、证伪则驳回并留探针证据（.scratch/<slug>/probe-*.json）；对称纪律=对方驳对的指控要认（D-042 撤回先例），我方驳倒的要有机器证据不许只有口头。
+_Avoid_: 凭记忆反驳、把对方指控照单全收（辩证=逐条实证）
+
+**证据指针 (evidence pointer)**:
+CHANGELOG/发布说明每条 Added/Fixed bullet 必须挂的可机检锚点——file:line 或测试 ID（D-xxx 引用已有，补齐指向可执行物证即完全体）；lint 可查形态，防「决策→文案」管线跑在「代码→对账」前面（CHANGELOG:33、manifest-based 两例病灶）。
+_Avoid_: 无锚点承诺文案、先写机制名后补实现
+
+**只加不删资产目录 (append-only asset dir)**:
+.github/assets/ 等被绝对 URL（main 钉）引用的发布资产目录纪律——条目只可新增不可删除/改名；旧 PyPI 页面 description 永久指向 main 路径且不可回改，退役删除=全部历史页面永久裂图。
+_Avoid_: 素材换代顺手删旧文件、改名复用槽位
