@@ -282,12 +282,39 @@ class TestSelectFiles:
         )
         assert polyhaven.split_texture_key("fbx") is None
         assert polyhaven.split_texture_key("random_key") is None
+        # case-insensitive compound suffix ("Body_Diff" must not drop)
+        assert polyhaven.split_texture_key("Body_Diff") == ("Body", "diff")
+        assert polyhaven.split_texture_key("Strap_Metallic") == ("Strap", "metallic")
+
+    def test_split_texture_key_bare_single_part(self):
+        # Single-part assets ship bare map names -> grouped into part "".
+        assert polyhaven.split_texture_key("Diffuse") == ("", "diff")
+        assert polyhaven.split_texture_key("nor_gl") == ("", "nor_gl")
+        assert polyhaven.split_texture_key("Rough") == ("", "rough")
+        assert polyhaven.split_texture_key("Metal") == ("", "metal")
+        assert polyhaven.split_texture_key("AO") == ("", "ao")
+        assert polyhaven.split_texture_key("arm") == ("", "arm")
+        assert polyhaven.split_texture_key("blend") is None
 
     def test_select_files_groups_parts(self, files_payload):
         sel = polyhaven.select_files(files_payload, "1k")
         assert sel["fbx"]["url"].endswith("Camera_01_1k.fbx")
         assert set(sel["parts"]["body"]) == {"diff", "nor_gl", "roughness"}
         assert set(sel["parts"]["strap"]) == {"metallic"}
+
+    def test_select_files_bare_keys_single_part(self):
+        # vintage_pocket_watch-shaped payload: bare keys -> one "" part.
+        entry = {"url": "https://dl.polyhaven.org/x/t.jpg", "size": 4}
+        payload = {
+            "fbx": {"1k": {"fbx": {"url": "https://dl.polyhaven.org/x/w_1k.fbx", "size": 5}}},
+            "Diffuse": {"1k": {"jpg": dict(entry)}},
+            "Metal": {"1k": {"exr": dict(entry)}},
+            "nor_gl": {"1k": {"exr": dict(entry)}},
+            "Rough": {"1k": {"exr": dict(entry)}},
+        }
+        sel = polyhaven.select_files(payload, "1k")
+        assert set(sel["parts"]) == {""}
+        assert set(sel["parts"][""]) == {"diff", "metal", "nor_gl", "rough"}
 
     def test_select_files_no_fbx(self):
         with pytest.raises(AssetError) as ei:
