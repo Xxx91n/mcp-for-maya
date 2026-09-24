@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Poly Haven single-asset texture wiring** — `split_texture_key()`
+  only recognised compound `<part>_<suffix>` keys, so single-piece
+  assets (e.g. `vintage_pocket_watch`, `metal_tool_chest`) silently
+  downloaded zero textures and imported as untextured shells. Bare
+  keys (`Diffuse`, `nor_gl`, `Metal`, `Rough`, `AO`, `ARM`, ...) now
+  map to the asset's single unnamed part; regression tests cover the
+  bare-key forms in `select_files()`.
+
+### Changed
+
+- **README facade rework (T-20, D-078~D-081)** — design banner restored
+  at top (`hero.svg` now embeds a real movement capture in its
+  viewport slot); all demo imagery consolidated into one showcase
+  table of six high-difficulty captures (involute watch movement,
+  L-system bonsai, Poly Haven workbench, low-poly street block,
+  Utah teapot recreation, metrology bench) plus a 20-frame orbit GIF;
+  every image reference is an absolute `raw.githubusercontent.com`
+  URL pinned to `main` so assets render on PyPI; generation scripts
+  checked in under `.github/assets-src/t20/`; `README.zh-CN.md`
+  mirrored (anchor `e8af732`). Retired: `hero.png`, `row1-4`,
+  `shot-hero`, `shot-alt`.
+
 ## [0.2.0] - 2026-09-23
 
 ### Added

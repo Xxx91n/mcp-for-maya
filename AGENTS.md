@@ -75,7 +75,7 @@ docs/
 ├── ruff-baseline.json     # frozen lint budget {"src":{"RULE":N},"tests":{...}} — per-rule ratchet down only (T-10b/D-044)
 ├── scripts/check_ruff_budget.py  # budget comparator used by the lint job
 ├── scripts/check_readme_skeleton.py  # README/zh-CN title-skeleton parity check (D-072)
-├── assets-src/            # reproducible capture scripts for README imagery (scene_build.py + capture.py; T-19c)
+├── assets-src/            # reproducible capture scripts for README imagery (t20/ scene generators; T-19c scene_build.py + capture.py kept for reference)
 └── assets/                # published README imagery (populated only after sign-off)
 ```
 
