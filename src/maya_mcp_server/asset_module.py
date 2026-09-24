@@ -178,9 +178,14 @@ def _match_material(part: str, mats: list[str]) -> list[str]:
 
 
 def _new_material(asset_id: str, part: str) -> tuple[str, str]:
-    """Dedicated blinn + shadingEngine for an unmatched part."""
+    """Dedicated standardSurface + shadingEngine for an unmatched part.
+
+    D-082e: standardSurface (not blinn) — Maya's VP2/Arnold-default PBR
+    shader since 2020; the wiring table below is attribute-aware, so
+    legacy imported materials still get their own channel names.
+    """
     safe = re.sub(r"[^A-Za-z0-9_]", "_", str(part))
-    mat = cmds.shadingNode("blinn", asShader=True, name=f"MAT_{asset_id}_{safe}")
+    mat = cmds.shadingNode("standardSurface", asShader=True, name=f"MAT_{asset_id}_{safe}")
     sg = cmds.sets(renderable=True, empty=True, name=f"SG_{asset_id}_{safe}")
     cmds.connectAttr(mat + ".outColor", sg + ".surfaceShader", force=True)
     return mat, sg
@@ -254,10 +259,12 @@ def _file_node(path: str, name: str, colorspace: str) -> str:
 def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
     """Connect one file node into a material channel. Returns True if wired."""
     if role == "color":
-        if not cmds.objExists(mat + ".color"):
-            return False
-        cmds.connectAttr(file_node + ".outColor", mat + ".color", force=True)
-        return True
+        # standardSurface/aiStandardSurface: baseColor; legacy shaders: color.
+        for attr in ("color", "baseColor"):
+            if cmds.objExists(mat + "." + attr):
+                cmds.connectAttr(file_node + ".outColor", mat + "." + attr, force=True)
+                return True
+        return False
     if role == "roughness":
         for attr in ("specularRoughness", "roughness"):
             if cmds.objExists(mat + "." + attr):
@@ -265,7 +272,10 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
                 return True
         return False
     if role == "metalness":
-        for attr in ("metalness", "reflectivity"):
+        # standardSurface/aiStandardSurface: metalness; StingrayPBS: metallic.
+        # The old reflectivity fallback is dropped — specular strength is
+        # not metalness; an honest unwired beats a confident wrong wire.
+        for attr in ("metalness", "metallic"):
             if cmds.objExists(mat + "." + attr):
                 cmds.connectAttr(file_node + ".outColorR", mat + "." + attr, force=True)
                 return True
@@ -285,8 +295,9 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
     if role == "ao":
         # AO darkens, so it must drive a multiplier - ambientColor *adds*
         # light (live dogfood finding: feeding AO there washes the model
-        # flat white). material.diffuse is the scalar color multiplier.
-        for attr in ("diffuse",):
+        # flat white). standardSurface: base (scalar weight over
+        # baseColor); legacy shaders: diffuse.
+        for attr in ("base", "diffuse"):
             if cmds.objExists(mat + "." + attr):
                 cmds.connectAttr(file_node + ".outColorR", mat + "." + attr, force=True)
                 return True
@@ -294,12 +305,25 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
     if role == "displacement":
         if not sg or not cmds.objExists(sg + ".displacementShader"):
             return False
+        # disp.displacement -> sg.displacementShader is the live-verified
+        # shape (Maya 2024 probe, .scratch/t21/probe-displacement.json) —
+        # but "connection established" is not render semantics; visual
+        # proof stays on the gui/human_verify tier.
+        disp = None
         try:
             disp = cmds.shadingNode("displacementShader", asUtility=True, name=file_node + "_disp")
             cmds.connectAttr(file_node + ".outAlpha", disp + ".displacement", force=True)
             cmds.connectAttr(disp + ".displacement", sg + ".displacementShader", force=True)
             return True
         except Exception:
+            # D-082b: a half-wired displacement node must not be left
+            # orphaned in the scene on failure.
+            if disp is not None:
+                try:
+                    if cmds.objExists(disp):
+                        cmds.delete(disp)
+                except Exception:
+                    pass
             return False
     return False
 

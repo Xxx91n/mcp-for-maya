@@ -47,6 +47,9 @@ def _maya_glob(pattern: str, name: str) -> bool:
 
 def ls(*args, **kwargs):
     sc = _s()
+    # ls(selection=True) returns the current selection (real Maya).
+    if kwargs.get("selection") or kwargs.get("sl"):
+        return list(sc.selection) or None
     ntype = kwargs.get("type")
     long_ = kwargs.get("long") or kwargs.get("l")
     materials = kwargs.get("materials")
@@ -245,6 +248,12 @@ def file(*args, **kwargs):
     """
     sc = _s()
     sc.file_calls.append({"args": args, "kwargs": dict(kwargs)})
+    if "modified" in kwargs or "m" in kwargs:
+        # file(q, modified) -> dirty flag; file(modified=v) sets it.
+        if kwargs.get("query") or kwargs.get("q"):
+            return sc.modified
+        sc.modified = bool(kwargs.get("modified", kwargs.get("m")))
+        return None
     if kwargs.get("query") or kwargs.get("q"):
         if (
             kwargs.get("sceneName")
@@ -367,6 +376,46 @@ def camera(name="camera1", focalLength=35.0, **kw):
     return [tr.name, sh.name]
 
 
+def polyCube(**kw):
+    """cmds.polyCube — transform + mesh shape; returns [transform].
+
+    constructionHistory=False skips the upstream polyCube history node
+    (modeled: none is ever created in the stub either way).
+    """
+    sc = _s()
+    w = float(kw.get("w", kw.get("width", 1.0)))
+    h = float(kw.get("h", kw.get("height", 1.0)))
+    d = float(kw.get("d", kw.get("depth", 1.0)))
+    name = kw.get("name") or kw.get("n") or "pCube1"
+    tr = sc.add_mesh(
+        name,
+        bbox_min=(-w / 2, -h / 2, -d / 2),
+        bbox_max=(w / 2, h / 2, d / 2),
+        num_polygons=6,
+    )
+    if kw.get("constructionHistory", kw.get("ch", True)) not in (False, 0):
+        sc.add_node(tr.name + "_history", "polyCube")
+    return [tr.name]
+
+
+def undoInfo(**kw):
+    """cmds.undoInfo — undo-queue state control.
+
+    stateWithoutFlush / state flags are recorded on the scene; the query
+    form returns the current flag. Used by the VP2 probe to keep its
+    disposable setup out of the user's undo queue (D-082d).
+    """
+    sc = _s()
+    sc.undo_calls.append(dict(kw))
+    if "stateWithoutFlush" in kw or "stf" in kw:
+        sc.undo_enabled = bool(kw.get("stateWithoutFlush", kw.get("stf")))
+    if "state" in kw:
+        sc.undo_enabled = bool(kw["state"])
+    if kw.get("query") or kw.get("q"):
+        return sc.undo_enabled
+    return None
+
+
 def spaceLocator(name="locator1", **kw):
     sc = _s()
     tr = sc.add_transform(name)
@@ -466,16 +515,26 @@ def delete(*args):
     sc = _s()
     for a in args:
         node = sc.resolve(a)
-        if node.parent is not None:
-            node.parent.children.remove(node)
-        elif node in sc.roots:
-            sc.roots.remove(node)
-        lst = sc.nodes.get(node.name, [])
-        if node in lst:
-            lst.remove(node)
-            if not lst:
-                del sc.nodes[node.name]
-        sc.deleted.append(node.name)
+        # Deleting a transform removes its whole subtree (shapes too) —
+        # real Maya does not leave orphaned shape nodes behind.
+        doomed = []
+        stack = [node]
+        while stack:
+            n = stack.pop()
+            doomed.append(n)
+            stack.extend(n.children)
+        for n in doomed:
+            if n.parent is not None and n in n.parent.children:
+                n.parent.children.remove(n)
+            if n in sc.roots:
+                sc.roots.remove(n)
+            lst = sc.nodes.get(n.name, [])
+            if n in lst:
+                lst.remove(n)
+                if not lst:
+                    del sc.nodes[n.name]
+            sc.deleted.append(n.name)
+        sc.modified = True
 
 
 def warning(msg):

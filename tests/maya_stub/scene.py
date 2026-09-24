@@ -22,8 +22,11 @@ SHAPE_TYPES = LIGHT_TYPES | {"mesh", "camera", "locator", "nurbsCurve", "joint"}
 
 # Type-defined attrs the stub seeds on creation - objExists("n.attr")
 # answers like real Maya only if the type's standard attrs exist.
-# Deliberately faithful: lambert has NO specularRoughness, blinn/phong
-# have it; metalness exists only on aiStandardSurface/standardSurface.
+# Live-probe pinned (D-082e, .scratch/t21/probe-displacement.json):
+# blinn carries reflectivity/specularRollOff but NO specularRoughness;
+# standardSurface/aiStandardSurface carry the PBR set (base, baseColor,
+# metalness, specularRoughness, specularColor, normalCamera, outColor)
+# and none of the legacy color/diffuse/ambientColor/reflectivity names.
 _MATERIAL_TYPES = {
     "lambert",
     "blinn",
@@ -140,6 +143,18 @@ class Scene:
         self.fbx_fixture = None  # {"meshes":[...], "materials":[...]}
         self.fbx_fixture_error = None  # truthy => import raises this
 
+        # ---- session-state surface (D-082d: VP2 probe net-zero proof) ----
+        # cmds.file(q, modified) / file(modified=v): scene-dirty flag.
+        # add_node/delete mark it like real Maya; file(open)/file(save)
+        # clear it. cmds.undoInfo state flags land in undo_calls.
+        self.modified = False
+        self.undo_enabled = True
+        self.undo_calls = []  # recorded undoInfo kwargs
+        # vp2_readback_bottom_up: device-level knob for tests — when True
+        # readColorBuffer fills the image in BOTTOM-UP row order (models a
+        # GPU/driver whose readback disagrees with the 2024 pin).
+        self.vp2_readback_bottom_up = False
+
     def setup_gui(self):
         """Seed a stock GUI layout: four model panels + default cameras.
 
@@ -178,11 +193,24 @@ class Scene:
             node.attrs.update(_COMMON_MAT_ATTRS)
         if ntype in {"blinn", "phong", "phongE"}:
             node.attrs.update(_SPECULAR_ATTRS)
+        if ntype == "blinn":
+            # Live probe (D-082e): real blinn has reflectivity +
+            # specularRollOff but NO specularRoughness/metalness/roughness.
+            node.attrs.pop("specularRoughness", None)
+            node.attrs["reflectivity"] = 0.5
+            node.attrs["specularRollOff"] = 0.7
         if ntype in {"aiStandardSurface", "standardSurface"}:
+            # Live probe (D-082e): PBR attr set only — no legacy
+            # color/diffuse/ambientColor; "base" is the scalar weight
+            # over baseColor that AO-style maps target.
+            for legacy in ("color", "ambientColor", "diffuse"):
+                node.attrs.pop(legacy, None)
             node.attrs.update(_METAL_ATTRS)
             node.attrs.update(_SPECULAR_ATTRS)
+            node.attrs["base"] = 1.0
         if ntype == "shadingEngine":
             node.attrs.update(_SG_ATTRS)
+        self.modified = True  # creating a node dirties the scene (real Maya)
         self.nodes.setdefault(name, []).append(node)
         if parent is not None:
             parent.children.append(node)
@@ -445,3 +473,4 @@ class Scene:
         self.set_members = {k: list(v) for k, v in data.get("set_members", {}).items()}
         self.current_time = data.get("current_time", 1)
         self.playback_range = list(data.get("playback_range", [1, 120]))
+        self.modified = False  # a freshly-opened file is clean (real Maya)

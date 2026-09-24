@@ -206,6 +206,22 @@ Failure to update dependent files will cause integration failures.
 | `cos_formatter.py` | `scene_tools.py` (COS format output) | Formatter changes affect all tool COS outputs |
 | `maya_scene_module.py` (scene_review check names/semantics) | `skills/scene-review-playbook/SKILL.md` | Card documents the 11 checks + findings→actions; check renames/semantics changes must sync it |
 
+### Changelog Evidence Rule (D-082⑦)
+
+Every `Added`/`Fixed`/`Changed` bullet in CHANGELOG.md MUST carry an
+executable evidence pointer — a `path:line` or a test node ID — so a
+wording drift like the 0.2.0 "manifest-based cache" line (which claimed
+a mechanism the code never had) is lint-checkable by inspection. The
+`[0.2.1]` section is the first compliant section.
+
+### Asset Directory Discipline (D-082⑥⑤)
+
+`.github/assets/` is **append-only**: README imagery is referenced by
+absolute `main`-branch URLs and every already-published PyPI page
+renders `main` forever — deleting or renaming a published asset
+permanently breaks every historical release page. New captures get NEW
+filenames; retirement happens in README prose, never by file deletion.
+
 ### Aesthetic Module Change Checklist
 
 When modifying ANY aesthetic-related code, update ALL of these:
@@ -291,3 +307,17 @@ The `scene_review()` function now detects:
 - **Spatial conflicts**: Objects penetrating non-parent objects
 - **Aesthetic weaknesses**: Dimensions scoring below 40/100
 - **Lighting issues**: Missing three-point setup, poor fill ratio, non-physical decay
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as GitHub issues on this repo; all operations use the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.

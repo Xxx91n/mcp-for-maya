@@ -124,8 +124,11 @@ class MImage:
         pattern = getattr(sc, "viewport_pattern", None) or _default_pattern
         self._rgba = bool(rgba)
         order = (0, 1, 2, 3) if rgba else (2, 1, 0, 3)
+        # vp2_readback_bottom_up models a device whose readback arrives
+        # row-flipped (D-082d): the buffer's row 0 is the image BOTTOM.
+        ys = range(h - 1, -1, -1) if getattr(sc, "vp2_readback_bottom_up", False) else range(h)
         rows = []
-        for y_top in range(h):  # buffer row 0 = top of the image
+        for y_top in ys:  # buffer row order: top-down unless bottom-up device
             row = []
             for x in range(w):
                 ch = pattern(x, y_top, w, h)  # (r, g, b, a) top-down

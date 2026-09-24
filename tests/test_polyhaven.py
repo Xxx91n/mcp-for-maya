@@ -19,6 +19,14 @@ from maya_mcp_server import polyhaven
 from maya_mcp_server.polyhaven import AssetError
 
 
+@pytest.fixture(autouse=True)
+def _fresh_index_cache():
+    """The /assets TTL cache is module-global — isolate every test."""
+    polyhaven._index_cache.clear()
+    yield
+    polyhaven._index_cache.clear()
+
+
 class FakeResp:
     """Minimal urlopen response: read(n) + headers.get() + geturl()."""
 
@@ -137,6 +145,21 @@ def files_routes(files_payload):
 
 
 class TestSearch:
+    def test_index_ttl_cache_bounds_calls(self, monkeypatch):
+        """D-082f: the multi-MB /assets index is TTL-cached — a second
+        search within the window does not re-hit the network."""
+        polyhaven._index_cache.clear()
+        record = []
+        assets = {"a1": {"name": "A", "categories": [], "tags": []}}
+        routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
+        monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes, record))
+        polyhaven.search_assets(query="a")
+        polyhaven.search_assets(query="a")
+        assert len(record) == 1, "index fetch must be cached within the TTL"
+        polyhaven._index_cache.clear()
+        polyhaven.search_assets(query="a")
+        assert len(record) == 2, "expired cache must refetch"
+
     def test_search_filters_and_limits(self, monkeypatch):
         assets = {
             f"asset_{i:02d}": {
@@ -262,6 +285,35 @@ class TestGuards:
             with pytest.raises(AssetError) as ei:
                 polyhaven.validate_asset_id(bad)
             assert ei.value.code == "invalid_asset_id"
+
+    def test_dirty_content_length_is_domain_error(self, monkeypatch):
+        """D-082f: a non-integer Content-Length header must surface as
+        bad_response inside the AssetError contract — never ValueError."""
+        routes = {"https://dl.polyhaven.org/x.fbx": (b"x", {"Content-Length": "garbage"})}
+        monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes))
+        with pytest.raises(AssetError) as ei:
+            polyhaven._fetch("https://dl.polyhaven.org/x.fbx", timeout=1, max_bytes=10)
+        assert ei.value.code == "bad_response"
+
+    def test_dirty_size_in_payload_is_domain_error(self, monkeypatch, tmp_path):
+        """D-082f: a non-integer 'size' field in the /files payload is a
+        bad_response domain error, not a ValueError mid-download."""
+        payload = {
+            "fbx": {
+                "1k": {
+                    "fbx": {
+                        "url": "https://dl.polyhaven.org/x/x.fbx",
+                        "size": "abc",
+                        "md5": None,
+                    }
+                }
+            }
+        }
+        routes = {"https://api.polyhaven.com/files/bad": json.dumps(payload).encode()}
+        monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes))
+        with pytest.raises(AssetError) as ei:
+            polyhaven.download_asset("bad", cache_root=str(tmp_path))
+        assert ei.value.code == "bad_response"
 
 
 # ------------------------------------------------------------------

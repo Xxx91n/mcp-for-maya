@@ -339,7 +339,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 | Maya 侧注入（helper） | Maya **≥2023**（自带 Python ≥3.9，依赖 `ast.unparse`；低于此版本注入时会收到明确报错） |
 | 实证版本 | Maya **2024** GUI |
 
-视觉闭环两个工具需要 **GUI 会话**（headless/mayapy 返回结构化能力错误）。
+视觉闭环两个工具需要 **GUI 会话**（headless/mayapy 返回结构化能力错误）。首次截图时服务端会跑一次 per-session VP2 回读方向探针（一次性搭景即拆，净零副作用）；个别驱动误报时可用 `MAYA_MCP_VP2_BOTTOM_UP=0|1` 强制指定。
 
 ## 开发
 

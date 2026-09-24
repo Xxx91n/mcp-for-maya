@@ -232,16 +232,26 @@ def _encode_file(path: str, max_size: int, out_format: str, quality: int) -> tup
     return _encode_qimage(qimg, out_format, quality)
 
 
-# Whether the VP2 float readback buffer arrives bottom-up. This is an
-# EMPIRICAL pin, not a version branch (D-056⑤): the gui-tier asymmetric
-# pure-color assertion (top-left red block must land top-left) is the
-# arbiter — flip this constant only if that test disagrees on a real
-# session.
-# T-18a re-pin (Maya 2024.0.0.4640, VP2): readColorBuffer hands back
+# Whether the VP2 float readback buffer arrives bottom-up — now a
+# FALLBACK DEFAULT, not the arbiter (D-082d): the per-session runtime
+# probe (_probe_vp2_direction) answers first, the MAYA_MCP_VP2_BOTTOM_UP
+# env override answers before that, and this constant only covers the
+# case where the probe itself could not resolve a direction.
+# T-18a pin (Maya 2024.0.0.4640, VP2): readColorBuffer hands back
 # TOP-DOWN rows on this box - the GL bottom-up assumption did not hold,
-# and the flip put the probe block bottom-left. The constant stays the
-# arbiter for GPUs/drivers that may still differ.
+# and the flip put the probe block bottom-left.
 _VP2_READBACK_BOTTOM_UP = False
+
+# Per-session probe result cache: None = unprobed (the probe runs on the
+# first capture call), True/False = resolved direction. The injected
+# module lives exactly as long as the Maya session that probed it.
+_VP2_DIRECTION: bool | None = None
+
+# MAYA_MCP_VP2_BOTTOM_UP=1/0 — documented escape hatch for drivers that
+# disagree with the probe (README Requirements section).
+_VP2_ENV = "MAYA_MCP_VP2_BOTTOM_UP"
+
+_PROBE_NODES = ("_mcp_vp2_cam", "_mcp_vp2_probe", "_mcp_vp2_red", "_mcp_vp2_redSG")
 
 
 def _vp2_color_image(view: Any) -> Any:
@@ -263,6 +273,178 @@ def _vp2_color_image(view: Any) -> Any:
     except TypeError:
         view.readColorBuffer(img)
     return img
+
+
+# ---------------------------------------------------------------------------
+# VP2 readback-direction runtime probe (D-082d)
+# ---------------------------------------------------------------------------
+
+
+def _vp2_direction(view: Any, panel: str | None) -> bool:
+    """Resolve the readback row order for this session.
+
+    Priority: MAYA_MCP_VP2_BOTTOM_UP env override > one-shot asymmetric
+    pure-color probe (per-session cached) > _VP2_READBACK_BOTTOM_UP
+    fallback default. A probe that fails or reads ambiguous resolves to
+    the fallback — never flip on a guess.
+    """
+    global _VP2_DIRECTION
+    env = os.environ.get(_VP2_ENV, "").strip().lower()
+    if env in ("1", "true", "yes", "on"):
+        return True
+    if env in ("0", "false", "no", "off"):
+        return False
+    if _VP2_DIRECTION is None:
+        _VP2_DIRECTION = _probe_vp2_direction(view, panel)
+        if _VP2_DIRECTION is None:
+            _VP2_DIRECTION = _VP2_READBACK_BOTTOM_UP
+    return bool(_VP2_DIRECTION)
+
+
+def _vp2_probe_verdict(img: Any) -> bool | None:
+    """Red-block cell test on the probe capture -> True iff bottom-up.
+
+    The marker sits in the probe frame's top-left quarter. A top-down
+    readback carries it in the top-left cell; a bottom-up readback
+    mirrors it into bottom-left. Same cells + tolerance band as the
+    gui-tier anchor (test_gui_session.py VP2 orientation probe).
+    Anything else is ambiguous — occlusion, a failed draw, HUD
+    collision — and returns None so the caller falls back.
+    """
+    fd, tmp = tempfile.mkstemp(prefix="_mcp_vp2_", suffix=".png")
+    os.close(fd)
+    try:
+        img.writeToFile(tmp, "png")
+        qimg = _QtGui.QImage(tmp)
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    if qimg.isNull():
+        return None
+    w, h = qimg.width(), qimg.height()
+
+    def _cell_mean(x0: int, y0: int, x1: int, y1: int) -> tuple[float, float, float]:
+        rs = gs = bs = n = 0
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                c = qimg.pixelColor(x, y)
+                rs += c.red()
+                gs += c.green()
+                bs += c.blue()
+                n += 1
+        return (rs / n, gs / n, bs / n)
+
+    tr, tg, tb = _cell_mean(w // 16, h // 16, w // 8, h // 8)  # inside marker
+    br, bg, bb = _cell_mean(w // 16, h * 13 // 16, w // 8, h * 7 // 8)  # mirrored spot
+    tl_red = tr > 120 and tr > tg + 40 and tr > tb + 40
+    bl_red = br > 120 and br > bg + 40 and br > bb + 40
+    if tl_red and not bl_red:
+        return False  # marker top-left -> rows arrive top-down
+    if bl_red and not tl_red:
+        return True  # marker mirrored to bottom-left -> bottom-up
+    return None
+
+
+def _probe_vp2_direction(view: Any, panel: str | None) -> bool | None:
+    """Asymmetric pure-color probe -> True iff readback is bottom-up.
+
+    Builds a disposable ortho camera + red surfaceShader cube far below
+    the scene (user content stays out of frame), points the active model
+    panel at it for one refresh, and checks which vertical half of the
+    readback carries the red block. Net-zero (D-026 discipline extended):
+    undo recording is suspended WITHOUT flushing the user's queue, and
+    selection / panel camera / scene-dirty flag are all restored — every
+    created node is deleted on every path. Returns None on any failure
+    so the caller falls back rather than flip on a guess.
+    """
+    if panel is None:
+        return None
+    prev_dirty = None
+    try:
+        prev_dirty = cmds.file(query=True, modified=True)
+    except Exception:
+        prev_dirty = None
+    try:
+        prev_sel = cmds.ls(selection=True) or []
+    except Exception:
+        prev_sel = []
+    created: list[str] = []
+    undo_off = False
+    try:
+        for n in _PROBE_NODES:  # clear leftovers of a killed probe
+            if cmds.objExists(n):
+                cmds.delete(n)
+        cmds.undoInfo(stateWithoutFlush=False)
+        undo_off = True
+        cam_tr, cam_shape = cmds.camera(name=_PROBE_NODES[0])
+        created.append(cam_tr)
+        for attr, val in (
+            ("orthographic", True),
+            ("orthoWidth", 20.0),
+            ("nearClipPlane", 1.0),
+            ("farClipPlane", 1000.0),
+        ):
+            cmds.setAttr(cam_shape + "." + attr, val)
+        base_y = -100000.0  # far below any plausible user content
+        cmds.setAttr(cam_tr + ".translate", 0.0, base_y, 100.0, type="double3")
+        cube = cmds.polyCube(
+            width=8.0, height=8.0, depth=8.0, name=_PROBE_NODES[1], constructionHistory=False
+        )[0]
+        created.append(cube)
+        # Default camera looks down -Z with +Y up -> -X/+Y is its
+        # top-left; ortho width 20 frames x in [-10,10].
+        cmds.move(-5.0, base_y + 3.0, 0.0, cube, absolute=True)
+        mat = cmds.shadingNode("surfaceShader", asShader=True, name=_PROBE_NODES[2])
+        created.append(mat)
+        cmds.setAttr(mat + ".outColor", 1.0, 0.0, 0.0, type="double3")
+        sg = cmds.sets(renderable=True, noSurfaceShader=True, empty=True, name=_PROBE_NODES[3])
+        created.append(sg)
+        cmds.connectAttr(mat + ".outColor", sg + ".surfaceShader", force=True)
+        cmds.sets(cube, edit=True, forceElement=sg)
+        with _camera_switch_restored(panel, cam_tr):
+            cmds.refresh(force=True)
+            img = _vp2_color_image(view)
+        return _vp2_probe_verdict(img)
+    except Exception:
+        return None
+    finally:
+        for n in reversed(created):
+            try:
+                for sh in cmds.listRelatives(n, shapes=True, fullPath=True) or []:
+                    if cmds.objExists(sh):
+                        cmds.delete(sh)
+            except Exception:
+                pass
+            try:
+                if cmds.objExists(n):
+                    cmds.delete(n)
+            except Exception:
+                pass
+        if undo_off:
+            try:
+                cmds.undoInfo(stateWithoutFlush=True)
+            except Exception:
+                pass
+        try:
+            if prev_sel:
+                cmds.select(prev_sel)
+            else:
+                cmds.select(clear=True)
+        except Exception:
+            pass
+        try:
+            # Repaint the user's real view — the probe frame must not
+            # leak into the caller's own readback.
+            cmds.refresh(force=True)
+        except Exception:
+            pass
+        if prev_dirty is not None:
+            try:
+                cmds.file(modified=prev_dirty)
+            except Exception:
+                logger.warning("vp2 probe: scene modified flag not restored")
 
 
 # ---------------------------------------------------------------------------
@@ -294,19 +476,18 @@ def viewport_snapshot(
     try:
         view = _omui.M3dView.active3dView()
         panel = _active_model_panel()
+        # Row order is probed per-session at runtime (D-082d); the env
+        # override MAYA_MCP_VP2_BOTTOM_UP and the T-18a constant are the
+        # documented fallbacks — the constant no longer arbitrates alone.
+        bottom_up = _vp2_direction(view, panel)
         if view.getRendererName() == view.kViewport2Renderer:
             img = _vp2_color_image(view)
-            # Conditional flip, anchored on the gui-tier asymmetric
-            # pure-color assertion — NOT a version branch (D-056⑤).
-            if _VP2_READBACK_BOTTOM_UP:
-                img.verticalFlip()
         else:
             img = _MImage()
             view.readColorBuffer(img)
-            # Same empirical pin governs both readback flavors (F4):
-            # unconditional flip here contradicted the re-pin.
-            if _VP2_READBACK_BOTTOM_UP:
-                img.verticalFlip()
+        # Same direction answer governs both readback flavors (F4).
+        if bottom_up:
+            img.verticalFlip()
 
         fd, tmp = tempfile.mkstemp(prefix="_mcp_visual_", suffix=".png")
         os.close(fd)

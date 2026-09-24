@@ -1,79 +1,77 @@
-# next-round.md — rev28（T-20：README 门面返工——高难度素材 + 展示栏收拢 + PyPI 裂图修复）
+# next-round.md — rev29（T-21：第三轮锐评修复批 + 0.2.1 收口）
 
-生成：2026-09-24 grill 后整理环节｜Spec：ADR-0025 + docs/decision-ledger.md D-078~D-081｜前置：ADR-0024、.scratch/t19/handoffs/2026-09-23-audit-handoff.md（T-19 闭环实录+复审签字）
+生成：2026-09-24 grill 后整理环节｜Spec：ADR-0026 + docs/decision-ledger.md D-082｜前置：ADR-0025、.scratch/t21/audit-r3.txt（审计原文）+ .scratch/t21/probe-displacement.json（P1-B 驳回真机证据+P2-E 属性面）
 
 ## 环境实况（本轮核验）
 
-- `main`=8b546ee：v0.2.0 已发 PyPI（22 工具/asset_search+asset_import 已交付）；PR #23/#24 已合
-- **PyPI 0.2.0 页面实证硬伤**：14 个 img 全相对路径=全裂图（无回改通道，只能随下版修）
-- **Maya 2024 活着**：PID 13028，:7001 在听，HUD 已英文（采集窗现成，无需重启）；开着 .scratch/t19/t19-showroom.ma
-- 旧 hero.png（设计横幅模板）已挖出备查：.scratch/t20/hero-old.png（2400×720 渐变底+logo 字标+tagline+视口槽）
-- 素材清单现状：.github/assets/ 9 件实拍（hero/shot×2/orbit/row×5/social）+品牌层 SVG 不动
-- assets-src 管线在：.github/assets-src/scene_build.py+capture.py+probe_shaders.py（上轮产物，可增量）
+- main=b2640f1（PR #25/#26 合入，T-20 落地：设计横幅+6 行 Prompt|Result 表+绝对 URL main 钉）；工作区干净
+- PyPI 0.2.0 页面 14 图全裂不可回改——随 0.2.1 顺带修（D-081 既定路线）
+- main 已带真代码修复 0ccf0a1（polyhaven bare-key）→ 0.2.1 patch 语义正当（docs-only 前提作废）
+- Maya 2024 活着：PID 4452，:7001 在听，HUD 英文；**场景为脏**（探针实测 pre_dirty=true）——动手前照旧走脏场景守卫
+- 门禁基线：pytest 692 / ruff 79+28+.github 0 / mypy 基线 237 行（新错 0 闸）/ skeleton 26 1:1 / pre-commit 8/8
 
 ## 任务清单
 
-### T-20a — 高难度场景构建（D-079；前置=脏场景守卫通过）
+### T-21a — P1-A tmp 注入卫生修（D-082①）
 
-agent 经本 MCP 工具实况迭代建造（execute_code 驱动，看截图调构图），各题材独立小场景、同一 Maya session 内切换：
+两处 temp-file 注入口改安全姿势：asset_tools.py:58（_mcp_asset_src.py）+ scene_tools.py:80（_mcp_scene_src.py）——mkstemp（dir=平台缓存目录）+0600+try/finally unlink；参照同仓正解 visual_module.py:311/:391。对外口径=卫生缺陷修复，非安全边界破口。
 
-1. **钟表机芯剖面**（主打）：真渐开线齿轮系（参数化齿形公式，禁假齿——啮合须成立）+层叠夹板+螺旋游丝（螺旋曲线）+螺丝阵列+日内瓦纹；微距构图+DoF
-2. **L-system 树/盆景**：参数化递归分枝+叶片实例；**明示 low-poly 为风格选择**
-3. **PH 导入+装配组合景**：asset_search→asset_import 挑重型资产（雕塑/载具类，数万面 PBR）+execute_code 布光/摆放/布景——「资产给质感、装配给叙事」
-4. **low-poly 城市块**：模块建筑+自发光窗阵（VP2 无 GI 故走低密度风格化不走写实夜景）
-5. **Utah 茶壶**：留任——随新 session 重拍（沿用 t19-showroom 内已有茶壶或独立小景重摆）
-6. **audit 布景**：搭违规场景→scene_review 检出→修复 的 before/after 双帧素材
+### T-21b — P1-B 残余小修+驳回留档（D-082②）
 
-铁律：禁原始体堆叠观感（D-071⑦ 延续为本轮验收门槛）；GRP_/GEO_/MAT_/CAM_/LGT_ 命名与 ≤4 层级纪律不破；zone 分区用材质/色温暗示禁线框描边。
+- 驳回已凭真机探针入账（disp.displacement→sg.displacementShader 连接成立，SG 源列表实见节点）
+- test_asset_module.py 补 displacement 正/负例（当前 grep=0 命中）
+- _wire_map 失败路径孤儿节点回收（asset_module.py:298 创建的 disp 节点失败时 delete）
+- stub connectAttr 槽位类型表=记债不本轮（现只建模标量→三元组）
+- displacement 渲染语义层（连接成立≠渲染生效）归 gui/human_verify 档，写进清单
 
-### T-20b — 冻结采集 session 出片（D-078/D-080；前置=T-20a 场景定稿）
+### T-21c — P2-C CHANGELOG 措辞归真（D-082③）
 
-- 一个冻结环境一个 session 一次出齐（同 VP2 设置/同灯光/同 HUD 状态/英文 UI 已在）：
-  - **hero 槽素材**=带 HUD 的视口实拍（scene_viewport_snapshot；视口框装真视口）
-  - **6 行例表图**：机芯微距 / 盆景 / PH 装配 / 街区 / 茶壶 / audit before+after 双帧
-  - **orbit.gif**：通栏收尾用，5-15s，**<10MB**；环绕对象=最有信息量场景（建议机芯或 PH 装配景）
-  - **social-preview.png**：随 hero 重合成（1280×640/<1MB/实底）
-- 密度红线：单图 <500KB；视觉模块 ≤4
-- 补拍仅作缺陷返工路径；跨 session 素材禁混
-- **验收门**：全套贴图呈报用户过目签字才入库（人工门，沿用 D-077④）
+CHANGELOG:49 "manifest-based cache reuse"→真实机制（fresh-metadata revalidation+per-file size+md5 复验；manifest.json=只写审计产物）。
 
-### T-20c — README 版面手术（D-078/D-080；可与 T-20a/b 部分并行——结构先行、嵌图等素材）
+### T-21d — P2-D VP2 方向运行时探针（D-082④）
 
-1. 顶部恢复设计横幅：hero.svg 模板重合成 hero.png——视口槽嵌新 HUD 实拍；social-preview 同步
-2. 单一展示栏=`| Prompt | Result |` 表 6 行（左文右图）+orbit.gif 通栏居中收尾；正文其余位置零实拍图
-3. **资产引用全改绝对 URL**：`https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/...`（main 钉，禁 tag 钉禁相对路径）
-4. 旧素材退役：row1-showroom/row3-camera/shot-alt 删；shot-hero 退役或留 docs/（hero 槽用新拍）；row2-teapot 文件随重拍替换
-5. SVG 品牌层清欠：「20 tools」→22 文案刷新
-6. README.zh-CN.md 镜像同步（头注 commit hash 锚更新）+CI 标题骨架校验须过
-7. 能力矩阵/对比表若因展示栏重构受影响则同步（传播矩阵纪律）
+首选：首次视觉工具调用时跑非对称纯色探针定 per-session 方向（复用 gui 档断言逻辑，tests 已有 :298-301 所指）。**铁约束=净零副作用**：探针瞬时搭景→断言→全拆→还原 dirty 标志；落位若被证不安全→退化为文档化逃生开关（env-var+README 环境要求节）。_VP2_READBACK_BOTTOM_UP 语义从「常量仲裁」改为「探针兜底默认值」。
 
-### T-20d — 门禁+收口+家务（D-080⑤/D-081）
+### T-21e — P2-E 材质修复（D-082⑤）
 
-- 门禁：pytest/ruff 预算/mypy 基线/pre-commit/README 骨架校验全绿；**发版前 twine check**（若有发版）
-- 版本归置：**不发专版**——PyPI 裂图随下一次真实发版顺带修；仅当用户判紧急才授权 0.2.0.post1
-- 家务落地：issue #2（自家 tracker）更新「0.2.0 已交付 models 切片，HDRI/贴图留 roadmap」；CHANGELOG 记门面返工+PyPI 修复（[Unreleased] 段或随下版）
-- assets-src 结晶：新场景构建脚本+采集脚本更新入 .github/assets-src/（复现 README 同步记题材/参数）
+_new_material blinn→standardSurface（asset_module.py:183）。**坑**：stdSurface 有 specularRoughness/metalness/normalCamera，无 roughness/diffuse/reflectivity（probe-displacement.json 实证）——AO 角色现指 diffuse 须改 base 侧目标；映射表同步重订；test_asset_module 材质断言面更新。
 
-### 人工门（用户执行，agent 备单）
+### T-21f — P3 六项打包（D-082⑥）
 
-素材过目签字（入库前置）→0.2.0.post1 紧急度裁决（默认不发）→（若发）tag/release 动作
+1. polyhaven.py:172/443/449 裸 int()→收口 AssetError 域（脏头/脏 size 不再抛 ValueError 逃契约）
+2. search_assets /assets 索引加 TTL 缓存（对 CC0 API 失礼修复）
+3. asset_tools.py:122 duration_ms=0.0→求真值或删字段（假数不如不填）
+4. create_orbit_camera/create_camera_shot 默认名 orbit_cam/shot_cam→CAM_ 前缀（maya_scene_module.py:1530/1631，自家工具撞自家 CAM_ 审计）；默认名=对外行为面，CHANGELOG 记为行为变更
+5. README/docs 钉法措辞+**assets 目录只加不删纪律**入 AGENTS.md（旧 PyPI 页永久引用 main 路径，删旧资产=历史页永久裂）
+6. 巨石增长记账（maya_scene_module 4583 行/mypy 183 行住它）——记债不本轮修
 
-## 顺延队列（原主不动）
+### T-21g — meta 机制：CHANGELOG 证据指针（D-082⑦）
 
-N4 smell 债 / T-06 dormant 引擎 / T-07 注册表 / 依赖锁定 / coverage patch 门 / macOS 冒烟 / Arnold 可选项 / T-19 顺延批（async 阻塞下载/双次哈希/_ensure 三份复制/首 SG 位移线/_ASSET_TYPE_RE 收紧/zh 历史地址注/2 码入清单/新 callform 入账/assets-src 上轮残留）——排序裁归下一轮
+AGENTS.md 联动规范增条：CHANGELOG Added/Fixed bullet 必须挂 file:line 或测试 ID（lint 可查）；0.2.1 条目为首发执行对象。病灶史=CHANGELOG:33（已删）+manifest-based。
+
+### T-21h — 门禁收口+0.2.1 备料（D-082⑧）
+
+- 全门禁：pytest / ruff 预算 / mypy 基线闸 / skeleton / pre-commit / uv build / twine check
+- bump 0.2.1+CHANGELOG 0.2.1 节（每条挂证据指针）
+- README/zh 镜像按传播矩阵同步；issue #2（自家 tracker）顺手更新
+- **发布动作为人工门**：tag/Release/PyPI publish 备命令清单呈报，用户执行；0.2.0 裂图页不可回改，0.2.1 发布即顺带修
+
+## 顺延债（原样挂账不动）
+
+N4 smell 债 / T-06 AE 归并 / T-07 validator 注册表+巨石拆分（锐评：下个 minor 该兑现一次减行）/ 依赖锁定 / coverage patch 门 / macOS smoke / Arnold / T-19 顺延批（async 阻塞下载/双次哈希/_ensure 三份复制/首 SG 位移线/_ASSET_TYPE_RE 收紧/zh 历史地址注/2 码入清单/新 callform 入账/assets-src 残留）/ **本轮新增**：stub connectAttr 槽位类型表
 
 ## 铁律
 
-- dogfood 不破：全部素材产品工具链实拍，禁 mock/生成图/手工摆拍；脏场景守卫探针先行
-- 精确性替代艺术性：纯脚本只做几何逻辑清晰题材；E 类（角色/生物）禁纯脚本
-- 素材未过目不入库；一次 session 出齐；单图 <500KB、orbit <10MB、视觉模块 ≤4
-- PyPI 资产引用一律绝对 URL（main 钉）；禁 video/js/iframe
-- VC 全走 but；grill/实现分离
+- 脏场景守卫：探针先行，脏则停（本轮实测场景即脏）
+- ICEV/命名/zone/双层错误契约不破；审计 JSONL 语义不动
+- 修复不夹带：只修 D-082 列项，新病灶记账另行
+- 对外口径诚实：P1-A=卫生缺陷；P1-B=已驳回（探针证据）
+- release/tag/push 全走人工确认门
 
-## suggested skills
+## Suggested skills
 
-- `$implement` — T-20a 场景构建（MCP 驱动）/T-20c README 手术
-- `$but` — 全部 VC 写操作
-- `$handoff` — 翻页
-- `$atomcode-research` — 争议调研（串行单发）
-- `$domain-modeling` — 术语增量入 CONTEXT.md 时
+- implement / tdd（修复批；T-21b 负例先行可复现 stub 语义差）
+- gitbutler（but 提交/PR）
+- handoff（下一轮交接）
+- domain-modeling / neat-freak（文档收口）
+- atomcode-research（仅当 P2-D 探针落位或 AO 映射需外部先例时，串行）
