@@ -75,20 +75,30 @@ async def _ensure_module_injected(client: Any, session_key: str | None) -> None:
         import os as _os
         import tempfile as _tf
 
+        import platformdirs as _pd
+
         _ResultType = __import__("maya_mcp_server.types", fromlist=["ResultType"]).ResultType
-        # Write source to temp file on the CLIENT side, then read it from Maya
-        _tmp = _os.path.join(_tf.gettempdir(), "_mcp_scene_src.py")
-        with open(_tmp, "w", encoding="utf-8") as f:
-            f.write(source)
-        # In Maya: read the file, compile, exec, register as module
-        # The temp file is accessible from both sides since they're on the same machine
-        _tmp_safe = _tmp.replace("\\", "/")
-        await client.execute_code(
-            "import types, sys, json; _c=open(json.loads("
-            + json.dumps(json.dumps(_tmp_safe))
-            + ")).read(); _m=types.ModuleType('_mcp_scene'); _m.__file__='<mcp:_mcp_scene>'; exec(compile(_c,'_mcp_scene.py','exec'),_m.__dict__); sys.modules['_mcp_scene']=_m",
-            _ResultType.NONE,
-        )
+        # D-082a hygiene: mkstemp under the platformdirs user cache (no
+        # predictable shared-temp path), 0600 perms, try/finally unlink.
+        _dir = _os.path.join(_pd.user_cache_dir("mcp-for-maya"), "inject")
+        _os.makedirs(_dir, exist_ok=True)
+        _fd, _tmp = _tf.mkstemp(prefix="_mcp_scene_src_", suffix=".py", dir=_dir)
+        try:
+            with _os.fdopen(_fd, "w", encoding="utf-8") as f:
+                f.write(source)
+            _os.chmod(_tmp, 0o600)
+            _tmp_safe = _tmp.replace("\\", "/")
+            await client.execute_code(
+                "import types, sys, json; _c=open(json.loads("
+                + json.dumps(json.dumps(_tmp_safe))
+                + ")).read(); _m=types.ModuleType('_mcp_scene'); _m.__file__='<mcp:_mcp_scene>'; exec(compile(_c,'_mcp_scene.py','exec'),_m.__dict__); sys.modules['_mcp_scene']=_m",
+                _ResultType.NONE,
+            )
+        finally:
+            try:
+                _os.remove(_tmp)
+            except OSError:
+                pass
     else:
         await client.write_module("_mcp_scene", source, overwrite=True)
     # Pre-import the module so subsequent calls use expression-only syntax
@@ -673,7 +683,7 @@ result
     async def camera_create(
         target: str,
         shot_type: str = "medium",
-        name: str = "shot_cam",
+        name: str = "CAM_shot",
         azimuth: float = 30,
         elevation: float = 15,
         session_key: str | None = None,
@@ -716,7 +726,7 @@ result
         center: str,
         radius: float = 500,
         frames: int = 120,
-        name: str = "orbit_cam",
+        name: str = "CAM_orbit",
         session_key: str | None = None,
     ) -> str:
         """Create a camera that orbits around a point with animation.

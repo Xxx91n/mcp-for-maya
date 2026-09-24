@@ -103,6 +103,25 @@ def jpeg_bytes(w, h, quality=80):
     return b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + payload.encode()
 
 
+class QColor:
+    """Minimal QColor: 0-255 channel getters (pixelColor return type)."""
+
+    def __init__(self, r=0, g=0, b=0, a=255):
+        self._c = (int(r), int(g), int(b), int(a))
+
+    def red(self):
+        return self._c[0]
+
+    def green(self):
+        return self._c[1]
+
+    def blue(self):
+        return self._c[2]
+
+    def alpha(self):
+        return self._c[3]
+
+
 class QImage:
     """Dimension/byte-contract QImage fake.
 
@@ -126,6 +145,14 @@ class QImage:
         elif len(args) >= 2:
             self._w, self._h = int(args[0]), int(args[1])
             self._null = False
+
+    def pixelColor(self, x, y):
+        """QImage.pixelColor(x, y) -> QColor from decoded PNG pixels."""
+        if self._pixels is None or not (0 <= x < self._w and 0 <= y < self._h):
+            return QColor(0, 0, 0, 0)
+        row = self._pixels[int(y)]
+        i = int(x) * 3
+        return QColor(row[i], row[i + 1], row[i + 2])
 
     def isNull(self):
         return self._null
@@ -229,6 +256,7 @@ def make_pyside6():
     qtgui = types.ModuleType("PySide6.QtGui")
     qtcore = types.ModuleType("PySide6.QtCore")
     qtgui.QImage = QImage
+    qtgui.QColor = QColor
     qtcore.QBuffer = QBuffer
     qtcore.QIODevice = QIODevice
     qtcore.Qt = Qt

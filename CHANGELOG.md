@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-24
+
 ### Fixed
 
 - **Poly Haven single-asset texture wiring** — `split_texture_key()`
@@ -16,10 +18,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keys (`Diffuse`, `nor_gl`, `Metal`, `Rough`, `AO`, `ARM`, ...) now
   map to the asset's single unnamed part; compound matching is
   case-insensitive (`Body_Diff` no longer drops). Regression tests
-  cover the bare-key and case-variant forms in `select_files()`.
+  cover the bare-key and case-variant forms in `select_files()`
+  (`tests/test_polyhaven.py::TestSelectFiles`).
+- **Temp-file injection hygiene (D-082a)** — the native-channel
+  fallback in `asset_tools.py::_ensure_asset_injected` and
+  `scene_tools.py::_ensure_module_injected` staged module source at a
+  predictable shared temp path with default perms and no cleanup; it
+  now uses `mkstemp` under `platformdirs.user_cache_dir("mcp-for-maya")
+  /inject`, chmod `0600`, try/finally unlink on success and failure
+  (`tests/test_scene_tools.py::TestInjectionHygiene`,
+  `tests/test_asset_tools.py::TestInjectionHygiene`,
+  `tests/test_qt_channel.py::test_native_client_keeps_tempfile_fallback`).
+- **Displacement wiring cleanup (D-082b)** — a `connectAttr` failure
+  mid-wiring left a half-created `displacementShader` node orphaned in
+  the scene; `_wire_map` now deletes it on every failure path
+  (`src/maya_mcp_server/asset_module.py::_wire_map`,
+  `tests/test_asset_module.py::TestDisplacement` — positive +
+  negative + orphan-cleanup cases). Note: the R3 audit's "connection
+  impossible" claim was refuted by a live Maya 2024 probe
+  (`disp.displacement -> sg.displacementShader` connects —
+  `.scratch/t21/probe-displacement.json`); "connected" is still not
+  "renders correctly" — visual proof stays on the gui/human_verify tier.
+- **Poly Haven surface hardening (D-082f)** — bare `int()` on
+  API/HTTP-controlled fields could escape the `AssetError` domain as a
+  raw `ValueError`; now `_as_int` maps them to `bad_response`
+  (`src/maya_mcp_server/polyhaven.py`). The multi-MB `/assets` index
+  carries a 300 s TTL cache (`SEARCH_INDEX_TTL_S`) so repeated
+  `asset_search` calls don't re-pull the listing — unrelated to the
+  download path's fresh-metadata revalidation rule. The supplementary
+  `asset_import` audit row now records real download+import wall time
+  instead of the `duration_ms: 0.0` placeholder
+  (`src/maya_mcp_server/asset_tools.py::_audit_asset_download`,
+  `tests/test_polyhaven.py::test_index_ttl_cache_bounds_calls`,
+  `test_dirty_content_length_is_domain_error`,
+  `test_dirty_size_in_payload_is_domain_error`,
+  `tests/test_asset_tools.py::test_audit_duration_ms_is_measured`).
+- **VP2 readback direction probed at runtime (D-082d)** —
+  `_VP2_READBACK_BOTTOM_UP` was a compile-time constant arbitrating a
+  runtime variable (cross-GPU differences were a known blind spot);
+  `visual_module._vp2_direction` now resolves it per-session on first
+  capture via an asymmetric pure-color probe — disposable ortho camera
+  + red `surfaceShader` cube, net-zero (undo recording suspended
+  without flushing, selection / panel camera / scene-dirty flag
+  restored, every node deleted on every path). The constant is demoted
+  to fallback default; `MAYA_MCP_VP2_BOTTOM_UP=0|1` is the documented
+  override (`src/maya_mcp_server/visual_module.py::_probe_vp2_direction`,
+  `tests/test_visual_tools.py::TestVp2DirectionProbe`).
+- **0.2.0 changelog wording correction (D-082c)** — the cache
+  mechanism was described as "manifest-based"; the actual mechanism is
+  fresh-metadata revalidation + per-file size/md5 re-verification
+  (`src/maya_mcp_server/polyhaven.py::_verify_local`), with
+  `manifest.json` a write-only audit artifact.
 
 ### Changed
 
+- **Camera default names use the `CAM_` prefix (D-082f)** —
+  `create_camera_shot`/`create_orbit_camera` and their `camera_create`/
+  `camera_orbit` tool wrappers default to `CAM_shot`/`CAM_orbit`
+  instead of `shot_cam`/`orbit_cam`, matching the project's own naming
+  audit (`maya_scene_module.py::_MAYA_STANDARDS`,
+  `src/maya_mcp_server/scene_tools.py:685`). Externally visible:
+  unnamed camera calls now produce `CAM_*` nodes.
+- **Generated materials are `standardSurface` (D-082e)** —
+  `_new_material` emits Maya's PBR default instead of `blinn`; the
+  texture wiring table is attribute-aware: color -> `color|baseColor`,
+  roughness -> `specularRoughness|roughness`, metalness ->
+  `metalness|metallic` (the old `reflectivity` fallback is dropped —
+  specular strength is not metalness), normal -> `normalCamera`,
+  AO -> `base|diffuse` (`src/maya_mcp_server/asset_module.py`,
+  `tests/test_asset_module.py::TestStandardSurface`). The stub material
+  attribute model was re-pinned to live-probe evidence: blinn carries
+  `reflectivity`/`specularRollOff` but no `specularRoughness`;
+  standardSurface has no `color`/`diffuse`/`ambientColor` and gains
+  `base` (`tests/maya_stub/scene.py`).
 - **README facade rework (T-20, D-078~D-081)** — design banner restored
   at top (`hero.svg` embeds a real `scene_viewport_snapshot` HUD capture
   in its viewport slot); all demo imagery consolidated into one
@@ -27,8 +98,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   L-system bonsai, Poly Haven workbench, low-poly street block,
   Utah teapot recreation, `scene_review` before/after pair at 53.7→64.2)
   plus a full-width 20-frame orbit GIF; every image reference is an
-  absolute `raw.githubusercontent.com` URL pinned to `main` so assets
-  render on PyPI; generation scripts checked in under
+  absolute `raw.githubusercontent.com` URL on `main` so assets render
+  on PyPI (a living-branch reference by design — `.github/assets/` is
+  append-only so historical release pages keep rendering); generation
+  scripts checked in under
   `.github/assets-src/t20/`; `README.zh-CN.md` mirrored (anchor
   `f8e6869`). Retired: `hero.png`, `row1-4`, `shot-hero`, `shot-alt`.
 
@@ -46,8 +119,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     (`api.polyhaven.com`, `dl.polyhaven.org`, `dl.polyhaven.com`),
     mandatory User-Agent, timeout, per-file 256 MiB / per-call 512 MiB
     caps, official per-file md5 verification + sha256 audit records,
-    manifest-based cache reuse with fresh-metadata revalidation
-    (no silent stale-cache serving — offline yields the structured
+    cache reuse gated on fresh /files metadata revalidation plus
+    per-file size and md5 re-verification (`manifest.json` is a
+    write-only audit artifact, never a cache-validity source —
+    no silent stale-cache serving; offline yields the structured
     `network_unavailable` error).
   - Maya-side `_mcp_asset` (lazy-injected, zero network by design):
     fbxmaya plug-in gate, `FBXImportConvertUnitString=m` unit lock,

@@ -15,11 +15,83 @@ from maya_mcp_server.cos_formatter import format_measure_cos, format_scene_cos
 from maya_mcp_server.scene_tools import (
     TokenBudget,
     _caches,
+    _ensure_module_injected,
     _get_cache,
     _injected_sessions,
     mark_dirty,
     register_scene_tools,
 )
+
+
+class TestInjectionHygiene:
+    """D-082a: native-channel temp-file injection must be mkstemp-unique,
+    permission-restricted, and unlinked on every path."""
+
+    async def test_native_channel_tmpfile_lifecycle(self, monkeypatch):
+        import os
+        from pathlib import Path
+
+        import platformdirs
+
+        inject_dir = Path(platformdirs.user_cache_dir("mcp-for-maya")) / "inject"
+        pre = set(inject_dir.glob("_mcp_scene_src_*.py")) if inject_dir.exists() else set()
+
+        client = MagicMock()
+        client.framed_channel = False
+        seen_during = {}
+
+        async def exec_code(code, result_type=None):
+            # At execute_code time the temp file must exist on disk and
+            # carry a unique mkstemp name (not a shared fixed path). The
+            # follow-up "import _mcp_scene" call runs post-unlink — only
+            # record while the staged file actually exists.
+            now = sorted(inject_dir.glob("_mcp_scene_src_*.py"))
+            if now:
+                seen_during["files"] = [p.name for p in now]
+                if os.name != "nt":
+                    seen_during["mode"] = oct(now[0].stat().st_mode & 0o777)
+            from maya_mcp_server.types import CommandResponse
+
+            return CommandResponse(result=None, error=None)
+
+        client.execute_code = exec_code
+        _injected_sessions.discard("hygiene")
+        try:
+            await _ensure_module_injected(client, "hygiene")
+        finally:
+            _injected_sessions.discard("hygiene")
+
+        assert seen_during.get("files"), "native path must stage a temp file"
+        assert len(seen_during["files"]) == 1
+        assert seen_during["files"][0] != "_mcp_scene_src.py", "unique mkstemp name"
+        if os.name != "nt":
+            assert seen_during["mode"] == "0o600"
+        post = set(inject_dir.glob("_mcp_scene_src_*.py")) if inject_dir.exists() else set()
+        assert post == pre, "temp file must be unlinked after injection"
+
+    async def test_tmpfile_unlinked_even_on_failure(self, monkeypatch):
+        from pathlib import Path
+
+        import platformdirs
+
+        inject_dir = Path(platformdirs.user_cache_dir("mcp-for-maya")) / "inject"
+        pre = set(inject_dir.glob("_mcp_scene_src_*.py")) if inject_dir.exists() else set()
+
+        client = MagicMock()
+        client.framed_channel = False
+
+        async def boom(code, result_type=None):
+            raise RuntimeError("commandPort dead")
+
+        client.execute_code = boom
+        _injected_sessions.discard("hygiene_fail")
+        try:
+            with pytest.raises(RuntimeError):
+                await _ensure_module_injected(client, "hygiene_fail")
+        finally:
+            _injected_sessions.discard("hygiene_fail")
+        post = set(inject_dir.glob("_mcp_scene_src_*.py")) if inject_dir.exists() else set()
+        assert post == pre, "temp file must be unlinked on the failure path"
 
 
 class TestTokenBudget:

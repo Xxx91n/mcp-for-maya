@@ -253,6 +253,123 @@ class TestTextureWiring:
 
 
 # ------------------------------------------------------------------
+# displacement (D-082b) — graph contract only; render semantics stay
+# on the gui/human_verify tier ("connected" != "renders correctly")
+# ------------------------------------------------------------------
+
+
+class TestDisplacement:
+    def test_disp_wires_via_imported_sg(self, asset_env, tmp_path):
+        """Positive case — live-verified shape (probe-displacement.json):
+        file.outAlpha -> disp.displacement -> sg.displacementShader on
+        the IMPORTED shading group."""
+        disp = tmp_path / "body_disp_1k.jpg"
+        disp.write_bytes(b"DISP")
+        d = dict(asset_env.descriptor)
+        d["texture_parts"] = dict(d["texture_parts"])
+        d["texture_parts"]["body"] = dict(d["texture_parts"]["body"])
+        d["texture_parts"]["body"]["disp"] = str(disp)
+        res = asset_env.module.import_asset(d)
+        assert "error" not in res, res
+        parts = {p["part"]: p for p in res["texture_wiring"]["parts"]}
+        assert "body_disp->body" in "\n".join(parts["body"]["wired"])
+        sc = asset_env.scene
+        assert sc.resolve("file_Camera_01_body_disp_disp").type == "displacementShader"
+        assert "file_Camera_01_body_disp" in sc.connections.get(
+            "file_Camera_01_body_disp_disp.displacement", []
+        )
+        assert "file_Camera_01_body_disp_disp" in sc.connections.get(
+            "|bodySG.displacementShader", []
+        )
+
+    def test_disp_without_sg_unwired(self, asset_env, tmp_path):
+        """Negative case — no shading group to hang the map on: reports
+        unwired and creates NO displacementShader node."""
+        tex = tmp_path / "x_disp.jpg"
+        tex.write_bytes(b"X")
+        fn = asset_env.module._file_node(str(tex), "file_nosg", "Raw")
+        ok = asset_env.module._wire_map(fn, "displacement", "body", None)
+        assert ok is False
+        assert not asset_env.cmds.objExists("file_nosg_disp")
+        assert asset_env.cmds.ls("*_disp") is None
+
+    def test_disp_connect_failure_leaves_no_orphan(self, asset_env, monkeypatch, tmp_path):
+        """D-082b — a connectAttr that dies mid-wiring must delete the
+        half-created displacementShader, not orphan it in the scene."""
+        tex = tmp_path / "x_disp.jpg"
+        tex.write_bytes(b"X")
+        asset_env.cmds.sets(renderable=True, empty=True, name="SG_test")
+        fn = asset_env.module._file_node(str(tex), "file_orphan", "Raw")
+        real_connect = asset_env.cmds.connectAttr
+
+        def boom(src, dst, **kw):
+            if str(dst).endswith(".displacementShader"):
+                raise RuntimeError("SG.displacementShader not connectable")
+            return real_connect(src, dst, **kw)
+
+        monkeypatch.setattr(asset_env.cmds, "connectAttr", boom)
+        ok = asset_env.module._wire_map(fn, "displacement", "body", "SG_test")
+        assert ok is False
+        assert not asset_env.cmds.objExists("file_orphan_disp")
+
+
+# ------------------------------------------------------------------
+# standardSurface migration (D-082e) — attribute-aware mapping
+# ------------------------------------------------------------------
+
+
+class TestStandardSurface:
+    def test_new_material_is_standard_surface(self, asset_env, tmp_path):
+        """D-082e: _new_material creates standardSurface, not blinn —
+        and the maps wire to the PBR attribute names."""
+        extra = tmp_path / "strap_metallic_1k.jpg"
+        extra.write_bytes(b"METL")
+        d = dict(asset_env.descriptor)
+        d["texture_parts"] = dict(d["texture_parts"])
+        d["texture_parts"]["strap"] = {"metallic": str(extra)}
+        res = asset_env.module.import_asset(d)
+        assert "error" not in res, res
+        mat = asset_env.scene.resolve("MAT_Camera_01_strap")
+        assert mat.type == "standardSurface"
+        # metallic lands on .metalness (PBR name), not reflectivity
+        assert "file_Camera_01_strap_metallic" in asset_env.scene.connections.get(
+            "MAT_Camera_01_strap.metalness", []
+        )
+
+    def test_ao_wires_to_base_on_standard_surface(self, asset_env, tmp_path):
+        """AO drives a multiplier: standardSurface.base is the scalar
+        weight over baseColor (legacy shaders still get .diffuse)."""
+        ao = tmp_path / "strap_ao_1k.jpg"
+        ao.write_bytes(b"AO")
+        d = dict(asset_env.descriptor)
+        d["texture_parts"] = dict(d["texture_parts"])
+        d["texture_parts"]["strap"] = {"ao": str(ao)}
+        res = asset_env.module.import_asset(d)
+        assert "error" not in res, res
+        assert "file_Camera_01_strap_ao" in asset_env.scene.connections.get(
+            "MAT_Camera_01_strap.base", []
+        )
+
+    def test_metalness_never_wires_reflectivity(self, asset_env, tmp_path):
+        """D-082e: on a legacy blinn (which DOES have reflectivity — live
+        probe), a metalness map must stay unwired, never land on
+        reflectivity. Specular strength is not metalness."""
+        asset_env.scene.fbx_fixture["materials"][0]["type"] = "blinn"
+        met = tmp_path / "body_metallic_1k.jpg"
+        met.write_bytes(b"MET")
+        d = dict(asset_env.descriptor)
+        d["texture_parts"] = dict(d["texture_parts"])
+        d["texture_parts"]["body"] = {"metallic": str(met)}
+        res = asset_env.module.import_asset(d)
+        assert "error" not in res, res
+        parts = {p["part"]: p for p in res["texture_wiring"]["parts"]}
+        assert "body_metallic->body" in parts["body"]["unwired"]
+        sc = asset_env.scene
+        assert sc.resolve("body").attrs.get("reflectivity") is not None  # fixture sanity
+        assert "file_Camera_01_body_metallic" not in sc.connections.get("|body.reflectivity", [])
+
+
+# ------------------------------------------------------------------
 # defensive input
 # ------------------------------------------------------------------
 

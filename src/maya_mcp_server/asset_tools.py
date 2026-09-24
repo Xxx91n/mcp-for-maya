@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -52,22 +53,35 @@ async def _ensure_asset_injected(client: Any, session_key: str | None) -> None:
         return
     source = _MODULE_SOURCE.read_text(encoding="utf-8")
     if len(source) > 15000 and not getattr(client, "framed_channel", False):
+        # D-082a hygiene: mkstemp under the platformdirs user cache (no
+        # predictable shared-temp path), 0600 perms, try/finally unlink.
         import os as _os
         import tempfile as _tf
 
-        _tmp = _os.path.join(_tf.gettempdir(), "_mcp_asset_src.py")
-        with open(_tmp, "w", encoding="utf-8") as f:
-            f.write(source)
-        _tmp_safe = _tmp.replace("\\", "/")
-        await client.execute_code(
-            "import types, sys, json; _c=open(json.loads("
-            + json.dumps(json.dumps(_tmp_safe))
-            + ")).read(); _m=types.ModuleType('_mcp_asset');"
-            " _m.__file__='<mcp:_mcp_asset>';"
-            " exec(compile(_c,'_mcp_asset.py','exec'),_m.__dict__);"
-            " sys.modules['_mcp_asset']=_m",
-            ResultType.NONE,
-        )
+        import platformdirs as _pd
+
+        _dir = _os.path.join(_pd.user_cache_dir("mcp-for-maya"), "inject")
+        _os.makedirs(_dir, exist_ok=True)
+        _fd, _tmp = _tf.mkstemp(prefix="_mcp_asset_src_", suffix=".py", dir=_dir)
+        try:
+            with _os.fdopen(_fd, "w", encoding="utf-8") as f:
+                f.write(source)
+            _os.chmod(_tmp, 0o600)
+            _tmp_safe = _tmp.replace("\\", "/")
+            await client.execute_code(
+                "import types, sys, json; _c=open(json.loads("
+                + json.dumps(json.dumps(_tmp_safe))
+                + ")).read(); _m=types.ModuleType('_mcp_asset');"
+                " _m.__file__='<mcp:_mcp_asset>';"
+                " exec(compile(_c,'_mcp_asset.py','exec'),_m.__dict__);"
+                " sys.modules['_mcp_asset']=_m",
+                ResultType.NONE,
+            )
+        finally:
+            try:
+                _os.remove(_tmp)
+            except OSError:
+                pass
     else:
         await client.write_module("_mcp_asset", source, overwrite=True)
     await client.execute_code("import _mcp_asset", ResultType.NONE)
@@ -99,6 +113,7 @@ def _audit_asset_download(
     session_key: str | None,
     descriptor: dict[str, Any],
     import_result: dict[str, Any],
+    duration_ms: float,
 ) -> None:
     """Record the download+import halves as a supplementary event (D-075).
 
@@ -119,7 +134,7 @@ def _audit_asset_download(
                 "resolution": descriptor.get("resolution"),
             },
             outcome="success" if import_ok else "error",
-            duration_ms=0.0,
+            duration_ms=duration_ms,
         )
         event["asset_download"] = {
             "urls": [f.get("url") for f in descriptor.get("files_hash", {}).values()],
@@ -232,6 +247,7 @@ def register_asset_tools(mcp: Any, audit: AuditLogger | None = None) -> None:
         client = await manager.get_client(session_key)
         await _ensure_asset_injected(client, session_key)
 
+        t0 = time.monotonic()
         try:
             descriptor = polyhaven.download_asset(asset_id, resolution=resolution)
         except polyhaven.AssetError as e:
@@ -247,7 +263,11 @@ def register_asset_tools(mcp: Any, audit: AuditLogger | None = None) -> None:
                 force=bool(force),
             ),
         )
-        _audit_asset_download(audit, session_key, descriptor, result)
+        # D-082⑥: real download+import wall time — duration_ms=0.0 was
+        # a placeholder that lied in every supplementary audit row.
+        _audit_asset_download(
+            audit, session_key, descriptor, result, (time.monotonic() - t0) * 1000.0
+        )
         mark_dirty(session_key)
         if isinstance(result, dict) and "error" not in result:
             result["download"] = {

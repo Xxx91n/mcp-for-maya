@@ -584,17 +584,42 @@ class TestModuleInjectionRouting:
         scene_tools._injected_sessions.discard("k-f")
 
     async def test_native_client_keeps_tempfile_fallback(self, monkeypatch, tmp_path):
+        """D-082a: native fallback still routes through a staged temp
+        file — but now it is a unique mkstemp name inside the
+        platformdirs cache, permission-locked, and unlinked after use."""
+        import os
+        from pathlib import Path
+
+        import platformdirs
+
         scene_tools._injected_sessions.discard("k-n")
         client = MagicMock()
         client.framed_channel = False
         client.write_module = AsyncMock()
-        client.execute_code = AsyncMock(return_value=CommandResponse(result=None, error=None))
-        monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
+
+        inject_dir = Path(platformdirs.user_cache_dir("mcp-for-maya")) / "inject"
+        pre = set(inject_dir.glob("_mcp_scene_src_*.py")) if inject_dir.exists() else set()
+        staged = []
+
+        async def exec_code(code, result_type=None):
+            # The follow-up "import _mcp_scene" call runs post-unlink —
+            # only record while the staged file actually exists.
+            now = sorted(inject_dir.glob("_mcp_scene_src_*.py"))
+            if now:
+                staged.extend(p.name for p in now)
+            return CommandResponse(result=None, error=None)
+
+        client.execute_code = AsyncMock(side_effect=exec_code)
 
         await scene_tools._ensure_module_injected(client, "k-n")
 
         client.write_module.assert_not_called()
-        assert (tmp_path / "_mcp_scene_src.py").exists()
+        assert staged, "native path must stage a mkstemp file during execute_code"
+        assert all(n != "_mcp_scene_src.py" for n in staged), "unique name, not shared"
+        if os.name != "nt":
+            assert (inject_dir / staged[0]).exists() is False  # unlinked
+        post = set(inject_dir.glob("_mcp_scene_src_*.py")) if inject_dir.exists() else set()
+        assert post == pre, "temp file must be unlinked after injection"
         assert client.execute_code.await_count == 2  # temp-read exec + pre-import
         scene_tools._injected_sessions.discard("k-n")
 

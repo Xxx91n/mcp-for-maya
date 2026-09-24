@@ -66,6 +66,33 @@ layout (a test deletes `omui.MImage` to simulate 2024).
 Verdict: **stub-only dual-location — justified, converged via
 dual-resolution.** Anchored here from `presence-allowlist.json`.
 
+## VP2 direction probe (D-082d)
+
+Added 2026-09-24 for the per-session runtime orientation probe in
+`visual_module._probe_vp2_direction`. These call forms are standard
+maya.cmds built-ins per the CommandsPython reference; live presence
+re-collection into `presence-baseline.json` is pending (no GUI session
+available this round) — `cmds.polyCube` and `cmds.undoInfo` are
+allowlisted against this section until re-collection.
+
+| Call site | Official contract | Use in probe |
+|---|---|---|
+| `cmds.polyCube(w, h, d, name=..., constructionHistory=False)` | returns `[transform]`; `-ch` flag suppresses the history node | disposable red marker cube |
+| `cmds.undoInfo(stateWithoutFlush=False/True)` | suspends undo recording without flushing the queue | keeps probe nodes out of Ctrl-Z |
+| `cmds.file(query=True, modified=True)` / `cmds.file(modified=bool)` | scene dirty flag get/set | net-zero dirty-flag restore |
+| `cmds.ls(selection=True)` | selected node names | selection save/restore |
+| `cmds.camera(name=...)` | `[transform, shape]`; `setAttr` on `orthographic`/`orthoWidth`/clip planes | disposable ortho probe camera |
+| `cmds.sets(cube, edit=True, forceElement=sg)` | assigns the shape to a shadingEngine | pure-red surfaceShader assignment |
+| `cmds.shadingNode("surfaceShader", asShader=True)` + `setAttr .outColor` | unlit flat color (light-independent) | marker paint |
+| `cmds.move(x, y, z, obj, absolute=True)` | absolute world placement | camera-space top-left placement |
+| `cmds.delete`, `cmds.objExists`, `cmds.listRelatives(.., shapes=True)` | subtree/attr membership | teardown of every created node |
+| `cmds.select(list)` / `cmds.select(clear=True)` | selection restore | net-zero selection |
+
+Net-zero discipline: undo suspended without flushing, selection /
+panel camera / scene-dirty flag all restored, every created node
+deleted on every path; repaint `cmds.refresh(force=True)` runs after
+teardown so the probe frame cannot leak into the caller's capture.
+
 ## Sources (atomcode research, serialized single run, 2026-09-22)
 
 - Autodesk Maya 2024 CommandsPython pages — about, getPanel,

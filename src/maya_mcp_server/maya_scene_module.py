@@ -1527,7 +1527,7 @@ SHOT_TYPES = {
 }
 
 
-def create_camera_shot(target, shot_type="medium", name="shot_cam", angle=None):
+def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
     """Create a camera positioned for a specific shot type.
 
     Args:
@@ -1628,7 +1628,7 @@ def create_camera_shot(target, shot_type="medium", name="shot_cam", angle=None):
     }
 
 
-def create_orbit_camera(center, radius=500, frames=120, name="orbit_cam"):
+def create_orbit_camera(center, radius=500, frames=120, name="CAM_orbit"):
     """Create a camera that orbits around a point using keyframes.
 
     Args:

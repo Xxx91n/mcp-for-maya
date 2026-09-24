@@ -559,3 +559,88 @@ class TestActivePanelProbe:
         out = await vtools.fns["scene_render_preview"]()
         meta = _meta(out)
         assert meta["panel"] == "modelPanel2"
+
+
+# ------------------------------------------------------------
+# VP2 direction runtime probe (D-082d)
+#
+# The stub cannot render the probe marker — scene.vp2_readback_bottom_up
+# models the DEVICE-level buffer orientation instead: the pattern is
+# viewport truth, the knob decides whether readColorBuffer hands it back
+# flipped. The probe samples whichever buffer arrives, so a bottom-up
+# device must resolve to a flip and a top-down device must not.
+# ------------------------------------------------------------
+
+
+class TestVp2DirectionProbe:
+    async def test_top_down_device_resolves_no_flip(self, vtools):
+        """Maya 2024-box truth (T-18a): readback arrives top-down, probe
+        sees the block top-left, no flip, red stays top-left."""
+        vtools.env.scene.viewport_pattern = _top_left_red
+        out = await vtools.fns["scene_viewport_snapshot"](format="png", max_size=2000)
+        raw = base64.b64decode(out[0].data)
+        w, h, rows = png_decode(raw)
+        tr, tg, tb = _cell_mean(rows, w, h, w // 16, h // 16, w // 8, h // 8)
+        br, bg, bb = _cell_mean(rows, w, h, w // 16, h * 13 // 16, w // 8, h * 7 // 8)
+        assert tr > 180 and tb < 80, f"top-left must be RED, got {(tr, tg, tb)}"
+        assert br < 60 and bb < 60, f"bottom-left must stay black, got {(br, bg, bb)}"
+        assert vtools.module._VP2_DIRECTION is False
+
+    async def test_bottom_up_device_detected_and_corrected(self, vtools):
+        """A GPU/driver whose readback arrives row-flipped: the probe
+        spots the marker bottom-left, resolves bottom_up=True, and the
+        capture is flipped back upright — red lands top-left."""
+        vtools.env.scene.viewport_pattern = _top_left_red
+        vtools.env.scene.vp2_readback_bottom_up = True
+        out = await vtools.fns["scene_viewport_snapshot"](format="png", max_size=2000)
+        raw = base64.b64decode(out[0].data)
+        w, h, rows = png_decode(raw)
+        tr, tg, tb = _cell_mean(rows, w, h, w // 16, h // 16, w // 8, h // 8)
+        assert tr > 180 and tb < 80, f"probe+flip must restore RED top-left, got {(tr, tg, tb)}"
+        assert vtools.module._VP2_DIRECTION is True
+
+    async def test_ambiguous_read_falls_back_to_constant(self, vtools):
+        """Uniform viewport (nothing asymmetric to read) -> verdict
+        None -> _VP2_READBACK_BOTTOM_UP fallback, still cached."""
+        # default pattern is uniform gray-blue — the probe runs but
+        # cannot resolve a direction
+        out = await vtools.fns["scene_viewport_snapshot"]()
+        assert len(out) == 2
+        assert vtools.module._VP2_DIRECTION is vtools.module._VP2_READBACK_BOTTOM_UP
+        # probe really ran: its disposable nodes were created+deleted
+        assert any(n.startswith("_mcp_vp2_") for n in vtools.env.scene.deleted)
+
+    async def test_probe_runs_once_per_session(self, vtools):
+        """Per-session cache: the second snapshot must not rebuild the
+        disposable probe scene."""
+        await vtools.fns["scene_viewport_snapshot"]()
+        await vtools.fns["scene_viewport_snapshot"]()
+        assert vtools.env.scene.deleted.count("_mcp_vp2_probe") == 1
+
+    async def test_probe_net_zero(self, vtools):
+        """D-026 extended: nodes, selection, dirty flag, panel camera,
+        and undo state all return to entry state after the probe."""
+        sc = vtools.env.scene
+        sc.modified = False
+        sc.selection = ["persp"]  # a pre-existing selection
+        await vtools.fns["scene_viewport_snapshot"]()
+        assert vtools.env.cmds.ls("_mcp_vp2_*") is None, "probe nodes must be deleted"
+        assert sc.modified is False, "dirty flag restored"
+        assert list(sc.selection) == ["persp"], "selection restored"
+        assert sc.panels["modelPanel1"]["camera"] == "persp", "panel camera restored"
+        assert sc.undo_enabled is True, "undo recording re-enabled"
+
+    async def test_env_override_skips_probe(self, vtools, monkeypatch):
+        """MAYA_MCP_VP2_BOTTOM_UP=1 forces the flip WITHOUT running the
+        probe — the documented escape hatch for a driver that lies."""
+        monkeypatch.setenv("MAYA_MCP_VP2_BOTTOM_UP", "1")
+        vtools.env.scene.viewport_pattern = _top_left_red
+        out = await vtools.fns["scene_viewport_snapshot"](format="png", max_size=2000)
+        raw = base64.b64decode(out[0].data)
+        w, h, rows = png_decode(raw)
+        # forced flip on a top-down buffer moves the block bottom-left —
+        # proof the override engaged (and that the probe never ran)
+        br, bg, bb = _cell_mean(rows, w, h, w // 16, h * 13 // 16, w // 8, h * 7 // 8)
+        assert br > 180 and bb < 80, f"forced flip must land red bottom-left, got {(br, bg, bb)}"
+        assert not any(n.startswith("_mcp_vp2_") for n in vtools.env.scene.deleted)
+        assert vtools.module._VP2_DIRECTION is None  # env path never caches

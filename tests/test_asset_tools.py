@@ -16,7 +16,11 @@ from unittest.mock import AsyncMock, MagicMock
 import maya_stub
 import pytest
 
-from maya_mcp_server.asset_tools import _asset_injected, register_asset_tools
+from maya_mcp_server.asset_tools import (
+    _asset_injected,
+    _ensure_asset_injected,
+    register_asset_tools,
+)
 from maya_mcp_server.maya_mcp_helper import prepare_code_for_result_capture
 from maya_mcp_server.security import AuditLogger, InputValidationError
 from maya_mcp_server.types import CommandResponse, OutputBuffer, ResultType
@@ -136,6 +140,46 @@ def tools(maya_env, monkeypatch, tmp_path):
     sys.modules.pop("_mcp_asset", None)
 
 
+class TestInjectionHygiene:
+    """D-082a: same mkstemp/0600/finally-unlink contract as _mcp_scene."""
+
+    async def test_native_channel_tmpfile_lifecycle(self):
+        import os
+        from pathlib import Path
+
+        import platformdirs
+
+        inject_dir = Path(platformdirs.user_cache_dir("mcp-for-maya")) / "inject"
+        pre = set(inject_dir.glob("_mcp_asset_src_*.py")) if inject_dir.exists() else set()
+
+        client = SimpleNamespace(framed_channel=False)
+        seen = {}
+
+        async def exec_code(code, result_type=ResultType.NONE):
+            # The follow-up "import _mcp_asset" call runs post-unlink —
+            # only record while the staged file actually exists.
+            now = sorted(inject_dir.glob("_mcp_asset_src_*.py"))
+            if now:
+                seen["files"] = [p.name for p in now]
+                if os.name != "nt":
+                    seen["mode"] = oct(now[0].stat().st_mode & 0o777)
+            return CommandResponse(result=None, error=None)
+
+        client.execute_code = exec_code
+        _asset_injected.discard("hygiene")
+        try:
+            await _ensure_asset_injected(client, "hygiene")
+        finally:
+            _asset_injected.discard("hygiene")
+
+        assert seen.get("files"), "native path must stage a temp file"
+        assert seen["files"][0] != "_mcp_asset_src.py", "unique mkstemp name"
+        if os.name != "nt":
+            assert seen["mode"] == "0o600"
+        post = set(inject_dir.glob("_mcp_asset_src_*.py")) if inject_dir.exists() else set()
+        assert post == pre, "temp file must be unlinked after injection"
+
+
 class TestAssetSearch:
     async def test_search_returns_results(self, tools):
         out = await tools.fns["asset_search"](query="camera")
@@ -220,3 +264,18 @@ class TestAssetImport:
         assert rows[0]["outcome"] == "success"
         assert row["import_group"] == "GRP_asset_Camera_01"
         assert row["import_error"] is None
+
+    async def test_audit_duration_ms_is_measured(self, tools, monkeypatch):
+        """D-082f: duration_ms is a real wall-clock measurement, not the
+        old 0.0 placeholder lying in every supplementary audit row."""
+        # first monotonic() call is the t0 start mark; every later call
+        # returns the end mark -> measured span is exactly 250 ms even
+        # if the call sites gain extra monotonic probes.
+        seq = iter([1000.0] + [1000.25] * 50)
+        monkeypatch.setattr("maya_mcp_server.asset_tools.time.monotonic", lambda: next(seq))
+        await tools.fns["asset_import"](asset_id="Camera_01")
+        lines = [
+            json.loads(line) for line in tools.audit_path.read_text().splitlines() if line.strip()
+        ]
+        rows = [line for line in lines if line.get("asset_download")]
+        assert rows[0]["duration_ms"] == 250.0

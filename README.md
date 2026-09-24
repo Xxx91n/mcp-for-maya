@@ -312,7 +312,7 @@ Releases are milestone-driven — no fixed cadence promised. Roadmap lives in Gi
 | Injected helper (runs inside Maya) | Maya **>= 2023** (bundled Python >= 3.9; relies on `ast.unparse` — older versions get an explicit refusal at injection) |
 | Verified against | Maya **2024** GUI |
 
-The two visual-loop tools need a **GUI session** (headless/mayapy returns a structured capability error).
+The two visual-loop tools need a **GUI session** (headless/mayapy returns a structured capability error). On the first capture the server probes the VP2 readback direction per-session (a disposable scene probe, net-zero side effects); `MAYA_MCP_VP2_BOTTOM_UP=0|1` forces it when a driver misreports.
 
 ## Development
 

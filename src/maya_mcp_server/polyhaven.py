@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -48,6 +49,7 @@ DEFAULT_TIMEOUT_S = 30.0
 MAX_FILE_BYTES = 256 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
 SEARCH_LIMIT_MAX = 20  # D-075: result list capped, total_count preserved
+SEARCH_INDEX_TTL_S = 300.0  # /assets index is multi-MB; TTL-bound reuse (D-082f)
 
 RESOLUTIONS = ("1k", "2k", "4k", "8k")
 DEFAULT_RESOLUTION = "1k"
@@ -118,6 +120,20 @@ def validate_asset_id(asset_id: str) -> str:
     return asset_id
 
 
+def _as_int(value: Any, what: str) -> int:
+    """API-supplied integer fields: dirty values are domain errors
+    (D-082f), never bare ValueError escaping the AssetError contract."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise AssetError("bad_response", f"non-integer {what}: {value!r}") from None
+
+
+# TTL cache for the multi-MB /assets index — bounds call rate against
+# the CC0 API (D-082f). Per asset_type; payload dicts only.
+_index_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
 def _check_url(url: str) -> None:
     parsed = urllib.parse.urlsplit(url)
     host = (parsed.netloc or "").lower()
@@ -169,10 +185,10 @@ def _fetch(url: str, *, timeout: float, max_bytes: int) -> bytes:
         with _urlopen(req, timeout=timeout) as resp:
             _check_url(resp.geturl() or url)
             length = resp.headers.get("Content-Length")
-            if length is not None and int(length) > max_bytes:
+            if length is not None and _as_int(length, "Content-Length") > max_bytes:
                 raise AssetError(
                     "download_too_large",
-                    f"{url} declares {int(length)} bytes, cap is {max_bytes}",
+                    f"{url} declares {length} bytes, cap is {max_bytes}",
                 )
             data: bytes = resp.read(max_bytes + 1)
             if len(data) > max_bytes:
@@ -215,13 +231,24 @@ def search_assets(
 ) -> dict[str, Any]:
     """Search the Poly Haven asset index. Read-only; needs no Maya session.
 
+    The /assets index payload is multi-MB, so the raw index is cached
+    for SEARCH_INDEX_TTL_S (5 min) per asset_type (D-082f) — this is a
+    listing cache, unrelated to the download path's fresh-metadata
+    revalidation rule. Filtering/scoring always re-runs on the cached
+    payload, so `query`/`limit` vary freely within the TTL.
+
     Returns {"results": [...<=limit], "total_count": <all matches>}.
     """
     limit = min(max(1, int(limit)), SEARCH_LIMIT_MAX)
     url = f"{API_BASE}/assets?t={urllib.parse.quote(str(asset_type))}"
-    data = _fetch_json(url, timeout)
-    if not isinstance(data, dict):
-        raise AssetError("bad_response", "unexpected /assets payload shape")
+    cached = _index_cache.get(str(asset_type))
+    if cached is not None and time.monotonic() - cached[0] < SEARCH_INDEX_TTL_S:
+        data = cached[1]
+    else:
+        data = _fetch_json(url, timeout)
+        if not isinstance(data, dict):
+            raise AssetError("bad_response", "unexpected /assets payload shape")
+        _index_cache[str(asset_type)] = (time.monotonic(), data)
 
     tokens = [t for t in re.split(r"\s+", str(query).strip().lower()) if t]
     scored: list[tuple[int, str, dict[str, Any]]] = []
@@ -406,7 +433,7 @@ def _verify_local(path: Path, size: Any, md5: Any) -> bool:
     """Cache validation against API-declared size + md5."""
     if not path.is_file():
         return False
-    if size is not None and path.stat().st_size != int(size):
+    if size is not None and path.stat().st_size != _as_int(size, "declared size"):
         return False
     if md5:
         got_md5, _sha, _sz = _hash_file(path)
@@ -444,7 +471,7 @@ def download_asset(
         for suffix, e in maps.items():
             entries.append({"role": "texture", "part": part, "suffix": suffix, **e})
 
-    total = sum(int(e.get("size") or 0) for e in entries)
+    total = sum(_as_int(e.get("size") or 0, "file size") for e in entries)
     if total > max_total_bytes:
         raise AssetError(
             "download_too_large",
@@ -466,7 +493,7 @@ def download_asset(
         target = dest_dir / fname
         if not _verify_local(target, e.get("size"), e.get("md5")):
             data = _fetch(e["url"], timeout=timeout, max_bytes=max_file_bytes)
-            if e.get("size") is not None and len(data) != int(e["size"]):
+            if e.get("size") is not None and len(data) != _as_int(e["size"], "declared size"):
                 raise AssetError(
                     "download_corrupt",
                     f"size mismatch for {fname}: {len(data)} != {e['size']}",
