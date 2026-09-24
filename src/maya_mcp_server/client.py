@@ -9,6 +9,7 @@ import logging
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from typing_extensions import Self
@@ -120,6 +121,69 @@ def raise_for_error(response: CommandResponse) -> None:
     if etb:
         detail += "\n" + etb
     raise MayaExecutionError(sanitize_error_message(detail))
+
+
+async def ensure_module_injected(
+    client: BaseMayaClient,
+    session_key: str | None,
+    *,
+    module_name: str,
+    source_path: Path,
+    tmp_prefix: str,
+    injected_sessions: set[str],
+) -> None:
+    """Ensure a Maya-side helper module is injected into the session.
+
+    Shared by _mcp_scene/_mcp_asset (D-083): reads the module source
+    from disk and writes it via write_module, once per session. For
+    large modules on the NATIVE (headless/bootstrap) channel the source
+    is staged through a unique mkstemp file to avoid command-port
+    buffer issues; the Qt framed channel carries length-prefixed frames
+    up to 16 MiB, so GUI sessions inject directly via write_module
+    (D-013).
+    """
+    key = session_key or "_default"
+    if key in injected_sessions:
+        return
+
+    source = source_path.read_text(encoding="utf-8")
+
+    if len(source) > 15000 and not getattr(client, "framed_channel", False):
+        import os as _os
+        import tempfile as _tf
+
+        import platformdirs as _pd
+
+        # D-082a hygiene: mkstemp under the platformdirs user cache (no
+        # predictable shared-temp path), 0600 perms, try/finally unlink.
+        _dir = _os.path.join(_pd.user_cache_dir("mcp-for-maya"), "inject")
+        _os.makedirs(_dir, exist_ok=True)
+        _fd, _tmp = _tf.mkstemp(prefix=tmp_prefix, suffix=".py", dir=_dir)
+        try:
+            with _os.fdopen(_fd, "w", encoding="utf-8") as f:
+                f.write(source)
+            _os.chmod(_tmp, 0o600)
+            _tmp_safe = _tmp.replace("\\", "/")
+            await client.execute_code(
+                "import types, sys, json; _c=open(json.loads("
+                + json.dumps(json.dumps(_tmp_safe))
+                + f")).read(); _m=types.ModuleType('{module_name}');"
+                f" _m.__file__='<mcp:{module_name}>';"
+                f" exec(compile(_c,'{module_name}.py','exec'),_m.__dict__);"
+                f" sys.modules['{module_name}']=_m",
+                ResultType.NONE,
+            )
+        finally:
+            try:
+                _os.remove(_tmp)
+            except OSError:
+                pass
+    else:
+        await client.write_module(module_name, source, overwrite=True)
+    # Pre-import the module so subsequent calls use expression-only syntax
+    await client.execute_code(f"import {module_name}", ResultType.NONE)
+    injected_sessions.add(key)
+    logger.info("Injected %s module into session %s", module_name, key)
 
 
 @dataclass

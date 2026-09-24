@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **bump2d orphan cleanup symmetry (D-083)** — a `setAttr`/`connectAttr`
+  failure mid-wiring in `_wire_map`’s `normal`/`normal_dx` branch left a
+  half-created `bump2d` node orphaned in the scene; it is now deleted on
+  every failure path, matching the `displacement` branch’s D-082b
+  contract (`src/maya_mcp_server/asset_module.py::_wire_map`,
+  `tests/test_asset_module.py::TestBumpOrphan` — both connect paths, the
+  `bumpInterp` setAttr path, and the no-`normalCamera` early return).
+
 ## [0.2.1] - 2026-09-24
 
 ### Fixed

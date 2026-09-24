@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from maya_mcp_server import polyhaven
-from maya_mcp_server.client import raise_for_error
+from maya_mcp_server.client import ensure_module_injected, raise_for_error
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS
 from maya_mcp_server.scene_tools import mark_dirty
 from maya_mcp_server.security import (
@@ -26,7 +26,6 @@ from maya_mcp_server.security import (
     InputValidationError,
     build_audit_event,
 )
-from maya_mcp_server.types import ResultType
 
 
 logger = logging.getLogger(__name__)
@@ -44,49 +43,18 @@ _ASSET_TYPE_RE = re.compile(r"^[a-z]+$")
 async def _ensure_asset_injected(client: Any, session_key: str | None) -> None:
     """Inject _mcp_asset once per session (mirrors _mcp_scene/_mcp_visual).
 
-    Same size guard as _mcp_scene: the native commandPort channel
-    mangles >15K module writes, so headless/native sessions fall back
-    to temp-file injection (D-013).
+    Delegates to client.ensure_module_injected (D-083) — the channel
+    contract (framed write_module vs native mkstemp fallback, D-013)
+    lives there.
     """
-    key = session_key or "_default"
-    if key in _asset_injected:
-        return
-    source = _MODULE_SOURCE.read_text(encoding="utf-8")
-    if len(source) > 15000 and not getattr(client, "framed_channel", False):
-        # D-082a hygiene: mkstemp under the platformdirs user cache (no
-        # predictable shared-temp path), 0600 perms, try/finally unlink.
-        import os as _os
-        import tempfile as _tf
-
-        import platformdirs as _pd
-
-        _dir = _os.path.join(_pd.user_cache_dir("mcp-for-maya"), "inject")
-        _os.makedirs(_dir, exist_ok=True)
-        _fd, _tmp = _tf.mkstemp(prefix="_mcp_asset_src_", suffix=".py", dir=_dir)
-        try:
-            with _os.fdopen(_fd, "w", encoding="utf-8") as f:
-                f.write(source)
-            _os.chmod(_tmp, 0o600)
-            _tmp_safe = _tmp.replace("\\", "/")
-            await client.execute_code(
-                "import types, sys, json; _c=open(json.loads("
-                + json.dumps(json.dumps(_tmp_safe))
-                + ")).read(); _m=types.ModuleType('_mcp_asset');"
-                " _m.__file__='<mcp:_mcp_asset>';"
-                " exec(compile(_c,'_mcp_asset.py','exec'),_m.__dict__);"
-                " sys.modules['_mcp_asset']=_m",
-                ResultType.NONE,
-            )
-        finally:
-            try:
-                _os.remove(_tmp)
-            except OSError:
-                pass
-    else:
-        await client.write_module("_mcp_asset", source, overwrite=True)
-    await client.execute_code("import _mcp_asset", ResultType.NONE)
-    _asset_injected.add(key)
-    logger.info("Injected _mcp_asset module into session %s", key)
+    await ensure_module_injected(
+        client,
+        session_key,
+        module_name="_mcp_asset",
+        source_path=_MODULE_SOURCE,
+        tmp_prefix="_mcp_asset_src_",
+        injected_sessions=_asset_injected,
+    )
 
 
 def _asset_call(fn_name: str, *args: Any, **kwargs: Any) -> str:
