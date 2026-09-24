@@ -1,16 +1,16 @@
-<!-- synced-with: README.md @ b33603e — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
+<!-- synced-with: README.md @ f8e6869 — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
 
 [English](README.md) | **简体中文**
 
 <p align="center">
-  <img src=".github/assets/hero.png" width="100%" alt="mcp-for-maya — Give AI agents eyes inside Autodesk Maya"/>
+  <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/hero.svg" width="100%" alt="mcp-for-maya — Give AI agents eyes inside Autodesk Maya"/>
 </p>
 
 # mcp-for-maya
 
 > 让 AI Agent 拥有 Maya 三维空间感知能力的 MCP 服务器
 
-[![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Python](https://img.shields.io/pypi/pyversions/mcp-for-maya)](https://pypi.org/project/mcp-for-maya/)
+[![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/Xxx91n/mcp-for-maya/blob/main/LICENSE) [![Python](https://img.shields.io/pypi/pyversions/mcp-for-maya)](https://pypi.org/project/mcp-for-maya/)
 
 ## 这是什么
 
@@ -21,28 +21,24 @@
 **核心能力：** AI 不再是"闭眼写代码"，而是能随时感知 Maya 场景的空间状态、材质分布、物体关系，并基于工程规范进行确定性审核。
 
 > [!WARNING]
-> 本服务器把任意 Python 代码送进 Maya 执行——这是设计能力而非漏洞。内置的校验/限流/审计是**误操作与注入指令的安全网，不是抵御恶意客户端的边界**；接入的 Agent 是受信方。详见 [docs/threat-model.md](docs/threat-model.md)。
+> 本服务器把任意 Python 代码送进 Maya 执行——这是设计能力而非漏洞。内置的校验/限流/审计是**误操作与注入指令的安全网，不是抵御恶意客户端的边界**；接入的 Agent 是受信方。详见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
 
-<img src=".github/assets/section-live-demo.svg" width="100%" alt="Live Demo — captured by the product itself"/>
+<img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-live-demo.svg" width="100%" alt="Live Demo — captured by the product itself"/>
 
-以下素材全部由本产品工具链真实捕获，非 mock：演示场景经 `execute_code` 构建，视口截图来自 `scene_viewport_snapshot`，环绕序列来自 `camera_orbit` + `scene_render_preview`（Maya 2024 GUI 会话；场景中 RGB 三色呼应 logo 的三轴意象）。
+以下素材全部由本产品工具链真实捕获，非 mock：场景经 `execute_code` / `write_module` 程序化构建（另含一次真实 `asset_import`），帧画面经 `scene_render_preview` 渲染，audit 双帧经 `scene_review` + `scene_viewport_snapshot` 采集，环绕序列由 `playblast` 逐帧采集（Maya 2024 GUI 会话）。
 
-<p align="center"><img src=".github/assets/orbit.gif" width="640" alt="camera_orbit 环绕序列 — 真实 playblast 帧"/></p>
-
-<p align="center">
-<img src=".github/assets/shot-hero.png" width="49%" alt="scene_viewport_snapshot：persp 视口捕获（含 HUD）"/>
-<img src=".github/assets/shot-alt.png" width="49%" alt="scene_viewport_snapshot：侧向视角（含 HUD）"/>
-</p>
-
-回路细节——全部帧经 `scene_render_preview` 渲染（960×540）：
-
-| 展厅 + 虹膜雕塑，由 `execute_code` 构建 | 脚本复刻茶壶，置于独立台座 |
+| 指令 | 结果 |
 |---|---|
-| <img src=".github/assets/row1-showroom.png" width="480" alt="程序化展厅：弧形舞台、虹膜雕塑、分区环"/> | <img src=".github/assets/row2-teapot.png" width="480" alt="暖主光下的脚本茶壶"/> |
-| Poly Haven `Camera_01` 经 `asset_import` 导入——26,987 面、贴图接线 | `scene_review` 回路：违规 → 自动修复，评分 46.7 → 100 |
-| <img src=".github/assets/row3-camera.png" width="480" alt="导入的 Poly Haven 旁轴相机，贴图加载"/> | <img src=".github/assets/row4-audit-before.png" width="239" alt="scene_review 修复前：默认名网格重叠"/><img src=".github/assets/row4-audit-after.png" width="239" alt="scene_review 修复后：分离、改名、满分"/> |
+| `write_module` → `t20_movement.build()`——"参数化渐开线钟表机芯：真渐开线齿形、日内瓦纹夹板、蓝钢螺丝、红宝石轴承、螺旋游丝" | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/showcase-movement.png" width="440" alt="参数化钟表机芯：渐开线齿轮、日内瓦纹、摆轮与游丝"/> |
+| `write_module` → `t20_bonsai.build()`——"low-poly L-system 盆景：递归分枝、切面叶团、盆+苔+石" | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/showcase-bonsai.png" width="440" alt="low-poly L-system 盆景：递归分枝、叶片团、盆与苔石"/> |
+| `asset_import("vintage_pocket_watch")` + `asset_import("metal_tool_chest")` → `t20_workbench.build()`——"钟表匠工作台：贴图接线的导入资产+程序化渐开线散件" | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/showcase-workbench.png" width="440" alt="钟表匠工作台：导入怀表与工具箱、程序化齿轮散件"/> |
+| `write_module` → `t20_street.build()`——"low-poly 街角街区：11 栋参数化楼体、山墙屋顶、雨棚、街道家具、停放车辆" | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/showcase-street.png" width="440" alt="low-poly 街区：11 栋参数化楼体、雨棚、街道家具"/> |
+| `write_module` → `t20_teapot.build()`——"Utah 茶壶复刻：旋转轮廓壶身、贝塞尔锥形壶嘴、耳形把手、棋盘地面" | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/showcase-teapot.png" width="440" alt="Utah 茶壶复刻：旋转壶身、贝塞尔锥形壶嘴、棋盘地面"/> |
+| 在堆满乱件的台面上 `scene_review()` → `scene_plan(auto_fix=True)` + 清理 → 再 `scene_review()`——评分 **53.7 → 64.2** | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/audit-before.png" width="215" alt="scene_review 修复前：计量台面上散落默认名乱件"/><img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/audit-after.png" width="215" alt="scene_review 修复后：违规清除、台面复原"/> |
 
-每一帧都可用 [`.github/assets-src/`](.github/assets-src/README.md) 里的脚本复现。
+<p align="center"><img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/orbit.gif" width="100%" alt="机芯环绕 — 20 帧真实 playblast，120° 扫掠"/></p>
+
+每一帧都可用 [`.github/assets-src/`](https://github.com/Xxx91n/mcp-for-maya/tree/main/.github/assets-src) 里的脚本复现。
 
 ## 与 blender-mcp 对比
 
@@ -56,7 +52,7 @@
 
 Poly Haven 模型搜索+导入已于 0.2.0 交付（issue #2 薄切片：FBX + 贴图接线；HDRI 与贴图包仍在路线图）。AI 生成与一等对象 CRUD 明确不做——后者 `execute_code` 已覆盖。
 
-<img src=".github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
+<img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
 
 | 能力 | 工具 | 说明 |
 |------|------|------|
@@ -73,7 +69,7 @@ Poly Haven 模型搜索+导入已于 0.2.0 交付（issue #2 薄切片：FBX + �
 
 共 22 个 MCP 工具。
 
-<img src=".github/assets/section-quick-start.svg" width="100%" alt="Quick Start"/>
+<img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-quick-start.svg" width="100%" alt="Quick Start"/>
 
 ### 1. 安装
 
@@ -179,7 +175,7 @@ tool_timeout_sec = 120
 
 AI 会自动调用 `scene_snapshot()` → 理解场景 → 执行建模 → `scene_review()` 审核结果。
 
-<img src=".github/assets/section-icev-workflow.svg" width="100%" alt="ICEV Workflow"/>
+<img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-icev-workflow.svg" width="100%" alt="ICEV Workflow"/>
 
 每次场景修改都遵循 **ICEV** 工作流（也内置为 Agent 流程卡，见 `skills/icev-workflow`）：
 
@@ -257,6 +253,8 @@ asset_import(asset_id="Camera_01", resolution="1k")
 # 然后 Maya 导入本地 FBX 并挂到 GRP_asset_<asset_id>（重复调用自动去重；
 # force=True 强制重导）。贴图按文件名后缀自动接线
 # （diff/rough/metal/nor_gl/ao/disp...），sRGB/Raw 色彩空间 + bump2d 法线。
+# 单件资产使用裸贴图名（Diffuse/Rough/Metal...）——同样被识别并接到
+# 该资产的唯一材质上。
 # 护栏：默认 100k 面数上限（allow_high_polycount 可放宽）、尺寸合理性检查。
 ```
 
@@ -297,7 +295,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 > 两卡仅在 Claude Code 上评测过，未在 Codex/Gemini CLI/Cursor 验证；跨模型评测计划见 issue #3。
 
-<img src=".github/assets/section-audit-trust.svg" width="100%" alt="Audit & Trust"/>
+<img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-audit-trust.svg" width="100%" alt="Audit & Trust"/>
 
 `scene_review()` 提供 11 项通用检查（0-100 分，按各项分值归一化）：
 
@@ -319,9 +317,9 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 - **零遥测**：zero telemetry, no phone-home——本项目不含任何遥测或主动外发上报代码，可源码核实。唯一外发流量是两个资产工具：仅在调用时经 HTTPS 访问 `api.polyhaven.com` / `dl.polyhaven.org|.com`（`polyhaven.py` 内主机白名单 + md5 校验 + 大小上限）。
 - **本地单用户**：命令端口仅绑定 localhost；接入的 MCP client 是受信方。
-- **安全网**：统一管线对全部 22 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 独立 JSONL 审计日志（覆盖全部 22 个工具）。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](docs/threat-model.md)。
+- **安全网**：统一管线对全部 22 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 独立 JSONL 审计日志（覆盖全部 22 个工具）。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
 - **事务安全**：`scene_checkpoint`/`scene_rollback` 提供内存态快照与显式回滚（快照不含 undo 历史，references 默认展平）。
-- 漏洞报告渠道见 [SECURITY.md](SECURITY.md)。
+- 漏洞报告渠道见 [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md)。
 
 ## 版本策略
 
@@ -353,10 +351,10 @@ mypy src                         # 类型检查
 python -m maya_mcp_server -vv    # DEBUG 日志运行（-v=INFO, -vv=DEBUG）
 ```
 
-贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)；变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+贡献流程见 [CONTRIBUTING.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/CONTRIBUTING.md)；变更记录见 [CHANGELOG.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/CHANGELOG.md)。
 
 ## 致谢
 
 Fork 自 [chadrik/maya-mcp-server](https://github.com/chadrik/maya-mcp-server)——保留其 MIT 版权声明（见 LICENSE），在其连接层之上扩展场景智能层。
 
-上游 open issue 在本仓的处置与修复版本对照见 [docs/upstream-issue-status.md](docs/upstream-issue-status.md)。
+上游 open issue 在本仓的处置与修复版本对照见 [docs/upstream-issue-status.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/upstream-issue-status.md)。
