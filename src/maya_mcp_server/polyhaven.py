@@ -273,12 +273,35 @@ def get_asset_files(asset_id: str, timeout: float = DEFAULT_TIMEOUT_S) -> dict[s
     return data
 
 
+_BARE_SUFFIX_ALIASES = {
+    # Single-part assets ship bare map names ("Diffuse", "Rough",
+    # "Metal") instead of "<part>_<suffix>" keys. Case-insensitive.
+    "diffuse": "diff",
+    "basecolor": "diff",
+    "base_color": "diff",
+    "metalness": "metallic",
+    "normal": "normal",
+    "alpha": "opacity",
+}
+
+
 def split_texture_key(key: str) -> tuple[str, str] | None:
-    """Split 'body_nor_gl' -> ('body', 'nor_gl'); None if not a texture key."""
+    """Split 'body_nor_gl' -> ('body', 'nor_gl'); None if not a texture key.
+
+    Single-part assets use bare map names ("Diffuse", "nor_gl") - these
+    return part "" so select_files groups them into one part; the
+    importer's single-part path then wires them to the mesh material.
+    """
+    lowered = key.lower()
     for suffix in _SUFFIXES:
         tail = "_" + suffix
-        if key.endswith(tail) and len(key) > len(tail):
+        if lowered.endswith(tail) and len(key) > len(tail):
             return key[: -len(tail)], suffix
+    bare = lowered
+    if bare in _SUFFIXES:
+        return "", bare
+    if bare in _BARE_SUFFIX_ALIASES:
+        return "", _BARE_SUFFIX_ALIASES[bare]
     return None
 
 

@@ -1,14 +1,14 @@
 **English** | [简体中文](README.zh-CN.md)
 
 <p align="center">
-  <img src=".github/assets/hero.png" width="100%" alt="mcp-for-maya — Give AI agents eyes inside Autodesk Maya"/>
+  <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/hero.svg" width="100%" alt="mcp-for-maya — Give AI agents eyes inside Autodesk Maya"/>
 </p>
 
 # mcp-for-maya
 
 > MCP server giving AI agents spatial awareness of Autodesk Maya scenes
 
-[![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Python](https://img.shields.io/pypi/pyversions/mcp-for-maya)](https://pypi.org/project/mcp-for-maya/)
+[![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/Xxx91n/mcp-for-maya/blob/main/LICENSE) [![Python](https://img.shields.io/pypi/pyversions/mcp-for-maya)](https://pypi.org/project/mcp-for-maya/)
 
 ## What Is This
 
@@ -19,28 +19,24 @@ Forked from [chadrik/maya-mcp-server](https://github.com/chadrik/maya-mcp-server
 **Key capability:** the agent stops "writing blind" — it can perceive spatial state, materials, and object relationships, then verify changes against engineering rules.
 
 > [!WARNING]
-> This server executes arbitrary Python inside Maya — that is a designed capability, not a bug. The built-in validation / rate-limit / audit pipeline is a **safety net for accidents and injected instructions, not a boundary against a malicious client**; the connected agent is trusted. See [docs/threat-model.md](docs/threat-model.md).
+> This server executes arbitrary Python inside Maya — that is a designed capability, not a bug. The built-in validation / rate-limit / audit pipeline is a **safety net for accidents and injected instructions, not a boundary against a malicious client**; the connected agent is trusted. See [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
 
-<img src=".github/assets/section-live-demo.svg" width="100%" alt="Live Demo — captured by the product itself"/>
+<img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-live-demo.svg" width="100%" alt="Live Demo — captured by the product itself"/>
 
-Every asset below is a real capture produced by this project's own tool chain — no mockups: the demo scene was built via `execute_code`, the viewport stills come from `scene_viewport_snapshot`, and the orbit sequence comes from `camera_orbit` + `scene_render_preview` (Maya 2024 GUI session; the scene's RGB trio echoes the logo's gizmo tripod).
+Every asset below is a real capture produced by this project's own tool chain — no mockups: scenes were built procedurally through `execute_code` / `write_module` (plus one live `asset_import`), frames rendered through `scene_render_preview`, the audit pair via `scene_review` + `scene_viewport_snapshot`, and the orbit sequence captured frame-by-frame with `playblast` (Maya 2024 GUI session).
 
-<p align="center"><img src=".github/assets/orbit.gif" width="640" alt="camera_orbit sequence — real playblast frames"/></p>
-
-<p align="center">
-<img src=".github/assets/shot-hero.png" width="49%" alt="scene_viewport_snapshot: persp viewport capture (HUD included)"/>
-<img src=".github/assets/shot-alt.png" width="49%" alt="scene_viewport_snapshot: side angle (HUD included)"/>
-</p>
-
-The loop in detail — all frames rendered through `scene_render_preview` (960×540):
-
-| Showroom + iris sculpture, built via `execute_code` | Scripted teapot replica on its pedestal |
+| Prompt | Result |
 |---|---|
-| <img src=".github/assets/row1-showroom.png" width="480" alt="procedural showroom: cove stage, iris sculpture, zone rings"/> | <img src=".github/assets/row2-teapot.png" width="480" alt="scripted teapot replica under warm key light"/> |
-| Poly Haven `Camera_01` via `asset_import` — 26,987 faces, textures wired | `scene_review` loop: violations → auto-fix, score 46.7 → 100 |
-| <img src=".github/assets/row3-camera.png" width="480" alt="imported Poly Haven rangefinder camera, textures loaded"/> | <img src=".github/assets/row4-audit-before.png" width="239" alt="scene_review before: overlapping default-named meshes"/><img src=".github/assets/row4-audit-after.png" width="239" alt="scene_review after: separated, renamed, score 100"/> |
+| `write_module` → `t20_movement.build()` — "parametric involute gear train caliber: true involute teeth, Geneva-striped plates, blue-steel screws, ruby jewels, spiral hairspring" | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/showcase-movement.png" width="440" alt="parametric watch movement: involute gears, Geneva striping, balance + hairspring"/> |
+| `write_module` → `t20_bonsai.build()` — "low-poly L-system bonsai: recursive branching, faceted foliage pads, pot + moss + stones" | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/showcase-bonsai.png" width="440" alt="low-poly L-system bonsai: recursive branching, foliage pads, pot + moss + stones"/> |
+| `asset_import("vintage_pocket_watch")` + `asset_import("metal_tool_chest")` → `t20_workbench.build()` — "horologist's workbench: imported assets with textures wired, procedural involute spares" | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/showcase-workbench.png" width="440" alt="horologist workbench: imported pocket watch + tool chest, procedural gear spares"/> |
+| `write_module` → `t20_street.build()` — "low-poly corner block: 11 parametric buildings, gable roofs, awnings, street furniture, parked vans" | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/showcase-street.png" width="440" alt="low-poly street block: 11 parametric buildings, awnings, street furniture"/> |
+| `write_module` → `t20_teapot.build()` — "Utah teapot recreation: revolve-profile body, Bezier tapered spout, ear handle, checkered floor" | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/showcase-teapot.png" width="440" alt="Utah teapot recreation: lathe body, bezier tapered spout, checkered floor"/> |
+| `scene_review()` on a bench littered with junk → `scene_plan(auto_fix=True)` + cleanup → `scene_review()` again — score **53.7 → 64.2** | <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/audit-before.png" width="215" alt="scene_review before: default-named junk piled on the metrology bench"/><img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/audit-after.png" width="215" alt="scene_review after: violations removed, bench restored"/> |
 
-Reproduce every frame with the scripts in [`.github/assets-src/`](.github/assets-src/README.md).
+<p align="center"><img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/orbit.gif" width="100%" alt="movement orbit — 20 real playblast frames, 120° sweep"/></p>
+
+Reproduce every frame with the scripts in [`.github/assets-src/`](https://github.com/Xxx91n/mcp-for-maya/tree/main/.github/assets-src).
 
 ## vs blender-mcp
 
@@ -54,7 +50,7 @@ An honest three-tier comparison with [ahujasid/blender-mcp](https://github.com/a
 
 Poly Haven model search + import shipped in 0.2.0 (issue #2 thin slice: FBX + texture wiring; HDRIs and texture packs remain roadmap). AI generation and first-class object CRUD are explicitly out of scope — the latter is already covered by `execute_code`.
 
-<img src=".github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
+<img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
 
 | Capability | Tools | Notes |
 |------------|-------|-------|
@@ -71,7 +67,7 @@ Poly Haven model search + import shipped in 0.2.0 (issue #2 thin slice: FBX + te
 
 22 MCP tools in total.
 
-<img src=".github/assets/section-quick-start.svg" width="100%" alt="Quick Start"/>
+<img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-quick-start.svg" width="100%" alt="Quick Start"/>
 
 ### 1. Install
 
@@ -175,7 +171,7 @@ Talk naturally:
 
 The agent calls `scene_snapshot()` → understands the scene → models → `scene_review()` audits the result.
 
-<img src=".github/assets/section-icev-workflow.svg" width="100%" alt="ICEV Workflow"/>
+<img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-icev-workflow.svg" width="100%" alt="ICEV Workflow"/>
 
 Every scene modification follows the **ICEV** loop (also shipped as an agent process card, see `skills/icev-workflow`):
 
@@ -237,6 +233,8 @@ asset_import(asset_id="Camera_01", resolution="1k")
 # then Maya imports the local FBX under GRP_asset_<asset_id> (repeat calls dedup;
 # force=True re-imports). Textures auto-wire by filename suffix
 # (diff/rough/metal/nor_gl/ao/disp...) with sRGB/Raw color spaces and bump2d normals.
+# Single-part assets ship bare map names (Diffuse/Rough/Metal...) — those are
+# recognised too and wired onto the asset's single material.
 # Guards: 100k-face polycount cap (allow_high_polycount override), dims sanity report.
 ```
 
@@ -270,7 +268,7 @@ Two **Experimental** process cards ship in `skills/`:
 
 > Evaluated on Claude Code only; untested on Codex/Gemini CLI/Cursor. Cross-model evaluation is tracked in issue #3.
 
-<img src=".github/assets/section-audit-trust.svg" width="100%" alt="Audit & Trust"/>
+<img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-audit-trust.svg" width="100%" alt="Audit & Trust"/>
 
 `scene_review()` provides 11 universal checks (score normalized to 0-100):
 
@@ -292,9 +290,9 @@ Two **Experimental** process cards ship in `skills/`:
 
 - **Zero telemetry**: no phone-home — the project ships no telemetry or unsolicited outbound traffic; verify in source. The ONLY outbound calls are the two asset tools: HTTPS to `api.polyhaven.com` / `dl.polyhaven.org|.com` (host allowlist + md5 + size caps in `polyhaven.py`), and only when you call them.
 - **Local, single-user**: the command port binds localhost only; the connected MCP client is trusted.
-- **Safety net**: a unified pipeline validates arguments + token-bucket rate limits (~100/60s reads, ~20/60s writes, per session) + pattern scan (warn-only by default) + an independent JSONL audit log across all 22 tools. It catches accidents, not malicious clients — full model in [docs/threat-model.md](docs/threat-model.md).
+- **Safety net**: a unified pipeline validates arguments + token-bucket rate limits (~100/60s reads, ~20/60s writes, per session) + pattern scan (warn-only by default) + an independent JSONL audit log across all 22 tools. It catches accidents, not malicious clients — full model in [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
 - **Transactional safety**: `scene_checkpoint`/`scene_rollback` give in-memory snapshots and explicit rollback (no undo history; references flattened).
-- Vulnerability reporting: [SECURITY.md](SECURITY.md).
+- Vulnerability reporting: [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md).
 
 ## Versioning
 
@@ -326,10 +324,10 @@ mypy src                         # typecheck
 python -m maya_mcp_server -vv    # run with DEBUG logs (-v=INFO, -vv=DEBUG)
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the PR flow and [CHANGELOG.md](CHANGELOG.md) for the change log.
+See [CONTRIBUTING.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/CONTRIBUTING.md) for the PR flow and [CHANGELOG.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/CHANGELOG.md) for the change log.
 
 ## Credits
 
 Forked from [chadrik/maya-mcp-server](https://github.com/chadrik/maya-mcp-server) — upstream MIT copyright retained (see LICENSE); this project adds the scene-intelligence layer on top of its connection stack.
 
-How each upstream open issue maps to a disposition and release version in this fork: [docs/upstream-issue-status.md](docs/upstream-issue-status.md).
+How each upstream open issue maps to a disposition and release version in this fork: [docs/upstream-issue-status.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/upstream-issue-status.md).

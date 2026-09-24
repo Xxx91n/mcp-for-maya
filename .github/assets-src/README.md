@@ -1,7 +1,37 @@
-# T-19 demo assets — reproduction
+# T-19 + T-20 demo assets — reproduction
 
 Frozen-session captures for README/social assets. Every image was
 produced by the product MCP tools (no mocks, no post-editing).
+
+## T-20 showcase set (current README)
+
+`t20/` holds the six scene generators plus the shared kit:
+
+| Script | Scene root | Hero camera | Subject |
+|--------|-----------|-------------|---------|
+| `t20kit.py` | — | — | shared helpers (mats, prism, ring, tube, cam, kill) |
+| `movement.py` | `GRP_t20_movement` | `CAM_t20mv_hero` | involute watch movement |
+| `bonsai.py` | `GRP_t20_bonsai` | `CAM_t20bn_hero` | L-system bonsai |
+| `workbench.py` | `GRP_t20_workbench` | `CAM_t20wb_hero` | Poly Haven import + assembly |
+| `streetblock.py` | `GRP_t20_street` | `CAM_t20st_hero` | low-poly corner block |
+| `teapot.py` | `GRP_t20_teapot` | `CAM_t20tp_hero` | Utah teapot recreation |
+| `auditbench.py` | `GRP_t20_audit` | `CAM_t20au_hero` | metrology bench |
+
+Run order inside a Maya 2024 GUI session (via `write_module` then
+`execute_code`):
+
+```python
+import t20kit, t20_movement  # modules are injected by write_module
+t20_movement.build()          # -> scene_render_preview("CAM_t20mv_hero")
+```
+
+Notes: `workbench.py` requires the Poly Haven cache populated by
+`asset_import("vintage_pocket_watch")` + `asset_import("metal_tool_chest")`
+first. `cmds.scale`/`cmds.rotate` are absolute-set in Maya — the scripts
+compute absolute targets, and second rotations use `relative=True`.
+`playblast` frame grabs must `lookThru` the intended camera.
+
+## T-19 set (superseded showcase, kept for reference)
 
 ## Environment
 
