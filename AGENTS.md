@@ -307,3 +307,17 @@ The `scene_review()` function now detects:
 - **Spatial conflicts**: Objects penetrating non-parent objects
 - **Aesthetic weaknesses**: Dimensions scoring below 40/100
 - **Lighting issues**: Missing three-point setup, poor fill ratio, non-physical decay
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as GitHub issues on this repo; all operations use the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
