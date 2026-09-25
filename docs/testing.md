@@ -85,8 +85,11 @@ skip honestly otherwise). Evidence table:
 For a quick smoke test of the module inside Maya's Script Editor:
 
 ```python
-import sys; sys.path.insert(0, r"D:\Aworker\maya\maya-mcp-server\src")
+import sys
+
+sys.path.insert(0, r"D:\Aworker\maya\maya-mcp-server\src")
 import maya_mcp_server.maya_scene_module as _mcp_scene
+
 _mcp_scene.get_scene_graph()
 ```
 
@@ -161,6 +164,8 @@ Human-eye (human_verify skeleton):
 For ad-hoc Script Editor checks inside Maya:
 
 ```python
-import sys; sys.path.insert(0, r"D:\Aworker\maya\maya-mcp-server\src")
+import sys
+
+sys.path.insert(0, r"D:\Aworker\maya\maya-mcp-server\src")
 import maya_mcp_server.visual_module as _mcp_visual
 ```
