@@ -22,7 +22,8 @@ Run order inside a Maya 2024 GUI session (via `write_module` then
 
 ```python
 import t20kit, t20_movement  # modules are injected by write_module
-t20_movement.build()          # -> scene_render_preview("CAM_t20mv_hero")
+
+t20_movement.build()  # -> scene_render_preview("CAM_t20mv_hero")
 ```
 
 Notes: `workbench.py` requires the Poly Haven cache populated by
