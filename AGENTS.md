@@ -216,22 +216,29 @@ Failure to update dependent files will cause integration failures.
 | `cos_formatter.py` | `scene_tools.py` (COS format output) | Formatter changes affect all tool COS outputs |
 | `maya_scene_module.py` (scene_review check names/semantics) | `skills/scene-review-playbook/SKILL.md` | Card documents the 11 checks + findings→actions; check renames/semantics changes must sync it |
 
-### Injected-module admission criteria (注入模块准入三判据, ADR-0027)
+### Injected-module admission criteria (注入模块准入判据, ADR-0027 + D-095)
 
 New Maya-side capability defaults to a NEW per-domain injected module —
 never into the `maya_scene_module.py` monolith. A new module is allowed
-only when ALL THREE criteria hold (the bar exists to stop precedent
-slide):
+only when ALL THREE domain criteria hold (the bar exists to stop
+precedent slide):
 
-1. **Independent injection timing** — its lazy-inject trigger has its
-   own cadence; it does not live or die with another module.
+1. **Independent injection timing** — semantic reading (D-095): the
+   capability is needed in session shapes of its own, not merely a
+   mechanically separate lazy-inject trigger.
 2. **Independent Maya-side API surface** — its cmds/omui call surface is
    orthogonal to the existing modules'.
 3. **Independent failure domain** — its error/degradation semantics are
    not shared with another module.
+4. **Target-module health (D-095)** — when criteria FAIL and the
+   destination module is a registered monolith (mypy-debt / T-07), land
+   the code as a separate host-side source file assembled into the same
+   injection unit (same module name / trigger / failure domain), not as a
+   direct append to the monolith body. First case: scene-graph
+   introspection → `_mcp_scene` unit via separate file.
 
 A capability that fails any criterion goes into an existing module (say
-which, and why). Cross-injected-module calls must be declared
+which, and why — criterion 4 then governs HOW it lands). Cross-injected-module calls must be declared
 explicitly — injected modules are self-contained by architecture (the
 `visual_module` look-alike code in `asset_module` is the accepted cost
 of that rule). Injection size is a budgeted resource (native channel
