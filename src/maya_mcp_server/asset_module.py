@@ -62,6 +62,22 @@ def _short(name: str) -> str:
     return str(name).split("|")[-1]
 
 
+def _delete_if_exists(node: str) -> None:
+    """Delete a node iff it still exists; failures are swallowed.
+
+    D-090: the single objExists->delete primitive shared by the batch
+    stale-DG loop and the half-wired bump2d/displacement rollback paths.
+    Zero-condition, one parameter, constant semantics — a future
+    different cleanup need (e.g. recursive shape deletion) inlines back
+    rather than adding parameters here (Metz wrong-abstraction rule).
+    """
+    try:
+        if cmds.objExists(node):
+            cmds.delete(node)
+    except Exception:
+        pass
+
+
 def _group_name(asset_id: str) -> str:
     safe = re.sub(r"[^A-Za-z0-9_]", "_", str(asset_id))
     return "GRP_asset_" + safe
@@ -139,11 +155,7 @@ def _delete_group_tree(grp: str, asset_id: str) -> None:
     stale = _stale_dg_nodes(grp, asset_id)
     cmds.delete(grp)
     for n in stale:
-        try:
-            if cmds.objExists(n):
-                cmds.delete(n)
-        except Exception:
-            pass
+        _delete_if_exists(n)
 
 
 def _imported_materials(new_nodes: list[str]) -> list[str]:
@@ -298,11 +310,7 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
             # D-083: a half-wired bump2d node must not be left
             # orphaned in the scene on failure.
             if bump is not None:
-                try:
-                    if cmds.objExists(bump):
-                        cmds.delete(bump)
-                except Exception:
-                    pass
+                _delete_if_exists(bump)
             return False
     if role == "ao":
         # AO darkens, so it must drive a multiplier - ambientColor *adds*
@@ -331,11 +339,7 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
             # D-082b: a half-wired displacement node must not be left
             # orphaned in the scene on failure.
             if disp is not None:
-                try:
-                    if cmds.objExists(disp):
-                        cmds.delete(disp)
-                except Exception:
-                    pass
+                _delete_if_exists(disp)
             return False
     return False
 
