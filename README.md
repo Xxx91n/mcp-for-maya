@@ -64,8 +64,9 @@ Poly Haven model search + import shipped in 0.2.0 (issue #2 thin slice: FBX + te
 | 👁️ **Visual loop** | `scene_viewport_snapshot` `scene_render_preview` | WYSIWYG viewport capture + single-frame playblast preview (GUI sessions only) |
 | 🔌 **Session management** | `list_sessions` `add_session` `maya_setup_guide` | Multi-session discovery/attach + connection diagnosis/install/fallback guidance |
 | 📦 **Asset library** | `asset_search` `asset_import` | Poly Haven CC0 models — host-side HTTPS download (host allowlist, md5 verify, size caps, platformdirs cache), Maya-side FBX import with texture wiring, polycount/dims guards, `GRP_asset_<id>` dedup |
+| 📤 **Scene export** | `scene_export` | FBX/OBJ/USD export — whole scene or named objects; format inferred from extension (conflict is an error, never a guess), parent dirs auto-created, overwrite opt-in, selection restored |
 
-22 MCP tools in total.
+23 MCP tools in total.
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-quick-start.svg" width="100%" alt="Quick Start"/>
 
@@ -107,7 +108,8 @@ In Maya's Script Editor (Python mode, not MEL):
 
 ```python
 import maya.cmds as cmds
-cmds.commandPort(name=':7001', sourceType='python')
+
+cmds.commandPort(name=":7001", sourceType="python")
 ```
 
 #### Option C: persistent auto-connect
@@ -122,6 +124,7 @@ Save this as `userSetup.py` in your Maya scripts directory:
 
 ```python
 import maya.cmds as cmds
+
 cmds.evalDeferred('cmds.commandPort(name=":7001", sourceType="python")', lowestPriority=True)
 ```
 
@@ -192,7 +195,7 @@ Every scene modification follows the **ICEV** loop (also shipped as an agent pro
 ### Spatial
 
 ```python
-scene_snapshot(detail="compact", format="cos")   # full scene in one call
+scene_snapshot(detail="compact", format="cos")  # full scene in one call
 scene_inspect(target="wall_entrance", include_neighbors=True)
 scene_measure(obj_a="wall_north", obj_b="counter_A", mode="clearance")
 scene_assert(expectations='{"wall": {"exists": true, "position": [0,0,500]}}')
@@ -201,7 +204,7 @@ scene_assert(expectations='{"wall": {"exists": true, "position": [0,0,500]}}')
 ### Audit
 
 ```python
-scene_review()   # 11 deterministic checks, 0-100 score
+scene_review()  # 11 deterministic checks, 0-100 score
 scene_validate(rules='[{"type": "min_clearance", "value": 180}]')
 ```
 
@@ -216,7 +219,7 @@ camera_orbit(center=[0, 100, 0], radius=500, frames=120)
 ### Disaster recovery
 
 ```python
-scene_checkpoint(name="before_renovation")   # exportAll in-memory snapshot; no undo history
+scene_checkpoint(name="before_renovation")  # exportAll in-memory snapshot; no undo history
 scene_checkpoint_list()
 scene_rollback(filename="cp_before_renovation.ma")
 # auto safety snapshot first, then rebinds the scene name to the original path
@@ -227,7 +230,7 @@ scene_rollback(filename="cp_before_renovation.ma")
 ### Assets (Poly Haven, host-side download)
 
 ```python
-asset_search(query="camera", asset_type="models", limit=20)   # Poly Haven index
+asset_search(query="camera", asset_type="models", limit=20)  # Poly Haven index
 asset_import(asset_id="Camera_01", resolution="1k")
 # HTTPS-only download into a platformdirs cache (per-file md5 verify + sha256 audit),
 # then Maya imports the local FBX under GRP_asset_<asset_id> (repeat calls dedup;
@@ -238,11 +241,25 @@ asset_import(asset_id="Camera_01", resolution="1k")
 # Guards: 100k-face polycount cap (allow_high_polycount override), dims sanity report.
 ```
 
+### Scene export
+
+```python
+scene_export(path="D:/out/scene.fbx")  # whole scene; format inferred from .fbx
+scene_export(path="/tmp/kit", format="obj")  # missing extension is appended -> kit.obj
+scene_export(path="D:/out/kit.usd", objects=["GEO_box"])  # exportSelected; prior selection restored
+# format {fbx,obj,usd}: an extension/format conflict is an error, never a guess.
+# An existing file is rejected unless overwrite=True. prompt=False is forced
+# (no modal can hang the channel); the scene's modified flag is untouched.
+# Alembic is not supported — AbcExport is not a cmds.file surface.
+```
+
 ### Visual loop (GUI sessions only)
 
 ```python
-scene_viewport_snapshot(max_size=800, format="jpeg")   # HUD/selection included — what the artist sees
-scene_render_preview(camera="CAM_hero", width=640, height=360)   # clean single-frame playblast
+scene_viewport_snapshot(
+    max_size=800, format="jpeg"
+)  # HUD/selection included — what the artist sees
+scene_render_preview(camera="CAM_hero", width=640, height=360)  # clean single-frame playblast
 # both return [image, JSON metadata]; headless sessions get a gui_session_required error
 # prefer format="png" for wireframe/line-art review; trust returned metadata for actual size
 ```
@@ -290,7 +307,7 @@ Two **Experimental** process cards ship in `skills/`:
 
 - **Zero telemetry**: no phone-home — the project ships no telemetry or unsolicited outbound traffic; verify in source. The ONLY outbound calls are the two asset tools: HTTPS to `api.polyhaven.com` / `dl.polyhaven.org|.com` (host allowlist + md5 + size caps in `polyhaven.py`), and only when you call them.
 - **Local, single-user**: the command port binds localhost only; the connected MCP client is trusted.
-- **Safety net**: a unified pipeline validates arguments + token-bucket rate limits (~100/60s reads, ~20/60s writes, per session) + pattern scan (warn-only by default) + an independent JSONL audit log across all 22 tools. It catches accidents, not malicious clients — full model in [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
+- **Safety net**: a unified pipeline validates arguments + token-bucket rate limits (~100/60s reads, ~20/60s writes, per session) + pattern scan (warn-only by default) + an independent JSONL audit log across all 23 tools. It catches accidents, not malicious clients — full model in [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
 - **Transactional safety**: `scene_checkpoint`/`scene_rollback` give in-memory snapshots and explicit rollback (no undo history; references flattened).
 - Vulnerability reporting: [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md).
 
@@ -302,7 +319,7 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **Beta**: promoted once feature-complete and external testing begins (classifier moves to `4 - Beta`).
 - **1.0.0**: public-API freeze commitment, promoted together with the `5 - Production/Stable` classifier in one commit.
 
-Releases are milestone-driven — no fixed cadence promised. Roadmap lives in GitHub issues: #2 Poly Haven integration (model slice shipped in 0.2.0; HDRIs/textures later), #3 Skills program (v1.x), #4 security & permission model (v1.x), #5 export_scene + scene-graph introspection (v1.x), #6 more asset sources (exploratory), #7 real-machine checklist + v1.0 feedback (pinned).
+Releases are milestone-driven — no fixed cadence promised. Roadmap lives in GitHub issues: #2 Poly Haven integration (model slice shipped in 0.2.0; scene_plan recommendation residual split to #31), #3 Skills program (v1.x), #4 security & permission model (v1.x), #5 scene export (scene_export shipped in 0.3.0: FBX/OBJ/USD; scene-graph introspection split into its own spec round), #6 more asset sources (exploratory), #7 real-machine checklist + v1.0 feedback (pinned).
 
 ## Requirements
 

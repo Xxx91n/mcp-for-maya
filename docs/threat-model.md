@@ -51,10 +51,10 @@ problem.
 | Error contract | host failures raise coded exceptions (isError); Maya-domain failures return `{error:{code,message,suggestion?}}` | pipeline.py, maya_scene_module.py |
 | Checkpoint/rollback | exportAll memory snapshots, auto safety snapshot before rollback, S2 rebind | maya_scene_module.py |
 | userSetup.py merge | marker-block upsert, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
-| Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 22 tools | pipeline.py |
+| Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 23 tools | pipeline.py |
 | Asset egress whitelist | asset_search/asset_import reach https only on api.polyhaven.com + dl.polyhaven.org/.com, mandatory User-Agent, size+timeout caps, per-file md5 verify, platformdirs cache | polyhaven.py |
 
-All 22 tools pass through one FastMCP middleware pipeline:
+All 23 tools pass through one FastMCP middleware pipeline:
 validate → rate-limit → pattern-scan → dispatch → audit.
 
 ## 4. Port and network exposure
@@ -91,7 +91,7 @@ authoritative and this table must match it row for row:
 | Hints | Tools |
 |-------|-------|
 | readOnly=T, destructive=F, idempotent=T | `list_sessions`, `scene_snapshot`, `scene_inspect`, `scene_measure`, `scene_assert`, `scene_validate`, `scene_checkpoint_list`, `scene_aesthetics`, `scene_review`, `scene_viewport_snapshot`, `scene_render_preview` |
-| readOnly=F, destructive=F, idempotent=F | `scene_checkpoint`, `scene_rollback`, `scene_plan`, `camera_create`, `camera_orbit`, `add_session` |
+| readOnly=F, destructive=F, idempotent=F | `scene_checkpoint`, `scene_rollback`, `scene_plan`, `camera_create`, `camera_orbit`, `add_session`, `scene_export` |
 | readOnly=F, destructive=T, idempotent=F | `execute_code`, `write_module`, `maya_setup_guide` |
 | readOnly=T, destructive=F, idempotent=T, openWorld=T | `asset_search` |
 | readOnly=F, destructive=F, idempotent=T, openWorld=T | `asset_import` |
@@ -103,6 +103,18 @@ authoritative and this table must match it row for row:
   the enforcement - the whitelist is.
 - asset_import is idempotent because GRP_asset_<id> dedup is real
   (repeat calls report the existing group; force=True opts out).
+- scene_export performs a **local file write** to an arbitrary
+  host-absolute path via Maya (D-092). That is informed acceptance,
+  not a boundary: under the execute_code ceiling any client can already
+  write files, so pretending to confine the export path would be
+  theater. What is real: `../` sequences in the `path` param are still
+  pattern-blocked host-side, the Maya side normalizes
+  (expanduser + abspath) and auto-creates parents, existing files are
+  rejected unless overwrite=True, and prompt=False is forced so no
+  modal dialog can hang the channel. Residuals registered honestly: no
+  realpath/symlink resolution (a symlinked parent is followed silently)
+  and no per-directory allowlist (any path the Maya process can write
+  is writable).
 - `scene_viewport_snapshot` / `scene_render_preview` are readOnly
   under the net-zero side-effect discipline (camera/current-time
   restored on every path, D-026) - the visible transient is documented

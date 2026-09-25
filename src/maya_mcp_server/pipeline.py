@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Tool annotations \u2014 the single matrix (D-018). All 22 tools, all four hints.
+# Tool annotations \u2014 the single matrix (D-018). All 23 tools, all four hints.
 # readOnlyHint also drives the read/write rate-limit bucket.
 # ---------------------------------------------------------------------------
 
@@ -86,13 +86,16 @@ TOOL_ANNOTATIONS: dict[str, mt.ToolAnnotations] = {
     # visual loop: net-zero side effect discipline makes readOnly honest (D-026)
     "scene_viewport_snapshot": _READ,
     "scene_render_preview": _READ,
-    # mutation-class tools: scene/filesystem effects, not destructive (6)
+    # mutation-class tools: scene/filesystem effects, not destructive (7)
     "scene_checkpoint": _WRITE_SAFE,
     "scene_rollback": _WRITE_SAFE,
     "scene_plan": _WRITE_SAFE,
     "camera_create": _WRITE_SAFE,
     "camera_orbit": _WRITE_SAFE,
     "add_session": _WRITE_SAFE,
+    # writes a host-local file via Maya; overwrite=False default, the
+    # docstring discloses overwrite irreversibility (D-092)
+    "scene_export": _WRITE_SAFE,
     # Poly Haven asset pipeline: openWorld - first tools reaching the
     # network (D-075); https + host whitelist + md5 + size caps host-side
     "asset_search": _READ_NET,

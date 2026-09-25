@@ -66,8 +66,9 @@ Poly Haven 模型搜索+导入已于 0.2.0 交付（issue #2 薄切片：FBX + �
 | 👁️ **视觉闭环** | `scene_viewport_snapshot` `scene_render_preview` | 视口所见即所得捕获 + 单帧 playblast 预览（仅 GUI 会话） |
 | 🔌 **会话管理** | `list_sessions` `add_session` `maya_setup_guide` | 多会话发现/接入 + 连接诊断/安装/回退引导 |
 | 📦 **资产库** | `asset_search` `asset_import` | Poly Haven CC0 模型——宿主侧 HTTPS 下载（主机白名单、md5 校验、大小上限、platformdirs 缓存），Maya 侧 FBX 导入带贴图自动接线、面数/尺寸护栏、`GRP_asset_<id>` 去重 |
+| 📤 **场景导出** | `scene_export` | FBX/OBJ/USD 导出——整场景或指定对象；格式按扩展名推断（冲突即报错不猜）、父目录自动创建、覆盖需显式 opt-in、导出后还原选择集 |
 
-共 22 个 MCP 工具。
+共 23 个 MCP 工具。
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-quick-start.svg" width="100%" alt="Quick Start"/>
 
@@ -109,7 +110,8 @@ pip install -e .
 
 ```python
 import maya.cmds as cmds
-cmds.commandPort(name=':7001', sourceType='python')
+
+cmds.commandPort(name=":7001", sourceType="python")
 ```
 
 > **提示**: Script Editor 打开方式：Maya 菜单 → Windows → General Editors → Script Editor；确保语言选择器为 **Python**（不是 MEL）。
@@ -126,6 +128,7 @@ cmds.commandPort(name=':7001', sourceType='python')
 
 ```python
 import maya.cmds as cmds
+
 cmds.evalDeferred('cmds.commandPort(name=":7001", sourceType="python")', lowestPriority=True)
 ```
 
@@ -247,7 +250,7 @@ scene_rollback(filename="cp_before_renovation.ma")
 ### 资产（Poly Haven，宿主侧下载）
 
 ```python
-asset_search(query="camera", asset_type="models", limit=20)   # Poly Haven 索引检索
+asset_search(query="camera", asset_type="models", limit=20)  # Poly Haven 索引检索
 asset_import(asset_id="Camera_01", resolution="1k")
 # 经 HTTPS 下载到 platformdirs 缓存（逐文件 md5 校验 + sha256 审计），
 # 然后 Maya 导入本地 FBX 并挂到 GRP_asset_<asset_id>（重复调用自动去重；
@@ -256,6 +259,18 @@ asset_import(asset_id="Camera_01", resolution="1k")
 # 单件资产使用裸贴图名（Diffuse/Rough/Metal...）——同样被识别并接到
 # 该资产的唯一材质上。
 # 护栏：默认 100k 面数上限（allow_high_polycount 可放宽）、尺寸合理性检查。
+```
+
+### 场景导出
+
+```python
+scene_export(path="D:/out/scene.fbx")  # 整场景导出；按 .fbx 扩展名推断格式
+scene_export(path="/tmp/kit", format="obj")  # 缺扩展名按显式 format 追加 -> kit.obj
+scene_export(path="D:/out/kit.usd", objects=["GEO_box"])  # exportSelected；导出后还原原选择集
+# format ∈ {fbx,obj,usd}：扩展名与显式 format 冲突即报错，绝不猜。
+# 目标已存在时拒绝，除非 overwrite=True。prompt=False 强制
+# （模态对话框会挂死命令通道）；不触碰场景 modified 脏标志。
+# 不支持 Alembic——AbcExport 不是 cmds.file 面。
 ```
 
 ### 视觉闭环（仅 GUI 会话）
@@ -317,7 +332,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 - **零遥测**：zero telemetry, no phone-home——本项目不含任何遥测或主动外发上报代码，可源码核实。唯一外发流量是两个资产工具：仅在调用时经 HTTPS 访问 `api.polyhaven.com` / `dl.polyhaven.org|.com`（`polyhaven.py` 内主机白名单 + md5 校验 + 大小上限）。
 - **本地单用户**：命令端口仅绑定 localhost；接入的 MCP client 是受信方。
-- **安全网**：统一管线对全部 22 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 独立 JSONL 审计日志（覆盖全部 22 个工具）。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
+- **安全网**：统一管线对全部 23 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 独立 JSONL 审计日志（覆盖全部 23 个工具）。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
 - **事务安全**：`scene_checkpoint`/`scene_rollback` 提供内存态快照与显式回滚（快照不含 undo 历史，references 默认展平）。
 - 漏洞报告渠道见 [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md)。
 
@@ -329,7 +344,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 - **Beta**：feature-complete 且开始外部测试后晋升（classifier 同步升 `4 - Beta`）。
 - **1.0.0**：公共 API 冻结承诺，与 `5 - Production/Stable` classifier 同一提交晋升。
 
-发布节奏为里程碑驱动，不承诺固定周期。路线图见 GitHub issues：#2 Poly Haven 集成（模型切片已随 0.2.0 交付；HDRI/贴图包后续）、#3 Skills 正式立项（v1.x）、#4 安全与权限模型（v1.x）、#5 export_scene+场景图内省（v1.x）、#6 更多资产源（exploratory）、#7 真机验证清单与 v1.0 反馈（pinned）。
+发布节奏为里程碑驱动，不承诺固定周期。路线图见 GitHub issues：#2 Poly Haven 集成（模型切片已随 0.2.0 交付并收口；scene_plan 推荐集成残余拆分为 #31）、#3 Skills 正式立项（v1.x）、#4 安全与权限模型（v1.x）、#5 场景导出（scene_export 已随 0.3.0 交付：FBX/OBJ/USD；场景图内省拆为独立 spec 轮）、#6 更多资产源（exploratory）、#7 真机验证清单与 v1.0 反馈（pinned）。
 
 ## 环境要求
 

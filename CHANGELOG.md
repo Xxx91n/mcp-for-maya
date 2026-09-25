@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-25
+
+### Added
+
+- **`scene_export` — FBX/OBJ/USD scene export (D-091/D-092)** — new
+  per-domain injected module `_mcp_export`
+  (`src/maya_mcp_server/export_module.py::export_scene`) + host tool
+  (`src/maya_mcp_server/export_tools.py::register_export_tools`,
+  registered in `src/maya_mcp_server/server.py`), 23 tools total.
+  Contract: path normalized (expanduser+abspath), parent dirs
+  auto-created, existing target rejected unless `overwrite=True`;
+  format enum {fbx,obj,usd} with extension inference, missing-extension
+  append, and conflict-is-an-error mirror rules (live-pinned type
+  tokens `FBX export`/`OBJexport`/`USD Export`); `objects=None` ->
+  exportAll, a list is `objExists`-prevalidated (no partial export) and
+  drives exportSelected with the prior selection restored in a finally;
+  `prompt=False`/`force=True` forced; scene modified flag untouched.
+  Returns `{path, format, objects_exported, size_bytes, duration_ms,
+  warnings}` with a structured domain-error family
+  (invalid_format/invalid_path/empty_objects/missing_objects/
+  plugin_missing/export_failed). Alembic deliberately excluded —
+  AbcExport is not a cmds.file surface.
+  (`tests/test_export_module.py`, `tests/test_export_tools.py`,
+  `tests/test_pipeline.py::TestToolAnnotations`,
+  `docs/threat-model.md` §5 local-file-write row)
+
+### Changed
+
+- **Ruff pin bump 0.15.20 -> 0.16.7 (D-089)** — the two pinned sites
+  moved together: `.pre-commit-config.yaml` rev and
+  `.github/workflows/ci.yml` `uvx ruff@` pin; dependabot.yml now ignores
+  fastmcp semver-major (PR #18 CI red: ToolAnnotations kwargs
+  camelCase->snake_case is an API migration, not a pin bump).
+- **`_delete_if_exists` primitive (D-090)** — the three
+  `objExists->delete` call sites in `asset_module.py` (stale-DG batch
+  loop + bump2d/displacement half-wire rollbacks) converge on one
+  zero-condition helper; rollback block bodies unchanged
+  (`src/maya_mcp_server/asset_module.py::_delete_if_exists`,
+  regression net `tests/test_asset_module.py` incl. `TestBumpOrphan`).
+
 ### Fixed
 
 - **bump2d orphan cleanup symmetry (D-083)** — a `setAttr`/`connectAttr`

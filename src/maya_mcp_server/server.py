@@ -18,6 +18,7 @@ from maya_mcp_server.connection_guide import (
     install_user_setup,
     uninstall_user_setup,
 )
+from maya_mcp_server.export_tools import register_export_tools
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS, SecurityPipeline
 from maya_mcp_server.scene_tools import mark_dirty, register_scene_tools
 from maya_mcp_server.security import (
@@ -113,6 +114,10 @@ mcp = FastMCP(
         "- asset_import: Download (https whitelist + md5 + cache) and\n"
         "  import FBX into Maya with texture auto-wiring; idempotent via\n"
         "  GRP_asset_<id> dedup\n\n"
+        "## Scene Export\n"
+        "- scene_export: Export the scene (or named objects) to FBX/OBJ/USD\n"
+        "  (path normalized, parents auto-created, overwrite opt-in,\n"
+        "  selection restored; Alembic is not supported)\n\n"
         "## General Tools\n"
         "- list_sessions: Discover active Maya sessions\n"
         "  (if empty, call maya_setup_guide for connection help)\n"
@@ -142,6 +147,7 @@ _audit_logger = (
     else None
 )
 register_asset_tools(mcp, audit=_audit_logger)
+register_export_tools(mcp)
 
 # Unified security pipeline: every tool call passes through validation,
 # rate limiting, pattern scanning, and audit logging (D-018/ADR-0005).

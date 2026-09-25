@@ -65,7 +65,7 @@ def _read_events(path: Path) -> list[dict]:
 
 
 class TestToolAnnotations:
-    """All 22 tools carry the four hints (D-018/ADR-0005 + D-075 matrix)."""
+    """All 23 tools carry the four hints (D-018/ADR-0005 + D-075/D-092 matrix)."""
 
     EXPECTED = {
         "list_sessions",
@@ -90,9 +90,10 @@ class TestToolAnnotations:
         "scene_render_preview",
         "asset_search",
         "asset_import",
+        "scene_export",
     }
 
-    def test_all_22_tools_covered(self):
+    def test_all_23_tools_covered(self):
         assert set(TOOL_ANNOTATIONS) == self.EXPECTED
 
     def test_four_hints_all_set(self):

@@ -54,6 +54,12 @@ def ls(*args, **kwargs):
     long_ = kwargs.get("long") or kwargs.get("l")
     materials = kwargs.get("materials")
 
+    # ls(assemblies=True) returns root-level objects only (real Maya).
+    if kwargs.get("assemblies") or kwargs.get("as"):
+        roots = [n for n in sc.all_nodes() if n.parent is None]
+        out = [sc.long_name(n) if long_ else n.name for n in roots]
+        return out or None
+
     if args and isinstance(args[0], (list, tuple)):
         names = []
         for nm in args[0]:
@@ -314,6 +320,16 @@ def file(*args, **kwargs):
         with open(path, "w", encoding="utf-8") as fh:
             fh.write("//Maya ASCII 2024 scene (stub)\n")
             fh.write(json.dumps(sc.serialize()))
+        return path
+    if kwargs.get("exportSelected") or kwargs.get("es"):
+        # Real Maya exports the current selection; the stub resolves the
+        # selection (a stale name raises, like Maya) and writes a real
+        # file so size_bytes assertions stay honest.
+        path = args[0]
+        sel = [sc.resolve(n).name for n in sc.selection]
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("//Maya ASCII 2024 scene (stub, exportSelected)\n")
+            fh.write(json.dumps({"exported": sel, "scene": sc.serialize()}))
         return path
     if kwargs.get("save") or kwargs.get("saveAs"):
         sc.scene_path = args[0] if args else sc.scene_path

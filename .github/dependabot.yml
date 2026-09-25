@@ -18,3 +18,12 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    # D-089: fastmcp semver-major stays frozen — PR #18 (fastmcp <5.0.0)
+    # went red on a ToolAnnotations kwargs rename (camelCase->snake_case),
+    # an API-migration-class bump, not a version pin fix. Deferred debt:
+    # "fastmcp-3.x exploration window" opens at the NEXT minor window —
+    # if 3.x proves compatible, tighten to >=3.x,<4.0.0 (with a pyproject
+    # comment citing the CI red); 4.x migration is a separate queue.
+    ignore:
+      - dependency-name: "fastmcp"
+        update-types: ["version-update:semver-major"]
