@@ -21,11 +21,13 @@ src/maya_mcp_server/
 ├── visual_module.py       # Maya-side _mcp_visual (lazy inject, GUI only)
 ├── asset_tools.py         # asset_search/asset_import MCP tools (D-074/D-075)
 ├── asset_module.py        # Maya-side _mcp_asset importer (lazy inject)
+├── export_tools.py        # scene_export MCP tool (D-091/D-092)
+├── export_module.py       # Maya-side _mcp_export exporter (lazy inject)
 ├── polyhaven.py           # Poly Haven host client: whitelist/md5/cache (D-075)
 ├── spatial_types.py       # Data type definitions
 ├── connection_guide.py    # Connection bootstrap; userSetup.py managed marker-block (D-017)
 ├── security.py            # Validation, token-bucket rate limits, pattern scan, JSONL audit
-├── pipeline.py            # FastMCP middleware: all 22 tools -> validate/rate-limit/scan/audit
+├── pipeline.py            # FastMCP middleware: all 23 tools -> validate/rate-limit/scan/audit
 ├── types.py               # Core types (ResultType, ClientType, SessionInfo)
 ├── bootstrap.py           # Server bootstrap
 ├── utils.py               # Utility functions (cross-platform process detection)
@@ -58,6 +60,8 @@ tests/
 ├── test_polyhaven.py        # T-19a host client: whitelist/md5/cache/domain errors (D-075)
 ├── test_asset_module.py     # T-19a _mcp_asset importer on the stub scene
 ├── test_asset_tools.py      # T-19a tool layer: dedup/domain errors/audit detail
+├── test_export_module.py    # T-23b _mcp_export contract on the stub (D-092)
+├── test_export_tools.py     # T-23b tool layer: validation/passthrough/dual-channel inject
 ├── test_check_ruff_budget.py    # ruff-budget comparator guard (per-rule ratchet, D-044/T-10b)
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
@@ -198,6 +202,7 @@ Failure to update dependent files will cause integration failures.
 | `visual_module.py` (capture paths) | `visual_tools.py`, `server.py` (instructions), `docs/adr/0013-visual-loop-architecture.md`, `tests/test_visual_tools.py` | Capture contract, annotations, and ADR must stay in sync |
 | `visual_tools.py` (tool surface) | `pipeline.py` (TOOL_ANNOTATIONS), `server.py` (instructions), `docs/threat-model.md` (§5 matrix), `README.md`, `README.zh-CN.md` | Tool surface changes require annotation + docs sync |
 | `asset_tools.py` / `polyhaven.py` / `asset_module.py` (asset surface) | `pipeline.py` (TOOL_ANNOTATIONS), `server.py` (instructions + shared audit), `docs/threat-model.md` (§4/§5), `tests/test_polyhaven.py`, `tests/test_asset_module.py`, `tests/test_asset_tools.py`, `tests/maya_stub/` (new cmds surface), `README.md`, `README.zh-CN.md`, `AGENTS.md` | Asset tools split host (download/cache) vs Maya-side (import/wire); every piece must stay in sync |
+| `export_tools.py` / `export_module.py` (export surface) | `pipeline.py` (TOOL_ANNOTATIONS), `server.py` (instructions), `docs/threat-model.md` (§5 matrix), `tests/test_export_module.py`, `tests/test_export_tools.py`, `tests/maya_stub/` (cmds.file export surface), `README.md`, `README.zh-CN.md`, `AGENTS.md` | Export tool splits host (validation/registration) vs Maya-side `export_scene` (path/format/selection/plugin contract); every piece must stay in sync |
 | `scene_tools.py` (new tool) | `server.py` (instructions), `README.md`, `README.zh-CN.md`, `AGENTS.md` | Tool surface changes require documentation sync |
 | `aesthetic_engine.py` | `maya_scene_module.py` (mirror functions), `tests/test_aesthetic_engine.py` | **DORMANT** (T-11b/D-038, ADR-0003 status note): zero production refs - Maya-side inline `_score_*` is the live implementation; kept for the T-06 consolidation decision |
 | `scene_cache.py` | `scene_tools.py` (cache invalidation), `session_manager.py` (mark_dirty) | Cache behavior must be consistent |
@@ -206,6 +211,27 @@ Failure to update dependent files will cause integration failures.
 | `connection_guide.py` | `server.py` (maya_setup_guide params), `tests/test_connection_guide.py` | Marker-block semantics + confirm/dry_run/remove_empty_file flags |
 | `cos_formatter.py` | `scene_tools.py` (COS format output) | Formatter changes affect all tool COS outputs |
 | `maya_scene_module.py` (scene_review check names/semantics) | `skills/scene-review-playbook/SKILL.md` | Card documents the 11 checks + findings→actions; check renames/semantics changes must sync it |
+
+### Injected-module admission criteria (注入模块准入三判据, ADR-0027)
+
+New Maya-side capability defaults to a NEW per-domain injected module —
+never into the `maya_scene_module.py` monolith. A new module is allowed
+only when ALL THREE criteria hold (the bar exists to stop precedent
+slide):
+
+1. **Independent injection timing** — its lazy-inject trigger has its
+   own cadence; it does not live or die with another module.
+2. **Independent Maya-side API surface** — its cmds/omui call surface is
+   orthogonal to the existing modules'.
+3. **Independent failure domain** — its error/degradation semantics are
+   not shared with another module.
+
+A capability that fails any criterion goes into an existing module (say
+which, and why). Cross-injected-module calls must be declared
+explicitly — injected modules are self-contained by architecture (the
+`visual_module` look-alike code in `asset_module` is the accepted cost
+of that rule). Injection size is a budgeted resource (native channel
+15000-char threshold, D-013) — keep modules lean.
 
 ### Changelog Evidence Rule (D-082⑦)
 

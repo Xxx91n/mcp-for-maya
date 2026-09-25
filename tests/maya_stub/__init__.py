@@ -127,6 +127,14 @@ def load_asset_module():
     return am
 
 
+def load_export_module():
+    """Import export_module fresh, bound to the installed stub."""
+    sys.modules.pop("maya_mcp_server.export_module", None)
+    import maya_mcp_server.export_module as em
+
+    return em
+
+
 __all__ = [
     "Scene",
     "install",
@@ -134,5 +142,6 @@ __all__ = [
     "load_scene_module",
     "load_visual_module",
     "load_asset_module",
+    "load_export_module",
     "runtime",
 ]
