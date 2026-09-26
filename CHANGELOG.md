@@ -35,6 +35,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tests/test_introspect_tools.py (dual-channel injection covered),
   docs/visual-callform-matrix.md “Introspection call sites”.
 
+### Changed
+
+- **Host-side injected-module calls unified (`module_call` /
+  `exec_module_code`, D-098)** — three verbatim-isomorphic
+  `_X_call`/`_exec_X` copies (scene/asset/export) generalized into
+  domain-agnostic call-construction primitives in
+  `src/maya_mcp_server/client.py`; the P0-2 "user input never becomes
+  executable source text" contract moved with `module_call`.
+  `scene_tools._execute_scene_code` keeps the cache branch over the
+  shared no-cache core; per-domain `_ensure_X_injected` binders
+  unchanged. Evidence: tests/test_client.py::TestModuleCall.
+
 ## [0.3.0] - 2026-09-25
 
 ### Added

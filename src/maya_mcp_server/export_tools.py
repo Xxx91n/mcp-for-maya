@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from maya_mcp_server.client import ensure_module_injected, raise_for_error
+from maya_mcp_server.client import ensure_module_injected, exec_module_code, module_call
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS
 from maya_mcp_server.security import InputValidationError
 
@@ -43,25 +43,6 @@ async def _ensure_export_injected(client: Any, session_key: str | None) -> None:
         tmp_prefix="_mcp_export_src_",
         injected_sessions=_export_injected,
     )
-
-
-def _export_call(fn_name: str, *args: Any, **kwargs: Any) -> str:
-    """Build the _mcp_export call with JSON-serialized args (P0-2 pattern)."""
-    payload = json.dumps({"args": list(args), "kwargs": kwargs})
-    return (
-        f"import json, _mcp_export; _a = json.loads({json.dumps(payload)}); "
-        f"_mcp_export.{fn_name}(*_a['args'], **_a['kwargs'])"
-    )
-
-
-async def _exec_export(client: Any, code: str) -> Any:
-    """Execute _mcp_export code and decode the JSON result."""
-    response = await client.execute_code(code, result_type="JSON")
-    raise_for_error(response)
-    data = response.result
-    if isinstance(data, str):
-        return json.loads(data)
-    return data
 
 
 def register_export_tools(mcp: Any) -> None:
@@ -129,9 +110,10 @@ def register_export_tools(mcp: Any) -> None:
         client = await manager.get_client(session_key)
         await _ensure_export_injected(client, session_key)
 
-        result = await _exec_export(
+        result = await exec_module_code(
             client,
-            _export_call(
+            module_call(
+                "_mcp_export",
                 "export_scene",
                 path,
                 format=format,

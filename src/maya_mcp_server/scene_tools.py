@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from maya_mcp_server.client import ensure_module_injected, raise_for_error
+from maya_mcp_server.client import ensure_module_injected, exec_module_code, module_call
 from maya_mcp_server.cos_formatter import (
     format_assert_cos,
     format_inspect_cos,
@@ -97,34 +97,11 @@ async def _execute_scene_code(
     """
 
     async def fetch():
-        result = await client.execute_code(code, result_type="JSON")
-        raise_for_error(result)
-        return result.result
+        return await exec_module_code(client, code)
 
     if use_cache and cache_key:
-        data = await _get_cache(session_key).get_or_fetch(cache_key, fetch)
-    else:
-        data = await fetch()
-
-    # Parse JSON if string
-    if isinstance(data, str):
-        return json.loads(data)
-    return data
-
-
-def _scene_call(fn_name: str, *args: Any, **kwargs: Any) -> str:
-    """Build Maya-side call code with all arguments JSON-serialized.
-
-    Arguments are embedded as a JSON document inside a Python string
-    literal and reconstructed via json.loads inside Maya. This removes
-    the entire string-interpolation injection surface — user input never
-    becomes executable source text.
-    """
-    payload = json.dumps({"args": list(args), "kwargs": kwargs})
-    return (
-        f"import json, _mcp_scene; _a = json.loads({json.dumps(payload)}); "
-        f"_mcp_scene.{fn_name}(*_a['args'], **_a['kwargs'])"
-    )
+        return await _get_cache(session_key).get_or_fetch(cache_key, fetch)
+    return await fetch()
 
 
 # --- Token Budget Management ---
@@ -203,7 +180,7 @@ def register_scene_tools(mcp: Any) -> None:
         # Get scene graph
         scene_data = await _execute_scene_code(
             client,
-            _scene_call("get_scene_graph", detail),
+            module_call("_mcp_scene", "get_scene_graph", detail),
             session_key,
             use_cache=True,
             cache_key=f"scene_graph_{detail}",
@@ -212,7 +189,7 @@ def register_scene_tools(mcp: Any) -> None:
         # Also get zone map
         zone_data = await _execute_scene_code(
             client,
-            _scene_call("get_zone_map"),
+            module_call("_mcp_scene", "get_zone_map"),
             session_key,
             use_cache=True,
             cache_key="zone_map",
@@ -277,7 +254,7 @@ def register_scene_tools(mcp: Any) -> None:
         # First try as a zone name
         zone_data = await _execute_scene_code(
             client,
-            _scene_call("get_zone_map"),
+            module_call("_mcp_scene", "get_zone_map"),
             session_key,
             use_cache=True,
             cache_key="zone_map",
@@ -354,7 +331,7 @@ result
         # Neighbors
         neighbors = None
         if include_neighbors and "error" not in obj_data:
-            spatial_code = _scene_call("get_spatial_index")
+            spatial_code = module_call("_mcp_scene", "get_spatial_index")
             spatial_data = await _execute_scene_code(
                 client,
                 spatial_code,
@@ -423,7 +400,7 @@ result
         # Ensure module is injected
         await _ensure_module_injected(client, session_key)
 
-        code = _scene_call("measure", obj_a, obj_b, mode)
+        code = module_call("_mcp_scene", "measure", obj_a, obj_b, mode)
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
 
         if format == "json":
@@ -468,7 +445,7 @@ result
             json.loads(expectations)
         except json.JSONDecodeError as e:
             raise InputValidationError(f"expectations must be valid JSON: {e}") from e
-        code = _scene_call("assert_scene_state", expectations)
+        code = module_call("_mcp_scene", "assert_scene_state", expectations)
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
 
         if format == "json":
@@ -514,7 +491,7 @@ result
             rules_obj = json.loads(rules)
         except json.JSONDecodeError as e:
             raise InputValidationError(f"rules must be valid JSON: {e}") from e
-        code = _scene_call("check_constraints", rules_obj)
+        code = module_call("_mcp_scene", "check_constraints", rules_obj)
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
 
         if format == "json":
@@ -567,7 +544,7 @@ result
         client = await manager.get_client(session_key)
         await _ensure_module_injected(client, session_key)
 
-        code = _scene_call("save_checkpoint", name=name, overwrite=overwrite)
+        code = module_call("_mcp_scene", "save_checkpoint", name=name, overwrite=overwrite)
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
         return json.dumps(result, indent=2)
 
@@ -606,7 +583,8 @@ result
         client = await manager.get_client(session_key)
         await _ensure_module_injected(client, session_key)
 
-        code = _scene_call(
+        code = module_call(
+            "_mcp_scene",
             "rollback_to_checkpoint",
             filename,
             discard_current_state=discard_current_state,
@@ -636,7 +614,7 @@ result
         client = await manager.get_client(session_key)
         await _ensure_module_injected(client, session_key)
 
-        code = _scene_call("list_checkpoints")
+        code = module_call("_mcp_scene", "list_checkpoints")
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
         return json.dumps(result, indent=2)
 
@@ -675,7 +653,8 @@ result
         client = await manager.get_client(session_key)
         await _ensure_module_injected(client, session_key)
 
-        code = _scene_call(
+        code = module_call(
+            "_mcp_scene",
             "create_camera_shot",
             target,
             shot_type,
@@ -716,7 +695,7 @@ result
             center_obj = json.loads(center)
         except json.JSONDecodeError as e:
             raise InputValidationError(f"center must be a JSON array [x, y, z]: {e}") from e
-        code = _scene_call("create_orbit_camera", center_obj, radius, frames, name)
+        code = module_call("_mcp_scene", "create_orbit_camera", center_obj, radius, frames, name)
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
         mark_dirty(session_key)
         return json.dumps(result, indent=2)
@@ -754,7 +733,7 @@ result
         client = await manager.get_client(session_key)
         await _ensure_module_injected(client, session_key)
 
-        code = _scene_call("analyze_aesthetics")
+        code = module_call("_mcp_scene", "analyze_aesthetics")
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
 
         if format == "json":
@@ -844,7 +823,7 @@ result
         await _ensure_module_injected(client, session_key)
 
         checks_obj = None if checks == "all" else [c.strip() for c in checks.split(",")]
-        code = _scene_call("scene_review", checks_obj)
+        code = module_call("_mcp_scene", "scene_review", checks_obj)
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
 
         if format == "json":
@@ -896,7 +875,9 @@ result
         client = await manager.get_client(session_key)
         await _ensure_module_injected(client, session_key)
 
-        code = _scene_call("scene_plan", objective=objective or None, auto_fix=auto_fix)
+        code = module_call(
+            "_mcp_scene", "scene_plan", objective=objective or None, auto_fix=auto_fix
+        )
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
 
         if format == "json":
