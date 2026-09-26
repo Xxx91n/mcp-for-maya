@@ -26,7 +26,7 @@ PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 async def _vcall(client, fn: str, **kwargs):
     """Call a _mcp_visual function over the live channel (same JSON-args
-    pattern as visual_tools._visual_call)."""
+    pattern as client.module_call)."""
     payload = json.dumps({"args": [], "kwargs": kwargs})
     code = (
         f"import json, _mcp_visual; _a = json.loads({json.dumps(payload)}); "
