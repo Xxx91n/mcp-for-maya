@@ -95,7 +95,6 @@ async def _execute_scene_code(
     Returns:
         Parsed result.
     """
-    cache = _get_cache(session_key)
 
     async def fetch():
         result = await client.execute_code(code, result_type="JSON")
@@ -103,7 +102,7 @@ async def _execute_scene_code(
         return result.result
 
     if use_cache and cache_key:
-        data = await cache.get_or_fetch(cache_key, fetch)
+        data = await _get_cache(session_key).get_or_fetch(cache_key, fetch)
     else:
         data = await fetch()
 

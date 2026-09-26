@@ -553,6 +553,7 @@ def file(*args, **kwargs):
             mat = sc.add_node(ms["name"], ms.get("type", "phong"))
             sg = sc.add_node(ms["name"] + "SG", "shadingEngine")
             sc.connections[sg.name + ".surfaceShader"] = [mat.name]
+            sc.plug_connections[sg.name + ".surfaceShader"] = [mat.name + ".outColor"]
             sc.set_members.setdefault(sg.name, [])
             mat_nodes[ms["name"]] = (mat, sg)
             created += ["|" + mat.name, "|" + sg.name]
@@ -564,6 +565,9 @@ def file(*args, **kwargs):
             if mref in mat_nodes:
                 sg = mat_nodes[mref][1]
                 sc.connections.setdefault(shape.name + ".instObjGroups[0]", []).append(sg.name)
+                sc.plug_connections.setdefault(shape.name + ".instObjGroups[0]", []).append(
+                    sg.name + ".dagSetMembers[0]"
+                )
                 sc.set_members[sg.name].append(sc.long_name(shape))
         sc.fbx_created = created
         if kwargs.get("returnNewNodes") or kwargs.get("rnn"):
