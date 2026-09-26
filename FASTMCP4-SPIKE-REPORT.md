@@ -84,6 +84,23 @@ to-end including the middleware choke point; the spike justifies
 scheduling the mechanical rename + pin move together in 0.4.0 rather
 than closing the window.
 
-## 7. CI corroboration
+## 7. CI corroboration (PR #41, run 36225673230 — AUTHORITATIVE)
 
-PENDING — filled from this PR's matrix run before closeout.
+Matches the local first-screen exactly:
+
+| leg | result | breakpoint |
+|-----|--------|------------|
+| pytest ubuntu 3.10 / 3.x, windows 3.10 / 3.x | 4x FAIL | collection-killer ModuleNotFoundError 'fastmcp.tools.tool' (test_pipeline.py:14); run aborts at collection so the 3 .fn failures stay masked |
+| mypy baseline gate | FAIL | camelCase kwargs on SDK v2 — pipeline.py:43/49/55/62/68 (readOnlyHint/destructiveHint/idempotentHint/openWorldHint), attr read :178, visual_tools.py:164 mimeType |
+| ruff budget gate | PASS | no new violations |
+
+VERDICT: partial red, zero blockers. All reds are test/type-layer
+mechanical items with one-line-class fixes; runtime on 4.0.10 is fully
+functional (stdio initialize/tools-list-25/ping/tools-call all green).
+Per D-097④ the outcome is per-item migration debts (R1-R3 below),
+trigger = next minor window (0.4.0); pin stays >=2.14,<3 on main.
+
+- R1 test_pipeline.py import: fastmcp.tools.tool -> fastmcp.tools.ToolResult
+- R2 three .fn call sites -> invoke the function object directly
+- R3 camelCase->snake_case: pipeline.py x6 sites + visual_tools.py x1 +
+  test asserts (test_export_tools.py:201-204, test_visual_tools.py:245)
