@@ -21,7 +21,12 @@ classifiers = [
     "Topic :: Multimedia :: Graphics :: 3D Modeling",
 ]
 dependencies = [
-    "fastmcp>=2.14.0,<3.0.0",
+    # SPIKE probe (D-099/D-097/T-25a): fastmcp>=4,<5 on discardable branch
+    # probe/fastmcp-4x — exploration-window evidence gathering, NOT a
+    # committed version narrowing. Any real tightening lands separately
+    # as >=4.x,<5.0.0 with dual evidence anchors (corrected red history
+    # + upstream minor-breakage policy) after the spike verdict.
+    "fastmcp>=4,<5",
     "platformdirs>=4.0.0",
     "psutil>=5.9.0",
 ]
