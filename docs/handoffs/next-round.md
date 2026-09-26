@@ -1,65 +1,73 @@
-# next-round.md — rev32（T-24：scene-graph introspection spec→实现 + 家政批）
+# next-round.md — rev33（T-25：fastmcp-4.x 探索窗执行 + A′ 复用重构 + 残余债登记）
 
-生成：2026-09-25 R24 grill 整理环节｜Spec：docs/decision-ledger.md D-094/D-095｜前置：ADR-0027（含 D-095 修订节）、.scratch/t24/questions/q1-introspection-shape.md + q2-module-placement.md、atomcode 调研经 ctx 索引（q10=形态 / q11=落位，ctx_search source=atomcode 可取全文）
+生成：2026-09-26 R25 grill 整理环节｜Spec：docs/decision-ledger.md D-096..D-100（D-096/D-089 已 revised→D-099 留痕）｜前置：D-097 契约骨架、atomcode 调研经 ctx 索引（R25-Q1 章程 / R25-Q2 契约 / R25-Q3 复用 / R25-Q4+Q4' 4.x 门 / Q5 终稿审计，ctx_search source=atomcode 可取全文）
 
-## 环境实况（本轮核验）
+## 环境实况（本环节核验）
 
-- main=4272d28（T-23 三栈 PR #32/#33/#34 全合入）。工作区=本环节文档改动。
-- **Maya 未在运行**（无 maya.exe 进程、:7001 无监听）——真机验证窗须用户开 Maya 后再跑。
-- issue #5 OPEN：export_scene 半项已交付 0.3.0（issue checkbox 未勾属文档滞后）；scene-graph introspection=残余项=本轮对象。
-- 门禁基线（T-23 审计复核值）：pytest 749/17skip、ruff src 77/77+tests 27/27、mypy new:0（基线 237）、skeleton 27、pre-commit 8/8、stdio 23 工具。
-- dependabot 三连：#36 fastmcp<4.0.0（D-089 冻结项；ignore:semver-major 已入 dependabot.yml 但 #36 仍开出——约束放宽型 PR 可能不吃 update-types 分类，处置时先复核）；#35 ruff-pre-commit 0.16.8；#30 setup-uv 10.1.0→10.2.0（actions-minor-patch 组）。
-- **0.3.0 残余人工门**：tag v0.3.0→GH Release→PyPI 未执行（用户专属，勿代办）。
+- main=c1ca50d+本环节文档栈；25 工具（scene_describe/scene_nodes 已落地，issue #5 已 CLOSE）。
+- fastmcp 钉 >=2.14.0,<3.0.0；**4.x 已 GA**（v4.0.0 2026-08-31「FastMCP 4 is stable」→4.0.10 十 patch；官方 archive v3 docs；requires-python>=3.10 全系成立；依赖地板 pydantic[email]>=2.12/starlette>=1.0.1/httpx2>=2.5.0/mcp>=2,<3）。
+- 本仓使用面实证：FastMCP() 仅身份 kwargs；mt.ToolAnnotations 走 mcp.types(camelCase kwargs,SDK v1)；单 Middleware 子类 SecurityPipeline；stdio-only；无 elicit/sampling/roots/OAuth（结构性免疫面大）。
+- Maya 未运行（mayapy 档不 import fastmcp，spike 不受 Maya 存活影响）。
+- **v0.3.0 残余人工门**：tag/Release/PyPI 未执行（用户专属）。pyproject version=0.3.0；0.4.0 属预期非裁决。
+- 门禁基线（T-24 审计复核值）：pytest 771/26skip、ruff src 77/77+tests 27/27、mypy new:0（基线 237）、skeleton 27、pre-commit 8/8、stdio 25 工具+ping。
 
 ## 任务清单
 
-### T-24a — 家政批（政策源 D-089；队列实况承 t23 审计交接）
+### T-25a — fastmcp-4.x 探索窗执行（D-097 骨架+D-099 重瞄+D-100 修订批）
 
-1. **PR #36**：按 D-089 同款处置——close+评论引证据（CI 红引 CI，CI 绿引冻结决策本体）；顺带核查 ignore 为何未拦约束放宽型 PR（确认一次性残留或规则补 wording），结论记债台账。覆盖 D-089。
-2. **PR #35**：原子 bump 模式复用——自开 PR 同步 bump .pre-commit-config.yaml rev（0.16.7→0.16.8）+ci.yml uvx 钉点；formatter 差异单独 commit；预算棘轮永不上调（D-044）。覆盖 D-089。
-3. **PR #30**：actions-minor-patch 组成员，按组策略评估直合或随批。覆盖 D-089（dependabot 政策面）。
-4. **stub 预勘**（T-24b 前置）：maya_stub 现有 objExists/nodeType/listConnections（简版）；listAttr/attributeQuery/listConnections(plugs/d) 面缺失须扩，按 D-074 先例。覆盖 D-094（测试面分支）。
+**形态**：time-boxed spike——探明+报告+裁决，产出=信息非代码；分支可弃不写迁移 PR。
 
-### T-24b — introspection 实现（D-094 形态 + D-095 落位）
+**执行链（序）**：
 
-- **形态**（D-094 定稿）：
-  - scene_describe(node)：实例级自描述 {type, attrs[组合调用必需切面], connections[{src_plug,dst_plug,direction}]}；connections 默认返回（轻字段不藏开关后），开关只控重字段（值/softRange）
-  - scene_nodes(type?,pattern?,dag_only?)：枚举含非 DAG 节点（材质/工具节点等 snapshot 盲区）；返回 count+截断名单(默认~50)+has_more/next_cursor+可选 type_counts
-  - 两工具 description 互写边界句：scene_describe≠scene_inspect（空间级）、scene_nodes≠scene_snapshot（低清概览）
-- **落位**（D-095 定稿）：B'——归 _mcp_scene 注入单元域 + 独立宿主侧文件装配（非追加巨石本体）；装配机制二选一在契约裁：①注入前拼接进 _mcp_scene payload ②注入后挂接命名空间。宿主侧 introspect_tools.py 独立成文件（同 export_tools 例）。定位 T-07 首批迁移单元。
-- **契约细部=Q3 提案表未裁决**（下窗首题；以下为提案非账本结论）：
-  - 提案：scene_describe(node, attrs=None|list[str], include_values=False, include_connections=True)；attrs 条目=组合调用必需切面 14 字段（attr_type/writable/readable/connectable/keyable/multi/enum+listEnum/min+max+exists/hidden/locked/storable/children/indexMatters）；scene_nodes(type, pattern=glob, dag_only, limit=50 且服务端 min(limit,100), cursor)；json-only 无 cos 分支；annotations readOnly=T/destructive=F/idempotent=T/openWorld=F；域错误族 node_not_found/attr_not_found/invalid_cursor/query_failed；include_values 可能触发 DG evaluation 须如实写 description+threat-model
-  - 提案叉子与建议：attrs 过滤=list[str]；json-only；include_values 默认 False；type 过滤加 inherited flag
-  - 提案负向：不做属性写入/类型级 schema/递归连接遍历/超限静默截断
-- **测试面**：stub 补 listAttr/attributeQuery/listConnections 参数面；契约+annotations+双通道测试；真机档（Maya 须用户开启）describe/nodes 冒烟留证
-- **文档**：README/README.zh-CN/AGENTS.md 工具计数 23→25；server.py instructions；pipeline.TOOL_ANNOTATIONS 两行；threat-model §5 纯读面如实登记（无新威胁面则写明）；CONTEXT.md 视落地补 introspection 术语
+1. **静态预筛⓪**：`grep -rn 'get_tools\|get_resources\|\.meta\[.*_fastmcp\|FASTMCP_\|from mcp.types' src/ tests/`；对 mcp.types 具体 import 符号列存活清单（CallToolRequestParams/ToolAnnotations/ToolResult vs SDK v2 Removed types——D-100④ 增项）。
+2. **本地 venv 初筛**：`uv venv .venv-fm4 && uv pip install 'fastmcp>=4,<5' -e '.[dev]' && pytest tests/ -q`——初筛红腿清单（ImportError 类先出）。
+3. **探测分支** `probe/fastmcp-4x`：允许 commit 仅三类——①pyproject pin 改 >=4,<5（注释标 spike 非收窄）②.scratch 外报告草稿③dependabot.yml 注释同步（3.x 叙述→4.x，D-100①；本环节已预改 main 版，分支核对一致性）。不夹带修复。
+4. **开 PR 触发 CI 矩阵**（非裸 push——PR 语境+4 格矩阵+可评论报告），出权威红/绿清单。
+5. **结构化报告** → .scratch/t25/reports/2026-XX-XX-fastmcp4-spike.md：objective/破坏面×调用面矩阵/findings/recommendation；**账本强制落两条根因修正**：#18+#36 双红史精确断点（D-100③——camelCase 误归因同染两条；ii-agent#165 实为 2.x×新 pydantic 冲突，ⓒ 触发时勿引错向 D-100⑤）。
+6. **裁决点**：全绿（CI 4 格+本地 stdio_probe 级整跑双绿）→收窄 PR：pin >=4.x,<5.0.0+注释双锚（#18/#36 修正后红史+上游 releases「minor 允许破坏」政策页）+dependabot 注释终稿；部分红→逐红项债（精确断点+修复估算+触发条件=下个 minor 窗口）；阻塞级→债登记+关窗，pin 留 2.14.x+ignore 续挡。
 
-### T-24c — issue #5 收口（D-093 先例复用）
+**探针清单**（D-097②+D-099②+D-100④ 合流）：⓪静态 grep 预筛→①#18/#36 红腿精确根因→②FastMCP() 构造 kwargs 全表对→③@mcp.tool 装饰器返回值面（v3+起返回原函数；FASTMCP_DECORATOR_MODE 过渡闸已 deprecated）→④Middleware 钩子签名 diff→⑤_fastmcp meta 键消费点→⑥stdio_probe 级整跑→⑦依赖解析面（pydantic≥2.12/Starlette≥1.0.1/httpx2）→⑧mcp.types 符号存活面→⑨同步 handler 移 worker 线程核验行（本仓钩子全 async）→⑩4.x requires-python floor 复核。3.x 已知破坏面（meta 键/装饰器/FASTMCP_DECORATOR_MODE）=参考映射非专项。
 
-落地后：#5 两 checkbox 勾齐+证据指针（export→0.3.0；introspection→本批测试锚点）+close comment；PR 用 Refs #5 不自动关；docs/agents/issue-tracker.md 同步。覆盖 D-094（兑现 issue 残余）+D-093（流程先例）。
+**4.x 注意点**（注记节内容）：SDK v2 camelCase→snake_case+FASTMCP_MCP_CAMELCASE_COMPAT 桥（默认开、读旧名出 DeprecationWarning）；ctx.elicit sessionless raise（本仓不用）；httpx→httpx2 异常类静默失配；背景任务入 fastmcp[tasks] extra；pydantic>=2.12 floor；fastmcp.__version__ 移除（本仓用 importlib.metadata 不受影响）；Middleware on_initialize 新协议 era 不触发（stdio+握手 era 暂免）。
 
-### T-24d — 门禁 + 版本人工门
+### T-25b — A′ 复用重构（D-098）
 
-全门禁复跑；introspection=feature→预期 minor（0.4.0 属预期非裁决，切分归人工门）；0.3.0 tag/Release/PyPI 人工门仍挂，可与本批同窗口处理。覆盖 D-093（发布节奏惯例）。
+- client.py 加模块级 `module_call(module,fn,*args,**kw)`+`exec_module_code(client,code)`（循 D-083 ensure_module_injected 形态不进类本体）；P0-2 安全 docstring 从 _scene_call 迁到 module_call。
+- _scene_call 不留别名：scene_tools/introspect_tools 全仓直调 `module_call("_mcp_scene",...)`；_execute_scene_code 留 scene_tools 保缓存分支（exec_module_code=其无缓存核）。
+- export_tools/asset_tools 删 _export_call/_exec_export/_asset_call/_exec_asset 私有拷贝调泛型；_ensure_X_injected 各域薄绑定保留。
+- 补 module_call 单测（payload JSON 形状+模块名嵌入）作安全原语回归锚；现有各域测试原样通过即行为不变式。
+- **翻车预案**：若某域 _exec_X 已微漂移→该域按 D-090 剧本 inline 保留不硬塞泛型。
+
+### T-25c — 残余债触发条件登记（D-096 捎带尾）
+
+账本/任务书登记触发条件（非实现）：hub 节点 connections 无界（触发=实测单节点 connections>500 出现）；positional cursor 不绑过滤集（触发=下个分页工作或正确性投诉）；Q3 契约正式追认（触发=首个 introspection 契约修订请求；optional）。**fastmcp-5.x 探索窗**触发条件=同构复合门（GA+沉淀/4.x 沉寂/依赖冲突，届时再立）。
+
+### T-25d — 门禁 + 发布关联
+
+全门禁复跑（基线上表）；收窄 PR 若成+A′ 重构→进 0.4.0 minor 车身（预期非裁决）；v0.3.0 tag/GH Release/PyPI 人工门仍挂。覆盖 D-097⑥/D-099③。
 
 ## 顺延债
 
-原样挂账：巨石 4583 行/T-06/T-07（introspection 独立文件=首批迁移单元候选）/stub connectAttr 槽位表/N4/依赖锁定/coverage patch 门/macOS smoke/Arnold/T-19 顺延批/Alembic 导出立项；issue #31（scene_plan 资产推荐残余）。
-- **fastmcp-3.x 探索窗**（触发条件=下个 minor 窗口——T-24 落版即达标，届时开探收窄 >=3.x,<4.0.0）
-- 新增：**Q3 契约细部提案待裁**（T-24b 首题）
+原样挂账：T-07 巨石拆分（introspect_module=首批迁移单元）/issue #31（scene_plan 资产推荐）/coverage patch 门/macOS smoke/Arnold/Alembic 导出/issue #7 真机验证窗/real-Maya introspection 冒烟（用户开 Maya 后跑 tests/test_mayapy_smoke.py::_injection_unit 脚手架）。
 
 ## 铁律
 
-- 判据语义读法=ADR-0027 修订后官方释法；新能力落位一律过判据流程
-- 诚实截断：has_more/total_count 是契约一部分，禁静默截断
-- 脏场景守卫照旧（真机操作前探针先行）；execute_code 天花板下不假装有 confinement
+- 探测分支可弃：仅三类 commit、不夹带修复、不合并进 main
+- 收窄 PR=证据型上界：注释必须双锚（修正后红史+上游政策页），措辞以 spike 报告修正版为准
+- grill 期不动源码；执行窗才跑探测链
 - release/tag/push/GH Release 全走人工确认门
 
 ## Suggested skills
 
-- to-spec（T-24b 契约定稿——Q3 提案表待裁或再过一轮 atomcode）
-- implement / tdd（T-24b；stub 契约先行）
-- gitbutler / gh（T-24a dependabot 处置+提交）
-- domain-modeling（introspection 术语定型时）
-- atomcode-research（fastmcp-3.x 探索窗触发时；Q3 若需二审）
-- neat-freak（台账/文档同步）
+- implement / tdd（T-25a 探测链+T-25b 重构——stub/测试先行）
+- atomcode-research（spike 撞未文档化破坏面时定点深挖；serial 纪律）
+- gitbutler / gh（探测分支+PR 机制：but push→gh pr create→gh pr merge --merge）
+- neat-freak（账本/dependabot 注释/文档同步复核）
+- domain-modeling（spike 报告术语结晶时）
+- handoff（下一轮收口）
+
+## T-25 执行回写（2026-09-26）
+
+- T-25a 裁决=**部分红非阻塞**：CI 权威面（PR #41 / run 36225673230）4 pytest 腿+mypy 红/ruff 绿；本地 stdio initialize/25 工具/ping/tools-call 全绿。#18/#36 根因修正与 R1-R3 迁移债束已落账本 D-105（触发=0.4.0 minor 窗口，更名与收窄 pin 同 PR）；探测分支 probe/fastmcp-4x 三类 commit 闭环不合并待删。spike 报告=.scratch/t25/reports/2026-09-26-fastmcp4-spike.md（gitignore 过程件）+ probe 分支 FASTMCP4-SPIKE-REPORT.md。
+- T-25b 已落 impl/t25-module-call-reuse：client.py module_call+exec_module_code 收编 scene/asset/export/introspect 四域私有拷贝，P0-2 docstring 随迁，tests/test_client.py::TestModuleCall 7 测试为安全原语回归锚。
+- T-25c 四项触发债已登记账本 D-101..D-104（hub connections>500 / positional cursor 下个分页或投诉 / Q3 契约首个修订请求 / 5.x 同构复合门届时再立）。

@@ -245,6 +245,19 @@ explicitly — injected modules are self-contained by architecture (the
 of that rule). Injection size is a budgeted resource (native channel
 15000-char threshold, D-013) — keep modules lean.
 
+### Module-call construction convention (D-098)
+
+Host-side calls into injected units go through two module-level
+primitives in `client.py`: `module_call(module, fn, *args, **kw)`
+(JSON-payload call builder — the P0-2 injection-safety surface: user
+input never becomes executable source text) and
+`exec_module_code(client, code)` (execute + raise_for_error + JSON
+decode). Per-domain `_ensure_X_injected` binders stay (they pin
+module_name/source_path/session-set = domain config, not duplication).
+Rule: the client.py module_call family only accepts domain-agnostic
+call-construction primitives — no domain semantics. Drifted domain
+variants inline back per the D-090 playbook.
+
 ### Changelog Evidence Rule (D-082⑦)
 
 Every `Added`/`Fixed`/`Changed` bullet in CHANGELOG.md MUST carry an
