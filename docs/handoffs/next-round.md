@@ -65,3 +65,10 @@
 - neat-freak（账本/dependabot 注释/文档同步复核）
 - domain-modeling（spike 报告术语结晶时）
 - handoff（下一轮收口）
+
+## T-25 执行回写（2026-09-26）
+
+- T-25a 裁决=**部分红非阻塞**：CI 权威面（PR #41 / run 36225673230）4 pytest 腿+mypy 红/ruff 绿；本地 stdio initialize/25 工具/ping/tools-call 全绿。#18/#36 根因修正与 R1-R3 迁移债束已落账本 D-105（触发=0.4.0 minor 窗口，更名与收窄 pin 同 PR）；探测分支 probe/fastmcp-4x 三类 commit 闭环不合并待删。spike 报告=.scratch/t25/reports/2026-09-26-fastmcp4-spike.md（gitignore 过程件）+ probe 分支 FASTMCP4-SPIKE-REPORT.md。
+- T-25b 已落 impl/t25-module-call-reuse：client.py module_call+exec_module_code 收编 scene/asset/export/introspect 四域私有拷贝，P0-2 docstring 随迁，tests/test_client.py::TestModuleCall 7 测试为安全原语回归锚。
+- T-25c 四项触发债已登记账本 D-101..D-104（hub connections>500 / positional cursor 下个分页或投诉 / Q3 契约首个修订请求 / 5.x 同构复合门届时再立）。
+
