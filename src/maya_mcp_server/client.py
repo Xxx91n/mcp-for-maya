@@ -175,7 +175,8 @@ async def ensure_module_injected(
             await client.execute_code(
                 "import types, sys, json; _c=open(json.loads("
                 + json.dumps(json.dumps(_tmp_safe))
-                + f")).read(); _m=types.ModuleType('{module_name}');"
+                + "), encoding='utf-8').read();"
+                f" _m=types.ModuleType('{module_name}');"
                 f" _m.__file__='<mcp:{module_name}>';"
                 f" exec(compile(_c,'{module_name}.py','exec'),_m.__dict__);"
                 f" sys.modules['{module_name}']=_m",
