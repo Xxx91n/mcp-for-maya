@@ -15,23 +15,16 @@ import json
 import logging
 from typing import Any
 
-from maya_mcp_server.client import raise_for_error
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS
-from maya_mcp_server.scene_tools import _ensure_module_injected, _scene_call
+from maya_mcp_server.scene_tools import (
+    _ensure_module_injected,
+    _execute_scene_code,
+    _scene_call,
+)
 from maya_mcp_server.security import InputValidationError
 
 
 logger = logging.getLogger(__name__)
-
-
-async def _exec_scene(client: Any, code: str) -> Any:
-    """Execute a _mcp_scene call; parse the JSON result."""
-    response = await client.execute_code(code, result_type="JSON")
-    raise_for_error(response)
-    data = response.result
-    if isinstance(data, str):
-        return json.loads(data)
-    return data
 
 
 def register_introspect_tools(mcp: Any) -> None:
@@ -100,7 +93,7 @@ def register_introspect_tools(mcp: Any) -> None:
 
         await _ensure_module_injected(client, session_key)
 
-        result = await _exec_scene(
+        result = await _execute_scene_code(
             client,
             _scene_call(
                 "describe_node",
@@ -109,6 +102,8 @@ def register_introspect_tools(mcp: Any) -> None:
                 include_values=bool(include_values),
                 include_connections=bool(include_connections),
             ),
+            session_key,
+            use_cache=False,
         )
         return json.dumps(result, indent=2)
 
@@ -172,7 +167,7 @@ def register_introspect_tools(mcp: Any) -> None:
 
         await _ensure_module_injected(client, session_key)
 
-        result = await _exec_scene(
+        result = await _execute_scene_code(
             client,
             _scene_call(
                 "list_nodes",
@@ -184,5 +179,7 @@ def register_introspect_tools(mcp: Any) -> None:
                 cursor=cursor,
                 include_type_counts=bool(include_type_counts),
             ),
+            session_key,
+            use_cache=False,
         )
         return json.dumps(result, indent=2)

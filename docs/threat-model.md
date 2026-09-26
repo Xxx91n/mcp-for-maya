@@ -90,7 +90,7 @@ authoritative and this table must match it row for row:
 
 | Hints | Tools |
 |-------|-------|
-| readOnly=T, destructive=F, idempotent=T | `list_sessions`, `scene_snapshot`, `scene_inspect`, `scene_measure`, `scene_assert`, `scene_validate`, `scene_checkpoint_list`, `scene_aesthetics`, `scene_review`, `scene_viewport_snapshot`, `scene_render_preview` |
+| readOnly=T, destructive=F, idempotent=T | `list_sessions`, `scene_snapshot`, `scene_inspect`, `scene_measure`, `scene_assert`, `scene_validate`, `scene_checkpoint_list`, `scene_aesthetics`, `scene_review`, `scene_describe`, `scene_nodes`, `scene_viewport_snapshot`, `scene_render_preview` |
 | readOnly=F, destructive=F, idempotent=F | `scene_checkpoint`, `scene_rollback`, `scene_plan`, `camera_create`, `camera_orbit`, `add_session`, `scene_export` |
 | readOnly=F, destructive=T, idempotent=F | `execute_code`, `write_module`, `maya_setup_guide` |
 | readOnly=T, destructive=F, idempotent=T, openWorld=T | `asset_search` |
@@ -119,6 +119,13 @@ authoritative and this table must match it row for row:
   under the net-zero side-effect discipline (camera/current-time
   restored on every path, D-026) - the visible transient is documented
   in the tool docstrings.
+- `scene_describe` / `scene_nodes` (D-094) are pure read queries and
+  add no new threat surface: no file I/O, no network, no writes.
+  Honest registration: `scene_describe(include_values=True)` can
+  trigger DG evaluation inside Maya (cost, not a side effect - the
+  eval is Maya's normal dependency resolution) and `scene_nodes`
+  paginates positionally, so a stale `cursor` is answered with
+  `invalid_cursor`, never silently re-applied.
 - destructive=true is reserved for arbitrary code execution and
   startup-file writes. `scene_rollback` recovers state (not destructive)
   but is not idempotent; `camera_create`/`camera_orbit`/`scene_checkpoint`

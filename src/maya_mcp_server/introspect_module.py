@@ -6,9 +6,13 @@
 # domain (the first T-07 migration unit). Self-contained on purpose: it
 # references nothing private in the monolith.
 #
-# Runtime floor: Maya >=2023 (Python 3.9). No __future__ import (it would
-# be mid-file in the concatenated payload = SyntaxError), no PEP-604
-# unions at runtime-evaluated positions - annotations stay quoted.
+# Runtime floor: Maya >=2023 (Python 3.9). This file carries NO
+# __future__ import of its own (it would sit mid-file in the
+# concatenated payload = SyntaxError) - the unquoted PEP-604
+# annotations below are py3.9-safe ONLY because the monolith's
+# `from __future__ import annotations` (maya_scene_module.py:13)
+# governs the assembled unit and makes every annotation lazy.
+# Do NOT exec/import this file standalone on py3.9.
 
 from typing import Any
 
@@ -153,6 +157,9 @@ def describe_node(
     writable, connectable, keyable, multi, hidden, locked, storable,
     children, index_matters, enum, enum_values, min, max, (+ soft_min,
     soft_max, value)}], connections[{src_plug, dst_plug, direction}]}.
+    Sparse shape: an attr that fails its own exists check (listAttr vs
+    attributeQuery disagreement / TOCTOU edge) carries only
+    {name, exists: False} - facets are never fabricated.
     """
     try:
         if not isinstance(node, str) or not node.strip():
@@ -165,7 +172,7 @@ def describe_node(
             )
         if attrs is not None:
             if not isinstance(attrs, (list, tuple)) or not all(isinstance(a, str) for a in attrs):
-                return _int_err("attr_not_found", "attrs must be a list of attribute names")
+                return _int_err("query_failed", "attrs must be a list of attribute names")
             missing = [a for a in attrs if not _aq(node, a, "exists")]
             if missing:
                 return _int_err(

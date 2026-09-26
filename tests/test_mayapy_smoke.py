@@ -170,3 +170,50 @@ def test_callform_selection_star_pulls_non_dag(real_maya):
 def test_callform_about_batch_is_true(real_maya):
     """Under mayapy the batch gate trigger fires: about(batch=True)."""
     assert real_maya.about(batch=True) is True
+
+
+def _injection_unit():
+    """Exec the real _mcp_scene payload shape in mayapy: monolith source
+    + introspection fragment concatenated into one namespace - the same
+    bytes the host ships via write_module (D-095). A __future__ slip or
+    py-unsafe syntax in the fragment fails here exactly as in Maya."""
+    import sys
+    import types
+    from pathlib import Path
+
+    src_dir = Path(__file__).resolve().parents[1] / "src" / "maya_mcp_server"
+    source = (src_dir / "maya_scene_module.py").read_text(encoding="utf-8")
+    frag = src_dir / "introspect_module.py"
+    if frag.exists():
+        source += "\n\n" + frag.read_text(encoding="utf-8")
+    mod = types.ModuleType("_mcp_scene")
+    mod.__file__ = str(src_dir / "maya_scene_module.py")
+    sys.modules.pop("_mcp_scene", None)
+    sys.modules["_mcp_scene"] = mod
+    exec(compile(source, mod.__file__, "exec"), mod.__dict__)
+    return mod
+
+
+def test_describe_node_in_real_maya(real_maya):
+    m = _injection_unit()
+    real_maya.polyCube(name="GEO_intro")
+    res = m.describe_node("GEO_intro")
+    assert res["type"] == "transform"
+    names = {a["name"] for a in res["attrs"]}
+    assert "translate" in names
+    assert all(a["attr_type"] is not None for a in res["attrs"] if a.get("exists")), (
+        "every existing attr must carry a real attr_type facet"
+    )
+    assert isinstance(res["connections"], list)
+
+
+def test_list_nodes_in_real_maya(real_maya):
+    m = _injection_unit()
+    real_maya.polyCube(name="GEO_enum")
+    res = m.list_nodes(pattern="GEO_*")
+    assert res["count"] >= 1
+    assert any(n.endswith("GEO_enum") for n in res["nodes"])
+    assert res["has_more"] is False
+    assert res["next_cursor"] is None
+    dg = m.list_nodes(dag_only=False)
+    assert dg["total_count"] >= res["total_count"]
