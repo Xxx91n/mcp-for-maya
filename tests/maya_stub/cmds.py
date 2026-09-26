@@ -12,7 +12,7 @@ import math
 import re
 
 from . import runtime
-from .scene import LIGHT_TYPES, SHAPE_TYPES
+from .scene import LIGHT_TYPES, SHAPE_TYPES, _isa_family
 
 
 def _s():
@@ -50,7 +50,10 @@ def ls(*args, **kwargs):
     # ls(selection=True) returns the current selection (real Maya).
     if kwargs.get("selection") or kwargs.get("sl"):
         return list(sc.selection) or None
-    ntype = kwargs.get("type")
+    ntype = kwargs.get("type") or kwargs.get("t")
+    exact_type = kwargs.get("exactType") or kwargs.get("et")
+    dag_only = kwargs.get("dagObjects") or kwargs.get("dag") or kwargs.get("do")
+    dep_only = kwargs.get("dependencyNodes") or kwargs.get("dep")
     long_ = kwargs.get("long") or kwargs.get("l")
     materials = kwargs.get("materials")
 
@@ -80,17 +83,20 @@ def ls(*args, **kwargs):
             for n in nodes
             if any(_maya_glob(p, n.name) or _maya_glob(p, sc.long_name(n)) for p in patterns)
         ]
+    if exact_type is not None:
+        exacts = {exact_type} if isinstance(exact_type, str) else set(exact_type)
+        nodes = [n for n in nodes if n.type in exacts]
+    if dag_only:
+        nodes = [n for n in nodes if _isa_family(n, "dagNode")]
+    if dep_only:
+        nodes = [n for n in nodes if not _isa_family(n, "dagNode")]
     if ntype is not None:
-        if isinstance(ntype, (list, tuple)):
-            preds = [_TYPE_FILTERS.get(t) or (lambda n, t=t: n.type == t) for t in ntype]
-            nodes = [n for n in nodes if any(p(n) for p in preds)]
-        else:
-            pred = _TYPE_FILTERS.get(ntype) or (lambda n: n.type == ntype)
-            nodes = [n for n in nodes if pred(n)]
+        names_ = [ntype] if isinstance(ntype, str) else list(ntype)
+        nodes = [n for n in nodes if any(_isa_family(n, t) for t in names_)]
     if materials:
         nodes = [n for n in nodes if n.type in _MATERIAL_TYPES]
 
-    out = [sc.long_name(n) if long_ else n.name for n in nodes]
+    out = [sc.long_name(n) if (long_ and _isa_family(n, "dagNode")) else n.name for n in nodes]
     return out if out else None
 
 
@@ -121,9 +127,7 @@ def objectType(ref, **kwargs):
     isa = kwargs.get("isAType") or kwargs.get("isa")
     if isa is None:
         return node.type
-    if isa == "dagNode":
-        return node.type == "transform" or node.type in SHAPE_TYPES
-    return node.type == isa
+    return _isa_family(node, isa)
 
 
 def listRelatives(ref, parent=False, children=False, type=None, fullPath=False, shapes=False, **kw):
@@ -155,14 +159,51 @@ def listRelatives(ref, parent=False, children=False, type=None, fullPath=False, 
     return None
 
 
-def listConnections(ref, type=None, **kwargs):
+def listConnections(*args, **kwargs):
     sc = _s()
+    ref = args[0] if args else None
+    type = kwargs.get("type") or kwargs.get("t")
+    plugs = kwargs.get("plugs") or kwargs.get("p")
+    pairs_flag = kwargs.get("connections") or kwargs.get("c")
+    want_src = kwargs.get("source", kwargs.get("s", True))
+    want_dst = kwargs.get("destination", kwargs.get("d", True))
+    if ref is None:
+        return None
     ref = str(ref)
     node_ref, attr = ref.split(".", 1) if "." in ref else (ref, "")
     try:
         node = sc.resolve(node_ref)
     except RuntimeError:
         return None
+
+    if plugs or pairs_flag:
+        # Plug-level surface (D-094): parallel plug_connections map.
+        # With connections=True each pair is (plug on queried node,
+        # remote plug) - matches the official "the one on the specified
+        # object is given first" contract.
+        if attr:
+            srcs = list(sc.plug_connections.get(node.name + "." + attr, []))
+            out = [s if plugs else s.split(".")[0] for s in srcs]
+            if type is not None:
+                out = [s for s in out if _isa_family(sc.resolve(s.split(".")[0]), type)]
+            return out or None
+        found = []  # (local_plug, remote_plug)
+        for dst_plug, srcs in sc.plug_connections.items():
+            dst_node = dst_plug.split(".")[0]
+            for s_plug in srcs:
+                src_node = s_plug.split(".")[0]
+                if dst_node == node.name and want_src:
+                    found.append((dst_plug, s_plug))
+                if src_node == node.name and want_dst:
+                    found.append((s_plug, dst_plug))
+        if type is not None:
+            found = [pr for pr in found if _isa_family(sc.resolve(pr[1].split(".")[0]), type)]
+        if pairs_flag:
+            flat = []
+            for local, remote in found:
+                flat.extend([local, remote])
+            return flat or None
+        return [remote for _, remote in found] or None
 
     if attr.startswith("instObjGroups"):
         targets = []
@@ -205,23 +246,236 @@ def sets(*args, **kwargs):
             node = sc.resolve(a)
             sc.set_members.setdefault(sgn, []).append(sc.long_name(node))
             sc.connections.setdefault(node.name + ".instObjGroups[0]", []).append(sgn)
+            sc.plug_connections.setdefault(node.name + ".instObjGroups[0]", []).append(
+                sgn + ".dagSetMembers[0]"
+            )
         return None
     if kwargs.get("query") or kwargs.get("q"):
         return sc.set_members.get(sc.resolve(args[0]).name, []) or None
     return None
 
 
-def getAttr(ref):
+def getAttr(ref, **kwargs):
     sc = _s()
     node_ref, attr = str(ref).split(".", 1)
     node = sc.resolve(node_ref)
     attr = attr.split("[")[0]
+    spec = sc.attr_meta(node).get(attr)
+    if spec is None:
+        raise RuntimeError("No attribute: " + ref)
+    if kwargs.get("type") or kwargs.get("t"):
+        return spec["attr_type"]
+    if kwargs.get("lock") or kwargs.get("l"):
+        return spec["locked"]
+    if kwargs.get("keyable") or kwargs.get("k"):
+        return spec["keyable"]
+    if kwargs.get("channelBox") or kwargs.get("cb"):
+        return spec["keyable"] or spec["channel_box"]
+    if kwargs.get("settable") or kwargs.get("se"):
+        return spec["writable"] and not spec["locked"]
+    if kwargs.get("asString"):
+        v = node.attrs.get(attr, spec["default"])
+        if spec["enum"] and isinstance(v, int) and 0 <= v < len(spec["enums"]):
+            return spec["enums"][v]
+        return v
+    for flag in kwargs:
+        sc.stub_note(f"getAttr flag {flag} unmodeled in stub")
     if attr in node.attrs:
         v = node.attrs[attr]
         if isinstance(v, tuple):
             return [v]
         return v
-    raise RuntimeError("No attribute: " + ref)
+    # Type attrs with no stored value: trs live on Node fields, the rest
+    # report their spec default (real getAttr returns defaults).
+    if node.type == "transform" and attr in _TRS_VALUE_MAP:
+        return _TRS_VALUE_MAP[attr](node)
+    return spec["default"]
+
+
+_TRS_VALUE_MAP = {
+    "translate": lambda n: [tuple(n.t)],
+    "translateX": lambda n: n.t[0],
+    "translateY": lambda n: n.t[1],
+    "translateZ": lambda n: n.t[2],
+    "rotate": lambda n: [tuple(n.r)],
+    "rotateX": lambda n: n.r[0],
+    "rotateY": lambda n: n.r[1],
+    "rotateZ": lambda n: n.r[2],
+    "scale": lambda n: [tuple(n.s)],
+    "scaleX": lambda n: n.s[0],
+    "scaleY": lambda n: n.s[1],
+    "scaleZ": lambda n: n.s[2],
+}
+
+
+def listAttr(*args, **kwargs):
+    """cmds.listAttr - attribute listing over Scene.attr_meta (D-094).
+
+    Models the filter-flag subset the introspection surface needs plus the
+    common listing flags; unmodeled flags go through stub_note.
+    """
+    sc = _s()
+    node = sc.resolve(args[0] if args else kwargs.get("node"))
+    meta = sc.attr_meta(node)
+    names = list(meta.keys())
+
+    def flag(*ks):
+        return any(kwargs.get(k) for k in ks)
+
+    if flag("keyable", "k"):
+        names = [a for a in names if meta[a]["keyable"]]
+    if flag("channelBox", "cb"):
+        names = [a for a in names if meta[a]["keyable"] or meta[a]["channel_box"]]
+    if flag("connectable", "c"):
+        names = [a for a in names if meta[a]["connectable"]]
+    if flag("multi", "m"):
+        names = [a for a in names if meta[a]["multi"]]
+    if flag("locked", "l"):
+        names = [a for a in names if meta[a]["locked"]]
+    if flag("unlocked", "un"):
+        names = [a for a in names if not meta[a]["locked"]]
+    if flag("visible", "v"):
+        names = [a for a in names if not meta[a]["hidden"]]
+    if flag("hidden", "h"):
+        names = [a for a in names if meta[a]["hidden"]]
+    if flag("readOnly", "ro"):
+        names = [a for a in names if meta[a]["readable"] and not meta[a]["writable"]]
+    if flag("settable", "s"):
+        names = [a for a in names if meta[a]["writable"] and not meta[a]["locked"]]
+    if flag("userDefined", "ud"):
+        names = [a for a in names if meta[a]["user_defined"]]
+    if flag("read", "r"):
+        names = [a for a in names if meta[a]["readable"]]
+    if flag("write", "w"):
+        names = [a for a in names if meta[a]["writable"]]
+    if flag("scalar", "sc"):
+        names = [a for a in names if not meta[a]["multi"] and not meta[a]["children"]]
+    if flag("array", "a"):
+        names = [a for a in names if meta[a]["multi"]]
+    if flag("leaf", "lf"):
+        names = [a for a in names if not meta[a]["children"]]
+    at = kwargs.get("attributeType") or kwargs.get("at")
+    if at:
+        names = [a for a in names if meta[a]["attr_type"] == at]
+    pat = kwargs.get("string") or kwargs.get("st")
+    if pat:
+        names = [a for a in names if _maya_glob(str(pat), a)]
+    if flag("fullNodeName", "fnn"):
+        names = [node.name + "." + a for a in names]
+    known = {
+        "keyable",
+        "k",
+        "channelBox",
+        "cb",
+        "connectable",
+        "c",
+        "multi",
+        "m",
+        "locked",
+        "l",
+        "unlocked",
+        "un",
+        "visible",
+        "v",
+        "hidden",
+        "h",
+        "readOnly",
+        "ro",
+        "settable",
+        "s",
+        "userDefined",
+        "ud",
+        "read",
+        "r",
+        "write",
+        "w",
+        "scalar",
+        "sc",
+        "array",
+        "a",
+        "leaf",
+        "lf",
+        "attributeType",
+        "at",
+        "string",
+        "st",
+        "fullNodeName",
+        "fnn",
+        "shortNames",
+        "sn",
+        "nodeName",
+        "nn",
+        "node",
+        "o",
+    }
+    for k in kwargs:
+        if k not in known:
+            sc.stub_note(f"listAttr flag {k} unmodeled in stub")
+    return names or None
+
+
+_AQ_FLAG_MAP = {
+    "exists": ("ex", lambda s: s is not None),
+    "readable": ("r", lambda s: s["readable"]),
+    "writable": ("w", lambda s: s["writable"]),
+    "connectable": ("c", lambda s: s["connectable"]),
+    "keyable": ("k", lambda s: s["keyable"]),
+    "channelBox": ("cb", lambda s: s["keyable"] or s["channel_box"]),
+    "multi": ("m", lambda s: s["multi"]),
+    "hidden": ("h", lambda s: s["hidden"]),
+    "storable": ("s", lambda s: s["storable"]),
+    "indexMatters": ("im", lambda s: s["index_matters"]),
+    "enum": ("e", lambda s: s["enum"]),
+    "listEnum": ("le", lambda s: s["enums"] or None),
+    "listChildren": ("lc", lambda s: s["children"] or None),
+    "numberOfChildren": ("nc", lambda s: len(s["children"])),
+    "minExists": ("mine", lambda s: s["min"] is not None),
+    "minimum": ("min", lambda s: [s["min"]] if s["min"] is not None else None),
+    "maxExists": ("maxe", lambda s: s["max"] is not None),
+    "maximum": ("max", lambda s: [s["max"]] if s["max"] is not None else None),
+    "softMinExists": ("smne", lambda s: s["smin"] is not None),
+    "softMin": ("smn", lambda s: [s["smin"]] if s["smin"] is not None else None),
+    "softMaxExists": ("smxe", lambda s: s["smax"] is not None),
+    "softMax": ("smx", lambda s: [s["smax"]] if s["smax"] is not None else None),
+    "rangeExists": ("re", lambda s: s["min"] is not None and s["max"] is not None),
+    "range": ("ra", lambda s: [s["min"], s["max"]]),
+    "internal": ("i", lambda s: False),
+    "categories": (None, lambda s: []),
+    "attributeType": ("at", lambda s: s["attr_type"]),
+    "longName": ("ln", lambda s: None),
+    "shortName": ("sn", lambda s: None),
+    "niceName": ("nn", lambda s: None),
+    "message": ("ms", lambda s: s["attr_type"] == "message"),
+    "usedAsFilename": ("uaf", lambda s: False),
+}
+
+
+def attributeQuery(*args, **kwargs):
+    """cmds.attributeQuery - per-attribute metadata over attr_meta (D-094).
+
+    Real signature: attributeQuery('attr', node='node', flag=True[, ...]).
+    Missing attrs raise like real Maya; unknown flags go to stub_note.
+    """
+    sc = _s()
+    attr = args[0] if args else kwargs.pop("attribute", None)
+    node_ref = kwargs.pop("node", kwargs.pop("nd", None))
+    node = sc.resolve(node_ref)
+    meta = sc.attr_meta(node)
+    spec = meta.get(attr)
+    results = []
+    for flag, on in kwargs.items():
+        if not on:
+            continue
+        entry = _AQ_FLAG_MAP.get(flag)
+        if entry is None:
+            sc.stub_note(f"attributeQuery flag {flag} unmodeled in stub")
+            continue
+        if spec is None and flag not in ("exists", "ex"):
+            raise RuntimeError(f"attributeQuery: attribute '{attr}' not on {node.name}")
+        results.append(entry[1](spec))
+    if not results:
+        raise RuntimeError("attributeQuery requires a query flag")
+    return results[0] if len(results) == 1 else results
 
 
 def currentUnit(query=False, linear=False, angle=False, time=False, **kw):
@@ -776,8 +1030,11 @@ def setAttr(ref, *args, **kwargs):
     sc = _s()
     node_ref, attr = str(ref).split(".", 1)
     node = sc.resolve(node_ref)
+    base = attr.split("[")[0]
+    if base not in sc.attr_meta(node, dynamic=False):
+        node.user_attrs.add(base)
     value = args[0] if len(args) == 1 else (list(args) if args else None)
-    node.attrs[attr.split("[")[0]] = value
+    node.attrs[base] = value
     return None
 
 
@@ -801,6 +1058,7 @@ def connectAttr(src, dst, **kwargs):
             "Data types of source and destination are not compatible."
         )
     sc.connections.setdefault(dst_node_name + "." + dst_attr, []).append(src_node.name)
+    sc.plug_connections.setdefault(dst_node_name + "." + dst_attr, []).append(str(src))
     return None
 
 
@@ -811,6 +1069,8 @@ def disconnectAttr(src, dst, **kwargs):
     key = dst_ref
     if key in sc.connections and src_node.name in sc.connections[key]:
         sc.connections[key].remove(src_node.name)
+    if key in sc.plug_connections and str(src) in sc.plug_connections[key]:
+        sc.plug_connections[key].remove(str(src))
     return None
 
 

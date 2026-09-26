@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import sys
 import types
+from pathlib import Path
 
 from . import cmds as _cmds
 from . import fakeqt as _fakeqt
@@ -104,11 +105,27 @@ def uninstall():
 
 
 def load_scene_module():
-    """Import maya_scene_module fresh, bound to the installed stub."""
-    sys.modules.pop("maya_mcp_server.maya_scene_module", None)
-    import maya_mcp_server.maya_scene_module as msm
+    """Load the _mcp_scene injection unit fresh, bound to the stub.
 
-    return msm
+    Mirrors the production payload assembly (D-095): maya_scene_module.py
+    + introspect_module.py concatenated into ONE module namespace - the
+    same bytes the host ships via write_module/mkstemp. A __future__
+    import or syntax slip in the fragment fails here exactly like it
+    would inside Maya.
+    """
+    sys.modules.pop("maya_mcp_server.maya_scene_module", None)
+    sys.modules.pop("maya_mcp_server.introspect_module", None)
+    src_dir = Path(__file__).resolve().parents[2] / "src" / "maya_mcp_server"
+    source = (src_dir / "maya_scene_module.py").read_text(encoding="utf-8")
+    frag = src_dir / "introspect_module.py"
+    if frag.exists():
+        source += "\n\n" + frag.read_text(encoding="utf-8")
+    mod = types.ModuleType("maya_mcp_server.maya_scene_module")
+    mod.__file__ = str(src_dir / "maya_scene_module.py")
+    mod.__package__ = "maya_mcp_server"
+    sys.modules["maya_mcp_server.maya_scene_module"] = mod
+    exec(compile(source, mod.__file__, "exec"), mod.__dict__)
+    return mod
 
 
 def load_visual_module():

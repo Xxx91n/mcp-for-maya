@@ -188,8 +188,8 @@ class TestTextureWiring:
         f_diff = sc.resolve("file_Camera_01_body_diff")
         assert f_diff.attrs.get("colorSpace") == "sRGB"
         assert "file_Camera_01_body_diff" in sc.connections.get(
-            "|body.color",
-            [],  # DG material sits at root -> long name key
+            "body.color",
+            [],  # DG material has no DAG path -> short name key (real ls -l)
         )
         # normal goes through a bump2d into normalCamera
         bump_targets = [k for k in sc.connections if k.endswith(".bumpValue")]
@@ -197,7 +197,7 @@ class TestTextureWiring:
         bump_node = bump_targets[0].split(".")[0]
         assert sc.resolve(bump_node).type == "bump2d"
         assert "file_Camera_01_body_nor_gl" in sc.connections[bump_targets[0]]
-        assert bump_node in [c for c in sc.connections.get("|body.normalCamera", [])]
+        assert bump_node in [c for c in sc.connections.get("body.normalCamera", [])]
         # normal map file is Raw, not sRGB
         f_nor = sc.resolve("file_Camera_01_body_nor_gl")
         assert f_nor.attrs.get("colorSpace") == "Raw"
@@ -220,7 +220,7 @@ class TestTextureWiring:
         wired = "\n".join(parts["body"]["wired"])
         assert "body_arm->body" in wired
         sc = asset_env.scene
-        assert "file_Camera_01_body_arm" in sc.connections.get("|body.diffuse", [])
+        assert "file_Camera_01_body_arm" in sc.connections.get("body.diffuse", [])
         f_arm = sc.resolve("file_Camera_01_body_arm")
         assert f_arm.attrs.get("colorSpace") == "Raw"
 
@@ -279,7 +279,7 @@ class TestDisplacement:
             "file_Camera_01_body_disp_disp.displacement", []
         )
         assert "file_Camera_01_body_disp_disp" in sc.connections.get(
-            "|bodySG.displacementShader", []
+            "bodySG.displacementShader", []
         )
 
     def test_disp_without_sg_unwired(self, asset_env, tmp_path):
@@ -426,7 +426,7 @@ class TestStandardSurface:
         assert "body_metallic->body" in parts["body"]["unwired"]
         sc = asset_env.scene
         assert sc.resolve("body").attrs.get("reflectivity") is not None  # fixture sanity
-        assert "file_Camera_01_body_metallic" not in sc.connections.get("|body.reflectivity", [])
+        assert "file_Camera_01_body_metallic" not in sc.connections.get("body.reflectivity", [])
 
 
 # ------------------------------------------------------------------

@@ -65,8 +65,9 @@ Poly Haven model search + import shipped in 0.2.0 (issue #2 thin slice: FBX + te
 | 🔌 **Session management** | `list_sessions` `add_session` `maya_setup_guide` | Multi-session discovery/attach + connection diagnosis/install/fallback guidance |
 | 📦 **Asset library** | `asset_search` `asset_import` | Poly Haven CC0 models — host-side HTTPS download (host allowlist, md5 verify, size caps, platformdirs cache), Maya-side FBX import with texture wiring, polycount/dims guards, `GRP_asset_<id>` dedup |
 | 📤 **Scene export** | `scene_export` | FBX/OBJ/USD export — whole scene or named objects; format inferred from extension (conflict is an error, never a guess), parent dirs auto-created, overwrite opt-in, selection restored |
+| 🔎 **Scene-graph introspection** | `scene_describe` `scene_nodes` | API-level node self-description (exact type, per-attribute metadata: keyable/connectable/enum/ranges, connection wiring) + bounded enumeration incl. non-DAG nodes (materials/tool nodes) with `has_more`/`next_cursor` pagination |
 
-23 MCP tools in total.
+25 MCP tools in total.
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-quick-start.svg" width="100%" alt="Quick Start"/>
 
@@ -307,7 +308,7 @@ Two **Experimental** process cards ship in `skills/`:
 
 - **Zero telemetry**: no phone-home — the project ships no telemetry or unsolicited outbound traffic; verify in source. The ONLY outbound calls are the two asset tools: HTTPS to `api.polyhaven.com` / `dl.polyhaven.org|.com` (host allowlist + md5 + size caps in `polyhaven.py`), and only when you call them.
 - **Local, single-user**: the command port binds localhost only; the connected MCP client is trusted.
-- **Safety net**: a unified pipeline validates arguments + token-bucket rate limits (~100/60s reads, ~20/60s writes, per session) + pattern scan (warn-only by default) + an independent JSONL audit log across all 23 tools. It catches accidents, not malicious clients — full model in [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
+- **Safety net**: a unified pipeline validates arguments + token-bucket rate limits (~100/60s reads, ~20/60s writes, per session) + pattern scan (warn-only by default) + an independent JSONL audit log across all 25 tools. It catches accidents, not malicious clients — full model in [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
 - **Transactional safety**: `scene_checkpoint`/`scene_rollback` give in-memory snapshots and explicit rollback (no undo history; references flattened).
 - Vulnerability reporting: [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md).
 

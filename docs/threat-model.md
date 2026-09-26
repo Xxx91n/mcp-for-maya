@@ -51,10 +51,10 @@ problem.
 | Error contract | host failures raise coded exceptions (isError); Maya-domain failures return `{error:{code,message,suggestion?}}` | pipeline.py, maya_scene_module.py |
 | Checkpoint/rollback | exportAll memory snapshots, auto safety snapshot before rollback, S2 rebind | maya_scene_module.py |
 | userSetup.py merge | marker-block upsert, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
-| Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 23 tools | pipeline.py |
+| Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 25 tools | pipeline.py |
 | Asset egress whitelist | asset_search/asset_import reach https only on api.polyhaven.com + dl.polyhaven.org/.com, mandatory User-Agent, size+timeout caps, per-file md5 verify, platformdirs cache | polyhaven.py |
 
-All 23 tools pass through one FastMCP middleware pipeline:
+All 25 tools pass through one FastMCP middleware pipeline:
 validate → rate-limit → pattern-scan → dispatch → audit.
 
 ## 4. Port and network exposure

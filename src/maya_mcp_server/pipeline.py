@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Tool annotations \u2014 the single matrix (D-018). All 23 tools, all four hints.
+# Tool annotations \u2014 the single matrix (D-018). All 25 tools, all four hints.
 # readOnlyHint also drives the read/write rate-limit bucket.
 # ---------------------------------------------------------------------------
 
@@ -73,7 +73,7 @@ _WRITE_NET_IDEMPOTENT = mt.ToolAnnotations(
 )
 
 TOOL_ANNOTATIONS: dict[str, mt.ToolAnnotations] = {
-    # read-only tools (11)
+    # read-only tools (13)
     "list_sessions": _READ,
     "scene_snapshot": _READ,
     "scene_inspect": _READ,
@@ -83,6 +83,9 @@ TOOL_ANNOTATIONS: dict[str, mt.ToolAnnotations] = {
     "scene_checkpoint_list": _READ,
     "scene_aesthetics": _READ,
     "scene_review": _READ,
+    # scene-graph introspection (D-094): read-only DG queries
+    "scene_describe": _READ,
+    "scene_nodes": _READ,
     # visual loop: net-zero side effect discipline makes readOnly honest (D-026)
     "scene_viewport_snapshot": _READ,
     "scene_render_preview": _READ,

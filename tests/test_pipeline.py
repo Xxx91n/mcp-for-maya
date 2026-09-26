@@ -65,7 +65,7 @@ def _read_events(path: Path) -> list[dict]:
 
 
 class TestToolAnnotations:
-    """All 23 tools carry the four hints (D-018/ADR-0005 + D-075/D-092 matrix)."""
+    """All 25 tools carry the four hints (D-018/ADR-0005 + D-075/D-092/D-094 matrix)."""
 
     EXPECTED = {
         "list_sessions",
@@ -91,9 +91,11 @@ class TestToolAnnotations:
         "asset_search",
         "asset_import",
         "scene_export",
+        "scene_describe",
+        "scene_nodes",
     }
 
-    def test_all_23_tools_covered(self):
+    def test_all_25_tools_covered(self):
         assert set(TOOL_ANNOTATIONS) == self.EXPECTED
 
     def test_four_hints_all_set(self):
@@ -124,6 +126,8 @@ class TestToolAnnotations:
             "scene_review",
             "scene_viewport_snapshot",
             "scene_render_preview",
+            "scene_describe",
+            "scene_nodes",
         ):
             assert TOOL_ANNOTATIONS[name].readOnlyHint is True, name
             assert TOOL_ANNOTATIONS[name].idempotentHint is True, name

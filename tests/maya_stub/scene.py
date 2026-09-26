@@ -49,6 +49,193 @@ _METAL_ATTRS = {"metalness": 0.0, "baseColor": (0.5, 0.5, 0.5)}
 _SG_ATTRS = {"surfaceShader": None, "displacementShader": None, "volumeShader": None}
 
 
+# --- Attribute metadata model (D-094 scene-graph introspection) ---------
+# Per-type attribute specs back the stub surface of cmds.listAttr,
+# cmds.attributeQuery and the flag forms of cmds.getAttr. Each spec dict
+# mirrors one attributeQuery facet row; values model the real Maya
+# contract closely enough for contract tests (never a census).
+
+
+def _aspec(attr_type, **kw):
+    spec = {
+        "attr_type": attr_type,
+        "readable": True,
+        "writable": True,
+        "connectable": True,
+        "keyable": False,
+        "channel_box": False,
+        "multi": False,
+        "enum": False,
+        "enums": [],
+        "min": None,
+        "max": None,
+        "smin": None,
+        "smax": None,
+        "hidden": False,
+        "locked": False,
+        "storable": True,
+        "children": [],
+        "index_matters": False,
+        "user_defined": False,
+    }
+    spec.update(kw)
+    if "default" not in spec:
+        spec["default"] = _default_value(attr_type)
+    return spec
+
+
+def _default_value(attr_type):
+    if attr_type in ("double", "doubleLinear", "doubleAngle", "long", "byte", "float"):
+        return 0.0
+    if attr_type == "bool":
+        return False
+    if attr_type == "enum":
+        return 0
+    if attr_type in ("double3", "float3"):
+        return [(0.0, 0.0, 0.0)]
+    if attr_type == "string":
+        return ""
+    return None  # message/typed attrs carry no direct value
+
+
+def _dynamic_aspec(value, user_defined):
+    """Spec for node.attrs entries outside the type table."""
+    if isinstance(value, bool):
+        t = "bool"
+    elif isinstance(value, float):
+        t = "double"
+    elif isinstance(value, int):
+        t = "long"
+    elif isinstance(value, str):
+        t = "string"
+    elif isinstance(value, (list, tuple)):
+        t = "double3" if len(value) == 3 else "doubleArray"
+    elif value is None:
+        t = "message"
+    else:
+        t = "typed"
+    return _aspec(t, keyable=user_defined, channel_box=user_defined, user_defined=user_defined)
+
+
+_BASE_ATTRS = {
+    "caching": _aspec("bool", hidden=True),
+    "frozen": _aspec("bool", hidden=True),
+    "isHistoricallyInteresting": _aspec("byte", hidden=True),
+    "nodeState": _aspec("enum", hidden=True, enums=["normal", "hasNoEffect", "blocking", "dead"]),
+    "binMembership": _aspec("string", hidden=True),
+}
+
+
+def _vec3(name):
+    return _aspec("double3", keyable=True, children=[name + "X", name + "Y", name + "Z"])
+
+
+_TRANSFORM_ATTRS = {
+    "translate": _vec3("translate"),
+    "translateX": _aspec("doubleLinear", keyable=True),
+    "translateY": _aspec("doubleLinear", keyable=True),
+    "translateZ": _aspec("doubleLinear", keyable=True),
+    "rotate": _vec3("rotate"),
+    "rotateX": _aspec("doubleAngle", keyable=True),
+    "rotateY": _aspec("doubleAngle", keyable=True),
+    "rotateZ": _aspec("doubleAngle", keyable=True),
+    "scale": _vec3("scale"),
+    "scaleX": _aspec("double", keyable=True),
+    "scaleY": _aspec("double", keyable=True),
+    "scaleZ": _aspec("double", keyable=True),
+    "shear": _aspec("double3", keyable=True, children=["shearXY", "shearXZ", "shearYZ"]),
+    "shearXY": _aspec("double", keyable=True),
+    "shearXZ": _aspec("double", keyable=True),
+    "shearYZ": _aspec("double", keyable=True),
+    "rotatePivot": _aspec("double3", children=["rotatePivotX", "rotatePivotY", "rotatePivotZ"]),
+    "rotatePivotX": _aspec("double"),
+    "rotatePivotY": _aspec("double"),
+    "rotatePivotZ": _aspec("double"),
+    "scalePivot": _aspec("double3", children=["scalePivotX", "scalePivotY", "scalePivotZ"]),
+    "scalePivotX": _aspec("double"),
+    "scalePivotY": _aspec("double"),
+    "scalePivotZ": _aspec("double"),
+    "visibility": _aspec("bool", keyable=True, channel_box=True, default=True),
+    "rotateOrder": _aspec("enum", keyable=True, enums=["xyz", "yzx", "zxy", "xzy", "yxz", "zyx"]),
+    "inheritsTransform": _aspec("bool", default=True),
+    "intermediateObject": _aspec("bool"),
+}
+
+_SHAPE_ATTRS = {
+    "visibility": _aspec("bool", keyable=True, channel_box=True, default=True),
+    "intermediateObject": _aspec("bool"),
+    "ghosting": _aspec("bool"),
+}
+
+_CAMERA_ATTRS = {
+    "focalLength": _aspec("double", keyable=True, min=0.0, default=35.0),
+    "orthographic": _aspec("bool", keyable=True),
+}
+
+_LIGHT_ATTRS = {
+    "color": _aspec("double3", keyable=True, children=["colorR", "colorG", "colorB"]),
+    "colorR": _aspec("double", keyable=True, default=1.0),
+    "colorG": _aspec("double", keyable=True, default=1.0),
+    "colorB": _aspec("double", keyable=True, default=1.0),
+    "intensity": _aspec("double", keyable=True, default=1.0),
+}
+
+_SPOTLIGHT_ATTRS = {
+    "coneAngle": _aspec("double", keyable=True, min=0.5, max=179.5, default=40.0),
+    "penumbraAngle": _aspec("double", keyable=True, min=-10.0, max=10.0),
+    "dropoff": _aspec("double", keyable=True, min=0.0, max=255.0),
+    "decayRate": _aspec("enum", keyable=True, enums=["linear", "quadratic", "cubic", "noDecay"]),
+    "emitDiffuse": _aspec("bool", keyable=True, default=True),
+    "emitSpecular": _aspec("bool", keyable=True, default=True),
+}
+
+_SG_ATTRS_SPEC = {
+    "surfaceShader": _aspec("message"),
+    "displacementShader": _aspec("message"),
+    "volumeShader": _aspec("message"),
+}
+
+
+def _type_attrs(ntype):
+    """Static per-type attribute spec table (no dynamic attrs)."""
+    table = dict(_BASE_ATTRS)
+    if ntype == "transform":
+        table.update(_TRANSFORM_ATTRS)
+    if ntype in SHAPE_TYPES:
+        table.update(_SHAPE_ATTRS)
+    if ntype == "camera":
+        table.update(_CAMERA_ATTRS)
+    if ntype in LIGHT_TYPES:
+        table.update(_LIGHT_ATTRS)
+    if ntype == "spotLight":
+        table.update(_SPOTLIGHT_ATTRS)
+    if ntype == "shadingEngine":
+        table.update(_SG_ATTRS_SPEC)
+    return table
+
+
+# Type-family map for objectType(isAType=) / ls(type=) inherited matching
+# (D-094): models the real Maya node hierarchy families the introspection
+# surface needs - not the full type tree.
+_TYPE_FAMILIES = {
+    "dagNode": lambda n: n.type == "transform" or n.type in SHAPE_TYPES,
+    "dependencyNode": lambda n: not (n.type == "transform" or n.type in SHAPE_TYPES),
+    "shape": lambda n: n.type in SHAPE_TYPES,
+    "light": lambda n: n.type in LIGHT_TYPES,
+    "transform": lambda n: n.type == "transform",
+    "lambert": lambda n: n.type in {"lambert", "blinn", "phong", "phongE"},
+    "shadingEngine": lambda n: n.type == "shadingEngine",
+}
+
+
+def _isa_family(node, type_name):
+    """isAType semantics: family membership or exact-type fallback."""
+    fam = _TYPE_FAMILIES.get(type_name)
+    if fam is not None:
+        return fam(node)
+    return node.type == type_name
+
+
 class Node:
     __slots__ = (
         "scene",
@@ -65,6 +252,7 @@ class Node:
         "num_vertices",
         "num_polygons",
         "keyframes",
+        "user_attrs",
     )
 
     def __init__(self, scene, name, ntype, parent=None):
@@ -82,6 +270,7 @@ class Node:
         self.num_vertices = 8
         self.num_polygons = 6
         self.keyframes = {}
+        self.user_attrs = set()  # attrs created post-init via cmds.setAttr
 
     def path_nodes(self):
         """Nodes root -> self inclusive."""
@@ -110,6 +299,10 @@ class Scene:
         self.selection = []
         self.constraints = []  # recorded aimConstraint calls
         self.connections = {}  # "node.attr" -> [target node names]
+        # Plug-level wiring for the introspection surface (D-094):
+        # "dst_node.dst_attr" -> ["src_node.src_attr"]. Kept parallel to
+        # `connections` (node-name view) so existing callers keep their shape.
+        self.plug_connections = {}
         self.set_members = {}  # shadingEngine -> [member names]
         self.keyed = []  # (node, attribute) setKeyframe calls
         self.warnings = []  # cmds.warning calls
@@ -289,11 +482,15 @@ class Scene:
         mat.attrs["color"] = tuple(color)
         sg = self.add_node(name + "SG", "shadingEngine")
         self.connections[sg.name + ".surfaceShader"] = [mat.name]
+        self.plug_connections[sg.name + ".surfaceShader"] = [mat.name + ".outColor"]
         members = []
         for target in assign_to:
             node = self.resolve(target)
             shape = next((c for c in node.children if c.type in SHAPE_TYPES), node)
             self.connections.setdefault(shape.name + ".instObjGroups[0]", []).append(sg.name)
+            self.plug_connections.setdefault(shape.name + ".instObjGroups[0]", []).append(
+                sg.name + ".dagSetMembers[0]"
+            )
             members.append(self.long_name(shape))
         self.set_members[sg.name] = members
         return mat
@@ -328,6 +525,23 @@ class Scene:
             return True
         except RuntimeError:
             return False
+
+    def attr_meta(self, node, dynamic=True):
+        """Attribute metadata table for cmds.listAttr/attributeQuery (D-094).
+
+        dynamic=False restricts to type-seeded attrs (static table plus
+        node.attrs entries NOT marked user-defined) - used by cmds.setAttr
+        to tell a user attr from a type attr.
+        """
+        meta = _type_attrs(node.type)
+        if not dynamic:
+            pool = {k: v for k, v in node.attrs.items() if k not in node.user_attrs}
+        else:
+            pool = node.attrs
+        for name, val in pool.items():
+            if name not in meta:
+                meta[name] = _dynamic_aspec(val, user_defined=name in node.user_attrs)
+        return meta
 
     def stub_note(self, msg):
         """Record an anomaly; raise it when strict mode is on (D-039)."""
@@ -435,11 +649,13 @@ class Scene:
                     "num_vertices": n.num_vertices,
                     "num_polygons": n.num_polygons,
                     "keyframes": n.keyframes,
+                    "user_attrs": sorted(n.user_attrs),
                 }
             )
         return {
             "nodes": nodes,
             "connections": self.connections,
+            "plug_connections": {k: list(v) for k, v in self.plug_connections.items()},
             "set_members": self.set_members,
             "current_time": self.current_time,
             "playback_range": list(self.playback_range),
@@ -469,9 +685,11 @@ class Scene:
             node.num_vertices = nd.get("num_vertices", 8)
             node.num_polygons = nd.get("num_polygons", 6)
             node.keyframes = nd.get("keyframes", {})
+            node.user_attrs = set(nd.get("user_attrs", []))
             path = (nd["parent"] + "|" + nd["name"]) if nd["parent"] else "|" + nd["name"]
             by_path[path] = node
         self.connections = {k: list(v) for k, v in data.get("connections", {}).items()}
+        self.plug_connections = {k: list(v) for k, v in data.get("plug_connections", {}).items()}
         self.set_members = {k: list(v) for k, v in data.get("set_members", {}).items()}
         self.current_time = data.get("current_time", 1)
         self.playback_range = list(data.get("playback_range", [1, 120]))

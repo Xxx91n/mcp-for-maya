@@ -19,6 +19,7 @@ from maya_mcp_server.connection_guide import (
     uninstall_user_setup,
 )
 from maya_mcp_server.export_tools import register_export_tools
+from maya_mcp_server.introspect_tools import register_introspect_tools
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS, SecurityPipeline
 from maya_mcp_server.scene_tools import mark_dirty, register_scene_tools
 from maya_mcp_server.security import (
@@ -80,6 +81,14 @@ mcp = FastMCP(
         "- scene_inspect: Deep inspection of object/zone\n"
         "- scene_measure: Distance/clearance between objects\n"
         "- scene_assert: Verify scene state\n\n"
+        "## Scene-Graph Introspection\n"
+        "- scene_describe: API-level node self-description - exact type,\n"
+        "  attribute metadata (keyable/connectable/enum/ranges) and\n"
+        "  connection wiring; use before composing execute_code\n"
+        "  setAttr/connectAttr calls (spatial questions -> scene_inspect)\n"
+        "- scene_nodes: bounded enumeration incl. non-DAG nodes\n"
+        "  (materials/tool nodes); type/pattern/dag_only filters +\n"
+        "  has_more/next_cursor pagination\n\n"
         "## Constraint & Safety Tools\n"
         "- scene_validate: Check spatial constraints (clearance, overlap, height)\n"
         "- scene_checkpoint: exportAll snapshot of in-memory state into checkpoints/\n"
@@ -148,6 +157,7 @@ _audit_logger = (
 )
 register_asset_tools(mcp, audit=_audit_logger)
 register_export_tools(mcp)
+register_introspect_tools(mcp)
 
 # Unified security pipeline: every tool call passes through validation,
 # rate limiting, pattern scanning, and audit logging (D-018/ADR-0005).

@@ -26,8 +26,12 @@ from maya_mcp_server.security import InputValidationError
 
 logger = logging.getLogger(__name__)
 
-# Module source path for _mcp_scene
+# Module source paths for _mcp_scene. The introspection fragment
+# (introspect_module.py) is concatenated into the SAME injection unit
+# (D-095, ADR-0027 criterion 4): one module name / trigger / failure
+# domain, but independently maintained host-side source files.
 _MODULE_SOURCE = Path(__file__).parent / "maya_scene_module.py"
+_INTROSPECT_FRAGMENT = Path(__file__).parent / "introspect_module.py"
 
 # Global cache per session (keyed by session_key)
 _caches: dict[str, SceneCache] = {}
@@ -68,6 +72,7 @@ async def _ensure_module_injected(client: Any, session_key: str | None) -> None:
         source_path=_MODULE_SOURCE,
         tmp_prefix="_mcp_scene_src_",
         injected_sessions=_injected_sessions,
+        extra_source_paths=[_INTROSPECT_FRAGMENT],
     )
 
 

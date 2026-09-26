@@ -131,6 +131,7 @@ async def ensure_module_injected(
     source_path: Path,
     tmp_prefix: str,
     injected_sessions: set[str],
+    extra_source_paths: list[Path] | None = None,
 ) -> None:
     """Ensure a Maya-side helper module is injected into the session.
 
@@ -141,12 +142,19 @@ async def ensure_module_injected(
     buffer issues; the Qt framed channel carries length-prefixed frames
     up to 16 MiB, so GUI sessions inject directly via write_module
     (D-013).
+
+    extra_source_paths (D-095): additional source files concatenated
+    into the SAME module payload before writing - one module name, one
+    namespace, one failure domain (ADR-0027 criterion 4). Fragment files
+    must carry no __future__ import (it lands mid-file = SyntaxError).
     """
     key = session_key or "_default"
     if key in injected_sessions:
         return
 
     source = source_path.read_text(encoding="utf-8")
+    for extra in extra_source_paths or ():
+        source += "\n\n" + extra.read_text(encoding="utf-8")
 
     if len(source) > 15000 and not getattr(client, "framed_channel", False):
         import os as _os
