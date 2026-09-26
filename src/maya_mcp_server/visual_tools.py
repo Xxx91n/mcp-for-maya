@@ -21,7 +21,7 @@ from typing import Any
 
 import mcp.types as mt
 
-from maya_mcp_server.client import raise_for_error
+from maya_mcp_server.client import exec_module_code, module_call
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS
 from maya_mcp_server.security import (
     CaptureEmptyError,
@@ -70,25 +70,6 @@ def _require_gui_channel(client: Any) -> None:
                 "have no viewport or playblast surface"
             ),
         )
-
-
-def _visual_call(fn_name: str, *args: Any, **kwargs: Any) -> str:
-    """Build the _mcp_visual call with JSON-serialized args (P0-2 pattern)."""
-    payload = json.dumps({"args": list(args), "kwargs": kwargs})
-    return (
-        f"import json, _mcp_visual; _a = json.loads({json.dumps(payload)}); "
-        f"_mcp_visual.{fn_name}(*_a['args'], **_a['kwargs'])"
-    )
-
-
-async def _exec_visual(client: Any, code: str) -> Any:
-    """Execute _mcp_visual code and decode the JSON result."""
-    response = await client.execute_code(code, result_type="JSON")
-    raise_for_error(response)
-    data = response.result
-    if isinstance(data, str):
-        return json.loads(data)
-    return data
 
 
 def _validate_format(format: str) -> str:
@@ -216,9 +197,9 @@ def register_visual_tools(mcp: Any) -> None:
         m = _validate_max_size(max_size)
 
         await _ensure_visual_injected(client, session_key)
-        result = await _exec_visual(
+        result = await exec_module_code(
             client,
-            _visual_call("viewport_snapshot", max_size=m, format=fmt, quality=q),
+            module_call("_mcp_visual", "viewport_snapshot", max_size=m, format=fmt, quality=q),
         )
         if isinstance(result, dict) and "error" in result:
             return json.dumps(result, indent=2)
@@ -288,9 +269,10 @@ def register_visual_tools(mcp: Any) -> None:
         h = _round4(height)
 
         await _ensure_visual_injected(client, session_key)
-        result = await _exec_visual(
+        result = await exec_module_code(
             client,
-            _visual_call(
+            module_call(
+                "_mcp_visual",
                 "render_preview",
                 camera=camera,
                 width=w,

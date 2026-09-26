@@ -195,6 +195,43 @@ async def ensure_module_injected(
     logger.info("Injected %s module into session %s", module_name, key)
 
 
+def module_call(module: str, fn_name: str, *args: Any, **kwargs: Any) -> str:
+    """Build Maya-side module call code with all arguments JSON-serialized.
+
+    Arguments are embedded as a JSON document inside a Python string
+    literal and reconstructed via json.loads inside Maya. This removes
+    the entire string-interpolation injection surface — user input never
+    becomes executable source text (P0-2).
+
+    Shared call-construction primitive for every injected domain
+    (_mcp_scene/_mcp_asset/_mcp_export/_mcp_visual), generalized from
+    the per-domain _X_call copies (D-098). Only domain-agnostic call
+    construction lives here; per-domain binding stays in each
+    _ensure_X_injected.
+    """
+    payload = json.dumps({"args": list(args), "kwargs": kwargs})
+    return (
+        f"import json, {module}; _a = json.loads({json.dumps(payload)}); "
+        f"{module}.{fn_name}(*_a['args'], **_a['kwargs'])"
+    )
+
+
+async def exec_module_code(client: BaseMayaClient, code: str) -> Any:
+    """Execute injected-module call code and decode the JSON result.
+
+    Shared executor for the module_call family (D-098): execute with
+    result_type=JSON, raise on wire/domain errors, decode a string
+    payload. Caching, when a domain wants it, wraps this no-cache core
+    (scene_tools._execute_scene_code).
+    """
+    response = await client.execute_code(code, result_type="JSON")
+    raise_for_error(response)
+    data = response.result
+    if isinstance(data, str):
+        return json.loads(data)
+    return data
+
+
 @dataclass
 class BaseMayaClient(ABC):
     """Abstract base class for Maya clients."""

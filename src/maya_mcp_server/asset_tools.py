@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from maya_mcp_server import polyhaven
-from maya_mcp_server.client import ensure_module_injected, raise_for_error
+from maya_mcp_server.client import ensure_module_injected, exec_module_code, module_call
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS
 from maya_mcp_server.scene_tools import mark_dirty
 from maya_mcp_server.security import (
@@ -55,25 +55,6 @@ async def _ensure_asset_injected(client: Any, session_key: str | None) -> None:
         tmp_prefix="_mcp_asset_src_",
         injected_sessions=_asset_injected,
     )
-
-
-def _asset_call(fn_name: str, *args: Any, **kwargs: Any) -> str:
-    """Build the _mcp_asset call with JSON-serialized args (P0-2 pattern)."""
-    payload = json.dumps({"args": list(args), "kwargs": kwargs})
-    return (
-        f"import json, _mcp_asset; _a = json.loads({json.dumps(payload)}); "
-        f"_mcp_asset.{fn_name}(*_a['args'], **_a['kwargs'])"
-    )
-
-
-async def _exec_asset(client: Any, code: str) -> Any:
-    """Execute _mcp_asset code and decode the JSON result."""
-    response = await client.execute_code(code, result_type="JSON")
-    raise_for_error(response)
-    data = response.result
-    if isinstance(data, str):
-        return json.loads(data)
-    return data
 
 
 def _audit_asset_download(
@@ -221,9 +202,10 @@ def register_asset_tools(mcp: Any, audit: AuditLogger | None = None) -> None:
         except polyhaven.AssetError as e:
             return json.dumps(e.to_dict(), indent=2)
 
-        result = await _exec_asset(
+        result = await exec_module_code(
             client,
-            _asset_call(
+            module_call(
+                "_mcp_asset",
                 "import_asset",
                 descriptor,
                 max_polycount=int(max_polycount),

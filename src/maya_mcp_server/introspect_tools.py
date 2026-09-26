@@ -15,12 +15,9 @@ import json
 import logging
 from typing import Any
 
+from maya_mcp_server.client import exec_module_code, module_call
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS
-from maya_mcp_server.scene_tools import (
-    _ensure_module_injected,
-    _execute_scene_code,
-    _scene_call,
-)
+from maya_mcp_server.scene_tools import _ensure_module_injected
 from maya_mcp_server.security import InputValidationError
 
 
@@ -93,17 +90,16 @@ def register_introspect_tools(mcp: Any) -> None:
 
         await _ensure_module_injected(client, session_key)
 
-        result = await _execute_scene_code(
+        result = await exec_module_code(
             client,
-            _scene_call(
+            module_call(
+                "_mcp_scene",
                 "describe_node",
                 node,
                 attrs=attrs,
                 include_values=bool(include_values),
                 include_connections=bool(include_connections),
             ),
-            session_key,
-            use_cache=False,
         )
         return json.dumps(result, indent=2)
 
@@ -167,9 +163,10 @@ def register_introspect_tools(mcp: Any) -> None:
 
         await _ensure_module_injected(client, session_key)
 
-        result = await _execute_scene_code(
+        result = await exec_module_code(
             client,
-            _scene_call(
+            module_call(
+                "_mcp_scene",
                 "list_nodes",
                 node_type=type,
                 pattern=pattern,
@@ -179,7 +176,5 @@ def register_introspect_tools(mcp: Any) -> None:
                 cursor=cursor,
                 include_type_counts=bool(include_type_counts),
             ),
-            session_key,
-            use_cache=False,
         )
         return json.dumps(result, indent=2)

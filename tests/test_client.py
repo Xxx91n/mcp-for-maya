@@ -18,6 +18,8 @@ from maya_mcp_server.client import (
     MayaQtClient,
     MayaTimeoutError,
     MayaUnavailableError,
+    exec_module_code,
+    module_call,
 )
 from maya_mcp_server.security import InputValidationError
 from maya_mcp_server.types import (
@@ -1139,3 +1141,92 @@ class TestBootstrapHotUpdateWarning:
         mocker.patch.object(MayaClient, "connect", new_callable=AsyncMock)
         new_client = await maya_client.bootstrap(client_type="native")
         assert getattr(new_client, "_dedicated_port", None) is not None
+
+
+# ============================================================================
+# module_call / exec_module_code (D-098)
+# ============================================================================
+
+
+class TestModuleCall:
+    """Shared call-construction primitives (D-098).
+
+    Payload JSON shape + module-name embedding are the P0-2
+    injection-safety regression anchor: user input must ride inside a
+    JSON document, never become executable source text.
+    """
+
+    @staticmethod
+    def _embedded_literal(code: str) -> tuple[str, int, int]:
+        """Locate the embedded JSON string literal -> (literal, start, end)."""
+        start = code.index("json.loads(") + len("json.loads(")
+        assert code[start] == '"'
+        i = start + 1
+        while True:
+            if code[i] == '"':
+                backslashes = 0
+                while code[i - 1 - backslashes] == "\\":
+                    backslashes += 1
+                if backslashes % 2 == 0:
+                    break
+            i += 1
+        return code[start : i + 1], start, i + 1
+
+    @classmethod
+    def _embedded_payload(cls, code: str) -> dict:
+        literal, _, _ = cls._embedded_literal(code)
+        return json.loads(json.loads(literal))
+
+    def test_payload_json_shape_and_module_embedding(self) -> None:
+        code = module_call("_mcp_scene", "get_scene_graph", "detailed", flag=True)
+        assert code.startswith("import json, _mcp_scene; _a = json.loads(")
+        assert code.endswith("_mcp_scene.get_scene_graph(*_a['args'], **_a['kwargs'])")
+        assert self._embedded_payload(code) == {
+            "args": ["detailed"],
+            "kwargs": {"flag": True},
+        }
+
+    def test_module_name_varies_per_domain(self) -> None:
+        assert "import json, _mcp_asset" in module_call("_mcp_asset", "import_asset")
+        assert "_mcp_asset.import_asset" in module_call("_mcp_asset", "import_asset")
+        assert "_mcp_export.export_scene" in module_call("_mcp_export", "export_scene")
+
+    def test_none_and_bool_survive_json_roundtrip(self) -> None:
+        code = module_call("_mcp_scene", "scene_plan", objective=None, auto_fix=True)
+        assert self._embedded_payload(code)["kwargs"] == {
+            "objective": None,
+            "auto_fix": True,
+        }
+
+    def test_user_input_roundtrips_inside_json_only(self) -> None:
+        hostile = "'); import os; os.system('x'); #"
+        code = module_call("_mcp_scene", "scene_plan", objective=hostile)
+        payload = self._embedded_payload(code)
+        assert payload["kwargs"]["objective"] == hostile
+        literal, start, end = self._embedded_literal(code)
+        template = code[:start] + code[end:]
+        assert "os.system" not in template
+        assert len(literal) > 0
+
+    @pytest.mark.asyncio
+    async def test_exec_decodes_json_string_result(self) -> None:
+        client = AsyncMock()
+        client.execute_code.return_value = CommandResponse(result='{"a": 1}', error=None)
+        assert await exec_module_code(client, "c") == {"a": 1}
+        client.execute_code.assert_awaited_once_with("c", result_type="JSON")
+
+    @pytest.mark.asyncio
+    async def test_exec_passthrough_dict_result(self) -> None:
+        client = AsyncMock()
+        client.execute_code.return_value = CommandResponse(result={"ok": 2}, error=None)
+        assert await exec_module_code(client, "c") == {"ok": 2}
+
+    @pytest.mark.asyncio
+    async def test_exec_raises_on_domain_error(self) -> None:
+        client = AsyncMock()
+        client.execute_code.return_value = CommandResponse(
+            result=None,
+            error={"type": "builtins.ValueError", "message": "bad thing"},
+        )
+        with pytest.raises(MayaExecutionError):
+            await exec_module_code(client, "c")
