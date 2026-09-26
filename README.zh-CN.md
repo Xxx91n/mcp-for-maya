@@ -345,7 +345,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 - **Beta**：feature-complete 且开始外部测试后晋升（classifier 同步升 `4 - Beta`）。
 - **1.0.0**：公共 API 冻结承诺，与 `5 - Production/Stable` classifier 同一提交晋升。
 
-发布节奏为里程碑驱动，不承诺固定周期。路线图见 GitHub issues：#2 Poly Haven 集成（模型切片已随 0.2.0 交付并收口；scene_plan 推荐集成残余拆分为 #31）、#3 Skills 正式立项（v1.x）、#4 安全与权限模型（v1.x）、#5 场景导出（scene_export 已随 0.3.0 交付：FBX/OBJ/USD；场景图内省拆为独立 spec 轮）、#6 更多资产源（exploratory）、#7 真机验证清单与 v1.0 反馈（pinned）。
+发布节奏为里程碑驱动，不承诺固定周期。路线图见 GitHub issues：#2 Poly Haven 集成（模型切片已随 0.2.0 交付并收口；scene_plan 推荐集成残余拆分为 #31）、#3 Skills 正式立项（v1.x）、#4 安全与权限模型（v1.x）、#5 场景导出与内省（scene_export 已随 0.3.0 交付：FBX/OBJ/USD；scene_describe/scene_nodes 内省已落地，待下个 minor 发布）、#6 更多资产源（exploratory）、#7 真机验证清单与 v1.0 反馈（pinned）。
 
 ## 环境要求
 
