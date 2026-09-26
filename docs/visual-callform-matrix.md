@@ -108,3 +108,27 @@ teardown so the probe frame cannot leak into the caller's capture.
 - Recorded research gaps: 2024 M3dView page unreachable (404);
   `convertPixelFormat` absence verified verbatim for the 2023/2024
   Python refs and inferred — not re-checked — for 2025/2027.
+
+## Introspection call sites (D-094)
+
+Scope: every cmds.* call site in `src/maya_mcp_server/introspect_module.py`
+(concatenated into the `_mcp_scene` injection unit, D-095) plus the stub
+surface added to `tests/maya_stub/cmds.py`. All rows verified verbatim
+against the official Maya 2024 CommandsPython pages on 2026-09-25.
+
+| # | Call site | Official signature / return | Verdict | URL | Version | Date |
+|---|---|---|---|---|---|---|
+| 1 | `cmds.attributeQuery(attr, node=node, <flag>=True)` | `attributeQuery(attr, node=name, <flag>=bool[,...])` -> bool/list; flags used: exists, readable, writable, connectable, keyable, multi, hidden, storable, indexMatters, listChildren, listEnum, enum, minExists, minimum, maxExists, maximum, softMinExists, softMin, softMaxExists, softMax | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/attributeQuery.html | 2024 | 2026-09-25 |
+| 2 | `cmds.listAttr(node)` | `listAttr(objects)` -> string[]; filter flags modeled in stub: keyable/channelBox/connectable/multi/locked/visible/userDefined/settable/attributeType/string | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/listAttr.html | 2024 | 2026-09-25 |
+| 3 | `cmds.getAttr(node.attr, type=True)` | `getAttr(attribute, type=bool)` -> attr type string; also `lock`/`keyable`/`settable`/`channelBox` bool flags | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/getAttr.html | 2024 | 2026-09-25 |
+| 4 | `cmds.listConnections(node, plugs=True, connections=True, source=X, destination=Y)` | flags: connections(c) returns (plug-on-object, connected-plug) pairs - "the one on the specified object is given first"; plugs(p) plug names; source/destination direction filters | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/listConnections.html | 2024 | 2026-09-25 |
+| 5 | `cmds.ls(pattern, long=True, type=t / exactType=t, dagObjects=True)` | `ls` flags: long, type (inheritance-aware), exactType (exact only), dagObjects, dependencyNodes; returns string[] | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/ls.html | 2024 | 2026-09-25 |
+| 6 | `cmds.objectType(node, isAType=t)` / `cmds.nodeType(node)` | `objectType` isAType checks the full inheritance chain; nodeType returns exact type | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/objectType.html | 2024 | 2026-09-25 |
+| 7 | `cmds.objExists(node)` | `objExists(string)` -> bool | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/objExists.html | 2024 | 2026-09-25 |
+
+Stub-side notes: the stub models a bounded, real-shaped subset of the
+attribute metadata space (transform trs compounds, light ranges,
+rotateOrder/decayRate enums, message attrs on shadingEngines) - enough
+to pin the contract, not a census. `ls(long=True)` on DG nodes returns
+the short name (no DAG path exists) - the earlier "|<name>" quirk was
+corrected in the same change (test_asset_module assertions updated).

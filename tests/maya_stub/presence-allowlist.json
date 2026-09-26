@@ -1,7 +1,15 @@
 {
-  "_comment": "Intentional stub-vs-real-Maya divergences (D-049b). Entries carry verdict + ref: ref anchors into the evidence layer (docs/visual-callform-matrix.md — the single source of truth, D-056③); verdict is the conclusion. Prefer fixing the divergence over allowing it. Class-level entries exempt their methods too. Baseline: presence-baseline.json, collected on Maya 2024.",
-  "omui.MImage": {
-    "verdict": "stub-only dual-location — real MImage lives in maya.api.OpenMaya on <=2024 and moves to OpenMayaUI in 2025+; the stub models both so _MImage dual-resolution is exercised against either layout",
-    "ref": "docs/visual-callform-matrix.md#omuimimage-dual-location"
-  }
+    "_comment": "Intentional stub-vs-real-Maya divergences (D-049b). Entries carry verdict + ref: ref anchors into the evidence layer (docs/visual-callform-matrix.md \u2014 the single source of truth, D-056\u2462); verdict is the conclusion. Prefer fixing the divergence over allowing it. Class-level entries exempt their methods too. Baseline: presence-baseline.json, collected on Maya 2024.",
+    "omui.MImage": {
+        "verdict": "stub-only dual-location \u2014 real MImage lives in maya.api.OpenMaya on <=2024 and moves to OpenMayaUI in 2025+; the stub models both so _MImage dual-resolution is exercised against either layout",
+        "ref": "docs/visual-callform-matrix.md#omuimimage-dual-location"
+    },
+    "cmds.listAttr": {
+        "verdict": "present in real Maya 2024 - absent from baseline because the baseline collector only probed the then-current stub surface; call form verified verbatim against the official CommandsPython page",
+        "ref": "docs/visual-callform-matrix.md#introspection-call-sites-d-094"
+    },
+    "cmds.attributeQuery": {
+        "verdict": "present in real Maya 2024 - absent from baseline for the same coverage reason as cmds.listAttr; call form verified verbatim against the official CommandsPython page",
+        "ref": "docs/visual-callform-matrix.md#introspection-call-sites-d-094"
+    }
 }

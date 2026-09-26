@@ -7,6 +7,11 @@ All functions return JSON strings for direct use with execute_code(result_type="
 Performance targets: 100 objects < 50ms, 1000 objects < 200ms.
 """
 
+# annotations lazily evaluated: the D-095 assembled payload concatenates
+# introspect_module.py below this file's end, so the fragment's PEP-604
+# annotations are strings at Maya-runtime (Py3.9) - never evaluated.
+from __future__ import annotations
+
 import json
 import math
 import re
@@ -20,7 +25,7 @@ import maya.cmds as cmds
 # --- Internal helpers ---
 
 
-def _err(code: str, message: str, suggestion: "str | None" = None) -> dict:
+def _err(code: str, message: str, suggestion: str | None = None) -> dict:
     """Maya-domain error result (D-019): {"error": {code, message, suggestion?}}."""
     err: dict = {"code": code, "message": message}
     if suggestion:
@@ -38,17 +43,17 @@ def _round3_list(vals: Any) -> list[float]:
     return [_round3(v) for v in vals]
 
 
-def _vec3_to_list(p: "om2.MPoint | om2.MVector") -> list[float]:
+def _vec3_to_list(p: om2.MPoint | om2.MVector) -> list[float]:
     """Convert MPoint/MVector to [x,y,z]."""
     return [_round3(p[0]), _round3(p[1]), _round3(p[2])]
 
 
-def _matrix_to_pos(matrix: "om2.MMatrix") -> list[float]:
+def _matrix_to_pos(matrix: om2.MMatrix) -> list[float]:
     """Extract translation from MMatrix."""
     return [_round3(matrix[12]), _round3(matrix[13]), _round3(matrix[14])]
 
 
-def _classify_node(dag: "om2.MDagPath") -> str:
+def _classify_node(dag: om2.MDagPath) -> str:
     """Classify a DAG node into a type string."""
     try:
         fn = om2.MFnDagNode(dag)
@@ -89,7 +94,7 @@ def _classify_node(dag: "om2.MDagPath") -> str:
         return "unknown"
 
 
-def _get_material_for_dag(dag: "om2.MDagPath") -> "str | None":
+def _get_material_for_dag(dag: om2.MDagPath) -> str | None:
     """Get material name for a DAG node."""
     try:
         fn = om2.MFnDagNode(dag)
@@ -115,7 +120,7 @@ def _get_material_for_dag(dag: "om2.MDagPath") -> "str | None":
     return None
 
 
-def _get_mesh_stats(dag: "om2.MDagPath") -> dict[str, int]:
+def _get_mesh_stats(dag: om2.MDagPath) -> dict[str, int]:
     """Get vertex and face count for a mesh DAG node."""
     try:
         dag_path = om2.MDagPath.getAPathTo(dag)
@@ -128,7 +133,7 @@ def _get_mesh_stats(dag: "om2.MDagPath") -> dict[str, int]:
         return {"v": 0, "f": 0}
 
 
-def _get_bbox_size(bbox: "om2.MBoundingBox") -> list[float]:
+def _get_bbox_size(bbox: om2.MBoundingBox) -> list[float]:
     """Get [w, h, d] from MBoundingBox."""
     mn = bbox.min
     mx = bbox.max
@@ -139,7 +144,7 @@ def _get_bbox_size(bbox: "om2.MBoundingBox") -> list[float]:
     ]
 
 
-def _point_distance(a: "om2.MPoint", b: "om2.MPoint") -> float:
+def _point_distance(a: om2.MPoint, b: om2.MPoint) -> float:
     """Euclidean distance between two MPoints."""
     dx = a[0] - b[0]
     dy = a[1] - b[1]
@@ -159,7 +164,7 @@ _SAMPLE_CONSTRAINT_WINDOW = 20
 _SAMPLE_DEPTH = 30
 
 
-def _world_bbox(dag: "om2.MDagPath") -> "om2.MBoundingBox":
+def _world_bbox(dag: om2.MDagPath) -> om2.MBoundingBox:
     """World-space AABB for a DAG node.
 
     Transforms all 8 corners of the object-space bounding box by the

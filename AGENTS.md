@@ -23,11 +23,13 @@ src/maya_mcp_server/
 ├── asset_module.py        # Maya-side _mcp_asset importer (lazy inject)
 ├── export_tools.py        # scene_export MCP tool (D-091/D-092)
 ├── export_module.py       # Maya-side _mcp_export exporter (lazy inject)
+├── introspect_tools.py    # scene_describe/scene_nodes MCP tools (D-094)
+├── introspect_module.py   # Maya-side fragment -> _mcp_scene unit (D-095)
 ├── polyhaven.py           # Poly Haven host client: whitelist/md5/cache (D-075)
 ├── spatial_types.py       # Data type definitions
 ├── connection_guide.py    # Connection bootstrap; userSetup.py managed marker-block (D-017)
 ├── security.py            # Validation, token-bucket rate limits, pattern scan, JSONL audit
-├── pipeline.py            # FastMCP middleware: all 23 tools -> validate/rate-limit/scan/audit
+├── pipeline.py            # FastMCP middleware: all 25 tools -> validate/rate-limit/scan/audit
 ├── types.py               # Core types (ResultType, ClientType, SessionInfo)
 ├── bootstrap.py           # Server bootstrap
 ├── utils.py               # Utility functions (cross-platform process detection)
@@ -62,6 +64,8 @@ tests/
 ├── test_asset_tools.py      # T-19a tool layer: dedup/domain errors/audit detail
 ├── test_export_module.py    # T-23b _mcp_export contract on the stub (D-092)
 ├── test_export_tools.py     # T-23b tool layer: validation/passthrough/dual-channel inject
+├── test_introspect_module.py # T-24b _mcp_scene fragment contract on stub (D-094)
+├── test_introspect_tools.py  # T-24b tool layer: assembly inject/validation/dual-channel
 ├── test_check_ruff_budget.py    # ruff-budget comparator guard (per-rule ratchet, D-044/T-10b)
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`scene_describe` / `scene_nodes` — scene-graph introspection
+  (D-094/D-095)** — first consumer of the ADR-0027 criterion-4
+  same-unit assembly: the Maya side lives in a separate host-maintained
+  file (`src/maya_mcp_server/introspect_module.py`) concatenated into
+  the `_mcp_scene` injection payload by `scene_tools` /
+  `client.ensure_module_injected(extra_source_paths=...)` — one module
+  name, one trigger, one failure domain; no `_mcp_introspect` module
+  exists. Host tool layer: `src/maya_mcp_server/introspect_tools.py`,
+  25 tools total. `scene_describe(node, attrs=None,
+  include_values=False, include_connections=True)` returns per-attribute
+  metadata (attr_type/readable/writable/connectable/keyable/multi/
+  hidden/locked/storable/children/index_matters/enum/listEnum/min/max,
+  values+soft ranges behind include_values) plus directional plug-level
+  connections {src_plug, dst_plug, direction}; domain errors
+  node_not_found/attr_not_found (named-attr aborts the whole call, no
+  partial metadata) /query_failed. `scene_nodes(type=None, pattern=None,
+  dag_only=False, inherited=True, limit=50, cursor=None,
+  include_type_counts=False)` enumerates DAG + dependency nodes with
+  honest pagination (total_count/has_more/next_cursor, hard cap 100,
+  invalid_cursor on stale tokens). Boundaries are explicit:
+  scene_describe is API-level self-description (spatial stays with
+  scene_inspect); scene_nodes is graph inventory (overview stays with
+  scene_snapshot). Evidence: tests/test_introspect_module.py,
+  tests/test_introspect_tools.py (dual-channel injection covered),
+  docs/visual-callform-matrix.md “Introspection call sites”.
+
 ## [0.3.0] - 2026-09-25
 
 ### Added
