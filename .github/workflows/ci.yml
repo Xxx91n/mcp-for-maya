@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0  # merge-base resolution for the assets guard (D-113)
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: true
@@ -31,6 +33,10 @@ jobs:
         run: python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json
       - name: README mirror skeleton check (D-072)
         run: python .github/scripts/check_readme_skeleton.py
+      - name: assets append-only guard (D-113)
+        env:
+          GUARD_BEFORE: ${{ github.event.before }}
+        run: python .github/scripts/check_assets_append_only.py
       - name: pre-commit fallback (all files)
         run: |
           pip install pre-commit

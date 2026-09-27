@@ -238,7 +238,7 @@ _Avoid_: 无锚点承诺文案、先写机制名后补实现
 _Avoid_: 裁决证据躺 .scratch 外部不可达、证据原位编辑冒充最新、裸声称无工件无档名
 
 **只加不删资产目录 (append-only asset dir)**:
-.github/assets/ 等被绝对 URL（main 钉）引用的发布资产目录纪律——条目只可新增不可删除/改名；旧 PyPI 页面 description 永久指向 main 路径且不可回改，退役删除=全部历史页面永久裂图。
+.github/assets/ 等被绝对 URL（main 钉）引用的发布资产目录纪律——条目只可新增不可删除/改名；旧 PyPI 页面 description 永久指向 main 路径且不可回改，退役删除=全部历史页面永久裂图。CI 守卫=.github/scripts/check_assets_append_only.py（D-113：纯 add 放行、D/M/R/T 拦；逃生口=维护者知情合入+PR 声明+账本注记）。
 _Avoid_: 素材换代顺手删旧文件、改名复用槽位
 
 **触发条件债**:

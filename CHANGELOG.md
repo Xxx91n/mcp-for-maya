@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **CI append-only guard for published assets (D-113, D-081)** —
+  `.github/scripts/check_assets_append_only.py:68` runs in the lint job:
+  pure additions under `.github/assets/` pass, while
+  delete/modify/rename fail the job (`git diff --no-renames
+  --diff-filter=DMRT`; merge-base three-dot on pull_request,
+  `before..after` on main pushes, all-zero `before` skips). Escape
+  hatch: maintainer-aware merge with the removal stated in the PR body
+  plus a ledger note. Tests: tests/test_check_assets_append_only.py.
+
 ## [0.3.0] - 2026-09-27
 
 ### Added
