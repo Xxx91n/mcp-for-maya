@@ -60,6 +60,31 @@ exclude = [".github"]
 packages = ["src/maya_mcp_server"]
 
 [tool.pytest.ini_options]
+# D-111 warnings ratchet: warnings escalate to errors. The exemption list
+# is a ratchet — entries may only be REMOVED once their trigger fires,
+# never added silently (each carries its removal trigger + evidence).
+filterwarnings = [
+    "error",
+    # authlib's deprecation noise emitted from fastmcp's auth stack.
+    # Category must be importable — the class lives at
+    # authlib.deprecate.AuthlibDeprecationWarning (the bare name resolves
+    # against builtins and crashes pytest config parse — verified). The
+    # module field is a start-anchored regex on the emitting module's
+    # __name__ (stacklevel attribution lands on the caller) — bare
+    # `fastmcp` prefix-matches fastmcp.*. Removal trigger: upstream
+    # migrates to joserfc (probe: D-099 4.x checklist addendum —
+    # authlib.jose survival check lands with the 4.x migration batch,
+    # D-105).
+    "ignore::authlib.deprecate.AuthlibDeprecationWarning:fastmcp",
+    # requests' urllib3/chardet pin-mismatch notice. The message field
+    # is a start-anchored regex and the real message opens with the
+    # package name ("urllib3 (...) doesn't match a supported
+    # version!"), so the leading .* is load-bearing — the bare literal
+    # from the adjudicated spec never matches (verified re.match).
+    # Category likewise needs the importable dotted path.
+    # Removal trigger: next dependency-floor refresh realigns the pins.
+    "ignore:.*doesn't match a supported version:requests.exceptions.RequestsDependencyWarning",
+]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]

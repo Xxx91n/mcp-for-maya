@@ -197,7 +197,8 @@ class TestRollback:
         saved_scene.scene.add_mesh("GEO_wip")  # unsaved work after checkpoint
         rb = saved_scene.module.rollback_to_checkpoint("cp_v1.ma")
         assert rb["success"] is True
-        auto_text = open(rb["safety_snapshot"], encoding="utf-8").read()
+        with open(rb["safety_snapshot"], encoding="utf-8") as _auto_f:
+            auto_text = _auto_f.read()
         assert "GEO_wip" in auto_text, "auto_before_rollback must snapshot memory state"
 
     def test_rollback_rejects_traversal(self, saved_scene):

@@ -346,6 +346,7 @@ class _Peer:
         finally:
             try:
                 writer.close()
+                await writer.wait_closed()
             except Exception:
                 pass
 
@@ -676,14 +677,19 @@ class TestQtSendReceiveDomainCode:
             writer.write(helper.encode_frame(body))
             await writer.drain()
             writer.close()
+            await writer.wait_closed()
 
         server = await asyncio.start_server(peer, "127.0.0.1", 0)
         port = server.sockets[0].getsockname()[1]
+        reader = writer = None
         try:
             reader, writer = await asyncio.open_connection("127.0.0.1", port)
             client._reader, client._writer = reader, writer
             with pytest.raises(MayaExecutionError, match="unknown_method"):
                 await client._send_receive("nope")
         finally:
+            if writer is not None:
+                writer.close()
+                await writer.wait_closed()
             server.close()
             await server.wait_closed()

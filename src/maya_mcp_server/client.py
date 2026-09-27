@@ -173,9 +173,9 @@ async def ensure_module_injected(
             _os.chmod(_tmp, 0o600)
             _tmp_safe = _tmp.replace("\\", "/")
             await client.execute_code(
-                "import types, sys, json; _c=open(json.loads("
+                "import types, sys, json; _f=open(json.loads("
                 + json.dumps(json.dumps(_tmp_safe))
-                + "), encoding='utf-8').read();"
+                + "), encoding='utf-8'); _c=_f.read(); _f.close();"
                 f" _m=types.ModuleType('{module_name}');"
                 f" _m.__file__='<mcp:{module_name}>';"
                 f" exec(compile(_c,'{module_name}.py','exec'),_m.__dict__);"

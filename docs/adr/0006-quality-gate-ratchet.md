@@ -9,3 +9,4 @@ Status: accepted (2026-09-16)
 
 ## Consequences
 - 存量债随绞杀者拆分逐步偿还；预算文件进版本控制。
+- **测试告警棘轮**（D-111，2026-09-27）：pyproject [tool.pytest.ini_options] filterwarnings=["error"+窄豁免清单]——豁免清单只减不增（棘爪同构），每条豁免挂触发条件债+证据指针；载体为 pyproject 内联（pytest 无外置豁免文件机制）。

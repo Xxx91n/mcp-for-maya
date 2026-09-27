@@ -261,6 +261,7 @@ class TestErrorPassthrough:
         client = AsyncMock()
         client.execute_code.return_value = CommandResponse(result={"ok": 1}, error=None)
         client.get_buffered_output.return_value = OutputBuffer()
+        client.append_output = MagicMock()  # sync def (client.py:342) — not AsyncMock
         manager = MagicMock()
         manager.get_client = AsyncMock(return_value=client)
         monkeypatch.setattr(server, "get_session_manager", lambda: manager)
