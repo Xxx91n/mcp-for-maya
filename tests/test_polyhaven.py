@@ -242,8 +242,12 @@ class TestGuards:
         assert ei.value.code == "network_unavailable"
         assert ei.value.suggestion
 
-    def test_404_maps_to_asset_not_found(self, monkeypatch):
+    def test_404_maps_to_asset_not_found(self, monkeypatch, request):
         err = urllib.error.HTTPError("https://api.polyhaven.com/files/nope", 404, "nf", {}, None)
+        # HTTPError wraps an io.BytesIO even when fp=None — close it
+        # deterministically or 3.14 GC surfaces ResourceWarning under
+        # filterwarnings=error (PytestUnraisableExceptionWarning).
+        request.addfinalizer(err.close)
         monkeypatch.setattr(
             polyhaven,
             "_urlopen",
