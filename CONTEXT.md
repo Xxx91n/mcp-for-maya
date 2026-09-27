@@ -226,12 +226,16 @@ _Avoid_: 截图散落正文各处、GIF 锁进表格窄列、图片堆砌显自�
 
 
 **实证反审计 (evidence-based counter-audit)**:
-对外部审计指控的回应姿势——每条指控先对当前树/真机取证再表态：成立则修、证伪则驳回并留探针证据（.scratch/<slug>/probe-*.json）；对称纪律=对方驳对的指控要认（D-042 撤回先例），我方驳倒的要有机器证据不许只有口头。
+对外部审计指控的回应姿势——每条指控先对当前树/真机取证再表态：成立则修、证伪则驳回并留探针证据（裁决型工件归 docs/evidence/ 见「裁决型证据」条；过程 transcript 仍 .scratch/<slug>/）；对称纪律=对方驳对的指控要认（D-042 撤回先例），我方驳倒的要有机器证据不许只有口头。
 _Avoid_: 凭记忆反驳、把对方指控照单全收（辩证=逐条实证）
 
 **证据指针 (evidence pointer)**:
 CHANGELOG/发布说明每条 Added/Fixed bullet 必须挂的可机检锚点——file:line 或测试 ID（D-xxx 引用已有，补齐指向可执行物证即完全体）；lint 可查形态，防「决策→文案」管线跑在「代码→对账」前面（CHANGELOG:33、manifest-based 两例病灶）。
 _Avoid_: 无锚点承诺文案、先写机制名后补实现
+
+**裁决型证据 (decision-grade evidence / evidence binary)**:
+证据二分归置纪律（D-109，修订 D-048）——支撑公开裁决/对外声明的工件（探针 JSON、对账报告）脱敏后入 `docs/evidence/` 版本化=外部可复核锚，并附 claim boundary 字段写清该证据支持到哪一层；过程 transcript/reports/草稿仍留 `.scratch/` 不入 git。工件 append-only：被反驳不原位篡改，走「新工件+新裁决+旧件标 superseded」。前向规则：一切 verified-live/live 级声明须挂仓内工件或点名 mayapy/human_verify 档记录，裸声称=违 D-017⑥。
+_Avoid_: 裁决证据躺 .scratch 外部不可达、证据原位编辑冒充最新、裸声称无工件无档名
 
 **只加不删资产目录 (append-only asset dir)**:
 .github/assets/ 等被绝对 URL（main 钉）引用的发布资产目录纪律——条目只可新增不可删除/改名；旧 PyPI 页面 description 永久指向 main 路径且不可回改，退役删除=全部历史页面永久裂图。
@@ -248,3 +252,8 @@ _Avoid_: 无证据预防性 cap、cap 悬空不引证据、上游已明令兼容
 **探索窗 (exploration window / spike)**:
 触发条件债的执行体——time-boxed 探测单元：探针清单→可弃分支→结构化报告→裁决点，产出=信息非代码（分支可弃不合并、不写迁移 PR 进主线）；成熟先例=XP spike/Renovate 按序探针。姊妹件关系：债=排程（何时探），窗=执行（探什么怎么判）。
 _Avoid_: 探测分支夹带修复、报告落 docs/ 越过程件归处、无验收判据的开放式探测
+
+**解析漂移金丝雀 (resolution-drift canary)**:
+weekly scheduled 浮动依赖解析 job（D-112 双轨裁决）——uv.lock 落地把 PR 矩阵锁成确定性面后，该 job 专职跑 fresh resolve 保「库测 PyPI 区间=用户实装面」的浮动探测不失传；红=上游 dep release 首次漂移信号（D-100④ 触发债自动成就），同时承接 fresh-resolution 类探针义务（D-099 的载体移交）。姊妹件关系：触发条件债=何时查，金丝雀=持续在看。
+_Avoid_: 全矩阵上锁无浮动哨兵、金丝雀红了无人肉归因义务、把金丝雀红灯误当 CI 绿态必达标
+
