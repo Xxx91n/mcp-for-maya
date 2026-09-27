@@ -256,4 +256,3 @@ _Avoid_: 探测分支夹带修复、报告落 docs/ 越过程件归处、无验�
 **解析漂移金丝雀 (resolution-drift canary)**:
 weekly scheduled 浮动依赖解析 job（D-112 双轨裁决）——uv.lock 落地把 PR 矩阵锁成确定性面后，该 job 专职跑 fresh resolve 保「库测 PyPI 区间=用户实装面」的浮动探测不失传；红=上游 dep release 首次漂移信号（D-100④ 触发债自动成就），同时承接 fresh-resolution 类探针义务（D-099 的载体移交）。姊妹件关系：触发条件债=何时查，金丝雀=持续在看。
 _Avoid_: 全矩阵上锁无浮动哨兵、金丝雀红了无人肉归因义务、把金丝雀红灯误当 CI 绿态必达标
-
