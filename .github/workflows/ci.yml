@@ -44,6 +44,8 @@ jobs:
         env:
           GUARD_BEFORE: ${{ github.event.before }}
         run: python .github/scripts/check_assets_append_only.py
+      - name: tool-count claims gate (D-121)
+        run: python .github/scripts/check_tool_count_claims.py
       - name: pre-commit fallback (all files)
         run: |
           pip install pre-commit

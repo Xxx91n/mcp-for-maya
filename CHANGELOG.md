@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CI tool-count claims gate (D-121)** —
+  `.github/scripts/check_tool_count_claims.py` runs in the lint job:
+  `N tools total` / `all N tools` claims (plus the zh-CN mirror
+  shapes) in live docs — README.md, README.zh-CN.md, AGENTS.md,
+  docs/threat-model.md — and the latest CHANGELOG release section are
+  asserted against the count derived statically from
+  `pipeline.TOOL_ANNOTATIONS` (ast, no project deps). Historical
+  release sections are exempt by construction — they record the
+  artifact's count at its own release time. The stale landing-time
+  count in the [0.3.0] `scene_export` bullet is corrected in the same
+  commit; new bullets avoid absolute tool totals (relative wording
+  only) so the gate stays quiet. Evidence:
+  `.github/scripts/check_tool_count_claims.py:115` +
+  `tests/test_check_tool_count_claims.py::test_repo_surface_currently_consistent`.
+
 - **CI append-only guard for published assets (D-113, D-081)** —
   `.github/scripts/check_assets_append_only.py:68` runs in the lint job:
   pure additions under `.github/assets/` pass, while
@@ -48,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-domain injected module `_mcp_export`
   (`src/maya_mcp_server/export_module.py::export_scene`) + host tool
   (`src/maya_mcp_server/export_tools.py::register_export_tools`,
-  registered in `src/maya_mcp_server/server.py`), 23 tools total.
+  registered in `src/maya_mcp_server/server.py`), 25 tools total.
   Contract: path normalized (expanduser+abspath), parent dirs
   auto-created, existing target rejected unless `overwrite=True`;
   format enum {fbx,obj,usd} with extension inference, missing-extension
