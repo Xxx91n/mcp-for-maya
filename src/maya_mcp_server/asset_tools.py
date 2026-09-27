@@ -3,7 +3,7 @@
 asset_search is host-side read-only - no Maya session needed.
 asset_import chains the host-side downloader (whitelist + md5 + size
 guards, platformdirs cache) into the Maya-side _mcp_asset importer.
-Both tools carry openWorldHint=True: they are the first tools that
+Both tools carry open_world_hint=True: they are the first tools that
 reach the open network, restricted to the Poly Haven whitelist
 (threat-model.md section 5).
 """

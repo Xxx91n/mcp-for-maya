@@ -111,7 +111,7 @@ class TestImportHappyPath:
 
 
 # ------------------------------------------------------------------
-# dedup (idempotentHint depends on it)
+# dedup (idempotent_hint depends on it)
 # ------------------------------------------------------------------
 
 

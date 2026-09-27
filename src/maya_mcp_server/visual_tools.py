@@ -142,7 +142,7 @@ def _mixed_result(result: dict[str, Any], raw: bytes, session_key: str, fmt: str
     image = mt.ImageContent(
         type="image",
         data=result["data_b64"],
-        mimeType=f"image/{fmt}",
+        mime_type=f"image/{fmt}",
         annotations=mt.Annotations(audience=["assistant", "user"]),
     )
     text = mt.TextContent(type="text", text=json.dumps(meta))
@@ -221,7 +221,7 @@ def register_visual_tools(mcp: Any) -> None:
         GUI sessions only - headless sessions get a structured
         gui_session_required error.
 
-        Side-effect disclosures (readOnlyHint is honest, D-026):
+        Side-effect disclosures (read_only_hint is honest, D-026):
         1. Switching the panel camera via the modelPanel camera flag
            is instantaneous, visible, and NOT undoable in Maya.
         2. Net-zero side effect: the panel camera is restored on every

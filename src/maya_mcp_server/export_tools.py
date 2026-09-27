@@ -68,7 +68,7 @@ def register_export_tools(mcp: Any) -> None:
         cmds.file surface). The selection set is restored after every
         objects= export and the scene's modified flag is untouched.
 
-        destructiveHint is False but note: overwrite=True permanently
+        destructive_hint is False but note: overwrite=True permanently
         replaces the target file - that path is not recoverable.
 
         Args:

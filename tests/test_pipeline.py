@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 from fastmcp.server.middleware import MiddlewareContext
-from fastmcp.tools.tool import ToolResult
+from fastmcp.tools import ToolResult
 from mcp.types import CallToolRequestParams
 
 from maya_mcp_server.pipeline import (
@@ -100,18 +100,18 @@ class TestToolAnnotations:
 
     def test_four_hints_all_set(self):
         for name, ann in TOOL_ANNOTATIONS.items():
-            assert ann.readOnlyHint is not None, name
-            assert ann.destructiveHint is not None, name
-            assert ann.idempotentHint is not None, name
+            assert ann.read_only_hint is not None, name
+            assert ann.destructive_hint is not None, name
+            assert ann.idempotent_hint is not None, name
             if name in ("asset_search", "asset_import"):
-                assert ann.openWorldHint is True, name
+                assert ann.open_world_hint is True, name
             else:
-                assert ann.openWorldHint is False, name
+                assert ann.open_world_hint is False, name
 
     def test_dangerous_tools_marked_destructive(self):
         for name in ("execute_code", "write_module", "maya_setup_guide"):
-            assert TOOL_ANNOTATIONS[name].destructiveHint is True
-            assert TOOL_ANNOTATIONS[name].readOnlyHint is False
+            assert TOOL_ANNOTATIONS[name].destructive_hint is True
+            assert TOOL_ANNOTATIONS[name].read_only_hint is False
 
     def test_read_tools_readonly_idempotent(self):
         for name in (
@@ -129,34 +129,34 @@ class TestToolAnnotations:
             "scene_describe",
             "scene_nodes",
         ):
-            assert TOOL_ANNOTATIONS[name].readOnlyHint is True, name
-            assert TOOL_ANNOTATIONS[name].idempotentHint is True, name
+            assert TOOL_ANNOTATIONS[name].read_only_hint is True, name
+            assert TOOL_ANNOTATIONS[name].idempotent_hint is True, name
 
     def test_rollback_not_destructive_not_idempotent(self):
         ann = TOOL_ANNOTATIONS["scene_rollback"]
-        assert ann.destructiveHint is False
-        assert ann.idempotentHint is False
-        assert ann.readOnlyHint is False
+        assert ann.destructive_hint is False
+        assert ann.idempotent_hint is False
+        assert ann.read_only_hint is False
 
     def test_asset_search_annotations(self):
         """asset_search: read-only, idempotent, openWorld (D-075)."""
         ann = TOOL_ANNOTATIONS["asset_search"]
-        assert ann.readOnlyHint is True
-        assert ann.destructiveHint is False
-        assert ann.idempotentHint is True
-        assert ann.openWorldHint is True
+        assert ann.read_only_hint is True
+        assert ann.destructive_hint is False
+        assert ann.idempotent_hint is True
+        assert ann.open_world_hint is True
 
     def test_asset_import_annotations(self):
         """asset_import: write-class, non-destructive, idempotent via
         same-name dedup, openWorld (D-075)."""
         ann = TOOL_ANNOTATIONS["asset_import"]
-        assert ann.readOnlyHint is False
-        assert ann.destructiveHint is False
-        assert ann.idempotentHint is True
-        assert ann.openWorldHint is True
+        assert ann.read_only_hint is False
+        assert ann.destructive_hint is False
+        assert ann.idempotent_hint is True
+        assert ann.open_world_hint is True
 
     def test_unknown_tool_defaults_write_class(self):
-        assert tool_annotations("nope").readOnlyHint is False
+        assert tool_annotations("nope").read_only_hint is False
 
 
 class TestPipelineDispatch:

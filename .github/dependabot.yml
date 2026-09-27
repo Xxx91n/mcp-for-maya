@@ -18,15 +18,16 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
-    # D-089 -> D-099/D-100: fastmcp semver-major stays frozen —
-    # PR #18/#36 went red on the fastmcp API surface (migration-class
-    # bump, not a version-pin fix; the earlier camelCase->snake_case
-    # attribution is being root-cause-corrected by the R25 spike, which
-    # covers both red histories). Exploration window re-aimed to
-    # fastmcp-4.x (GA 2026-08-31, 10 patches; upstream archived v3
-    # docs): probe branch fastmcp>=4,<5 -> structured report -> if
-    # all-green, tighten to >=4.x,<5.0.0 with a comment citing the CI
-    # red history; if red, per-item migration debts with triggers.
+    # D-089 -> D-099/D-100/D-105: fastmcp semver-major stays frozen.
+    # The 4.x migration LANDED in T-26e (pin now >=4.0.0,<5.0.0 —
+    # R1-R3 test/API renames applied; the spike's "red" was corrected
+    # to decorator-returns-fn + fastmcp.tools.tool removal +
+    # ToolAnnotations snake_case kwargs, not a camelCase bridge
+    # failure). The major-version freeze stays: upstream's releases
+    # policy allows breaking changes on MINOR bumps, so every major
+    # still needs a migration PR — semver-major ignore remains the
+    # correct guard, and the weekly drift canary (ci.yml) is the
+    # earliest detector for any new-major resolution break.
     ignore:
       - dependency-name: "fastmcp"
         update-types: ["version-update:semver-major"]

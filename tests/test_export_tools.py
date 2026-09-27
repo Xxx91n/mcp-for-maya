@@ -198,7 +198,7 @@ class TestAnnotations:
     def test_scene_export_annotations(self):
         """D-092: write-class, non-destructive, non-idempotent, closed."""
         ann = TOOL_ANNOTATIONS["scene_export"]
-        assert ann.readOnlyHint is False
-        assert ann.destructiveHint is False
-        assert ann.idempotentHint is False
-        assert ann.openWorldHint is False
+        assert ann.read_only_hint is False
+        assert ann.destructive_hint is False
+        assert ann.idempotent_hint is False
+        assert ann.open_world_hint is False

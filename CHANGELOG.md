@@ -18,6 +18,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hatch: maintainer-aware merge with the removal stated in the PR body
   plus a ledger note. Tests: tests/test_check_assets_append_only.py.
 
+### Changed
+
+- **Install path migrated to uv.lock dual-track (D-112)** — `uv.lock`
+  committed (113 packages); CI test/mypy and release-test jobs now run
+  `uv sync --frozen` + `uv run` on the locked resolution, dev deps moved
+  to PEP 735 `[dependency-groups]`; floating-resolution coverage moved
+  to a weekly drift canary job (`uv lock --upgrade`, Mon 06:37 UTC).
+  Dev setup: `uv sync --frozen` (pip >=25.1 can still
+  `pip install -e . --group dev`).
+
+- **fastmcp 4.x migration (D-105, D-099 trigger gates satisfied)** —
+  dependency pin narrowed from `>=2.14,<3.0.0` to `>=4.0.0,<5.0.0`
+  (dual anchors in pyproject.toml: corrected #18/#36 red history +
+  upstream minor-may-break releases policy). Code deltas: MCP SDK v2
+  snake_case field renames (`read_only_hint`/`mime_type`/`ToolResult`
+  import path — the earlier camelCase-breakage attribution was
+  root-cause-corrected by the R25 spike). Both AuthlibDeprecationWarning
+  pytest exemptions removed — the registered trigger fired (auth
+  providers moved to joserfc). `scene_describe` gains the D-110
+  response budget (`limit` param, 200 soft / 1000 hard per face,
+  `*_truncated` + totals disclosure).
+
 ## [0.3.0] - 2026-09-27
 
 ### Added

@@ -271,7 +271,7 @@ def test_annotations_readonly():
 
     for name in ("scene_describe", "scene_nodes"):
         ann = TOOL_ANNOTATIONS[name]
-        assert ann.readOnlyHint is True
-        assert ann.destructiveHint is False
-        assert ann.idempotentHint is True
-        assert ann.openWorldHint is False
+        assert ann.read_only_hint is True
+        assert ann.destructive_hint is False
+        assert ann.idempotent_hint is True
+        assert ann.open_world_hint is False

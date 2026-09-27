@@ -21,7 +21,16 @@ classifiers = [
     "Topic :: Multimedia :: Graphics :: 3D Modeling",
 ]
 dependencies = [
-    "fastmcp>=2.14.0,<3.0.0",
+    # D-105/D-099: fastmcp 4.x migration (R25 spike adjudicated — the
+    # earlier camelCase attribution was root-cause-corrected: the real
+    # reds were .fn/ToolResult import/annotation-kwarg renames).
+    # Ceiling stays at the next major: upstream releases policy allows
+    # breaking changes on minors, so a minor bump must not slip in via
+    # this pin alone — it goes through a migration PR. Dual anchors:
+    # CI red histories #18/#36 (post-correction reading) + the upstream
+    # "minor may break" releases policy
+    # (https://github.com/jlowin/fastmcp/releases).
+    "fastmcp>=4.0.0,<5.0.0",
     "platformdirs>=4.0.0",
     "psutil>=5.9.0",
 ]
@@ -65,22 +74,12 @@ packages = ["src/maya_mcp_server"]
 # never added silently (each carries its removal trigger + evidence).
 filterwarnings = [
     "error",
-    # authlib's deprecation noise emitted from fastmcp's auth stack.
-    # Category must be importable — the class lives at
-    # authlib.deprecate.AuthlibDeprecationWarning (the bare name resolves
-    # against builtins and crashes pytest config parse — verified). The
-    # module field is a start-anchored regex on the emitting module's
-    # __name__ (stacklevel attribution lands on the caller) — bare
-    # `fastmcp` prefix-matches fastmcp.*. Removal trigger: upstream
-    # migrates to joserfc (probe: D-099 4.x checklist addendum —
-    # authlib.jose survival check lands with the 4.x migration batch,
-    # D-105).
-    "ignore::authlib.deprecate.AuthlibDeprecationWarning:fastmcp",
-    # authlib 1.8.0 (the locked resolution, D-112) added a second
-    # deprecation site — httpx_client is deprecated for httpx2 —
-    # emitted from an authlib.* module so it needs its own module scope.
-    # Same category, same removal trigger (joserfc migration).
-    "ignore::authlib.deprecate.AuthlibDeprecationWarning:authlib",
+    # NOTE (D-105): both adjudicated AuthlibDeprecationWarning
+    # exemptions were REMOVED by the fastmcp 4.x migration — their
+    # registered trigger fired: fastmcp 4.0.10's auth providers moved
+    # to joserfc and `import fastmcp` emits no authlib warnings
+    # (authlib.jose survival probe result: absent). Re-add narrowly if
+    # a future resolution resurrects the warning.
     # The second adjudicated exemption — requests' urllib3/chardet
     # pin-mismatch notice — lives in tests/conftest.py as a CONDITIONAL
     # runtime filter: requests is not a declared dependency (it only

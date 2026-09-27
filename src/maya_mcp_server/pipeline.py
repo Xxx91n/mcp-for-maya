@@ -37,39 +37,39 @@ logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Tool annotations \u2014 the single matrix (D-018). All 25 tools, all four hints.
-# readOnlyHint also drives the read/write rate-limit bucket.
+# read_only_hint also drives the read/write rate-limit bucket.
 # ---------------------------------------------------------------------------
 
 _READ = mt.ToolAnnotations(
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 _WRITE_SAFE = mt.ToolAnnotations(
-    readOnlyHint=False,
-    destructiveHint=False,
-    idempotentHint=False,
-    openWorldHint=False,
+    read_only_hint=False,
+    destructive_hint=False,
+    idempotent_hint=False,
+    open_world_hint=False,
 )
 _WRITE_DESTRUCTIVE = mt.ToolAnnotations(
-    readOnlyHint=False,
-    destructiveHint=True,
-    idempotentHint=False,
-    openWorldHint=False,
+    read_only_hint=False,
+    destructive_hint=True,
+    idempotent_hint=False,
+    open_world_hint=False,
 )
 
 _READ_NET = mt.ToolAnnotations(
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=True,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=True,
 )
 _WRITE_NET_IDEMPOTENT = mt.ToolAnnotations(
-    readOnlyHint=False,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=True,
+    read_only_hint=False,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=True,
 )
 
 TOOL_ANNOTATIONS: dict[str, mt.ToolAnnotations] = {
@@ -175,7 +175,7 @@ class SecurityPipeline(Middleware):
 
             # 2. rate limit \u2014 split read/write token buckets, per session
             if self.config.rate_limit_enabled:
-                kind = "read" if tool_annotations(tool_name).readOnlyHint else "write"
+                kind = "read" if tool_annotations(tool_name).read_only_hint else "write"
                 limiter = self._read_limiter if kind == "read" else self._write_limiter
                 if not limiter.try_consume(session_id):
                     wait = limiter.retry_after(session_id)

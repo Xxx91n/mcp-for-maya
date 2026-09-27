@@ -225,10 +225,10 @@ class TestAnnotations:
 
         for name in ("scene_viewport_snapshot", "scene_render_preview"):
             ann = TOOL_ANNOTATIONS[name]
-            assert ann.readOnlyHint is True, name
-            assert ann.idempotentHint is True, name
-            assert ann.destructiveHint is False, name
-            assert ann.openWorldHint is False, name
+            assert ann.read_only_hint is True, name
+            assert ann.idempotent_hint is True, name
+            assert ann.destructive_hint is False, name
+            assert ann.open_world_hint is False, name
 
 
 # ------------------------------------------------------------
@@ -242,7 +242,7 @@ class TestSnapshotContract:
         assert len(out) == 2
         img, txt = out
         assert img.type == "image"
-        assert img.mimeType == "image/jpeg"
+        assert img.mime_type == "image/jpeg"
         assert list(img.annotations.audience) == ["assistant", "user"]
         raw = base64.b64decode(img.data)
         assert raw.startswith(b"\xff\xd8"), "jpeg magic"
@@ -256,7 +256,7 @@ class TestSnapshotContract:
     async def test_png_format_magic(self, vtools):
         out = await vtools.fns["scene_viewport_snapshot"](format="png")
         img = out[0]
-        assert img.mimeType == "image/png"
+        assert img.mime_type == "image/png"
         assert base64.b64decode(img.data).startswith(b"\x89PNG")
         assert _meta(out)["format"] == "png"
 
