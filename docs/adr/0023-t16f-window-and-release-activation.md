@@ -41,6 +41,10 @@ Maya 开机激活整条阻塞链，本轮同裁：T-16f 执行面 + 通过后的
 - GH Release 判别钉死：minor 版执行、patch 版依 D-084 跳过（release.yml 注释同锚；D-068 原序列文本在此修订）。
 - tag 前软前置冒烟：本批新 cmds 面（T-24 = attr_meta / plug_connections / listAttr / attributeQuery）——Maya 开机则跑 `pytest -m mayapy` 冒烟；未开机则 release notes 按 D-049 档披 known-unverified。不设硬 CI 门。
 
+**R27 增补（D-123①，2026-09-27）**：
+
+- 发布清单硬项：v1.0.0 门前须存在 **≥1 条 drift-canary 人为复核记录**（运行结果+归因写账本，**红绿均可**——防「等红灯才复核」死角致清单项永远无法兑现）。红→人知通道=ci.yml `drift-notify` 独立 trailing job（去重 issue/续败评论/恢复自动关）；复核义务登记为 D-127。
+
 ## D-069：#2/#7 发帖机制
 
 本窗口即发（备稿就绪+"≥0.1.0 已含"耐久真话不依赖 0.1.2）；执行=**agent 贴终稿→用户过目→gh 以用户账号发出**。过目为授权前置条件，发出前用户有最终否决点；其余四条（#1/#3/#4/#5）仍等 0.1.2 发布后同流程；一 issue 一评不追评纪律不变；措辞改动须回草稿重过目。

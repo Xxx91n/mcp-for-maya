@@ -24,6 +24,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.github/scripts/check_tool_count_claims.py:115` +
   `tests/test_check_tool_count_claims.py::test_repo_surface_currently_consistent`.
 
+- **Drift-canary red -> issue artifact (D-123)** — the weekly
+  resolution-drift job gains an independent trailing `drift-notify`
+  job in `.github/workflows/ci.yml` driven by
+  `.github/scripts/notify_drift_canary.py`: first red opens one
+  dedup issue per workflow+branch, continued reds comment on it,
+  recovery comments and auto-closes. Job-level `issues: write`
+  escalation only (workflow stays read-only) and the job is
+  `continue-on-error` so its own failure never masks the drift red.
+  ADR-0023 gains the v1.0.0 release-checklist hard item — at least
+  one human canary-review record (result + attribution in the
+  decision ledger, red or green) must exist before v1.0.0 ships
+  (obligation registered as D-127). Evidence:
+  `.github/workflows/ci.yml:120` (drift-notify job) +
+  `.github/scripts/notify_drift_canary.py:109` +
+  `tests/test_notify_drift_canary.py::test_red_creates_issue_when_none_open` /
+  `::test_green_closes_open_issue`.
+
 - **CI append-only guard for published assets (D-113, D-081)** —
   `.github/scripts/check_assets_append_only.py:68` runs in the lint job:
   pure additions under `.github/assets/` pass, while

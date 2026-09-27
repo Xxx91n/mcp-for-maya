@@ -68,10 +68,11 @@ tests/
 ├── test_introspect_tools.py  # T-24b tool layer: assembly inject/validation/dual-channel
 ├── test_check_ruff_budget.py    # ruff-budget comparator guard (per-rule ratchet, D-044/T-10b)
 ├── test_check_tool_count_claims.py # tool-count claim gate (D-121)
+├── test_notify_drift_canary.py  # drift-canary issue lifecycle (D-123)
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
-├── adr/                   # ADR-0001..0024 architecture decision records
+├── adr/                   # ADR-0001..0027 architecture decision records
 ├── decision-ledger.md     # grill decision ledger — canonical path since T-11a (D-041)
 ├── handoffs/              # round handoffs — canonical (next-round.md standing task book)
 ├── testing.md             # real-Maya manual tier checklist
@@ -86,6 +87,7 @@ docs/
 ├── scripts/check_readme_skeleton.py  # README/zh-CN title-skeleton parity check (D-072)
 ├── scripts/check_assets_append_only.py # .github/assets append-only guard (D-113)
 ├── scripts/check_tool_count_claims.py # live-doc tool-count claims == TOOL_ANNOTATIONS (D-121)
+├── scripts/notify_drift_canary.py  # drift canary -> dedup issue artifact (D-123)
 ├── assets-src/            # reproducible capture scripts for README imagery (t20/ scene generators; T-19c scene_build.py + capture.py kept for reference)
 └── assets/                # published README imagery (populated only after sign-off)
 ```

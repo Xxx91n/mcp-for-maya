@@ -115,6 +115,36 @@ jobs:
           uv sync
           uv run python -m pytest -q
 
+  drift-notify:
+    # D-123: scheduled-job red only emails whoever last touched the
+    # cron line — on a solo repo that is a structural blind spot.
+    # Independent trailing job (not an if:failure() inline step) so
+    # its own conclusion never masks the drift job's red.
+    name: drift canary notify (D-123)
+    needs: drift
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write # job-level escalation only; workflow stays read-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+      - name: drift result -> issue artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRIFT_RESULT: ${{ needs.drift.result }}
+          DRIFT_WORKFLOW: ${{ github.workflow }}
+          BRANCH: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: python .github/scripts/notify_drift_canary.py
+
   ci:
     name: ci
     needs: [lint, mypy, test]
