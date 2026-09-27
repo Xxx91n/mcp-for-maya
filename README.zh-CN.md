@@ -360,7 +360,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 ## 开发
 
 ```bash
-pip install -e ".[dev]"          # 或 uv pip install -e ".[dev]"
+uv sync --frozen                  # 从 uv.lock 装锁定开发环境（备选 pip install -e . --group dev，需 pip>=25.1）
 python -m pytest tests/ -q       # 测试
 ruff check src tests             # lint
 mypy src                         # 类型检查

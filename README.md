@@ -335,7 +335,7 @@ The two visual-loop tools need a **GUI session** (headless/mayapy returns a stru
 ## Development
 
 ```bash
-pip install -e ".[dev]"          # or: uv pip install -e ".[dev]"
+uv sync --frozen                  # locked dev env from uv.lock (alt: pip install -e . --group dev, pip>=25.1)
 python -m pytest tests/ -q       # tests
 ruff check src tests             # lint
 mypy src                         # typecheck

@@ -3,7 +3,8 @@
 ## Development setup
 
 ```bash
-pip install -e ".[dev]"            # or: uv pip install -e ".[dev]"
+uv sync --frozen                   # installs project + dev group from uv.lock (D-112)
+# alternatives: uv sync (re-resolve) | pip install -e . --group dev (pip >=25.1)
 pre-commit install                  # one-time: wire git hooks (.pre-commit-config.yaml)
 pre-commit run --all-files          # hook sweep — CI runs this identical step as its lint fallback
 python -m pytest tests/ -q         # stub-layer suite (contract tests vs the maya.cmds stub)

@@ -1,5 +1,5 @@
 # Thin pre-commit set (ADR-0017 / D-044 / D-045).
-# Local:  pip install -e ".[dev]" && pre-commit install && pre-commit run --all-files
+# Local:  uv sync --frozen && uv run pre-commit install && uv run pre-commit run --all-files
 # CI fallback: lint job in .github/workflows/ci.yml (guards --no-verify pushes).
 # Hook rev upkeep: dependabot pre-commit ecosystem (monthly) or manual
 #   `pre-commit autoupdate` — always through human review, never pre-commit.ci.

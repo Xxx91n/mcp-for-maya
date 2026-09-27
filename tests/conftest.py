@@ -18,6 +18,24 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import maya_stub  # noqa: E402
 
+# D-111 exemption #2 (conditional): requests' urllib3/chardet
+# pin-mismatch notice is known-benign, but requests is not a declared
+# dependency — it only exists when a transitive resolution pulls it in.
+# Registering the filter at runtime under find_spec keeps the exemption
+# active when present and inert when absent (a config-level dotted
+# category would crash pytest collection in the locked env).
+import importlib.util  # noqa: E402
+import warnings  # noqa: E402
+
+if importlib.util.find_spec("requests") is not None:
+    import requests.exceptions
+
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*doesn't match a supported version",
+        category=requests.exceptions.RequestsDependencyWarning,
+    )
+
 
 @pytest.fixture
 def mock_port() -> int:

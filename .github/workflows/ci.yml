@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # weekly floating-resolution canary (D-112 dual-track): latest-in-range
+    # resolution is tested here instead of the PR matrix — a red run means
+    # dependency drift broke us (the D-100④ re-review trigger) and is also
+    # the carrier for the D-099 "test fresh resolution when fastmcp 4.x
+    # lands" obligation.
+    - cron: "37 6 * * 1"
   workflow_dispatch:
 
 concurrency:
@@ -53,14 +60,18 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.x"
-      - name: install
-        run: uv pip install -e ".[dev]" --system
+      - name: install (locked)
+        # D-112: uv sync --frozen installs the committed uv.lock, not a
+        # floating resolution. sync has no --system mode (uv#9399) — the
+        # project env is .venv and commands run via `uv run`. Windows
+        # first-check if sync misbehaves: UV_PROJECT_ENVIRONMENT.
+        run: uv sync --frozen
       - name: mypy | mypy-baseline filter
         run: |
           rc=0
-          python -m mypy src/ > mypy-report.txt || rc=$?
+          uv run python -m mypy src/ > mypy-report.txt || rc=$?
           if [ "$rc" -gt 1 ]; then cat mypy-report.txt; exit "$rc"; fi
-          mypy-baseline filter < mypy-report.txt
+          uv run mypy-baseline filter < mypy-report.txt
 
   test:
     name: pytest (${{ matrix.os }}, ${{ matrix.python-version }})
@@ -78,10 +89,29 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
-      - name: install
-        run: uv pip install -e ".[dev]" --system
+      - name: install (locked)
+        run: uv sync --frozen
       - name: pytest
-        run: python -m pytest -q
+        run: uv run python -m pytest -q
+
+  drift:
+    name: resolution-drift canary (D-112)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+      - name: fresh floating resolution
+        run: uv lock --upgrade   # ignores the committed lock; newest-in-range wins
+      - name: install + test on floating resolution
+        run: |
+          uv sync
+          uv run python -m pytest -q
 
   ci:
     name: ci

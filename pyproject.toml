@@ -26,7 +26,7 @@ dependencies = [
     "psutil>=5.9.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
@@ -76,15 +76,21 @@ filterwarnings = [
     # authlib.jose survival check lands with the 4.x migration batch,
     # D-105).
     "ignore::authlib.deprecate.AuthlibDeprecationWarning:fastmcp",
-    # requests' urllib3/chardet pin-mismatch notice. The message field
-    # is a start-anchored regex and the real message opens with the
-    # package name ("urllib3 (...) doesn't match a supported
-    # version!"), so the leading .* is load-bearing — the bare literal
-    # from the adjudicated spec never matches (verified re.match).
-    # Category likewise needs the importable dotted path.
-    # Removal trigger: next dependency-floor refresh realigns the pins.
-    "ignore:.*doesn't match a supported version:requests.exceptions.RequestsDependencyWarning",
+    # authlib 1.8.0 (the locked resolution, D-112) added a second
+    # deprecation site — httpx_client is deprecated for httpx2 —
+    # emitted from an authlib.* module so it needs its own module scope.
+    # Same category, same removal trigger (joserfc migration).
+    "ignore::authlib.deprecate.AuthlibDeprecationWarning:authlib",
+    # The second adjudicated exemption — requests' urllib3/chardet
+    # pin-mismatch notice — lives in tests/conftest.py as a CONDITIONAL
+    # runtime filter: requests is not a declared dependency (it only
+    # exists when a transitive resolution pulls it in), and a
+    # config-level exemption against a module the locked env does not
+    # ship crashes pytest's filter import at collection. Conftest's
+    # find_spec guard is the honest equivalent of the spec's narrow
+    # exemption: active when requests is present, inert when absent.
 ]
+
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
