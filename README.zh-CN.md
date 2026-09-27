@@ -67,7 +67,7 @@ Poly Haven 模型搜索+导入已于 0.2.0 交付（issue #2 薄切片：FBX + �
 | 🔌 **会话管理** | `list_sessions` `add_session` `maya_setup_guide` | 多会话发现/接入 + 连接诊断/安装/回退引导 |
 | 📦 **资产库** | `asset_search` `asset_import` | Poly Haven CC0 模型——宿主侧 HTTPS 下载（主机白名单、md5 校验、大小上限、platformdirs 缓存），Maya 侧 FBX 导入带贴图自动接线、面数/尺寸护栏、`GRP_asset_<id>` 去重 |
 | 📤 **场景导出** | `scene_export` | FBX/OBJ/USD 导出——整场景或指定对象；格式按扩展名推断（冲突即报错不猜）、父目录自动创建、覆盖需显式 opt-in、导出后还原选择集 |
-| 🔎 **场景图内省** | `scene_describe` `scene_nodes` | API 级节点自描述（精确类型、逐属性元数据 keyable/connectable/enum/取值范围、连接布线）+ 有界枚举（含非 DAG 节点：材质/工具节点），`has_more`/`next_cursor` 诚实分页 |
+| 🔎 **场景图内省** | `scene_describe` `scene_nodes` | API 级节点自描述（精确类型、逐属性元数据 keyable/connectable/enum/取值范围、连接布线——响应有界，`limit` 最高放宽至 1000，截断经 `*_truncated` 披露）+ 有界枚举（含非 DAG 节点：材质/工具节点），`has_more`/`next_cursor` 诚实分页 |
 
 共 25 个 MCP 工具。
 

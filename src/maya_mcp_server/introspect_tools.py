@@ -37,6 +37,7 @@ def register_introspect_tools(mcp: Any) -> None:
         attrs: list[str] | None = None,
         include_values: bool = False,
         include_connections: bool = True,
+        limit: int = 200,
         session_key: str | None = None,
     ) -> str:
         """API-level self-description of ONE node (not spatial).
@@ -50,8 +51,12 @@ def register_introspect_tools(mcp: Any) -> None:
         Args:
             node: Node name (short name or long DAG path).
             attrs: Attribute names to describe; None (default) lists
-                every attribute listAttr reports. A named attr that does
-                not exist aborts the whole call (attr_not_found) - no
+                every attribute listAttr reports UP TO the response
+                budget (limit) - over-budget output is truncated and
+                disclosed via attrs_truncated + total_count, never
+                silent; narrow further with an explicit attrs list or
+                raise limit and re-query. A named attr that does not
+                exist aborts the whole call (attr_not_found) - no
                 partial metadata (same contract as scene_export's
                 missing_objects).
             include_values: Also return value + soft_min/soft_max per
@@ -59,15 +64,23 @@ def register_introspect_tools(mcp: Any) -> None:
                 evaluation inside Maya - still read-only, but the eval
                 may cost time on heavy graphs.
             include_connections: Return connection wiring
-                {src_plug, dst_plug, direction} (default True).
+                {src_plug, dst_plug, direction} (default True); the same
+                budget applies (connections_truncated +
+                total_connections; no cursor in v1 - narrow and
+                re-query).
+            limit: Max items returned per face (attrs and connections).
+                Soft default 200; a caller may relax explicitly to the
+                hard cap 1000 (D-110) - bounds response size only, not
+                the per-attribute query cost.
             session_key: Maya session key (auto-selected if one session).
 
         Returns:
             JSON {node, type, attrs[{name, exists, attr_type, readable,
             writable, connectable, keyable, multi, hidden, locked,
             storable, children, index_matters, enum, enum_values, min,
-            max, (soft_min, soft_max, value)}], connections?[{src_plug,
-            dst_plug, direction}]}. Domain failures return
+            max, (soft_min, soft_max, value)}], attrs_truncated,
+            total_count, connections?[{src_plug, dst_plug, direction}],
+            connections_truncated?, total_connections?}. Domain failures return
             {"error": {code, message}} - node_not_found, attr_not_found,
             query_failed.
 
@@ -82,6 +95,8 @@ def register_introspect_tools(mcp: Any) -> None:
             not isinstance(attrs, list) or not all(isinstance(a, str) for a in attrs)
         ):
             raise InputValidationError("attrs must be a list of attribute names")
+        if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+            raise InputValidationError("limit must be a positive int")
 
         from maya_mcp_server.server import get_session_manager
 
@@ -99,6 +114,7 @@ def register_introspect_tools(mcp: Any) -> None:
                 attrs=attrs,
                 include_values=bool(include_values),
                 include_connections=bool(include_connections),
+                limit=limit,
             ),
         )
         return json.dumps(result, indent=2)

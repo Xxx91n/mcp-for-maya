@@ -132,3 +132,8 @@ rotateOrder/decayRate enums, message attrs on shadingEngines) - enough
 to pin the contract, not a census. `ls(long=True)` on DG nodes returns
 the short name (no DAG path exists) - the earlier "|<name>" quirk was
 corrected in the same change (test_asset_module assertions updated).
+Response budget (D-110): the caps live in introspect_module.py
+(_DESCRIBE_SOFT_CAP/_DESCRIBE_HARD_CAP), not in the stub surface —
+listAttr/listConnections return full lists and describe_node applies
+the 200-item soft cap / 1000 hard cap at response assembly with
+*_truncated + totals disclosure.

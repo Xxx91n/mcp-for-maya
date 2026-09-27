@@ -65,7 +65,7 @@ Poly Haven model search + import shipped in 0.2.0 (issue #2 thin slice: FBX + te
 | 🔌 **Session management** | `list_sessions` `add_session` `maya_setup_guide` | Multi-session discovery/attach + connection diagnosis/install/fallback guidance |
 | 📦 **Asset library** | `asset_search` `asset_import` | Poly Haven CC0 models — host-side HTTPS download (host allowlist, md5 verify, size caps, platformdirs cache), Maya-side FBX import with texture wiring, polycount/dims guards, `GRP_asset_<id>` dedup |
 | 📤 **Scene export** | `scene_export` | FBX/OBJ/USD export — whole scene or named objects; format inferred from extension (conflict is an error, never a guess), parent dirs auto-created, overwrite opt-in, selection restored |
-| 🔎 **Scene-graph introspection** | `scene_describe` `scene_nodes` | API-level node self-description (exact type, per-attribute metadata: keyable/connectable/enum/ranges, connection wiring) + bounded enumeration incl. non-DAG nodes (materials/tool nodes) with `has_more`/`next_cursor` pagination |
+| 🔎 **Scene-graph introspection** | `scene_describe` `scene_nodes` | API-level node self-description (exact type, per-attribute metadata: keyable/connectable/enum/ranges, connection wiring — size-bounded, `*_truncated` disclosure, `limit` up to 1000) + bounded enumeration incl. non-DAG nodes (materials/tool nodes) with `has_more`/`next_cursor` pagination |
 
 25 MCP tools in total.
 

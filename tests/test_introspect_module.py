@@ -170,3 +170,68 @@ class TestListNodes:
     def test_empty_scene(self, env):
         out = env.module.list_nodes()
         assert out["total_count"] == 0 and out["nodes"] == []
+
+
+class TestDescribeBudget:
+    """D-110 response-size caps: soft 200 default / hard 1000 via limit=,
+    *_truncated + totals disclosure (never silent). Mechanism tests run
+    at small explicit limits - the stub's attr_meta rebuild is O(n^2)
+    per-attr so large real-scale seeds are kept off the stub tier; the
+    cap constants themselves are pinned directly.
+    """
+
+    @staticmethod
+    def _seed_attrs(env, name, count):
+        node = env.scene.add_node(name, "transform")
+        for i in range(count):
+            node.attrs[f"uattr{i}"] = i
+        return node
+
+    def test_cap_constants_are_the_contract(self, env):
+        assert env.module._DESCRIBE_SOFT_CAP == 200
+        assert env.module._DESCRIBE_HARD_CAP == 1000
+
+    def test_limit_truncates_with_disclosure(self, env):
+        self._seed_attrs(env, "hub", 12)
+        out = env.module.describe_node("hub", include_connections=False, limit=5)
+        assert len(out["attrs"]) == 5
+        assert out["attrs_truncated"] is True
+        assert out["total_count"] >= 12
+
+    def test_limit_relaxes_truncation(self, env):
+        self._seed_attrs(env, "hub", 12)
+        out = env.module.describe_node("hub", include_connections=False, limit=50)
+        assert out["attrs_truncated"] is False
+        assert out["total_count"] == len(out["attrs"])
+
+    def test_hard_cap_clamps_limit(self, env, monkeypatch):
+        monkeypatch.setattr(env.module, "_DESCRIBE_HARD_CAP", 5)
+        env.scene.add_node("hub", "transform")
+        out = env.module.describe_node("hub", include_connections=False, limit=50)
+        assert len(out["attrs"]) == 5
+        assert out["attrs_truncated"] is True
+
+    def test_explicit_attrs_list_is_capped(self, env):
+        self._seed_attrs(env, "hub", 10)
+        names = [f"uattr{i}" for i in range(10)]
+        out = env.module.describe_node("hub", attrs=names, include_connections=False, limit=4)
+        assert len(out["attrs"]) == 4
+        assert out["attrs_truncated"] is True
+        assert out["total_count"] == 10
+
+    def test_connections_cap_and_total(self, env):
+        env.scene.add_node("hub", "transform")
+        for i in range(8):
+            env.scene.plug_connections[f"hub.in{i}"] = [f"src{i}.out"]
+        out = env.module.describe_node("hub", attrs=["translate"], limit=5)
+        assert len(out["connections"]) == 5
+        assert out["connections_truncated"] is True
+        assert out["total_connections"] == 8
+
+    def test_untruncated_shape_carries_disclosure_fields(self, env):
+        env.scene.add_mesh("GEO_a")
+        out = env.module.describe_node("GEO_a")
+        assert out["attrs_truncated"] is False
+        assert out["total_count"] == len(out["attrs"])
+        assert out["connections_truncated"] is False
+        assert out["total_connections"] == len(out["connections"])

@@ -125,3 +125,4 @@
 | D-115 | T-26b D-109⑤ 衍生债登记：其余 live-probe 工件补采 | 登记 | 债=shader_probe/mcp_stdio_probe/rst-fin-probe 等其余探针工件仍滞留 .scratch 未入仓；触发条件=下个真机 Maya 窗口开启时按 D-109 形态（provenance+claim_boundary）补采入 docs/evidence/ | 非实现项——只登记触发条件；无真机窗不预采 | current |
 | D-116 | T-26b D-111④ 衍生债登记：单测耗时 profiling | 登记 | 债=测试套件无 per-test 耗时棘轮（锐评「5s×8」归因已驳回但耗时面未否认）；触发条件=实测任一单测 ≥1s 异常出现→届时立票裁采样/预算方案 | 非实现项——只登记触发条件；凭数据再动 | current |
 | D-117 | T-26b D-111⑤ 衍生债登记：max_warnings 棘轮 | 登记 | 债=pytest 未钉上限版本，max_warnings=0 暂不启用；触发条件=CI 4 格全部解析出 pytest ≥9.1→同 commit 启用 max_warnings=0（warnings-as-errors 的原生棘轮位） | 非实现项——只登记触发条件 | current |
+| D-118 | T-26c D-110⑧ 衍生债登记：describe 主线程耗时面 | 登记 | 债=scene_describe 每属性 ~10 次 attributeQuery 在 Maya 主线程串行执行（D-110 cap 只封响应体积面，耗时面独立）；触发条件=真机实测单节点 describe 耗时超标→届时另立采样/批量 query 方案债（不得与响应体积 cap 混同） | 非实现项——只登记触发条件；无真机数据不预优化 | current |

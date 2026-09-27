@@ -163,6 +163,26 @@ async def test_nodes_rejects_bad_limit(tools):
             await tools.fns["scene_nodes"](limit=bad)
 
 
+async def test_describe_rejects_bad_limit(tools):
+    from maya_mcp_server.security import InputValidationError
+
+    for bad in (0, -3, "many", True, 1.5):
+        with pytest.raises(InputValidationError):
+            await tools.fns["scene_describe"]("GEO_a", limit=bad)
+
+
+async def test_describe_limit_passthrough_and_disclosure(tools):
+    """D-110: limit= reaches the module; truncation fields ride the JSON."""
+    node = tools.env.scene.add_node("hub", "transform")
+    for i in range(12):
+        node.attrs[f"uattr{i}"] = i
+    out = json.loads(await tools.fns["scene_describe"]("hub", limit=5, include_connections=False))
+    assert len(out["attrs"]) == 5
+    assert out["attrs_truncated"] is True
+    assert out["total_count"] >= 12
+    assert "connections" not in out
+
+
 # ------------------------------------------------------------
 # Injection lifecycle (D-095): same _mcp_scene unit, assembled payload
 # ------------------------------------------------------------

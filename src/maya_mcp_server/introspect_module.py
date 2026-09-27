@@ -70,6 +70,19 @@ _ATTR_FACET_FLAGS = (
 )
 
 
+# Response-size caps (D-110): the attrs and connections faces each default
+# to a soft cap of _DESCRIBE_SOFT_CAP items; a caller may explicitly relax
+# via limit= up to _DESCRIBE_HARD_CAP (same idiom as scene_nodes
+# limit=50/cap=100). Truncation is disclosed via *_truncated flags plus
+# totals - never silent. The caps bound RESPONSE SIZE only: the ~10
+# attributeQuery calls per attribute are a separate main-thread cost axis
+# inside Maya - if real-Maya timing proves problematic that is a distinct
+# profiling/batched-query debt (registered D-118), not a reason to widen
+# these caps.
+_DESCRIBE_SOFT_CAP = 200
+_DESCRIBE_HARD_CAP = 1000
+
+
 def _describe_attr(node: str, attr: str, include_values: bool) -> dict[str, Any]:
     entry: dict[str, Any] = {"name": attr}
     if not _aq(node, attr, "exists"):
@@ -150,13 +163,21 @@ def describe_node(
     attrs: list[str] | None = None,
     include_values: bool = False,
     include_connections: bool = True,
+    limit: int = _DESCRIBE_SOFT_CAP,
 ) -> dict[str, Any]:
     """Instance-level API self-description of one node (D-094).
 
     Returns {node, type, attrs[{name, exists, attr_type, readable,
     writable, connectable, keyable, multi, hidden, locked, storable,
     children, index_matters, enum, enum_values, min, max, (+ soft_min,
-    soft_max, value)}], connections[{src_plug, dst_plug, direction}]}.
+    soft_max, value)}], attrs_truncated, total_count, connections?[
+    {src_plug, dst_plug, direction}], connections_truncated?,
+    total_connections?}. D-110 budget: each face returns at most
+    limit items (soft default 200, caller-relaxable up to the hard cap
+    1000); over-budget output is truncated and disclosed via
+    *_truncated + totals - never silent. Consumers narrow and re-query
+    (an explicit attrs=[...] list is the natural continuation form;
+    connections have no cursor in v1).
     Sparse shape: an attr that fails its own exists check (listAttr vs
     attributeQuery disagreement / TOCTOU edge) carries only
     {name, exists: False} - facets are never fabricated.
@@ -183,13 +204,21 @@ def describe_node(
             names = list(attrs)
         else:
             names = cmds.listAttr(node) or []
+        limit = min(max(int(limit), 1), _DESCRIBE_HARD_CAP)
+        total = len(names)
+        names = names[:limit]
         result = {
             "node": node,
             "type": cmds.objectType(node),
             "attrs": [_describe_attr(node, a, include_values) for a in names],
+            "attrs_truncated": total > len(names),
+            "total_count": total,
         }
         if include_connections:
-            result["connections"] = _node_connections(node)
+            conns = _node_connections(node)
+            result["connections"] = conns[:limit]
+            result["connections_truncated"] = len(conns) > limit
+            result["total_connections"] = len(conns)
         return result
     except Exception as e:
         return _int_err("query_failed", f"{type(e).__name__}: {e}")

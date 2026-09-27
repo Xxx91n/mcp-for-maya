@@ -125,7 +125,11 @@ authoritative and this table must match it row for row:
   trigger DG evaluation inside Maya (cost, not a side effect - the
   eval is Maya's normal dependency resolution) and `scene_nodes`
   paginates positionally, so a stale `cursor` is answered with
-  `invalid_cursor`, never silently re-applied.
+  `invalid_cursor`, never silently re-applied. Responses are
+  size-bounded (D-110): attrs/connections faces cap at 200 items by
+  default (caller-relaxable to 1000 via limit=); over-budget output is
+  truncated and disclosed via *_truncated flags + totals, never
+  silently cut.
 - destructive=true is reserved for arbitrary code execution and
   startup-file writes. `scene_rollback` recovers state (not destructive)
   but is not idempotent; `camera_create`/`camera_orbit`/`scene_checkpoint`
