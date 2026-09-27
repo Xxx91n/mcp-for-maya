@@ -6,7 +6,9 @@ readColorBuffer + MImage create/pixels/flip/writeToFile.
 
 Pixel model (D-056⑤): readColorBuffer fills the image with GL-truth —
 buffer rows are TOP-DOWN (row 0 = top - live-verified on Maya
-2024.0.0.4640, T-18a re-pin) and channels
+2024.0.0.4640, T-18a re-pin; gui-tier assert
+tests/test_gui_session.py::test_vp2_pure_color_orientation_and_channels)
+and channels
 are stored BGRA (MImage's de-facto order; isRGBA() reports the flag).
 verticalFlip() physically reverses row order; writeToFile emits buffer
 order to file rows, interpreting channels via the RGBA/BGRA marker —

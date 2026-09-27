@@ -224,7 +224,8 @@ class TestCmdsFacade:
         assert cmds.ls(type="transform") is None
 
     def test_ls_glob_patterns(self, scene):
-        """Real-Maya glob semantics (verified live on 2024): string
+        """Real-Maya glob semantics (live-verified on 2024; probe artifact
+        pending docs/evidence intake — D-109): string
         patterns filter by name, and * never crosses the namespace ':'."""
         cmds = __import__("maya.cmds", fromlist=["x"])
         scene.add_mesh("GEO_box")

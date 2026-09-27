@@ -136,7 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   negative + orphan-cleanup cases). Note: the R3 audit's "connection
   impossible" claim was refuted by a live Maya 2024 probe
   (`disp.displacement -> sg.displacementShader` connects —
-  `.scratch/t21/probe-displacement.json`); "connected" is still not
+  `docs/evidence/probes/probe-displacement.json`); "connected" is still not
   "renders correctly" — visual proof stays on the gui/human_verify tier.
 - **Poly Haven surface hardening (D-082f)** — bare `int()` on
   API/HTTP-controlled fields could escape the `AssetError` domain as a

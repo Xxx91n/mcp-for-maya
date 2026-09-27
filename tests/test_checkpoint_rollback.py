@@ -328,8 +328,9 @@ class TestRollback:
         for c in mutating:
             if c["kwargs"].get("rename"):
                 # Real Maya rejects flag combos with -rename ("the
-                # -rename flag must be used by itself") — verified live
-                # on Maya 2024. Rename carries no prompt flag at all.
+                # -rename flag must be used by itself") — live-verified
+                # on Maya 2024 (artifact pending docs/evidence intake —
+                # D-109). Rename carries no prompt flag at all.
                 assert list(c["kwargs"]) == ["rename"], c
             else:
                 assert c["kwargs"].get("prompt") is False, c

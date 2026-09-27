@@ -36,7 +36,8 @@ _MATERIAL_TYPES = {"lambert", "phong", "blinn", "surfaceShader", "aiStandardSurf
 
 
 def _maya_glob(pattern: str, name: str) -> bool:
-    """Maya ls glob semantics, verified live on Maya 2024:
+    """Maya ls glob semantics, live-verified on Maya 2024 (probe
+    artifact pending docs/evidence intake — D-109):
     ``*`` and ``?`` match within a namespace segment only — they never
     cross ``:``. ``ls("*x*")`` does NOT match ``ns:x``; you need
     ``ls("*:*x*")``.

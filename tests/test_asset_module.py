@@ -260,7 +260,8 @@ class TestTextureWiring:
 
 class TestDisplacement:
     def test_disp_wires_via_imported_sg(self, asset_env, tmp_path):
-        """Positive case — live-verified shape (probe-displacement.json):
+        """Positive case — live-verified shape
+        (docs/evidence/probes/probe-displacement.json):
         file.outAlpha -> disp.displacement -> sg.displacementShader on
         the IMPORTED shading group."""
         disp = tmp_path / "body_disp_1k.jpg"

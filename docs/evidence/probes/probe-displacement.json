@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "date": "2026-09-24",
+    "env": "Maya 2024 GUI session PID4452 :7001",
+    "purpose": "R21 adjudication of audit P1-B/P2-E (live probe, net-zero: nodes deleted, dirty flag preserved)",
+    "verdict": "P1-B refuted: disp.displacement->sg.displacementShader accepted; P2-E confirmed: blinn lacks roughness/specularRoughness/metalness; stdSurface lacks diffuse/reflectivity",
+    "claim_boundary": "Proves plug-level acceptance of disp.displacement -> sg.displacementShader and material attr presence/absence on blinn/stdSurface (Maya 2024). Does NOT prove render correctness — \"connected\" is not \"renders correctly\"; visual proof stays on the gui/human_verify tier."
+  },
+  "result": {
+    "sg_node_type": "shadingEngine",
+    "sg_disp_exists": true,
+    "sg_disp_attrtype": "Tdata",
+    "in_link": "ok",
+    "out_link_disp_to_sg": "ok",
+    "sg_disp_srcs": [
+      "displacementShader1"
+    ],
+    "blinn_attrs": {
+      "roughness": false,
+      "specularRoughness": false,
+      "metalness": false,
+      "reflectivity": true,
+      "specularRollOff": true,
+      "normalCamera": true,
+      "diffuse": true
+    },
+    "stdSurface_attrs": {
+      "roughness": false,
+      "specularRoughness": true,
+      "metalness": true,
+      "reflectivity": false,
+      "specularRollOff": false,
+      "normalCamera": true,
+      "diffuse": false
+    },
+    "pre_dirty": true
+  }
+}

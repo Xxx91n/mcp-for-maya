@@ -262,7 +262,8 @@ def _vp2_color_image(view: Any) -> Any:
     RGBA-ordered floats, so writeToFile's built-in float->byte
     conversion emits a correct PNG with no Python-side pixel copy —
     MScriptUtil was removed in Maya 2024 and the float* pointer-wrap
-    path is gone for good (D-056⑤, live-verified on 2024.0.0.4640).
+    path is gone for good (D-056⑤, live-verified on 2024.0.0.4640;
+    probe artifact pending docs/evidence intake — D-109).
     Versions lacking the flag fall back to the default BGRA read;
     writeToFile still honors the image's channel-order marker on write.
     """

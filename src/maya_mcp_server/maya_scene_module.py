@@ -1484,8 +1484,9 @@ def rollback_to_checkpoint(filename: str, discard_current_state: bool = False) -
         try:
             # -rename must be used by itself on real Maya — combining it
             # with prompt=False raises "the -rename flag must be used by
-            # itself" (verified live on Maya 2024; the stub never
-            # modeled that constraint).
+            # itself" (live-verified on Maya 2024; probe artifact pending
+            # docs/evidence intake at the next real-Maya window — D-109;
+            # the stub never modeled that constraint).
             cmds.file(rename=scene_before)
         except Exception as e:
             return _rb_error(

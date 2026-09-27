@@ -22,7 +22,7 @@ SHAPE_TYPES = LIGHT_TYPES | {"mesh", "camera", "locator", "nurbsCurve", "joint"}
 
 # Type-defined attrs the stub seeds on creation - objExists("n.attr")
 # answers like real Maya only if the type's standard attrs exist.
-# Live-probe pinned (D-082e, .scratch/t21/probe-displacement.json):
+# Live-probe pinned (D-082e, docs/evidence/probes/probe-displacement.json):
 # blinn carries reflectivity/specularRollOff but NO specularRoughness;
 # standardSurface/aiStandardSurface carry the PBR set (base, baseColor,
 # metalness, specularRoughness, specularColor, normalCamera, outColor)

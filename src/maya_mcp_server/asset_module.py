@@ -295,7 +295,9 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
     if role == "normal" or role == "normal_dx":
         if not cmds.objExists(mat + ".normalCamera"):
             return False
-        # Canonical network per fbxmaya itself (verified live Maya 2024):
+        # Canonical network per fbxmaya itself (live-verified on Maya 2024;
+        # probe artifact pending docs/evidence intake at the next
+        # real-Maya window — D-109):
         # file.outAlpha -> bump2d.bumpValue; bump2d.outNormal -> mat.normalCamera;
         # bumpInterp=1 selects tangent-space normals. outColor -> bumpValue is
         # rejected by real Maya (color -> float is not connectable).
@@ -326,7 +328,8 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
         if not sg or not cmds.objExists(sg + ".displacementShader"):
             return False
         # disp.displacement -> sg.displacementShader is the live-verified
-        # shape (Maya 2024 probe, .scratch/t21/probe-displacement.json) —
+        # shape (Maya 2024 probe, docs/evidence/probes/probe-displacement.json)
+        # —
         # but "connection established" is not render semantics; visual
         # proof stays on the gui/human_verify tier.
         disp = None
