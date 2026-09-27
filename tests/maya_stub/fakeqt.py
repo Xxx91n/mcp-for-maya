@@ -173,17 +173,27 @@ class QImage:
         else:
             out._w, out._h = int(w), int(h)
         if self._pixels is not None and (out._w, out._h) != (self._w, self._h):
-            # nearest-neighbor resample keeps per-pixel content honest
-            rows = []
-            for y in range(out._h):
-                src = self._pixels[min(self._h - 1, int(y * self._h / out._h))]
-                rows.append(
-                    b"".join(
-                        src[min(self._w - 1, int(x * self._w / out._w)) * 3 :][:3]
-                        for x in range(out._w)
-                    )
+            if self._pixels.count(self._pixels[0]) == len(self._pixels):
+                # D-122: uniform image — every mapped source row is the
+                # same bytes, so one resampled row covers the output.
+                src = self._pixels[0]
+                row = b"".join(
+                    src[min(self._w - 1, int(x * self._w / out._w)) * 3 :][:3]
+                    for x in range(out._w)
                 )
-            out._pixels = rows
+                out._pixels = [row] * out._h
+            else:
+                # nearest-neighbor resample keeps per-pixel content honest
+                rows = []
+                for y in range(out._h):
+                    src = self._pixels[min(self._h - 1, int(y * self._h / out._h))]
+                    rows.append(
+                        b"".join(
+                            src[min(self._w - 1, int(x * self._w / out._w)) * 3 :][:3]
+                            for x in range(out._w)
+                        )
+                    )
+                out._pixels = rows
         elif self._pixels is not None:
             out._pixels = list(self._pixels)
         out._null = False

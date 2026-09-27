@@ -315,7 +315,11 @@ class Scene:
         self.batch = False  # cmds.about(batch=True)
         self.panels = {}  # name -> {type,camera,activeView,withFocus,width,height}
         self.focus_panel = None  # getPanel(withFocus=True)
-        self.viewport_size = (1280, 720)  # M3dView.portWidth/portHeight
+        # D-122: tiny default — every pixel-fed test (MImage fills,
+        # PNG encode/decode) costs O(w*h); 1280x720 made 14 tests take
+        # ~6s each with zero extra coverage. Tests asserting a specific
+        # size set viewport_size explicitly.
+        self.viewport_size = (64, 48)  # M3dView.portWidth/portHeight
         self.look_thru_calls = []  # (panel, camera) lookThru invocations
         self.model_panel_calls = []  # (panel, camera) modelPanel camera edits
         self.stub_strict = False  # D-039: True => unclassifiable args raise like real Maya

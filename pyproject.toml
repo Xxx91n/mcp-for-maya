@@ -90,6 +90,14 @@ filterwarnings = [
     # exemption: active when requests is present, inert when absent.
 ]
 
+# D-117 redeemed (T-27b): trigger verified 2026-09-27 — uv.lock pins
+# pytest 9.1.1 and every CI cell installs the same lock via
+# `uv sync --frozen`, so all 4 cells resolve pytest >=9.1. The
+# warnings-as-errors native ratchet slot is now armed: the suite
+# fails when any warning escapes the filterwarnings=error wall
+# (collection-phase warnings included).
+max_warnings = 0
+
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]

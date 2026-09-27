@@ -262,11 +262,13 @@ class TestSnapshotContract:
 
     async def test_max_size_downsample_math(self, vtools):
         """1280x720 viewport, max_size=800 -> 800x450 (aspect kept)."""
+        vtools.env.scene.viewport_size = (1280, 720)  # explicit per D-122
         out = await vtools.fns["scene_viewport_snapshot"](max_size=800)
         meta = _meta(out)
         assert (meta["width"], meta["height"]) == (800, 450)
 
     async def test_no_downsample_when_fits(self, vtools):
+        vtools.env.scene.viewport_size = (1280, 720)  # explicit per D-122
         out = await vtools.fns["scene_viewport_snapshot"](max_size=2000)
         meta = _meta(out)
         assert (meta["width"], meta["height"]) == (1280, 720)

@@ -126,6 +126,21 @@ class MImage:
         pattern = getattr(sc, "viewport_pattern", None) or _default_pattern
         self._rgba = bool(rgba)
         order = (0, 1, 2, 3) if rgba else (2, 1, 0, 3)
+        if pattern is _default_pattern:
+            # D-122 fast path: the default pattern is a constant, so the
+            # honest buffer is one shared row repeated — identical
+            # observable pixels in O(w) instead of O(w*h) Python.
+            ch = _default_pattern(0, 0, w, h)
+            out = (ch[order[0]], ch[order[1]], ch[order[2]], ch[order[3]])
+            if self.format == self.kFloat:
+                px = tuple(float(c) for c in out)
+            else:
+                px = tuple(max(0, min(255, int(round(c * 255)))) for c in out)
+            row = [px] * w
+            # bottom-up row order on a uniform buffer produces the same
+            # rows — the shared-row build is honest either way.
+            self._rows = [row] * h
+            return
         # vp2_readback_bottom_up models a device whose readback arrives
         # row-flipped (D-082d): the buffer's row 0 is the image BOTTOM.
         ys = range(h - 1, -1, -1) if getattr(sc, "vp2_readback_bottom_up", False) else range(h)
@@ -150,10 +165,10 @@ class MImage:
             with open(path, "wb") as fh:
                 fh.write(png_bytes(self.width, self.height))
             return True
+
         # writeToFile emits buffer order to file rows; channels are
         # interpreted via the RGBA marker (a lie here swaps R/B out).
-        rows_rgb = []
-        for row in self._rows:
+        def _rgb_row(row):
             out = bytearray()
             for px in row:
                 if self.format == self.kFloat:
@@ -165,7 +180,13 @@ class MImage:
                 else:
                     b, g, r = px[0], px[1], px[2]
                 out += bytes((r, g, b))
-            rows_rgb.append(bytes(out))
+            return bytes(out)
+
+        if self._rows and all(r is self._rows[0] for r in self._rows):
+            # shared-row uniform fill — one emitted row is the file (D-122)
+            rows_rgb = [_rgb_row(self._rows[0])] * self.height
+        else:
+            rows_rgb = [_rgb_row(row) for row in self._rows]
         with open(path, "wb") as fh:
             fh.write(png_pixels(self.width, self.height, rows_rgb))
         return True
