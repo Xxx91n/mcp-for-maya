@@ -35,6 +35,12 @@ Maya 开机激活整条阻塞链，本轮同裁：T-16f 执行面 + 通过后的
 
 **b) yank 改逐版核实制**（对我方"同带病"表述的修正）：PyPI 官方判定单位=**单个 release 非缺陷家族**——0.1.0/0.1.1 之间隔着 T-11b 等修复，须 `git show v0.1.0/v0.1.1` 逐版实证各带什么病，确认带病者才 yank、reason 写具体故障模式（attrs 先例：一句话说清故障模式）。PEP 592 语义钉死：yank 只挡非 pin 解析（`==0.1.1` 仍可装+warning）、可 unyank 回滚；**yank 只在 0.1.2 确认 PyPI 可用后执行**（防全项目无可用版本空窗）。
 
+**R26 增补（D-107④ / D-108②③，2026-09-27 兑现）**：
+
+- 发布清单硬核对项：`[X.Y.Z]` 节内容 == tag diff —— 节内每条叙事条目可归因到 `git diff <prev-tag>..<tag-commit>` 的文件集；对不上即不可发。
+- GH Release 判别钉死：minor 版执行、patch 版依 D-084 跳过（release.yml 注释同锚；D-068 原序列文本在此修订）。
+- tag 前软前置冒烟：本批新 cmds 面（T-24 = attr_meta / plug_connections / listAttr / attributeQuery）——Maya 开机则跑 `pytest -m mayapy` 冒烟；未开机则 release notes 按 D-049 档披 known-unverified。不设硬 CI 门。
+
 ## D-069：#2/#7 发帖机制
 
 本窗口即发（备稿就绪+"≥0.1.0 已含"耐久真话不依赖 0.1.2）；执行=**agent 贴终稿→用户过目→gh 以用户账号发出**。过目为授权前置条件，发出前用户有最终否决点；其余四条（#1/#3/#4/#5）仍等 0.1.2 发布后同流程；一 issue 一评不追评纪律不变；措辞改动须回草稿重过目。
