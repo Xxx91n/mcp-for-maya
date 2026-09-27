@@ -58,7 +58,6 @@ tests/
 ├── test_session_manager.py
 ├── test_module_teardown.py   # T-16a overwrite teardown protocol + Qt signal semantics (D-058, upstream #4)
 ├── test_version_unification.py # T-16e serverInfo=product version (D-060③)
-├── test_aesthetic_engine.py     # dormant-engine unit coverage (D-038; not a production-path claim)
 ├── test_polyhaven.py        # T-19a host client: whitelist/md5/cache/domain errors (D-075)
 ├── test_asset_module.py     # T-19a _mcp_asset importer on the stub scene
 ├── test_asset_tools.py      # T-19a tool layer: dedup/domain errors/audit detail
@@ -181,6 +180,11 @@ ruff check .
 # Typecheck vs frozen baseline (mypy-baseline.txt — fails only on NEW errors)
 python -m mypy src/ | mypy-baseline filter
 
+# Pre-commit hook surface BEFORE pushing — the lint job runs this verbatim
+# (trailing-whitespace / end-of-file / ruff-format); a skipped local run
+# means deterministic CI red (T-27 audit F-01 class).
+uv run pre-commit run --all-files
+
 # Run with debug logging (-v=INFO, -vv=DEBUG)
 python -m maya_mcp_server -vv
 
@@ -207,8 +211,8 @@ Failure to update dependent files will cause integration failures.
 | Module Modified | Must Also Update | Reason |
 |----------------|------------------|--------|
 | `maya_scene_module.py` (scene_plan) | `scene_tools.py`, `server.py`, `README.md`, `README.zh-CN.md` | Scene planning tool needs MCP tool + docs |
-| `maya_scene_module.py` (aesthetic functions) | `aesthetic_engine.py`, `scene_tools.py`, `tests/test_aesthetic_engine.py` | Aesthetic engine is dual-implemented (standalone + Maya-side); tool descriptions must match; tests must cover |
-| `maya_scene_module.py` (lighting functions) | `scene_tools.py`, `tests/test_aesthetic_engine.py` | Lighting data fields must match tool expectations |
+| `maya_scene_module.py` (aesthetic functions) | `scene_tools.py`, `tests/test_maya_scene_module.py` | Inline `_score_*` functions are the sole implementation (ADR-0003 status notes; host module retired in 0.4.0 per D-124); tool descriptions + stub-tier coverage must match |
+| `maya_scene_module.py` (lighting functions) | `scene_tools.py`, `tests/test_maya_scene_module.py` | Lighting data fields must match tool expectations |
 | `maya_scene_module.py` (scene_review) | `scene_tools.py` (scene_review docstring), `server.py` (instructions) | Review check names must match tool args; instructions must list all checks |
 | `maya_scene_module.py` (new function) | `scene_tools.py` (new tool), `server.py` (instructions), `README.md`, `README.zh-CN.md`, `tests/` | Every new Maya function needs a corresponding MCP tool, docs, and tests |
 | `visual_module.py` (capture paths) | `visual_tools.py`, `server.py` (instructions), `docs/adr/0013-visual-loop-architecture.md`, `tests/test_visual_tools.py` | Capture contract, annotations, and ADR must stay in sync |
@@ -217,7 +221,6 @@ Failure to update dependent files will cause integration failures.
 | `export_tools.py` / `export_module.py` (export surface) | `pipeline.py` (TOOL_ANNOTATIONS), `server.py` (instructions), `docs/threat-model.md` (§5 matrix), `tests/test_export_module.py`, `tests/test_export_tools.py`, `tests/maya_stub/` (cmds.file export surface), `README.md`, `README.zh-CN.md`, `AGENTS.md` | Export tool splits host (validation/registration) vs Maya-side `export_scene` (path/format/selection/plugin contract); every piece must stay in sync |
 | `introspect_tools.py` / `introspect_module.py` (introspection surface) | `pipeline.py` (TOOL_ANNOTATIONS), `server.py` (instructions), `docs/threat-model.md` (§5 matrix), `docs/visual-callform-matrix.md` (call-site table), `tests/test_introspect_module.py`, `tests/test_introspect_tools.py`, `tests/maya_stub/` (attr_meta / plug_connections / listAttr / attributeQuery surface), `README.md`, `README.zh-CN.md`, `AGENTS.md` | Introspection is a `_mcp_scene`-unit fragment (D-095 criterion 4): the Maya side is concatenated into the scene payload by `scene_tools`/`client.ensure_module_injected(extra_source_paths=...)` — not a standalone module; every piece must stay in sync; the D-110 response budget (`limit` param, `_DESCRIBE_SOFT_CAP`/`_DESCRIBE_HARD_CAP` constants, `*_truncated`/`total_count`/`total_connections` disclosure fields) is part of the contract surface |
 | `scene_tools.py` (new tool) | `server.py` (instructions), `README.md`, `README.zh-CN.md`, `AGENTS.md` | Tool surface changes require documentation sync |
-| `aesthetic_engine.py` | `maya_scene_module.py` (mirror functions), `tests/test_aesthetic_engine.py` | **DORMANT** (T-11b/D-038, ADR-0003 status note): zero production refs - Maya-side inline `_score_*` is the live implementation; kept for the T-06 consolidation decision |
 | `scene_cache.py` | `scene_tools.py` (cache invalidation), `session_manager.py` (mark_dirty) | Cache behavior must be consistent |
 | `security.py` | `pipeline.py` (enforcement point), `tests/test_security.py`, `tests/test_pipeline.py` | Security rules enforced by the middleware pipeline, not per-tool |
 | `pipeline.py` | `server.py` (middleware registration + annotations), `scene_tools.py` (annotations), `docs/threat-model.md` | Pipeline/threat-model must stay in sync |
@@ -287,24 +290,22 @@ filenames; retirement happens in README prose, never by file deletion.
 
 When modifying ANY aesthetic-related code, update ALL of these:
 
-1. **`maya_scene_module.py`** — Maya-side `analyze_aesthetics()` + `_score_*()` functions
-2. **`aesthetic_engine.py`** — **dormant** module (zero production refs; sync optional until the T-06 consolidation — Maya-side inline `_score_*` is the live implementation)
-3. **`scene_tools.py`** — `scene_aesthetics` tool docstring + COS format output
-4. **`maya_scene_module.py`** — `scene_review()` aesthetics section (must read new format)
-5. **`server.py`** — MCP instructions (aesthetic dimension descriptions)
-6. **`tests/test_aesthetic_engine.py`** — Unit tests for all dimensions
-7. **`README.md`** + **`README.zh-CN.md`** — Feature descriptions
-8. **`AGENTS.md`** — This checklist (if new dimensions added)
+1. **`maya_scene_module.py`** — Maya-side `analyze_aesthetics()` + `_score_*()` functions (sole implementation since D-124)
+2. **`scene_tools.py`** — `scene_aesthetics` tool docstring + COS format output
+3. **`maya_scene_module.py`** — `scene_review()` aesthetics section (must read new format)
+4. **`server.py`** — MCP instructions (aesthetic dimension descriptions)
+5. **`tests/test_maya_scene_module.py`** — Unit tests for all dimensions
+6. **`README.md`** + **`README.zh-CN.md`** — Feature descriptions
+7. **`AGENTS.md`** — This checklist (if new dimensions added)
 
 ### Lighting Module Change Checklist
 
 When modifying lighting analysis:
 
-1. **`maya_scene_module.py`** — Light data collection in `analyze_aesthetics()` + `_score_lighting_quality()`
-2. **`aesthetic_engine.py`** — `compute_lighting_quality_score()` (**dormant** — optional sync; Maya-side inline is authoritative)
-3. **`scene_tools.py`** — `scene_aesthetics` and `scene_review` tool docs
-4. **`maya_scene_module.py`** — `scene_review()` lighting section
-5. **`tests/test_aesthetic_engine.py`** — Lighting tests
+1. **`maya_scene_module.py`** — Light data collection in `analyze_aesthetics()` + `_score_lighting_quality()` (sole implementation since D-124)
+2. **`scene_tools.py`** — `scene_aesthetics` and `scene_review` tool docs
+3. **`maya_scene_module.py`** — `scene_review()` lighting section
+4. **`tests/test_maya_scene_module.py`** — Lighting tests
 
 ### Scene Review Change Checklist
 

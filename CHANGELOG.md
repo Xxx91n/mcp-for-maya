@@ -86,6 +86,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   response budget (`limit` param, 200 soft / 1000 hard per face,
   `*_truncated` + totals disclosure).
 
+### Removed
+
+- **Dormant aesthetic engine retired (D-124)** — deleted
+  `src/maya_mcp_server/aesthetic_engine.py` (1,420 lines, zero
+  production references across nine rounds) and its dedicated
+  `tests/test_aesthetic_engine.py` (58 tests exercising only the
+  dormant module) in the same commit. The Maya-side inline
+  `_score_*` functions in `maya_scene_module.py` remain the sole,
+  live implementation — the single-source goal ADR-0003 once
+  vetoed now achieved in the opposite direction; the ADR carries
+  errata + status notes, not a reopen. Coverage note: any numeric
+  coverage delta reflects deleting dormant-only tests; production
+  coverage is unchanged (`tests/test_maya_scene_module.py` exercises
+  `_score_*` through the stub). Baselines lowered with the reason
+  stated: `.github/ruff-baseline.json` (src E741 14→8 / F841 5→4;
+  tests E741 10→3 / F401 16→9 / N801 1→0), `mypy-baseline.txt`
+  (38 stale entries removed, 237→199), `.pre-commit-config.yaml`
+  exclude updated. Evidence: `docs/adr/0003-single-source-aesthetic-engine.md:9`
+  (errata + status notes) + `docs/decision-ledger.md` D-038/D-124 rows
+  + `tests/test_maya_scene_module.py::test_aesthetics_sampling`
+  (production-path coverage). Recall path: `git log -G aesthetic_engine`.
+
 ## [0.3.0] - 2026-09-27
 
 ### Added

@@ -25,12 +25,11 @@ House rules:
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (feat / fix / docs / refactor / test / chore).
 - CI gates (`.github/workflows/ci.yml`): `pytest` must be green on ubuntu + windows; the ruff budget
   (`.github/ruff-baseline.json`) is ratchet-only-down — above budget fails, and a lower count may be
-  budgeted down in the same PR commit with the reason stated. The `src` count includes
-  `aesthetic_engine.py`, a **dormant** module (zero production references; Maya-side inline
-  `_score_*` is the live implementation — kept for the T-06 consolidation decision, see the
-  ADR-0003 status note and D-038). `mypy` is baseline-gated in CI (`mypy-baseline.txt`; 223 errors in 3 files
-  as of the post-audit resync — baseline counts are stub-env sensitive; drift trail
-  221→223→212→223 across formatter and stub-environment changes): `python -m mypy src | mypy-baseline filter` fails only on NEW errors.
+  budgeted down in the same PR commit with the reason stated. `mypy` is baseline-gated in CI
+  (`mypy-baseline.txt`; 184 errors in 2 files as of the D-124 dormant-module deletion —
+  baseline counts are stub-env sensitive; drift trail 221→223→212→223→184 across formatter,
+  stub-environment changes and dormant-code removal): `python -m mypy src | mypy-baseline filter`
+  fails only on NEW errors.
   After resolving errors, run `python -m mypy src | mypy-baseline sync` and commit
   the refreshed baseline in the same PR. The ruff budget is per-rule
   (`{segment:{rule:count}}`) since T-10b — rules cannot subsidise each other.
