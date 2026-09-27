@@ -69,6 +69,7 @@ tests/
 ├── test_check_ruff_budget.py    # ruff-budget comparator guard (per-rule ratchet, D-044/T-10b)
 ├── test_check_tool_count_claims.py # tool-count claim gate (D-121)
 ├── test_notify_drift_canary.py  # drift-canary issue lifecycle (D-123)
+├── test_check_monolith_budget.py # monolith line-budget ratchet (D-125)
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
@@ -79,15 +80,17 @@ docs/
 └── threat-model.md        # threat model + security boundaries
 
 .github/
-├── workflows/ci.yml       # lint (ruff budget gate) + README skeleton check + test matrix ubuntu/windows x 3.10/3.x
+├── workflows/ci.yml       # lint (ruff budget + monolith line + tool-count claims + assets append-only + README skeleton gates) + test matrix ubuntu/windows x 3.10/3.x + weekly drift canary -> issue notify (D-112/D-123)
 ├── workflows/release.yml  # tag v* -> test -> build -> publish (trusted publisher; env: pypi)
 ├── dependabot.yml         # weekly github-actions bumps, minor+patch grouped
 ├── ruff-baseline.json     # frozen lint budget {"src":{"RULE":N},"tests":{...}} — per-rule ratchet down only (T-10b/D-044)
+├── monolith-budget.json   # frozen line budget {path: N} — monolith ratchet down only (D-125)
 ├── scripts/check_ruff_budget.py  # budget comparator used by the lint job
 ├── scripts/check_readme_skeleton.py  # README/zh-CN title-skeleton parity check (D-072)
 ├── scripts/check_assets_append_only.py # .github/assets append-only guard (D-113)
 ├── scripts/check_tool_count_claims.py # live-doc tool-count claims == TOOL_ANNOTATIONS (D-121)
 ├── scripts/notify_drift_canary.py  # drift canary -> dedup issue artifact (D-123)
+├── scripts/check_monolith_budget.py # maya_scene_module.py line-count ratchet (D-125)
 ├── assets-src/            # reproducible capture scripts for README imagery (t20/ scene generators; T-19c scene_build.py + capture.py kept for reference)
 └── assets/                # published README imagery (populated only after sign-off)
 ```
@@ -221,6 +224,7 @@ Failure to update dependent files will cause integration failures.
 | `connection_guide.py` | `server.py` (maya_setup_guide params), `tests/test_connection_guide.py` | Marker-block semantics + confirm/dry_run/remove_empty_file flags |
 | `cos_formatter.py` | `scene_tools.py` (COS format output) | Formatter changes affect all tool COS outputs |
 | `maya_scene_module.py` (scene_review check names/semantics) | `skills/scene-review-playbook/SKILL.md` | Card documents the 11 checks + findings→actions; check renames/semantics changes must sync it |
+| `maya_scene_module.py` (line-count growth) | `.github/monolith-budget.json`, `.github/scripts/check_monolith_budget.py`, `tests/test_check_monolith_budget.py` | D-125 ratchet: growth past the frozen cap fails the lint job; legitimate additions need a human-approved budget edit in the same PR with the reason stated; new Maya-side capability routes to a same-unit separate file (ADR-0027 criterion 4), never appended to the monolith |
 
 ### Injected-module admission criteria (注入模块准入判据, ADR-0027 + D-095)
 

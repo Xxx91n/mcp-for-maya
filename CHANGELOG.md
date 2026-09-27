@@ -41,6 +41,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_notify_drift_canary.py::test_red_creates_issue_when_none_open` /
   `::test_green_closes_open_issue`.
 
+- **Monolith line-count ratchet (D-125)** —
+  `src/maya_mcp_server/maya_scene_module.py` is capped by
+  `.github/monolith-budget.json` (frozen at its landing-time count)
+  enforced by `.github/scripts/check_monolith_budget.py` in the lint
+  job: over budget fails, under budget warns "may be lowered" so the
+  ratchet keeps closing instead of decaying into a high-water mark.
+  Growth channel: human-approved budget edit in the same PR with the
+  reason stated; new Maya-side capability routes to a
+  same-injection-unit separate file per ADR-0027 criterion 4
+  (`introspect_module.py` is the first case). Evidence:
+  `.github/monolith-budget.json:2` +
+  `.github/scripts/check_monolith_budget.py:39` +
+  `tests/test_check_monolith_budget.py::test_repo_monolith_within_budget`.
+
 - **CI append-only guard for published assets (D-113, D-081)** —
   `.github/scripts/check_assets_append_only.py:68` runs in the lint job:
   pure additions under `.github/assets/` pass, while
