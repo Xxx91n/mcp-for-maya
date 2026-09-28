@@ -24,7 +24,7 @@
 ### T-29a — 0.4.0 发布执行窗 — ⑤完成，⑥待 go-signal ②
 
 已完成：release commit 70c96c7→PR #44（CI 六格全绿）→merge b977908→tag v0.4.0→release.yml 全绿→PyPI 文件+attestations 落地。
-GH Release 已建（v0.4.0 非 draft，body=103 行逐字）；PyPI canonical 验证已闭环——T-29a 全部完成。
+GH Release 已建（v0.4.0 非 draft，body=103 行逐字）；PyPI canonical=曾成立后回归（D-139 详录，等维护收敛复核）
 
 suggested skills：neat-freak（补验逐项挂证据）
 
