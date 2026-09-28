@@ -399,6 +399,7 @@ class TestDownload:
             "nor_gl",
             "roughness",
         }
+
         assert d["license"] == "CC0-1.0"
         # every file hashed (sha256 audit + md5 verify)
         assert len(d["files_hash"]) == 5
@@ -480,3 +481,22 @@ class TestDownload:
         with pytest.raises(AssetError) as ei:
             polyhaven.download_asset("bad", cache_root=str(tmp_path))
         assert ei.value.code == "url_not_allowed"
+
+    def test_belt_refuses_resolved_escape(self, monkeypatch, tmp_path, files_payload):
+        """Gate adjudication (D-133③ debt ruling): even if
+        _sanitize_filename were ever bypassed, a target resolving outside
+        dest_dir must raise path_escape — never write."""
+        monkeypatch.setattr(
+            polyhaven,
+            "_urlopen",
+            fake_urlopen(files_routes(files_payload)),
+        )
+        monkeypatch.setattr(
+            polyhaven,
+            "_sanitize_filename",
+            lambda url: "../evil.fbx",
+        )
+        with pytest.raises(AssetError) as ei:
+            polyhaven.download_asset("Camera_01", cache_root=str(tmp_path))
+        assert ei.value.code == "path_escape"
+        assert not (tmp_path / "evil.fbx").exists()
