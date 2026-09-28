@@ -1,4 +1,4 @@
-<!-- synced-with: README.md @ 7789d75 — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
+<!-- synced-with: README.md @ 9e14fdc — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
 
 [English](README.md) | **简体中文**
 
@@ -51,6 +51,8 @@
 | **双方共有** | MCP 工具面、Poly Haven 资产源、视口截图回传、任意 Python 执行、本地 socket 连接 |
 
 Poly Haven 模型搜索+导入已于 0.2.0 交付（issue #2 薄切片：FBX + 贴图接线；HDRI 与贴图包仍在路线图）。AI 生成与一等对象 CRUD 明确不做——后者 `execute_code` 已覆盖。
+
+共有的资产下载链路在本仓是代码强制面而非惯例：下载仅发生在宿主侧——scheme+主机白名单、逐文件 md5、大小上限、文件名取 URL 末段并做字符白名单（`polyhaven.py`）——Maya 本体零网络面。执行细节见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
 
@@ -333,7 +335,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 - **零遥测**：zero telemetry, no phone-home——本项目不含任何遥测或主动外发上报代码，可源码核实。唯一外发流量是两个资产工具：仅在调用时经 HTTPS 访问 `api.polyhaven.com` / `dl.polyhaven.org|.com`（`polyhaven.py` 内主机白名单 + md5 校验 + 大小上限）。
 - **本地单用户**：命令端口仅绑定 localhost；接入的 MCP client 是受信方。
-- **安全网**：统一管线对全部 25 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 独立 JSONL 审计日志（覆盖全部 25 个工具）。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
+- **安全网**：统一管线（`pipeline.py` + `security.py`）对全部 25 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 独立 JSONL 审计日志（覆盖全部 25 个工具）。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
 - **事务安全**：`scene_checkpoint`/`scene_rollback` 提供内存态快照与显式回滚（快照不含 undo 历史，references 默认展平）。
 - 漏洞报告渠道见 [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md)。
 
@@ -343,7 +345,9 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 - **0.x（至 0.3.x，Alpha）**：工具面仍可能调整；minor bump 承载新功能，不承诺兼容冻结。
 - **Beta（0.4.0）**：feature-complete 层级——自此开始外部测试（classifier `4 - Beta`）。
-- **1.0.0**：公共 API 冻结承诺，与 `5 - Production/Stable` classifier 同一提交晋升。
+- **1.0.0**：公共 API 冻结——工具面与输出 schema 按 semver 保持稳定；breaking 变更须升 2.0.0。与 `5 - Production/Stable` classifier 同一提交晋升；由 [#7 真机验证清单](https://github.com/Xxx91n/mcp-for-maya/issues/7)把守（全绿方可 tag）。
+
+**公共 API** 即 MCP 工具面：工具名、输入/输出形状、双层错误契约（宿主侧 `isError` 故障 vs `{error:{code,message,suggestion}}` 域结果）与工具 annotations 语义（见 [docs/threat-model.md §5](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)）。additive 变更（新工具、新可选响应字段）随 minor 发布；破坏该面的变更须 major 升档。1.0.0 是对该面的冻结承诺而非质量认证——剩余真机验证面在 #7 显式跟踪，不默示抹去。
 
 发布节奏为里程碑驱动，不承诺固定周期。路线图见 GitHub issues：#2 Poly Haven 集成（模型切片已随 0.2.0 交付并收口；scene_plan 推荐集成残余拆分为 #31）、#3 Skills 正式立项（v1.x）、#4 安全与权限模型（v1.x）、#5 场景导出与内省（scene_export 已随 0.3.0 交付：FBX/OBJ/USD；scene_describe/scene_nodes 内省同随 0.3.0 交付）、#6 更多资产源（exploratory）、#7 真机验证清单与 v1.0 反馈（pinned）。
 

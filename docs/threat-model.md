@@ -79,6 +79,29 @@ validate → rate-limit → pattern-scan → dispatch → audit.
   per-file md5 + size caps). Maya itself stays zero-network: it only
   ever sees host-local file paths. The whitelist is a safety net for
   accidents/confused deputies, not a boundary.
+- The attack class these controls exist against is documented in the
+  wild, not hypothetical: a peer download-and-import MCP tool shipped a
+  CWE-22 path traversal where API-supplied `include` keys were joined
+  straight into filesystem paths — MITM / prompt injection could supply
+  `../../.bashrc` — yielding arbitrary file write (CVSS 6.0):
+  [CVE-2026-66004](https://www.cve.org/CVERecord?id=CVE-2026-66004),
+  [VulnCheck advisory](https://www.vulncheck.com/advisories/blendermcp-path-traversal-via-download-polyhaven-asset-api),
+  upstream report [blender-mcp#257](https://github.com/ahujasid/blender-mcp/issues/257).
+  The citation anchors on the attack class existing in this tool
+  category — it is not a claim about that project's overall posture.
+  On this project's asset path the same disease has no injection
+  surface: API response keys are never used as paths — file names
+  derive from the whitelisted URL's last segment via
+  `_sanitize_filename` (charset `[A-Za-z0-9_.-]`, dot-prefixed names
+  replaced), `asset_id`/`resolution` are whitelist-validated, and the
+  destination directory is code-fixed under the platformdirs cache
+  (applicability review: docs/evidence/release-surface-review-2026-09-28.md).
+
+  > _Citation etiquette (maintenance note, D-132): the above cites a
+  > *published* peer CVE strictly as attack-class evidence. If a future
+  > revision cites a peer tool's vulnerability that is not yet public,
+  > notify the affected project before publishing — coordinated-
+  > disclosure etiquette._
 
 ## 5. Tool annotations (MCP hints)
 
@@ -100,7 +123,8 @@ authoritative and this table must match it row for row:
   asset_search (host-side Poly Haven index query) and asset_import
   (host downloads -> Maya imports local paths). Both are restricted
   to the PH whitelist in polyhaven.py; openWorldHint is a hint, not
-  the enforcement - the whitelist is.
+  the enforcement - the whitelist is. CVE-2026-66004 (§4) is the
+  wild-documented attack class this chain exists against.
 - asset_import is idempotent because GRP_asset_<id> dedup is real
   (repeat calls report the existing group; force=True opts out).
 - scene_export performs a **local file write** to an arbitrary

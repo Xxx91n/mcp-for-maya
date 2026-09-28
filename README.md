@@ -50,6 +50,8 @@ An honest three-tier comparison with [ahujasid/blender-mcp](https://github.com/a
 
 Poly Haven model search + import shipped in 0.2.0 (issue #2 thin slice: FBX + texture wiring; HDRIs and texture packs remain roadmap). AI generation and first-class object CRUD are explicitly out of scope — the latter is already covered by `execute_code`.
 
+On the shared asset-download path, this project's controls are enforced in code rather than conventional: downloads happen host-side only — https + host allowlist, per-file md5, size caps, filenames sanitized from the URL's last segment (`polyhaven.py`) — and Maya itself never touches the network. Enforcement detail: [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
+
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
 
 | Capability | Tools | Notes |
@@ -308,7 +310,7 @@ Two **Experimental** process cards ship in `skills/`:
 
 - **Zero telemetry**: no phone-home — the project ships no telemetry or unsolicited outbound traffic; verify in source. The ONLY outbound calls are the two asset tools: HTTPS to `api.polyhaven.com` / `dl.polyhaven.org|.com` (host allowlist + md5 + size caps in `polyhaven.py`), and only when you call them.
 - **Local, single-user**: the command port binds localhost only; the connected MCP client is trusted.
-- **Safety net**: a unified pipeline validates arguments + token-bucket rate limits (~100/60s reads, ~20/60s writes, per session) + pattern scan (warn-only by default) + an independent JSONL audit log across all 25 tools. It catches accidents, not malicious clients — full model in [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
+- **Safety net**: a unified pipeline (`pipeline.py` + `security.py`) validates arguments + token-bucket rate limits (~100/60s reads, ~20/60s writes, per session) + pattern scan (warn-only by default) + an independent JSONL audit log across all 25 tools. It catches accidents, not malicious clients — full model in [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
 - **Transactional safety**: `scene_checkpoint`/`scene_rollback` give in-memory snapshots and explicit rollback (no undo history; references flattened).
 - Vulnerability reporting: [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md).
 
@@ -318,7 +320,9 @@ This project follows [Semantic Versioning](https://semver.org/):
 
 - **0.x (through 0.3.x, Alpha)**: the tool surface could still change; minor bumps carried features, no compatibility freeze.
 - **Beta (0.4.0)**: feature-complete tier — external testing begins here (classifier `4 - Beta`).
-- **1.0.0**: public-API freeze commitment, promoted together with the `5 - Production/Stable` classifier in one commit.
+- **1.0.0**: public API freeze — tool surface and output schemas stable per semver; breaking changes require 2.0.0. Promoted together with the `5 - Production/Stable` classifier in one commit; gated by the [#7 real-machine checklist](https://github.com/Xxx91n/mcp-for-maya/issues/7) (all-green required).
+
+The **public API** is the MCP tool surface: tool names, their input/output shapes, the two-layer error contract (host `isError` failures vs `{error:{code,message,suggestion}}` domain results), and tool-annotation semantics ([docs/threat-model.md §5](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)). Additive changes (new tools, new optional response fields) ship as minor releases; breaking changes ship as a major bump. 1.0.0 is a freeze commitment on this surface — not a quality certification: the remaining real-machine verification surface is tracked explicitly in #7 rather than implied away.
 
 Releases are milestone-driven — no fixed cadence promised. Roadmap lives in GitHub issues: #2 Poly Haven integration (model slice shipped in 0.2.0; scene_plan recommendation residual split to #31), #3 Skills program (v1.x), #4 security & permission model (v1.x), #5 scene export + introspection (scene_export shipped in 0.3.0: FBX/OBJ/USD; scene_describe/scene_nodes introspection shipped in the same 0.3.0), #6 more asset sources (exploratory), #7 real-machine checklist + v1.0 feedback (pinned).
 
