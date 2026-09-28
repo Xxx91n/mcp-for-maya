@@ -45,6 +45,32 @@ Maya 开机激活整条阻塞链，本轮同裁：T-16f 执行面 + 通过后的
 
 - 发布清单硬项：v1.0.0 门前须存在 **≥1 条 drift-canary 人为复核记录**（运行结果+归因写账本，**红绿均可**——防「等红灯才复核」死角致清单项永远无法兑现）。红→人知通道=ci.yml `drift-notify` 独立 trailing job（去重 issue/续败评论/恢复自动关）；复核义务登记为 D-127。
 
+**R28 增补（D-131/D-132，2026-09-28）——v1.0.0 门前清单**：
+
+清单唯一真源=账本 D-131 规范化列；本块为抄写+格式化载体，清单项增删须回账本裁决（冻结语义）。
+
+- **硬项**（全绿方可 tag v1.0.0）：
+  - issue #7 十框真机验证清单全绿（D-040）
+  - D-115 探针工件补采同窗（下个真机窗按 D-109 形态入 docs/evidence/）
+  - D-127 drift-canary 复核记录 ≥1 条——已兑现（run 36334876189，workflow_dispatch 首燃全绿）；完成条件另含 cron 对照核验（schedule 事件链首验）
+  - 「`[X.Y.Z]` 节内容 == tag diff」硬核对（D-107④）
+  - 版本阶梯履行：0.4.0 升 `4 - Beta` → 1.0.0 与 `5 - Production/Stable` 同 commit（D-032 阶梯履行非修改；0.4.0 发布计划调整已单独拍板）
+  - GitHub Release 依 D-084/D-108 判别（minor 建、patch 跳过）
+  - milestone 归置（D-130 执行面，已执行：v1.0.0←#7、v1.x←#31/#6/#4/#3）
+  - public-API 冻结声明（README Versioning 节一段：public API=MCP 工具名+IO 形状+双层错误契约+annotations 语义；additive→minor、breaking→major；不立 snapshot 新机件）
+  - D-036⑤ main 分支保护：入硬项执行（gh api PUT，外部动作须用户确认）或显式豁免写理由
+- **软前置**：T-24 mayapy 冒烟；未跑则 release notes 按 D-049 档披 known-unverified
+- **一次性过堂行**（发布面卫生核验，结果落账本行或 docs/evidence/）：
+  - 断链全扫 / 陈旧宣称清点 / 实验态措辞核对
+  - CVE-2026-66004 对本仓 asset_import 路径适用性核验（引用前必核）
+  - twine check（D-080⑤）
+- **观测项**（非 blocker，显式入账防静默收窄）：
+  - drift schedule 事件链首验——2026-09-28 06:37 UTC 后 `gh run list --event schedule` 非空+结果归因入账（静默未触发→升级方案=外部 cron 调 dispatch API）
+  - notify 红路径真实验证（自然真红免费闭环；禁制造红）
+- **裁出**（触发态均否，2026-09-27 核验）：D-102 / D-104 / D-118
+- **时序**：0.4.0 先落地（4-Beta）；1.0.0=0.4.0 之后下一 release，不插 0.5.x（真机窗出 feature 级 blocker 除外）；gate 核对时点=0.4.0 发布后
+- **go/no-go**：核对产出=账本行逐项挂证据指针，用户拍板
+
 ## D-069：#2/#7 发帖机制
 
 本窗口即发（备稿就绪+"≥0.1.0 已含"耐久真话不依赖 0.1.2）；执行=**agent 贴终稿→用户过目→gh 以用户账号发出**。过目为授权前置条件，发出前用户有最终否决点；其余四条（#1/#3/#4/#5）仍等 0.1.2 发布后同流程；一 issue 一评不追评纪律不变；措辞改动须回草稿重过目。
