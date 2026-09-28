@@ -40,7 +40,7 @@ Reproduce every frame with the scripts in [`.github/assets-src/`](https://github
 
 ## vs blender-mcp
 
-An honest three-tier comparison with [ahujasid/blender-mcp](https://github.com/ahujasid/blender-mcp) (measured 2026-09):
+An honest three-tier comparison with [ahujasid/mcp-for-blender](https://github.com/ahujasid/mcp-for-blender) (measured 2026-09):
 
 | Tier | Contents |
 |------|----------|
