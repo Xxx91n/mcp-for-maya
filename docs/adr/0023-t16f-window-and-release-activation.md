@@ -71,6 +71,10 @@ Maya 开机激活整条阻塞链，本轮同裁：T-16f 执行面 + 通过后的
 - **时序**：0.4.0 先落地（4-Beta）；1.0.0=0.4.0 之后下一 release，不插 0.5.x（真机窗出 feature 级 blocker 除外）；gate 核对时点=0.4.0 发布后
 - **go/no-go**：核对产出=账本行逐项挂证据指针，用户拍板
 
+**R30 增补（D-142β，2026-09-28）**：
+
+- 发布窗 preflight 第 6 行：release body 披露附录断言——`python .github/scripts/check_release_appendix.py <tag>`（弱断言=附录节存在+非空+引用 #7；#7 open⇒义务生效、closed⇒义务解除，不数 `- [ ]`；fail-loud 三显式报错：gh 不可用/HTTP 非 200/rate-limit 403）。人工执行项，不进 push CI；断言脚本随 pytest 回归（tests/test_check_release_appendix.py）。
+
 ## D-069：#2/#7 发帖机制
 
 本窗口即发（备稿就绪+"≥0.1.0 已含"耐久真话不依赖 0.1.2）；执行=**agent 贴终稿→用户过目→gh 以用户账号发出**。过目为授权前置条件，发出前用户有最终否决点；其余四条（#1/#3/#4/#5）仍等 0.1.2 发布后同流程；一 issue 一评不追评纪律不变；措辞改动须回草稿重过目。
