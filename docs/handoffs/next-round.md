@@ -1,58 +1,81 @@
-# next-round.md — rev39（R29 毕：0.4.0 已发布+gate 已核 D-138；PyPI 索引注册回归中=D-139；仍开=真机窗/10-05 双窗/notify 红路径）
+# next-round.md — rev40（R30 毕：锐评三发现+平台扩张裁决已立 D-141..D-143；执行窗待开）
 
-生成：2026-09-28 T-29a..c 执行后｜Spec：docs/decision-ledger.md D-133..D-137｜执行报告：.scratch/t29/reports/2026-09-28-report.md（逐条命令+输出摘要）
+生成：2026-09-28 R30 整理环节｜Spec：docs/decision-ledger.md D-141..D-143｜前档：rev39（R29 发布窗全录）
 
-## 环境实况（本环节核验 ~09:40 UTC）
+## 环境实况（本环节核验 ~15:00 UTC）
 
-- main=b977908（PR #44 merge commit，09:08:32Z）；grill/round29-release-window 栈已整合移除；**v0.4.0 tag 已推**（轻量 tag→b977908，D-136 merge-then-tag 序，is-ancestor 已验）。
-- release.yml run 36401741670 **全绿**：pytest×4（uv sync --frozen 锁定集）+build+publish；upload 200×2 + PEP 740 attestations（sdist b359c282…/wheel 66773559…）。
-- **PyPI 维护窗干扰**：status.python.org=Service Under Maintenance；0.4.0 JSON per-version 就位（4-Beta/>=3.10/desc 23549c），直连 wheel 冒烟绿（import+入口点双验）；canonical 补验上传时点曾闭环（页面 200+索引路径 70 包装入+冒烟绿），后复核回归=D-139（索引注册丢失，latest=0.3.0，工件完好，等维护收敛）。
-- T-29b 已落地（D-137）：Task Scheduler mcp-for-maya-drift-canary（周一 14:40 +08=06:40 UTC，gh workflow run ci.yml）端到端实证通；ci.yml disable/enable 重注册完成（state=active）。dispatch run 36401533215 被 main-push 并发组 supersede 取消=正常并发语义非失败。
-- T-29c 已落地：.scratch/maya-mcp-grill/decision-ledger.md 顶部 SUPERSEDED 横幅留档；P-01 校正命令已用于 T-29 报告。
-- closeout 分支 grill/round29-release-closeout：已合 main（PR #45，merge a0a088d）；后续文档修正批=PR #46(f9e732f)/#48(5c5a165)/#49(cdc5cb2) 均已合。
-- GH Release：**已建**（go-signal ②=「ok」后创建；v0.4.0 非 draft，body=103 行逐字）。
-
-## 批次序与规则（发布编排纪律词条全约束）
-
-序=T-29a✅→T-29b✅→T-29c✅→T-29d（gate 核对）。
-**andon 三段**（D-133②）：PyPI 推送=不可回改点已过且成功——其后一切瑕疵走 0.4.1 patch+waiver 带 expiry；中止即 incident 入账。
-go-signal ①②均兑现：tag push 后 release.yml 全绿→GH Release 已建。
-**冻结语义**：CHANGELOG 节==tag diff（D-107④）。
+- main=a8870bb（PR #50）；账本 143 行；工作区净；栈 grill/round30-critique-registry（opk→tlq→upx 三笔账本提交，未推未合）。
+- v0.4.0 已发布态：tag→b977908、release.yml 36401741670 全绿、GH Release 已建非 draft（body=103 行逐字=**缺披露附录，T-30a 待补**）。
+- PyPI：锐评 R6 报索引已自愈（latest=0.4.0）——**须先复核再销账 D-139**（T-30i）。
+- canary 双载体在位：schtasks mcp-for-maya-drift-canary（周一 14:40 +08）+ci.yml active；下窗 2026-10-05 双源观测。
+- 分支保护已开；mayapy env-broken 实锤（#7 走 GUI 通道）。
 
 ## 任务清单
 
-### T-29a — 0.4.0 发布执行窗 — 全毕（tag/CI/PyPI 上传/GH Release 齐）
+### T-30a — v0.4.0 Release body 补挂披露附录（人工门） — 覆盖 D-049/D-115/D-142α
 
-已完成：release commit 70c96c7→PR #44（CI 六格全绿）→merge b977908→tag v0.4.0→release.yml 全绿→PyPI 文件+attestations 落地。
-GH Release 已建（v0.4.0 非 draft，body=103 行逐字）；PyPI canonical=曾成立后回归（D-139 详录，等维护收敛复核）
+序：①`gh release view v0.3.0 --json body` 取附录结构源文→②备稿（装船时点快照语义：#7 链接+D-049/D-115 引用+mayapy env-broken 实测结论；**去计数化**；措辞过 D-132）→③**用户过目批准**→④`gh release edit v0.4.0` 就地补挂→⑤账本注记「D-138③ 所记 body 形态自此不再准确」。只动 body 不碰 CHANGELOG/tag。
 
-suggested skills：neat-freak（补验逐项挂证据）
+suggested skills：handoff（备稿交接）、neat-freak（措辞校准核验）
 
-### T-29b — canary 外部调度 — 已落地，下窗核验挂 2026-10-05
+### T-30b — preflight 附录断言脚本 PR — 覆盖 D-142β/D-134γ
 
-下窗双源观测：native cron 37 6 * * 1 是否自愈（D 重注册之效）+ scheduler 14:40 +08 自触发；任一/双通道出 run 即记归因，闭环 D-127 对照条件。若双双静默→incident 行+升第三载体。
+新增 .github/scripts/check_release_appendix.py：弱断言=release body 存在披露附录节+非空+引用 #7+issue open；条件=「#7 未勾项>0 或存在未兑现声明⇒附录恒非空」不写死 0/10；附录可在 body 任意位置；fail-loud 三显式报错（gh 不可用/HTTP 非 200/rate-limit 403）；配 pytest 回归（每修必带测试）。挂发布窗 preflight 第 6 行（ADR-0023 增补块），不进 push CI。agent 自主 PR。
 
-suggested skills：neat-freak（归因入账）
+suggested skills：tdd（断言面先测）、domain-modeling（核对单行措辞）
 
-### T-29c — 文档顺手批 — 完成
+### T-30c — PyPI 索引双源探针并 canary 链 — 覆盖 D-139/D-142γ/D-123
 
-（superseded 横幅+P-01 校正均已兑现，见 T-29 报告 22-23 条）
+weekly drift job 增探针步：主=GET pypi.org/simple/mcp-for-maya/（Accept: application/vnd.pypi.simple.v1+json）断言含最新版本串；副=project JSON info.version==最新 tag（去 v 前缀）。双绿=健康；simple 红=安装面断（最高 severity）；simple 绿+JSON 红=API 漂移。红→D-123 notify 通道，维护窗假红人肉归因消化。
 
-### T-29d — 0.4.0 发布后 gate 核对 — 核对已执行，产出=账本 D-138
+suggested skills：tdd、neat-freak（归因入账）
 
-核对产出=D-138 账本行（逐项证据指针已挂）。机器可验项全绿：节==tag diff/版本阶梯/GH Release/milestone/公 API 声明/**D-036⑤ 已执行**（main 保护=ci strict+禁 force-push/删除）/**asset_import 断言债=立即修已落地**（PR #47，path_escape belt+回归测试）/一次性过堂行在档。T-24 mayapy=env-broken 复核实锤（DLL init failed→AV）→D-049 披露义务随 v1.0.0 窗结转。
-**仍开（结转项）**：#7 十框 0/10（真机窗）/D-115 同窗/D-127=2026-10-05 双窗观测/notify 红路径观测（无自然红挂起）。go/no-go 末行=用户拍板。
+### T-30d — CONTRIBUTING 预算注记 — 覆盖 D-142δ
 
-suggested skills：neat-freak（逐项证据指针核验）、domain-modeling（债裁决措辞）
+预算段加一句：「CI 按被检 commit 的 tip（=PR 终态）判定，PR 中途 commit 瞬时超预算不构成门失败语义」。机制不动（D-125 棘爪不触）。
 
-## 债库存（触发态快照 2026-09-28 ~09:40 UTC）
+suggested skills：—（单句文档）
 
-D-102（否）/D-104（否——fastmcp 最新 4.0.10 无 5.x 线）/D-115（是-不可即兑，无真机窗）/D-118（否-未实测）；asset_import 断言债=**已偿还**（D-138⑧，PR #47 belt+回归测试，非挂账）；D-127=载体已落地，闭环条件=2026-10-05 下窗双源观测；D-036⑤=已执行（分支保护开启）。
+### T-30e — README mcp-name 标记行+PyPI badge — 覆盖 D-143δ/D-036④
+
+README.md+README.zh-CN.md 同步（D-072）：①HTML 注释行 `<!-- mcp-name: io.github.Xxx91n/mcp-for-maya -->`（边界规则：后跟换行/-->）；②PyPI version badge（shields.io 动态端点）。现在合 main——Registry publish 绑下次发版窗生效。
+
+suggested skills：neat-freak（双语镜像对齐）
+
+### T-30f — Glama 查+claim — 覆盖 D-143α
+
+先查 glama.ai 是否已自动索引本仓（大概率是）；在列→GitHub OAuth claim（个人账号直连，免 glama.json）；不在列→Add MCP Server 提交 repo URL。**禁启用 Docker 构建面**（stdio+Maya 宿主健康检查恒红）。宣称文本过 D-132。
+
+suggested skills：—（平台操作，含用户 OAuth 人工门）
+
+### T-30g — awesome-mcp-servers PR — 覆盖 D-143α
+
+punkpeye/awesome-mcp-servers 提 PR：照抄现有行格式+三 emoji（语言/范围/OS）+一句话描述（D-132 句式，beta 语气）+字母序+PR title 加 🤖🤖🤖 fast-track。可提不押时点（3000+ open PR 队列，合并非里程碑）。
+
+suggested skills：—（外部 PR，须用户推自己 fork 或授权）
+
+### T-30h — server.json 备稿+Registry publish（绑下次发版） — 覆盖 D-143β
+
+agent 备稿 server.json（$schema 2025-12-11/name=io.github.Xxx91n/mcp-for-maya/registryType=pypi/identifier=mcp-for-maya/version=届时版本/transport=stdio）+`mcp-publisher validate` 离线预检；**人工门**：用户 `mcp-publisher login github`（device flow）+publish；agent 备核验 curl（registry API search）。version 须与 PyPI 精确一致；发新版需重 publish。执行窗=下次发版（0.4.1/0.5.0）后。
+
+suggested skills：neat-freak（发布编排纪律嵌套）
+
+### T-30i — D-139 销账复核 — 覆盖 D-139
+
+`pip index versions mcp-for-maya`+project JSON latest 复核；若 0.4.0 在列→账本行注记「索引已自愈+时间戳」销账（锐评 R6 已报 latest=0.4.0，须独立复核确认）；不复位→用户拍板删版重传或 0.4.1 patch（D-133②）。
+
+suggested skills：neat-freak（带时间戳销账）
+
+## 结转挂账（非本轮新增，时点驱动）
+
+- **2026-10-05 双窗观测**（D-127/D-137）：native cron 37 6 * * 1 是否自愈+scheduler 14:40 +08 自触发；任一/双通道出 run 记归因闭环；双双静默→incident 行+第三载体。
+- **#7 十框+D-115 探针补采**（真机窗）：Maya 2024 在机，mayapy env-broken→GUI 通道；v1.0.0 硬项。
+- **notify 红路径**：观测项挂起，无自然红不制造。
+- **叙事传播**（D-143γ）：备稿不发，v1.0.0+#7 全绿后启用。
 
 ## 措辞红线
 
-- 归因禁写「weekly schedule 已验证」——schedule 链静默死亡已实证（D-129），新载体 A+D 已落地（D-137），自愈与否待 10-05 窗核验。
-- PyPI 验证状态禁写「已验证」——直连冒烟绿≠canonical 索引绿；页面 503=维护窗，补验挂起如实标。
-- README 禁点竞品名/CVE 号、禁惰性安全语句；宣称=能力+证据指针。
-- CONDITIONAL GO 的条件项必须有独立跟踪路径不许失联（D-133①）。
-- 账本唯一真源：docs/decision-ledger.md，不从对话回忆补写。
+- 附录=装船时点快照+声明性指针，禁计数型内容、禁 tracker-dump、禁抄 v0.3.0 未校准措辞。
+- Registry/Glama/awesome 描述=4-Beta 语气+能力+证据指针，禁 stable 宣称。
+- D-138③ body 描述在 T-30a 后为陈旧快照，引用须带「superseded」意识。
+- 账本唯一真源 docs/decision-ledger.md。
