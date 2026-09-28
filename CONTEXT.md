@@ -254,7 +254,7 @@ _Avoid_: 无证据预防性 cap、cap 悬空不引证据、上游已明令兼容
 _Avoid_: 探测分支夹带修复、报告落 docs/ 越过程件归处、无验收判据的开放式探测
 
 **解析漂移金丝雀 (resolution-drift canary)**:
-weekly scheduled 浮动依赖解析 job（D-112 双轨裁决）——uv.lock 落地把 PR 矩阵锁成确定性面后，该 job 专职跑 fresh resolve 保「库测 PyPI 区间=用户实装面」的浮动探测不失传；红=上游 dep release 首次漂移信号（D-100④ 触发债自动成就），同时承接 fresh-resolution 类探针义务（D-099 的载体移交）。红→人知通道（D-123 制度化对价）=独立 trailing notify job：job 级 issues:write 按需提权，issue 按 workflow/branch 去重——首开新建、续败评论、恢复自动关，notify 自身失败不遮蔽原红（continue-on-error）；人肉复核义务登记 D-127（v1.0.0 清单硬项，红绿均可——D-129 已兑现于触发前，dispatch 首燃全绿）。事件链独立（D-129）：workflow_dispatch 与 schedule 是两条独立事件链（GitHub community #206369 实证私仓 schedule 可全静默无记录），一链验证不担保另一链——归因禁写「weekly schedule 已验证」，除非 schedule 事件真验过。姊妹件关系：触发条件债=何时查，金丝雀=持续在看。
+weekly scheduled 浮动依赖解析 job（D-112 双轨裁决）——uv.lock 落地把 PR 矩阵锁成确定性面后，该 job 专职跑 fresh resolve 保「库测 PyPI 区间=用户实装面」的浮动探测不失传；红=上游 dep release 首次漂移信号（D-100④ 触发债自动成就），同时承接 fresh-resolution 类探针义务（D-099 的载体移交）。红→人知通道（D-123 制度化对价）=独立 trailing notify job：job 级 issues:write 按需提权，issue 按 workflow/branch 去重——首开新建、续败评论、恢复自动关，notify 自身失败不遮蔽原红（continue-on-error）；人肉复核义务登记 D-127（v1.0.0 清单硬项，红绿均可——D-129 已兑现于触发前，dispatch 首燃全绿）。事件链独立（D-129）：workflow_dispatch 与 schedule 是两条独立事件链（GitHub community #206369 实证私仓 schedule 可全静默无记录），一链验证不担保另一链——归因禁写「weekly schedule 已验证」，除非 schedule 事件真验过。静默实证（2026-09-28）：schedule 首窗 06:37 UTC 后 61min 三次核验恒空、全量 run 无记录、workflow=active——结构性静默失效（#206369/runner#4210 形态），周驱动须由外部调度源调 workflow_dispatch 承载（D-129/D-135③）。姊妹件关系：触发条件债=何时查，金丝雀=持续在看。
 _Avoid_: 全矩阵上锁无浮动哨兵、金丝雀红不成可检索工件、把金丝雀红灯误当 CI 绿态必达标
 **发布门前清单 (release gate checklist)**:
 发布前裁决汇编的单载体清单（D-128/D-131）——分层结构=硬项（全绿方可 tag 的定义性前提）/软前置（未达须显式披露的减损项）/一次性过堂行（发布面卫生核验：断链/陈旧宣称/实验态措辞/CVE 适用性/twine check）/观测项（非 blocker 的后续验证登记，显式入账防静默收窄）/裁出项（触发态否的存量债显式除名）/go-no-go 末行（逐项挂证据指针+单一决策人记录在案）；载体=发布链 ADR 增补块单真源，issue body/milestone description 仅作指针或操作副本；milestone=release payload（名=tag 名），后推池用 rolling-container 自封措辞（1.x 线规划时拆为精确版本 milestone）；blocker 定义在 release day 前写死（blast radius×severity×reversibility 三问）。
@@ -263,3 +263,7 @@ _Avoid_: 清单双载体漂移、issue body 当权威、观测项冒充硬项或
 **校准宣称 (calibrated claim)**:
 对外宣称的强度校准纪律（D-132）——宣称句式=「能力+证据指针」：semver 1.0.0 规范语义=public API freeze 承诺（非质量认证），成熟范式=稳定宣称+freeze 承诺+证据指针+显式排除面（Temporal 1.0/React Compiler 1.0 一手公告同构）；安全宣称须指到 enforcement 代码或测试节点；竞品漏洞引用分层=threat-model 可作攻击类存在性论据、README 营销面不点名（CTA 伦理：不得将竞品漏洞用于商业利益；引用未公开同行漏洞须先知会竞方）。姊妹件：耐久陈述管宣称的时间寿命，校准宣称管宣称的强度-证据配比。
 _Avoid_: 全称质量宣称超载、「we take security seriously」类惰性语句、横幅摘除与验证证据脱节、README 点名竞品 CVE
+
+**发布编排纪律 (release choreography)**:
+发布执行窗的操作纪律集（D-133/D-134/D-135）——①三段中止线：tag 后 CI 红→中止不升 PyPI（Debug to Revert; Not to Fix，窗内不修），PyPI 推送=不可回改点其后一切瑕疵走下个 patch 且 waiver 必带修复 expiry（禁无 expiry 挂账），每次中止=账本 incident 行（归因+回退+重发时点）；②go-signal 分层批准：批准门只设在不可逆邻域（uniform approval 失效），批准面=逐项核验证据非走读；③preflight 核对单=每行须绑定一个 CI 不覆盖的决策（cargo-cult 判据「这行会改变什么决策」），单子自挂 expiry 防沉淀为仪式；④谁发布谁守窗：所有权离散转移，观测闭环（健康确认+归因入账）前不算完成（false completion 禁忌）；⑤CONDITIONAL GO：非阻塞观测项不满足=带条件放行+独立跟踪路径，不拖停发布；⑥静默即升级：调度依赖静默实锤后立即走预案不等下一窗。
+_Avoid_: 窗内修车、waiver 无 expiry 裸挂账、核对单含与既有门禁重复行、发布即散场、观测项当 blocker、静默等下周
