@@ -491,6 +491,11 @@ def download_asset(
             fname = "_" + fname
         used.add(fname)
         target = dest_dir / fname
+        if target.resolve().parent != dest_dir.resolve():
+            raise AssetError(
+                "path_escape",
+                f"refused write outside cache dir: {fname!r}",
+            )
         if not _verify_local(target, e.get("size"), e.get("md5")):
             data = _fetch(e["url"], timeout=timeout, max_bytes=max_file_bytes)
             if e.get("size") is not None and len(data) != _as_int(e["size"], "declared size"):
