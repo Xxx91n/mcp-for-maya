@@ -1,6 +1,7 @@
 # Threat Model — mcp-for-maya
 
-> Status: current (D-008/D-017/D-018/D-019, 2026-09-17). Source of truth
+> Status: current (D-008/D-017/D-018/D-019; tool-surface rows D-075/
+> D-092/D-094/D-110; CVE citation D-132, 2026-09-28). Source of truth
 > for what this project's safety machinery does and does not claim.
 
 ## 1. Explicit threat model
@@ -86,7 +87,7 @@ validate → rate-limit → pattern-scan → dispatch → audit.
   `../../.bashrc` — yielding arbitrary file write (CVSS 6.0):
   [CVE-2026-66004](https://www.cve.org/CVERecord?id=CVE-2026-66004),
   [VulnCheck advisory](https://www.vulncheck.com/advisories/blendermcp-path-traversal-via-download-polyhaven-asset-api),
-  upstream report [blender-mcp#257](https://github.com/ahujasid/blender-mcp/issues/257).
+  upstream report [mcp-for-blender#257](https://github.com/ahujasid/mcp-for-blender/issues/257).
   The citation anchors on the attack class existing in this tool
   category — it is not a claim about that project's overall posture.
   On this project's asset path the same disease has no injection
