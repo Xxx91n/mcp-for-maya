@@ -1,4 +1,4 @@
-<!-- synced-with: README.md @ 9e14fdc — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
+<!-- synced-with: README.md @ 47c5600 — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
 
 [English](README.md) | **简体中文**
 
@@ -42,7 +42,7 @@
 
 ## 与 blender-mcp 对比
 
-对标 [ahujasid/blender-mcp](https://github.com/ahujasid/blender-mcp)（2026-09 实测），诚实三档：
+对标 [ahujasid/mcp-for-blender](https://github.com/ahujasid/mcp-for-blender)（2026-09 实测），诚实三档：
 
 | 档位 | 内容 |
 |------|------|
