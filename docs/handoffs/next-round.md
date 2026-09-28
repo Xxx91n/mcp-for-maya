@@ -38,15 +38,16 @@ suggested skills：neat-freak（归因入账）
 
 （superseded 横幅+P-01 校正均已兑现，见 T-29 报告 22-23 条）
 
-### T-29d — 0.4.0 发布后 gate 核对（D-131 清单唯一载体=ADR-0023 R28 增补块）
+### T-29d — 0.4.0 发布后 gate 核对 — 核对已执行，产出=账本 D-138
 
-触发点（D-135③）：β 观测已闭环（静默归因入账）+PyPI 冒烟全项绿——**核对已可开**。议程=ADR-0023 增补块逐项挂证据指针：#7 十框全绿（用户真机窗）/D-115 补采同窗/D-127 复核（含 T-29b 2026-10-05 下窗）/节==tag diff（v0.4.0 节↔b977908 diff）/版本阶梯（0.4.0 落地，latest 索引待传播确认）/GH Release 存在性/milestone 归置/公 API 声明（README 冻结段已在档）/D-036⑤ 分支保护 404=硬项或豁免裁决/T-24 mayapy 冒烟或 D-049 披露/**asset_import resolve().startswith 断言债裁**（D-133③）/一次性过堂行已完成（docs/evidence/release-surface-review-2026-09-28.md）/notify 红路径观测/裁出 D-102/D-104/D-118。末行 go/no-go=用户拍板。
+核对产出=D-138 账本行（逐项证据指针已挂）。机器可验项全绿：节==tag diff/版本阶梯/GH Release/milestone/公 API 声明/**D-036⑤ 已执行**（main 保护=ci strict+禁 force-push/删除）/**asset_import 断言债=立即修已落地**（PR #47，path_escape belt+回归测试）/一次性过堂行在档。T-24 mayapy=env-broken 复核实锤（DLL init failed→AV）→D-049 披露义务随 v1.0.0 窗结转。
+**仍开（结转项）**：#7 十框 0/10（真机窗）/D-115 同窗/D-127=2026-10-05 双窗观测/notify 红路径观测（无自然红挂起）。go/no-go 末行=用户拍板。
 
 suggested skills：neat-freak（逐项证据指针核验）、domain-modeling（债裁决措辞）
 
 ## 债库存（触发态快照 2026-09-28 ~09:40 UTC）
 
-D-102（否）/D-104（否——fastmcp 最新 4.0.10 无 5.x 线）/D-115（是-不可即兑，无真机窗）/D-118（否-未实测）；asset_import 断言债=待裁（T-29d gate）；D-127=载体已落地，闭环条件=2026-10-05 下窗双源观测。
+D-102（否）/D-104（否——fastmcp 最新 4.0.10 无 5.x 线）/D-115（是-不可即兑，无真机窗）/D-118（否-未实测）；asset_import 断言债=**已偿还**（D-138⑧，PR #47 belt+回归测试，非挂账）；D-127=载体已落地，闭环条件=2026-10-05 下窗双源观测；D-036⑤=已执行（分支保护开启）。
 
 ## 措辞红线
 
