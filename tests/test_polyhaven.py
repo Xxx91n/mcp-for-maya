@@ -499,4 +499,4 @@ class TestDownload:
         with pytest.raises(AssetError) as ei:
             polyhaven.download_asset("Camera_01", cache_root=str(tmp_path))
         assert ei.value.code == "path_escape"
-        assert not (tmp_path / "evil.fbx").exists()
+        assert not (tmp_path / "Camera_01" / "evil.fbx").exists()

@@ -479,6 +479,7 @@ def download_asset(
         )
 
     dest_dir = cache_dir_for(asset_id, resolution, cache_root)
+    dest_dir_resolved = dest_dir.resolve()
     used: set[str] = set()
     downloaded_any = False
     manifest_files: dict[str, dict[str, Any]] = {}
@@ -491,7 +492,7 @@ def download_asset(
             fname = "_" + fname
         used.add(fname)
         target = dest_dir / fname
-        if target.resolve().parent != dest_dir.resolve():
+        if target.resolve().parent != dest_dir_resolved:
             raise AssetError(
                 "path_escape",
                 f"refused write outside cache dir: {fname!r}",
