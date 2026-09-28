@@ -74,7 +74,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to PEP 735 `[dependency-groups]`; floating-resolution coverage moved
   to a weekly drift canary job (`uv lock --upgrade`, Mon 06:37 UTC).
   Dev setup: `uv sync --frozen` (pip >=25.1 can still
-  `pip install -e . --group dev`).
+  `pip install -e . --group dev`). Evidence: uv.lock, pyproject.toml:38
+  `[dependency-groups]`, .github/workflows/ci.yml:102 resolution-drift
+  canary job.
 
 - **fastmcp 4.x migration (D-105, D-099 trigger gates satisfied)** —
   dependency pin narrowed from `>=2.14,<3.0.0` to `>=4.0.0,<5.0.0`
@@ -86,7 +88,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pytest exemptions removed — the registered trigger fired (auth
   providers moved to joserfc). `scene_describe` gains the D-110
   response budget (`limit` param, 200 soft / 1000 hard per face,
-  `*_truncated` + totals disclosure).
+  `*_truncated` + totals disclosure). Evidence:
+  pyproject.toml (fastmcp >=4.0.0,<5.0.0 pin),
+  src/maya_mcp_server/introspect_module.py:82-83
+  (`_DESCRIBE_SOFT_CAP`/`_DESCRIBE_HARD_CAP`),
+  tests/test_introspect_tools.py, tests/test_introspect_module.py.
 
 ### Removed
 
