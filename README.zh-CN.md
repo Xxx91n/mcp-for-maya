@@ -1,4 +1,4 @@
-<!-- synced-with: README.md @ f8e6869 — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
+<!-- synced-with: README.md @ 7789d75 — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
 
 [English](README.md) | **简体中文**
 
@@ -341,8 +341,8 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 遵循 [Semantic Versioning](https://semver.org/)：
 
-- **0.x（当前 0.2.0，Alpha）**：工具面仍可能调整；minor bump 承载新功能，不承诺兼容冻结。
-- **Beta**：feature-complete 且开始外部测试后晋升（classifier 同步升 `4 - Beta`）。
+- **0.x（至 0.3.x，Alpha）**：工具面仍可能调整；minor bump 承载新功能，不承诺兼容冻结。
+- **Beta（0.4.0）**：feature-complete 层级——自此开始外部测试（classifier `4 - Beta`）。
 - **1.0.0**：公共 API 冻结承诺，与 `5 - Production/Stable` classifier 同一提交晋升。
 
 发布节奏为里程碑驱动，不承诺固定周期。路线图见 GitHub issues：#2 Poly Haven 集成（模型切片已随 0.2.0 交付并收口；scene_plan 推荐集成残余拆分为 #31）、#3 Skills 正式立项（v1.x）、#4 安全与权限模型（v1.x）、#5 场景导出与内省（scene_export 已随 0.3.0 交付：FBX/OBJ/USD；scene_describe/scene_nodes 内省同随 0.3.0 交付）、#6 更多资产源（exploratory）、#7 真机验证清单与 v1.0 反馈（pinned）。

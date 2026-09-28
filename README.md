@@ -316,8 +316,8 @@ Two **Experimental** process cards ship in `skills/`:
 
 This project follows [Semantic Versioning](https://semver.org/):
 
-- **0.x (current 0.2.0, Alpha)**: the tool surface may still change; minor bumps carry features, no compatibility freeze.
-- **Beta**: promoted once feature-complete and external testing begins (classifier moves to `4 - Beta`).
+- **0.x (through 0.3.x, Alpha)**: the tool surface could still change; minor bumps carried features, no compatibility freeze.
+- **Beta (0.4.0)**: feature-complete tier — external testing begins here (classifier `4 - Beta`).
 - **1.0.0**: public-API freeze commitment, promoted together with the `5 - Production/Stable` classifier in one commit.
 
 Releases are milestone-driven — no fixed cadence promised. Roadmap lives in GitHub issues: #2 Poly Haven integration (model slice shipped in 0.2.0; scene_plan recommendation residual split to #31), #3 Skills program (v1.x), #4 security & permission model (v1.x), #5 scene export + introspection (scene_export shipped in 0.3.0: FBX/OBJ/USD; scene_describe/scene_nodes introspection shipped in the same 0.3.0), #6 more asset sources (exploratory), #7 real-machine checklist + v1.0 feedback (pinned).
