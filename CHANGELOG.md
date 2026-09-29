@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-29
+
+### Added
+
+- **MCP Registry ownership marker (D-143)** — added
+  `<!-- mcp-name: io.github.Xxx91n/mcp-for-maya -->` ownership marker to
+  `README.md` and `README.zh-CN.md` to satisfy the official MCP Registry
+  publishing authentication prerequisite for package name ownership.
+  Evidence: `README.md:1` + `README.zh-CN.md:1`.
+
+- **PyPI simple+JSON dual-source probe lane (D-142γ)** — added
+  `.github/scripts/check_pypi_index.py` probe lane integrated into the
+  weekly resolution-drift canary in `.github/workflows/ci.yml` (reading both
+  PEP 691 JSON / HTML simple index and project JSON APIs) to catch CDN split
+  and index desynchronization regressions before release verification.
+  Evidence: `.github/scripts/check_pypi_index.py:1` +
+  `tests/test_check_pypi_index.py::test_both_green_is_clean`.
+
+- **Release-body disclosure appendix assertion script (D-142β)** — added
+  `.github/scripts/check_release_appendix.py` to enforce preflight item 6
+  weak assertions against GitHub Release notes, validating disclosure
+  appendix existence and issue reference formatting. Evidence:
+  `.github/scripts/check_release_appendix.py:1` +
+  `tests/test_check_release_appendix.py::test_pass_when_appendix_present_and_issue_open`.
+
+- **Distribution surfaces registry table (D-144, D-145)** — created
+  `docs/distribution-surfaces.md` tracking listing-surface three-state
+  registrations (actionable, passive-observation-with-trigger, structural-rejection)
+  alongside 30-day post-publish verification obligations in ADR-0023.
+  Evidence: `docs/distribution-surfaces.md:1` +
+  `docs/adr/0023-t16f-window-and-release-activation.md:78`.
+
+### Changed
+
+- **Release tag and baseline location hygiene governance (D-150②③)** —
+  standardized forward release tagging to annotated tags (`git tag -a`) and
+  bare `vX.Y.Z` release titles, while confirming `mypy-baseline.txt`
+  legitimacy at repository root per upstream tooling defaults. Evidence:
+  `docs/decision-ledger.md:160` +
+  `docs/adr/0023-t16f-window-and-release-activation.md:85`.
+
+- **Contributing guide PR tip budget policy clarification (D-142)** —
+  clarified in `CONTRIBUTING.md` that budget gates evaluate PR tip state
+  rather than mid-PR transients. Evidence: `CONTRIBUTING.md:36`.
+
 ## [0.4.0] - 2026-09-28
 
 ### Added
