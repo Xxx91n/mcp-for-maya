@@ -82,6 +82,12 @@ Maya 开机激活整条阻塞链，本轮同裁：T-16f 执行面 + 通过后的
 - 起算点=Registry publish 日期落账日，非发版日；与 v1.0.0 硬项区隔——硬项 gate 核对在 tag 前，本行核对在 publish 后，时点不同互不阻塞。
 - 逾期未核销=债文标已触发未兑现；非 CI 项无探针步（一次性核销≠持续监控，D-127/D-129/D-135③/D-137 立法史同源）。
 
+**R32 增补（D-150，2026-09-29）**：
+
+- D-146 起算锚实际化=**0.4.1-publish**（承接 D-150① 发版序裁决：下次发版=0.4.1 patch 先行、走完整 D-084 patch 纪律跳 GH Release；唯一真源仍为账本 D-146 行，本块为操作提醒载体）。
+- tag/Release 前向立法（D-150③）：自下一 tag 起统一 **annotated**——人工 `git tag -a` 建锚、GH Release 挂已存在 tag 不反向生成（git manpage「annotated=release」+GitHub REST tags API 只收 annotated；v0.2.0+ lightweight 系 GH Release 功能自身工具成因非纪律疏漏）；Release 标题=裸 `vX.Y.Z`；存量 tag/标题不回填（D-080/D-108① 冻结同源）。
+- 0.4.1 发版窗 preflight 两行：PyPI 双车道复核见 0.4.1（pip 车道+探针车道各带时间戳，T-30i/D-142γ 同型防 CDN 分裂致 D-146 锚悬空）；0.4.1 wheel 的 README 须含 `<!-- mcp-name: -->` 标记行（Registry publish 硬前提，D-143）。
+
 ## D-069：#2/#7 发帖机制
 
 本窗口即发（备稿就绪+"≥0.1.0 已含"耐久真话不依赖 0.1.2）；执行=**agent 贴终稿→用户过目→gh 以用户账号发出**。过目为授权前置条件，发出前用户有最终否决点；其余四条（#1/#3/#4/#5）仍等 0.1.2 发布后同流程；一 issue 一评不追评纪律不变；措辞改动须回草稿重过目。

@@ -157,7 +157,7 @@ _Avoid_: 全绿门槛、noqa 打标基线
 _Avoid_: 仅口头休眠、无锚点标注、把 dormant 测试算进生产覆盖率叙事
 
 **棘爪 (ratchet pawl)**:
-冻结预算之外的防侵蚀单向机制——预算只降不升之外还须堵“抑制项只增不减”的侧门：mypy 落地为 warn_unused_ignores+warn_unused_configs（不再必要的 ignore/override 立即显形）、lint 落地为 noqa 审计与预算下调须同 commit 说明；无棘爪的 ratchet 会因抑制面静默膨胀而失效。失效模式另例=预算值长期高于现值不收紧、闸只挡不收退化为高水位线（旧 cap 默许继续膨胀至上限）——达标即应 PR 下调并写明理由。
+冻结预算之外的防侵蚀单向机制——预算只降不升之外还须堵“抑制项只增不减”的侧门：mypy 落地为 warn_unused_ignores+warn_unused_configs（不再必要的 ignore/override 立即显形）、lint 落地为 noqa 审计与预算下调须同 commit 说明；无棘爪的 ratchet 会因抑制面静默膨胀而失效。失效模式另例=预算值长期高于现值不收紧、闸只挡不收退化为高水位线（旧 cap 默许继续膨胀至上限）——达标即应 PR 下调并写明理由。棘轮件的物理位置遵工具约定：`mypy-baseline.txt` 在仓根=该工具默认 CWD 读取位置，与 `.github/` 自研兄弟件（ruff-baseline.json/monolith-budget.json）的不对称系工具约束非漂移（D-150②）。
 _Avoid_: 只设预算不设棘爪
 
 **human_verify 骨架测试**:
@@ -265,8 +265,8 @@ _Avoid_: 清单双载体漂移、issue body 当权威、观测项冒充硬项或
 _Avoid_: 全称质量宣称超载、「we take security seriously」类惰性语句、横幅摘除与验证证据脱节、README 点名竞品 CVE
 
 **发布编排纪律 (release choreography)**:
-发布执行窗的操作纪律集（D-133/D-134/D-135）——①三段中止线：tag 后 CI 红→中止不升 PyPI（Debug to Revert; Not to Fix，窗内不修），PyPI 推送=不可回改点其后一切瑕疵走下个 patch 且 waiver 必带修复 expiry（禁无 expiry 挂账），每次中止=账本 incident 行（归因+回退+重发时点）；②go-signal 分层批准：批准门只设在不可逆邻域（uniform approval 失效），批准面=逐项核验证据非走读；③preflight 核对单=每行须绑定一个 CI 不覆盖的决策（cargo-cult 判据「这行会改变什么决策」），单子自挂 expiry 防沉淀为仪式；④谁发布谁守窗：所有权离散转移，观测闭环（健康确认+归因入账）前不算完成（false completion 禁忌）；⑤CONDITIONAL GO：非阻塞观测项不满足=带条件放行+独立跟踪路径，不拖停发布；⑥静默即升级：调度依赖静默实锤后立即走预案不等下一窗。
-_Avoid_: 窗内修车、waiver 无 expiry 裸挂账、核对单含与既有门禁重复行、发布即散场、观测项当 blocker、静默等下周
+发布执行窗的操作纪律集（D-133/D-134/D-135）——①三段中止线：tag 后 CI 红→中止不升 PyPI（Debug to Revert; Not to Fix，窗内不修），PyPI 推送=不可回改点其后一切瑕疵走下个 patch 且 waiver 必带修复 expiry（禁无 expiry 挂账），每次中止=账本 incident 行（归因+回退+重发时点）；②go-signal 分层批准：批准门只设在不可逆邻域（uniform approval 失效），批准面=逐项核验证据非走读；③preflight 核对单=每行须绑定一个 CI 不覆盖的决策（cargo-cult 判据「这行会改变什么决策」），单子自挂 expiry 防沉淀为仪式；④谁发布谁守窗：所有权离散转移，观测闭环（健康确认+归因入账）前不算完成（false completion 禁忌）；⑤CONDITIONAL GO：非阻塞观测项不满足=带条件放行+独立跟踪路径，不拖停发布；⑥静默即升级：调度依赖静默实锤后立即走预案不等下一窗；⑦tag/Release 前向形态（D-150③）：tag 统一 annotated（人工 `git tag -a` 建锚、GH Release 挂已存在 tag 不反向生成）、Release 标题=裸 `vX.Y.Z`、存量不回填（tag 签发后冻结同源 D-080）。
+_Avoid_: 窗内修车、waiver 无 expiry 裸挂账、核对单含与既有门禁重复行、发布即散场、观测项当 blocker、静默等下周、lightweight tag 充发布锚、Release 标题自由发挥、回填改写已发布 tag
 
 **披露附录 (known-unverified appendix / disclosure appendix)**:
 GH Release body 尾部的 per-release 已知未验证披露块（D-049 义务载体，D-142 机制定型）——语义=装船时点现状快照（release-scoped effectively frozen，Wakelog known-issues 双层惯例之第①层），frozen 后 stale=特性非缺陷（修复时在 fix 条目点名+旧条目加「Fixed in X→」指针，禁静默删）；内容纪律=只放声明性指针（issue 链接/债 ID 引用/实测结论），计数型易腐内容禁入；措辞必过校准宣称句式；机验=弱断言脚本（附录存在+非空+引用锚 issue+issue open，fail-loud），断言条件=「未勾项>0 或存在未兑现声明⇒附录恒非空」不写死计数；载体=Release body 层（可编辑非不可逆），不进 CHANGELOG。
