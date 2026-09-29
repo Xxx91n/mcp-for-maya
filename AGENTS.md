@@ -69,6 +69,8 @@ tests/
 ├── test_check_tool_count_claims.py # tool-count claim gate (D-121)
 ├── test_notify_drift_canary.py  # drift-canary issue lifecycle (D-123)
 ├── test_check_monolith_budget.py # monolith line-budget ratchet (D-125)
+├── test_check_release_appendix.py # release-body appendix weak assertions (D-142β)
+├── test_check_pypi_index.py   # PyPI simple+JSON dual-source probe lanes (D-142γ)
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
@@ -79,7 +81,7 @@ docs/
 └── threat-model.md        # threat model + security boundaries
 
 .github/
-├── workflows/ci.yml       # lint (ruff budget + monolith line + tool-count claims + assets append-only + README skeleton gates) + test matrix ubuntu/windows x 3.10/3.x + weekly drift canary -> issue notify (D-112/D-123)
+├── workflows/ci.yml       # lint (ruff budget + monolith line + tool-count claims + assets append-only + README skeleton gates) + test matrix ubuntu/windows x 3.10/3.x + weekly drift canary (+ PyPI index probe lane, D-142γ) -> issue notify (D-112/D-123)
 ├── workflows/release.yml  # tag v* -> test -> build -> publish (trusted publisher; env: pypi)
 ├── dependabot.yml         # weekly github-actions bumps, minor+patch grouped
 ├── ruff-baseline.json     # frozen lint budget {"src":{"RULE":N},"tests":{...}} — per-rule ratchet down only (T-10b/D-044)
@@ -90,6 +92,8 @@ docs/
 ├── scripts/check_tool_count_claims.py # live-doc tool-count claims == TOOL_ANNOTATIONS (D-121)
 ├── scripts/notify_drift_canary.py  # drift canary -> dedup issue artifact (D-123)
 ├── scripts/check_monolith_budget.py # maya_scene_module.py line-count ratchet (D-125)
+├── scripts/check_release_appendix.py # release-body disclosure-appendix weak assertions — release-preflight item 6, manual not push CI (D-142β)
+├── scripts/check_pypi_index.py   # PyPI simple-index (PEP 691+HTML)/project-JSON probe lane in the weekly drift job (D-142γ)
 ├── assets-src/            # reproducible capture scripts for README imagery (t20/ scene generators; T-19c scene_build.py + capture.py kept for reference)
 └── assets/                # published README imagery (populated only after sign-off)
 ```

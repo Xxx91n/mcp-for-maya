@@ -1,3 +1,5 @@
+<!-- mcp-name: io.github.Xxx91n/mcp-for-maya -->
+
 **English** | [简体中文](README.zh-CN.md)
 
 <p align="center">

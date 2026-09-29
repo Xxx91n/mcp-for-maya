@@ -33,6 +33,9 @@ House rules:
   After resolving errors, run `python -m mypy src | mypy-baseline sync` and commit
   the refreshed baseline in the same PR. The ruff budget is per-rule
   (`{segment:{rule:count}}`) since T-10b — rules cannot subsidise each other.
+  Budget gates are judged on the checked commit's tip (the PR's end state); a
+  mid-PR commit that transiently exceeds a budget does not constitute a gate
+  failure.
 
 ## Conduct
 

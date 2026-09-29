@@ -5,6 +5,12 @@ work item (a GitHub issue), because a scheduled-job red only emails
 the person who last touched the cron line — a structural blind spot
 on a single-maintainer repo.
 
+The drift job carries two signal lanes since D-142gamma: the floating
+resolution itself, and the PyPI index dual-source probe. Both turn the
+same job red — for attribution the script lists the run's failed step
+names (best-effort, via ``gh api .../jobs``; a lookup failure here must
+never break notify).
+
 Semantics:
 
 - drift red (failure/cancelled): open one dedup issue per
@@ -24,6 +30,7 @@ Invocation: notify_drift_canary.py (no args; env-driven).
   BRANCH              — github.ref_name (part of the dedup key)
   REPO                — owner/name for `gh` commands (default GITHUB_REPOSITORY)
   RUN_URL             — the run's URL, embedded for provenance
+  RUN_ID              — github.run_id, for failed-step attribution
   RUN_ATTEMPT         — github.run_attempt
   GITHUB_SHA          — head sha
   GH_TOKEN            — auth token for gh (required on CI)
@@ -87,8 +94,42 @@ def find_open_issue(repo: str, workflow: str, branch: str, runner: Runner) -> in
     return None
 
 
-def _issue_body(env: dict[str, str]) -> str:
-    return (
+def failed_steps(env: dict[str, str], runner: Runner) -> list[str]:
+    """Best-effort attribution: ``job: step`` names with conclusion=failure.
+
+    Never raises — a lookup failure must not break notify (D-123's
+    continue-on-error is for THIS script's own failure, not a licence to
+    crash on the attribution add-on).
+    """
+    run_id = env.get("RUN_ID", "")
+    repo = env.get("REPO") or env.get("GITHUB_REPOSITORY", "")
+    if not run_id or not repo:
+        return []
+    try:
+        out = _gh(["api", f"repos/{repo}/actions/runs/{run_id}/jobs"], runner)
+        data = json.loads(out)
+        jobs = data.get("jobs", []) if isinstance(data, dict) else []
+        bad = []
+        for job in jobs:
+            for step in job.get("steps", []):
+                if step.get("conclusion") == "failure":
+                    bad.append(f"{job.get('name', '?')}: {step.get('name', '?')}")
+        return bad
+    except Exception:
+        return []
+
+
+def _failed_steps_md(env: dict[str, str], runner: Runner) -> str:
+    bad = failed_steps(env, runner)
+    if not bad:
+        return ""
+    return "\n\nFailed steps (attribution — drift lane vs PyPI probe lane):\n" + "\n".join(
+        f"- {s}" for s in bad
+    )
+
+
+def _issue_body(env: dict[str, str], runner: Runner) -> str:
+    body = (
         "Weekly resolution-drift canary (uv lock --upgrade + pytest on the "
         "floating resolution) went red.\n\n"
         f"- workflow: {env.get('DRIFT_WORKFLOW', '?')}\n"
@@ -96,7 +137,11 @@ def _issue_body(env: dict[str, str]) -> str:
         f"- run: {env.get('RUN_URL', '?')} (attempt {env.get('RUN_ATTEMPT', '?')})\n"
         f"- sha: {env.get('GITHUB_SHA', '?')}\n\n"
         "A red here means upstream dependency drift first broke us — "
-        "the D-100 trigger-debt is armed by this signal. Repeated reds "
+        "the D-100 trigger-debt is armed by this signal. Since D-142gamma "
+        "the same job also carries the PyPI index dual-source probe "
+        "(simple index + project JSON vs the latest tag) — check the "
+        "failed steps below / the run log for which lane went red; a "
+        "simple-index red is the install face broken. Repeated reds "
         "comment on this issue instead of opening new ones; the issue "
         "auto-closes on the next green run.\n\n"
         "Obligation: at least one human review record (result + "
@@ -104,6 +149,7 @@ def _issue_body(env: dict[str, str]) -> str:
         "v1.0.0 release checklist can pass — red or green counts "
         "(ADR-0023 / D-127)."
     )
+    return body + _failed_steps_md(env, runner)
 
 
 def notify(env: dict[str, str], runner: Runner = _subprocess_runner) -> int:
@@ -151,7 +197,7 @@ def notify(env: dict[str, str], runner: Runner = _subprocess_runner) -> int:
                     "--title",
                     title,
                     "--body",
-                    _issue_body(env),
+                    _issue_body(env, runner),
                 ],
                 runner,
             )
@@ -159,7 +205,7 @@ def notify(env: dict[str, str], runner: Runner = _subprocess_runner) -> int:
     body = (
         f"Still red: {env.get('RUN_URL', '?')} "
         f"(attempt {env.get('RUN_ATTEMPT', '?')}, sha {env.get('GITHUB_SHA', '?')})."
-    )
+    ) + _failed_steps_md(env, runner)
     print(f"drift-notify: {result} — commenting on #{number}")
     if not dry:
         _gh(["issue", "comment", str(number), "--repo", repo, "--body", body], runner)

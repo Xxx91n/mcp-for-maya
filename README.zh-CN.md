@@ -1,4 +1,5 @@
-<!-- synced-with: README.md @ 47c5600 — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
+<!-- mcp-name: io.github.Xxx91n/mcp-for-maya -->
+<!-- synced-with: README.md @ 8402e3b — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
 
 [English](README.md) | **简体中文**
 

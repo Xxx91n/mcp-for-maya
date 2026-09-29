@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -123,5 +124,62 @@ def test_dry_run_mutates_nothing():
 
 def test_issue_body_carries_obligation_pointer():
     mod = _load()
-    body = mod._issue_body(_env("failure"))
+    body = mod._issue_body(_env("failure"), FakeGh())
     assert "ADR-0023" in body and "D-127" in body
+
+
+def test_red_body_lists_failed_steps():
+    """RUN_ID set → issue body carries job:step failure attribution."""
+    mod = _load()
+    jobs = {
+        "jobs": [
+            {
+                "name": "resolution-drift canary (D-112)",
+                "steps": [
+                    {"name": "pytest", "conclusion": "success"},
+                    {
+                        "name": "PyPI index dual-source probe",
+                        "conclusion": "failure",
+                    },
+                ],
+            }
+        ]
+    }
+    gh = FakeGh()
+    orig = gh.__call__
+
+    def runner(argv):
+        if "api" in argv:
+            gh.calls.append(argv)
+            return json.dumps(jobs)
+        return orig(argv)
+
+    rc = mod.notify(_env("failure", RUN_ID="4242"), runner=runner)
+    assert rc == 0
+    creates = [c for c in gh.calls if "create" in c]
+    assert len(creates) == 1
+    body = creates[0][creates[0].index("--body") + 1]
+    assert "PyPI index dual-source probe" in body
+
+
+def test_failed_step_lookup_failure_does_not_break_notify():
+    """Attribution is best-effort: a broken api call still files the issue."""
+    mod = _load()
+
+    def runner(argv):
+        if "api" in argv:
+            raise subprocess.CalledProcessError(1, argv, stderr="boom")
+        if "list" in argv:
+            return "[]"
+        return ""
+
+    rc = mod.notify(_env("failure", RUN_ID="4242"), runner=runner)
+    assert rc == 0
+
+
+def test_no_run_id_skips_attribution():
+    mod = _load()
+    gh = FakeGh()
+    rc = mod.notify(_env("failure"), runner=gh)
+    assert rc == 0
+    assert not any("api" in c for c in gh.calls)
