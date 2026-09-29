@@ -267,3 +267,16 @@ _Avoid_: 全称质量宣称超载、「we take security seriously」类惰性语
 **发布编排纪律 (release choreography)**:
 发布执行窗的操作纪律集（D-133/D-134/D-135）——①三段中止线：tag 后 CI 红→中止不升 PyPI（Debug to Revert; Not to Fix，窗内不修），PyPI 推送=不可回改点其后一切瑕疵走下个 patch 且 waiver 必带修复 expiry（禁无 expiry 挂账），每次中止=账本 incident 行（归因+回退+重发时点）；②go-signal 分层批准：批准门只设在不可逆邻域（uniform approval 失效），批准面=逐项核验证据非走读；③preflight 核对单=每行须绑定一个 CI 不覆盖的决策（cargo-cult 判据「这行会改变什么决策」），单子自挂 expiry 防沉淀为仪式；④谁发布谁守窗：所有权离散转移，观测闭环（健康确认+归因入账）前不算完成（false completion 禁忌）；⑤CONDITIONAL GO：非阻塞观测项不满足=带条件放行+独立跟踪路径，不拖停发布；⑥静默即升级：调度依赖静默实锤后立即走预案不等下一窗。
 _Avoid_: 窗内修车、waiver 无 expiry 裸挂账、核对单含与既有门禁重复行、发布即散场、观测项当 blocker、静默等下周
+
+**披露附录 (known-unverified appendix / disclosure appendix)**:
+GH Release body 尾部的 per-release 已知未验证披露块（D-049 义务载体，D-142 机制定型）——语义=装船时点现状快照（release-scoped effectively frozen，Wakelog known-issues 双层惯例之第①层），frozen 后 stale=特性非缺陷（修复时在 fix 条目点名+旧条目加「Fixed in X→」指针，禁静默删）；内容纪律=只放声明性指针（issue 链接/债 ID 引用/实测结论），计数型易腐内容禁入；措辞必过校准宣称句式；机验=弱断言脚本（附录存在+非空+引用锚 issue+issue open，fail-loud），断言条件=「未勾项>0 或存在未兑现声明⇒附录恒非空」不写死计数；载体=Release body 层（可编辑非不可逆），不进 CHANGELOG。
+_Avoid_: 全债表 dump（tracker-dump 反模式）、措辞抄未校准旧文、断言锁 body 尾部位置、fail-open 静默通过、改动 CHANGELOG 代补 body
+
+**收录/叙事双轨 (listing/narrative dual-track)**:
+对外扩张渠道的两层分类（D-141/D-143）——声明式低承诺轨=目录收录面（官方 MCP Registry/Glama/awesome-list），随时可上可撤、版本不可变但可重发，宣称走校准句式（beta 级禁 stable 语气）；叙事型高承诺轨=Show HN/blog/社区帖，一次性消费且有「working demo」证据门（证据不足的 launch 会被社区反噬），弹药=校准宣称+真机证据链，时点=v1.0.0+#7 全绿后。Registry 机制注：PyPI 所有权验证读已发布版本 README 的 mcp-name 标记行→registry publish 天然绑发版时点；聚合器同步逐渠道核销（D-144）：仅 Glama 官方明文 superset 分钟级同步精确成立；mcp.so/PulseMCP 未证实自动同步（mcp.so=GitHub issue 人工提交面）；渠道三态处置查询面=docs/distribution-surfaces.md（D-145α）。
+_Avoid_: 叙事帖在证据未固化时抢发、聚合器逐个手工直投、收录徽章堆砌成荣誉墙、给 Smithery 类托管面配无法健康检查的容器面
+
+
+**收录面三态判置 (listing three-state disposition)**:
+逐渠道收录处置一次立法固化于 docs/distribution-surfaces.md（D-144/D-145α）——三态=可行动/被动观察带触发条件/结构性否决永续（否决判据=结构匹配性一票否决：本地 stdio+Maya GUI 宿主可否承载其提交面/健康检查面，与 Smithery 同构判据）；未列出渠道默认=被动观察（catch-all），升级单向=被动观察→触发条件→可行动，防顺手提交滑梯（ADR-0027 同构）；兜底只豁免收录轨——叙事型投放位仍走双轨证据门（D-143γ）。
+-_Avoid_: 逐渠道周期性重开议事、未过结构匹配性判据即顺手提交、把被动观察误读为可行动、把结构性否决改写成临时推迟
