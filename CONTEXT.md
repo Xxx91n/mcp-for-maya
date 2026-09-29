@@ -273,5 +273,10 @@ GH Release body 尾部的 per-release 已知未验证披露块（D-049 义务载
 _Avoid_: 全债表 dump（tracker-dump 反模式）、措辞抄未校准旧文、断言锁 body 尾部位置、fail-open 静默通过、改动 CHANGELOG 代补 body
 
 **收录/叙事双轨 (listing/narrative dual-track)**:
-对外扩张渠道的两层分类（D-141/D-143）——声明式低承诺轨=目录收录面（官方 MCP Registry/Glama/awesome-list），随时可上可撤、版本不可变但可重发，宣称走校准句式（beta 级禁 stable 语气）；叙事型高承诺轨=Show HN/blog/社区帖，一次性消费且有「working demo」证据门（证据不足的 launch 会被社区反噬），弹药=校准宣称+真机证据链，时点=v1.0.0+#7 全绿后。Registry 机制注：PyPI 所有权验证读已发布版本 README 的 mcp-name 标记行→registry publish 天然绑发版时点；聚合器（mcp.so/Smithery/Glama）从 Registry 小时级同步，不重复直投。
+对外扩张渠道的两层分类（D-141/D-143）——声明式低承诺轨=目录收录面（官方 MCP Registry/Glama/awesome-list），随时可上可撤、版本不可变但可重发，宣称走校准句式（beta 级禁 stable 语气）；叙事型高承诺轨=Show HN/blog/社区帖，一次性消费且有「working demo」证据门（证据不足的 launch 会被社区反噬），弹药=校准宣称+真机证据链，时点=v1.0.0+#7 全绿后。Registry 机制注：PyPI 所有权验证读已发布版本 README 的 mcp-name 标记行→registry publish 天然绑发版时点；聚合器同步逐渠道核销（D-144）：仅 Glama 官方明文 superset 分钟级同步精确成立；mcp.so/PulseMCP 未证实自动同步（mcp.so=GitHub issue 人工提交面）；渠道三态处置查询面=docs/distribution-surfaces.md（D-145α）。
 _Avoid_: 叙事帖在证据未固化时抢发、聚合器逐个手工直投、收录徽章堆砌成荣誉墙、给 Smithery 类托管面配无法健康检查的容器面
+
+
+**收录面三态判置 (listing three-state disposition)**:
+逐渠道收录处置一次立法固化于 docs/distribution-surfaces.md（D-144/D-145α）——三态=可行动/被动观察带触发条件/结构性否决永续（否决判据=结构匹配性一票否决：本地 stdio+Maya GUI 宿主可否承载其提交面/健康检查面，与 Smithery 同构判据）；未列出渠道默认=被动观察（catch-all），升级单向=被动观察→触发条件→可行动，防顺手提交滑梯（ADR-0027 同构）；兜底只豁免收录轨——叙事型投放位仍走双轨证据门（D-143γ）。
+-_Avoid_: 逐渠道周期性重开议事、未过结构匹配性判据即顺手提交、把被动观察误读为可行动、把结构性否决改写成临时推迟
