@@ -147,6 +147,10 @@ _Avoid_: 包名（歧义）
 一次性高副作用公开动作的人工批准边界——repo 改名、push main、建 tag、建 Release、PyPI 发布、改 secret 须经用户执行或逐条批准；agent 仅备命令清单与影响面列表。低风险可逆动作（文件/分支/issues/PR）agent 自主。
 _Avoid_: 自动发布
 
+**事件门授权 (event-gate authorization)**:
+无人值守执行窗（真机验证窗/发版窗）内 agent 的授权形态（D-152）——不逐段确认也不 blanket approval，授权钉在预定义事件门上：①任一验收卡未达预期=红灯即停呈报三选一（处置权在用户），依赖下游冻结；②脏场景守卫等安全红线=不可授权越过，口头「继续」也须重新确认场景处置；③侵入用户会话段（如 GUI 道）开始前先打招呼；④其余段全自主、失败即记录后继依赖序允许的下一项。两层分权=停手权在 agent、处置权在用户（Andon 同构）。同窗并行人工道=其排程对偶——人工门动作（OAuth/备稿过目）排进 agent 结构性空闲段，红灯裁决暂停优先于半途的人工门（OAuth 中途打断=上下文作废）。
+_Avoid_: 逐段一停（往返成本+无新增判断点可守）、blanket 授权越过红线、人工门动作插在裁决悬停段
+
 **冻结预算 (frozen budget)**:
 
 存量 lint/类型错误以计数预算文件入库冻结、只降不升的 ratchet 纪律——CI 计数>预算即 fail；预算下调须经 PR 同 commit 改文件并写明理由，CI 内禁止自动写预算；粒度按目录分段（src/tests），per-rule 为完整质量门升级项。
@@ -235,7 +239,8 @@ _Avoid_: 无锚点承诺文案、先写机制名后补实现
 
 **裁决型证据 (decision-grade evidence / evidence binary)**:
 证据二分归置纪律（D-109，修订 D-048）——支撑公开裁决/对外声明的工件（探针 JSON、对账报告）脱敏后入 `docs/evidence/` 版本化=外部可复核锚，并附 claim boundary 字段写清该证据支持到哪一层；过程 transcript/reports/草稿仍留 `.scratch/` 不入 git。工件 append-only：被反驳不原位篡改，走「新工件+新裁决+旧件标 superseded」。前向规则：一切 verified-live/live 级声明须挂仓内工件或点名 mayapy/human_verify 档记录，裸声称=违 D-017⑥。
-_Avoid_: 裁决证据躺 .scratch 外部不可达、证据原位编辑冒充最新、裸声称无工件无档名
+尺寸纪律（D-153②）：≤512KB 的 PNG 截图件与 JSON 同址入 probes/；超限件（录屏类）不入仓，走 sha256+本地路径+再生成脚本路径的三联指针=仓内描述件+仓外实物，出现时按再裁流程立裁。issue 载体二分（D-153③）：tracker 类 issue 的 body=压缩终态一次性更新、过程进展走评论 append-only——窗内逐框改写 body 会让弱断言脚本（check_release_appendix.py）中途语义抖动，且半成品态对外可读违披露纪律。
+_Avoid_: 裁决证据躺 .scratch 外部不可达、证据原位编辑冒充最新、裸声称无工件无档名、MB 级二进制裸入仓、逐框改写 tracker issue body
 
 **只加不删资产目录 (append-only asset dir)**:
 .github/assets/ 等被绝对 URL（main 钉）引用的发布资产目录纪律——条目只可新增不可删除/改名；旧 PyPI 页面 description 永久指向 main 路径且不可回改，退役删除=全部历史页面永久裂图。CI 守卫=.github/scripts/check_assets_append_only.py（D-113：纯 add 放行、D/M/R/T 拦；逃生口=维护者知情合入+PR 声明+账本注记）。
