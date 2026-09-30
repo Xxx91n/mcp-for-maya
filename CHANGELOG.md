@@ -7,21 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **TDQS disclosure ratchet CI gate (D-175)** — static AST and JSON
+  validation script `.github/scripts/check_tdqs_disclosure.py:1` hard-gated in
+  CI lint workflow (`.github/workflows/ci.yml:51`), enforcing 30 required
+  disclosure elements across 11 tools against single-source specification
+  `docs/adr/0028-elements.yaml:1`, backed by unit test suite
+  `tests/test_check_tdqs_disclosure.py:1` (5 passed).
+
+- **TDQS description quality architecture decision record (D-174)** —
+  `docs/adr/0028-tdqs-description-quality.md:1` and machine-readable specification
+  `docs/adr/0028-elements.yaml:1` establishing P0 required disclosure elements
+  and single-direction `Boundary:` conventions.
+
+### Changed
+
+- **P0 core tool descriptions rewritten (D-172, ADR-0028 §2)** —
+  `execute_code` (`src/maya_mcp_server/server.py:345`) rewritten to disclose
+  arbitrary code scope, full session privileges, irreversible execution,
+  `result_type` envelope, and session prerequisites; `write_module`
+  (`src/maya_mcp_server/server.py:292`) rewritten to disclose session
+  prerequisites, in-memory overwrite semantics, and `execute_code` boundary;
+  `scene_validate` (`src/maya_mcp_server/scene_tools.py:473`) rewritten to
+  disclose read-only spatial constraints without `auto_fix` mutations, session
+  prerequisites, and disambiguation boundaries.
+
+- **P1 scene analysis tool disambiguation boundaries (D-173, ADR-0028 §3)** —
+  added single-direction `Boundary:` lines across 9 scene tools in
+  `src/maya_mcp_server/scene_tools.py:35` and
+  `src/maya_mcp_server/introspect_tools.py:48` to eliminate conceptual
+  overlap across spatial inspection and auditing tools.
+
+- **Tool instructions and threat model alignment (D-173④)** — synchronized
+  FastMCP server instructions (`src/maya_mcp_server/server.py:93`) and
+  security threat model (`docs/threat-model.md:162`) to reflect `execute_code`
+  arbitrary execution privilege and `scene_validate` read-only constraint semantics.
+
 ### Fixed
 
-- **MCP ImageContent camelCase attribute alignment** — align `mt.ImageContent`
-  instantiation to use pydantic camelCase `mimeType` instead of `mime_type`
-  (`src/maya_mcp_server/visual_tools.py:145`), resolving validation error
-  during viewport snapshot processing with updated MCP library versions
-  (`tests/test_visual_tools.py:245`).
+- **MCP ImageContent snake_case attribute alignment** — align `mt.ImageContent`
+  instantiation to use standard snake_case `mime_type` instead of deprecated
+  `mimeType` (`src/maya_mcp_server/visual_tools.py:145`), resolving mypy
+  `call-arg` violation and `FastMCPDeprecationWarning` during viewport
+  snapshot processing with MCP SDK v2 (`tests/test_visual_tools.py:245`,
+  `tests/test_visual_tools.py:259`).
 
-- **FastMCP 2.14.x / 4.x test harness compatibility** — adapt test suite for
-  library upgrades: import `ToolResult` directly from `fastmcp.tools.tool`
-  (`tests/test_pipeline.py:14`), invoke `server.execute_code.fn` and
-  `inspect.signature(server.add_session.fn)` on `FunctionTool` objects
-  (`tests/test_scene_tools_json.py:256`, `tests/test_qt_channel.py:636`), and
-  reposition `filterwarnings(category=Warning)` ahead of
-  `import requests.exceptions` in conftest (`tests/conftest.py:33`).
+- **FastMCP 4.x / 2.14.x test harness compatibility** — adapt test suite for
+  library upgrades: import `ToolResult` with fallback order from
+  `fastmcp.tools.base` to `fastmcp.tools.tool` to `mcp.types.CallToolResult`
+  (`tests/test_pipeline.py:13`), support both raw decorated functions in
+  FastMCP 4.x and legacy `.fn` attributes via `getattr` in session and scene
+  tool tests (`tests/test_qt_channel.py:636`,
+  `tests/test_scene_tools_json.py:256`), and filter warnings ahead of imports
+  in conftest (`tests/conftest.py:33`).
 
 ## [0.5.0] - 2026-09-30
 
