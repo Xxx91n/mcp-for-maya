@@ -4,7 +4,8 @@
     "date": "2026-09-30",
     "env": "post real-Maya window 2026-09-30; table=docs/evidence/real-maya-window-2026-09-30.md",
     "purpose": "v1.0.0 gate 三态判定的机检清单（D-163）",
-    "claim_boundary": "Waived rows carry reason+owner+expiry and fail-closed semantics (unresolved at expiry => Blocked). \"Waived\" is not \"Pass\". Re-read at every release-preflight."
+    "claim_boundary": "Waived rows carry reason+owner+expiry and fail-closed semantics (unresolved at expiry => Blocked). \"Waived\" is not \"Pass\". Re-read at every release-preflight.",
+    "renewal_law": "D-168/D-169/D-170/D-171：到期未消解行三车道 pass/Blocked/显式续期；续期五要件（owner 外门权者重签+新事件锚 expiry 三选一+每行上限 2 次第 2 次用户拍板+reason 重验+门审后豁免车道关闭）；renewals 字段 0/1/2 机检；descope 走 revise 车道与豁免永久隔离"
   },
   "gate": "v1.0.0",
   "rule": "Pass set all green AND Waived set all explicit (reason+owner+expiry) AND Blocked set empty",
@@ -16,7 +17,8 @@
       "reason": "mayapy env-broken on host (AV 0xC0000005)",
       "owner": "user",
       "expiry": "first gate-check execution after D-163 lands, or Linux-capable/fixed-mayapy env available, whichever first",
-      "ref": "D-159"
+      "ref": "D-159",
+      "renewals": 0
     },
     {
       "frame": 2,
@@ -25,7 +27,8 @@
       "reason": "deterministic capture_failed kFailure on this station (VP2 path; station-specific suspect — playblast path green)",
       "owner": "@Xxx91n",
       "expiry": "v1.0.0 gate review event (γ-B anchor) or second-station re-verify",
-      "ref": "Issue #53 + probe-box02-vp2-red.json"
+      "ref": "Issue #53 + probe-box02-vp2-red.json",
+      "renewals": 0
     },
     {
       "frame": "2b/2c",
@@ -34,7 +37,8 @@
       "reason": "not-verified — no installs on host",
       "owner": "user",
       "expiry": "first gate-check execution after D-163 lands (explicit not-verified rows preserved)",
-      "ref": "D-149②"
+      "ref": "D-149②",
+      "renewals": 0
     },
     {
       "frame": 3,
@@ -49,7 +53,8 @@
       "reason": "mayapy env-broken (same root as frame 1)",
       "owner": "user",
       "expiry": "same as frame 1",
-      "ref": "D-159"
+      "ref": "D-159",
+      "renewals": 0
     },
     {
       "frame": 5,
@@ -58,7 +63,8 @@
       "reason": "Inspector --cli verified end-to-end incl. real image bytes; client-UI pixel render + claude/codex seats blocked at client model/provider layer",
       "owner": "user",
       "expiry": "first client-UI image render witnessed, or gate review",
-      "ref": "probe-box05-client-multiblock.json"
+      "ref": "probe-box05-client-multiblock.json",
+      "renewals": 0
     },
     {
       "frame": 6,
