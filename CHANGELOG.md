@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-30
+
+Verification-milestone release — **no runtime code changes since 0.4.1**.
+The delta is evidence and governance: the real-Maya verification window
+executed and its results are now in-repo, machine-readable form.
+
+### Added
+
+- **Real-Maya verification evidence pack** — the ten-frame live window ran
+  on Maya 2024 (Windows, en_US, published artifact `uvx mcp-for-maya@0.4.1`)
+  and landed as `docs/evidence/real-maya-window-2026-09-30.md` plus 20
+  probe artifacts under `docs/evidence/probes/` (D-153 three-layer closeout).
+
+- **Linux server-side verification** — the published artifact installs and
+  serves over stdio on Linux (WSL2/Kali, Python 3.13), and the Qt-channel
+  socket test suite passes 42/42 including RST/FIN semantics
+  (`probe-box06-linux-wsl.json`). Residual: the in-Maya channel under a
+  Linux-hosted Maya remains unverified (no Linux install on host).
+
+- **Machine-checkable v1.0.0 gate waiver list** —
+  `docs/evidence/gate-waiver-list-1.0.0.json` records the three-state gate
+  (Pass / Waived with owner+expiry+reason, fail-closed / Blocked=empty)
+  adopted in D-163.
+
+- **MCP Registry listing** — `io.github.Xxx91n/mcp-for-maya` v0.4.1 is
+  active on the official registry (published 2026-09-30).
+
+### Known limitations (unchanged disclosure discipline)
+
+- `scene_viewport_snapshot` fails deterministically on the test station
+  (VP2 `capture_failed` — Issue #53; the playblast-based
+  `scene_render_preview` is verified working).
+- mayapy on the verification host is env-broken; Tier-2 suite deferred.
+- Maya 2025/2026 and in-Maya Linux lanes are explicitly not-verified.
+- Client-UI image rendering verified at protocol level only (Inspector
+  --cli); Claude Code/Codex seats were blocked by client-side model/proxy
+  configuration, not by this server.
+
 ## [0.4.1] - 2026-09-29
 
 ### Added
