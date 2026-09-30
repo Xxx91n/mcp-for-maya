@@ -1,0 +1,18 @@
+{
+  "meta": {
+    "date": "2026-09-30",
+    "env": "GUI-channel presence baseline (Maya 2024, framed) ↔ tests/maya_stub",
+    "box": 8,
+    "purpose": "stub contract fidelity diff vs real Maya symbol surface",
+    "verdict": "stub guardrail mechanism landed and green: tests/test_presence_baseline.py 5/5 passed — every stub cmds symbol present in real-Maya presence-baseline or explicitly allowlisted (presence-allowlist.json, 3 adjudicated divergences: omui.MImage dual-location, cmds.listAttr & cmds.attributeQuery baseline-coverage gaps)",
+    "claim_boundary": "Presence-level contract only (exists/callable) — Maya builtins carry no inspect.signature so signature-tier diff is structurally unavailable; mayapy collection lane remains env-broken (AV 0xC0000005, D-138⑦ → AC-01 debt). Baseline collected via live GUI framed channel (D-056/D-085③ lineage). The diff test is the durable in-repo guard, run in every suite pass."
+  },
+  "result": {
+    "baseline_file": "tests/maya_stub/presence-baseline.json (48 symbols: cmds 36 / om 11 / omui 2)",
+    "allowlist_file": "tests/maya_stub/presence-allowlist.json (3 entries, all with verdict+ref)",
+    "guard_test": "tests/test_presence_baseline.py → 5 passed (2026-09-30)",
+    "omui_MImage": "absent in real Maya 2024 omui namespace (lives under om <=2024, moves to omui 2025+) — allowlisted dual-location stub models both",
+    "mayapy_lane": "env-broken, conditional (AC-01 debt row)"
+  },
+  "repro": "uv run pytest tests/test_presence_baseline.py -q"
+}
