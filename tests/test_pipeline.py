@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 from fastmcp.server.middleware import MiddlewareContext
-from fastmcp.tools import ToolResult
+from fastmcp.tools.tool import ToolResult  # fastmcp≥2.10 moved out of __init__
 from mcp.types import CallToolRequestParams
 
 from maya_mcp_server.pipeline import (

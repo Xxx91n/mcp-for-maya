@@ -24,15 +24,20 @@ import maya_stub  # noqa: E402
 # D-111 exemption #2 (conditional): requests' urllib3/chardet
 # pin-mismatch notice is known-benign, but requests is not a declared
 # dependency — it only exists when a transitive resolution pulls it in.
-# Registering the filter at runtime under find_spec keeps the exemption
-# active when present and inert when absent (a config-level dotted
-# category would crash pytest collection in the locked env).
-# Ordering: filterwarnings() inserts at the head of the filter list,
-# so this runtime ignore wins over any config-side filter that follows.
+# The filter MUST be installed before importing requests (requests/__init__.py
+# fires the warning at import time; the filter is inert if inserted after).
+# We use the base Warning category for the pre-import filter (safe catch-all
+# for this specific message pattern), then tighten to the typed class after.
 # Removal trigger: next dependency-floor refresh realigns the pins.
 if importlib.util.find_spec("requests") is not None:
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*doesn't match a supported version",
+        category=Warning,
+    )
     import requests.exceptions  # noqa: E402
 
+    # Re-register with the precise typed category (tighter scope post-import).
     warnings.filterwarnings(
         "ignore",
         message=r".*doesn't match a supported version",
