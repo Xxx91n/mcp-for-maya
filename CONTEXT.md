@@ -289,3 +289,7 @@ _Avoid_: 叙事帖在证据未固化时抢发、聚合器逐个手工直投、�
 **发布门三态判定 (release-gate three-state disposition)**:
 v1.0.0 发布门对验收项的处置词表（D-163，工业映射=Autonoma/beefed go-no-go 框架+K8s EXCEPTIONS 例外制+Chromium release-blocker 矩阵）——三态=**Pass**（实测绿）/ **Waived**（显式豁免行：reason+owner+expiry 三要素缺一即不成立，到期未消解 fail-closed 自动转 Blocked）/ **Blocked**（一票否决）。机检清单工件=docs/evidence/gate-waiver-list-1.0.0.json，每次 release-preflight 重读；与「收录面三态判置」正交（彼管渠道处置、此管发布门项处置）。修订关系：D-040「十框字面全绿」标 revised（判定形态改三态，立法目的「真机层须实证」保留）；blocker 判据锚=Chromium severity×prevalence（「must not ship」才够格，有 workaround+站特异降格）。
 _Avoid_: waived 行当 pass 读、无 expiry 豁免（退化永久豁免）、把站特异红直接拔为 feature-blocker、叙事面把 waived 项描绿
+
+**安装面标注 (install-surface badge)**:
+第三方列表/收录面里 OS emoji、平台徽标、安装形态标记的语义域（D-165）——语义=「此平台可安装/可运行」的**安装信号**，不是「该 OS 上全能力已验证」的审计信号；punkpeye Legend 原文=「For macOS/Windows/Linux」即「for」非「verified」。由此 D-149②「声明集=已验证集」的管辖边界显式化为：**宣称文本**（README/claim/描述句/叙事面）受其约束，**安装面标注**按宿主软件实际可运行平台标子集（桌面宿主 MCP server 标 OS 子集是列表正规形态，如 ableton-mind 🍎🪟）；剔除「已部分实证 OS」的 emoji 反而制造虚假信息（Linux 用户误判不可用）。
+_Avoid_: 把 emoji 当审计声明逐字代入 D-149② 裁切、在列表一行内塞验证态限定词（生态惯例=一句话只讲功能+安装面）、宣称文本反而用 emoji 语义当借口放宽
