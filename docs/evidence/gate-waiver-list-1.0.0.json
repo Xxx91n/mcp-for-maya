@@ -16,9 +16,10 @@
       "state": "waived",
       "reason": "mayapy env-broken on host (AV 0xC0000005)",
       "owner": "user",
-      "expiry": "first gate-check execution after D-163 lands, or Linux-capable/fixed-mayapy env available, whichever first",
+      "expiry": "next gate-check or gate review, whichever first",
       "ref": "D-159",
-      "renewals": 0
+      "renewals": 1,
+      "renewed_by": "user @2026-09-30"
     },
     {
       "frame": 2,
@@ -36,9 +37,10 @@
       "state": "waived",
       "reason": "not-verified — no installs on host",
       "owner": "user",
-      "expiry": "first gate-check execution after D-163 lands (explicit not-verified rows preserved)",
+      "expiry": "next gate-check or gate review, whichever first",
       "ref": "D-149②",
-      "renewals": 0
+      "renewals": 1,
+      "renewed_by": "user @2026-09-30"
     },
     {
       "frame": 3,
@@ -52,9 +54,10 @@
       "state": "waived",
       "reason": "mayapy env-broken (same root as frame 1)",
       "owner": "user",
-      "expiry": "same as frame 1",
+      "expiry": "next gate-check or gate review, whichever first",
       "ref": "D-159",
-      "renewals": 0
+      "renewals": 1,
+      "renewed_by": "user @2026-09-30"
     },
     {
       "frame": 5,
