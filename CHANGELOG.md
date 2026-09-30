@@ -35,12 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **P1 scene analysis tool disambiguation boundaries (D-173, ADR-0028 §3)** —
   added single-direction `Boundary:` lines across 9 scene tools in
-  `src/maya_mcp_server/scene_tools.py:35` and
-  `src/maya_mcp_server/introspect_tools.py:48` to eliminate conceptual
+  `src/maya_mcp_server/scene_tools.py:147` and
+  `src/maya_mcp_server/introspect_tools.py:35` to eliminate conceptual
   overlap across spatial inspection and auditing tools.
 
 - **Tool instructions and threat model alignment (D-173④)** — synchronized
-  FastMCP server instructions (`src/maya_mcp_server/server.py:93`) and
+  FastMCP server instructions (`src/maya_mcp_server/server.py:67`) and
   security threat model (`docs/threat-model.md:162`) to reflect `execute_code`
   arbitrary execution privilege and `scene_validate` read-only constraint semantics.
 
@@ -56,10 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **FastMCP 4.x / 2.14.x test harness compatibility** — adapt test suite for
   library upgrades: import `ToolResult` with fallback order from
   `fastmcp.tools.base` to `fastmcp.tools.tool` to `mcp.types.CallToolResult`
-  (`tests/test_pipeline.py:13`), support both raw decorated functions in
+  (`tests/test_pipeline.py:17`), support both raw decorated functions in
   FastMCP 4.x and legacy `.fn` attributes via `getattr` in session and scene
   tool tests (`tests/test_qt_channel.py:636`,
-  `tests/test_scene_tools_json.py:256`), and filter warnings ahead of imports
+  `tests/test_scene_tools_json.py:255`), and filter warnings ahead of imports
   in conftest (`tests/conftest.py:33`).
 
 ## [0.5.0] - 2026-09-30
@@ -423,7 +423,7 @@ executed and its results are now in-repo, machine-readable form.
   `camera_orbit` tool wrappers default to `CAM_shot`/`CAM_orbit`
   instead of `shot_cam`/`orbit_cam`, matching the project's own naming
   audit (`maya_scene_module.py::_MAYA_STANDARDS`,
-  `src/maya_mcp_server/scene_tools.py:685`). Externally visible:
+  `src/maya_mcp_server/scene_tools.py:649`). Externally visible:
   unnamed camera calls now produce `CAM_*` nodes.
 - **Generated materials are `standardSurface` (D-082e)** —
   `_new_material` emits Maya's PBR default instead of `blinn`; the
