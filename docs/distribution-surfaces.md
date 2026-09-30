@@ -17,7 +17,7 @@
 
 | 渠道 | 结构匹配性 | 受众质量 | 进入成本/凭据面 | 宣称纪律 | 动作锚 |
 |---|---|---|---|---|---|
-| 官方 MCP Registry | ✅ stdio 一等支持（D-143β 已核） | 权威上游，全聚合器消费（Glama 官方明文 superset 全量摄入；下游镜像有实证同步缺口——GitHub 镜像 discussion #203757——故下游收录态逐一核销勿假设） | mcp-publisher CLI + GitHub device flow=用户人工门；server.json 草稿见任务书 T-30h | server.json 描述走 D-132 句式 | **已收录（2026-09-30，v0.4.1 active，D-161）**；发新版须重 publish（操作契约见下「Registry publish 小节」） |
+| 官方 MCP Registry | ✅ stdio 一等支持（D-143β 已核） | 权威上游，全聚合器消费（Glama 官方明文 superset 全量摄入；下游镜像有实证同步缺口——GitHub 镜像 discussion #203757——故下游收录态逐一核销勿假设） | mcp-publisher CLI + GitHub device flow=用户人工门；server.json 草稿见任务书 T-30h | server.json 描述走 D-132 句式 | **已收录（2026-09-30，v0.5.0 active via mcp-publisher 1.7.9；v0.4.1→v0.5.0 isLatest 翻转已核）**；发新版须重 publish（操作契约见下「Registry publish 小节」） |
 | Glama | ⚠️ 自动索引态已实核=未收录（T-30 审计 live-recheck）；构建面依赖 Dockerfile——**无 Dockerfile 构建面=不分发常态，禁主动启 Docker 构建/健康检查面**（Maya GUI 宿主构建恒失败→健康检查红反损 listing） | 中流量，生态搜索 SEO 好，Maya 密度低 | Add MCP Server 提交 repo URL→GitHub OAuth claim（个人账号直连免 glama.json） | claim 文案走 D-132 句式 | T-30f；预期=占位+元数据所有权，非分发流量（D-144③）。**备注（遗漏面 #7）：claim 后改 repo 描述/logo 须重走 Claim ownership 流程触发同步** |
 | awesome-mcp-servers | ✅ 纯列表，无运行时匹配要求 | 87-94K★，生态最权威列表，长期 SEO 背链 | fork+PR（格式=owner/repo+语言 emoji+字母序），🤖🤖🤖 fast-track；行稿备稿见任务书 T-30g | 一句话描述走 D-132 beta 语气 | T-30g，不押时点 |
 
