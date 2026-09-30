@@ -11,7 +11,15 @@ from pathlib import Path
 
 import pytest
 from fastmcp.server.middleware import MiddlewareContext
-from fastmcp.tools.tool import ToolResult  # fastmcp≥2.10 moved out of __init__
+
+
+try:
+    from fastmcp.tools.base import ToolResult  # fastmcp 4.x
+except ImportError:
+    try:
+        from fastmcp.tools.tool import ToolResult  # fastmcp 2.10..2.x
+    except ImportError:
+        from fastmcp.tools import ToolResult  # fastmcp <2.10
 from mcp.types import CallToolRequestParams
 
 from maya_mcp_server.pipeline import (

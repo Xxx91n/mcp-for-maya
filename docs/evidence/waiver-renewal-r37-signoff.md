@@ -1,10 +1,10 @@
 # R37 Gate Waiver Renewal Sign-Off Record
 
-**Date**: 2026-09-30  
-**Gate**: v1.0.0  
-**Cycle**: Round 37 Execution Window A (First Gate-Check, D-169)  
-**Artifact**: `docs/evidence/waiver-renewal-r37-signoff.md`  
-**Referenced List**: `docs/evidence/gate-waiver-list-1.0.0.json`  
+**Date**: 2026-09-30
+**Gate**: v1.0.0
+**Cycle**: Round 37 Execution Window A (First Gate-Check, D-169)
+**Artifact**: `docs/evidence/waiver-renewal-r37-signoff.md`
+**Referenced List**: `docs/evidence/gate-waiver-list-1.0.0.json`
 
 ---
 
@@ -56,7 +56,7 @@
 
 ---
 
-**签署人**：`@Xxx91n`（Project Maintainer, Authorized by Human 2026-09-30）  
+**签署人**：`@Xxx91n`（Project Maintainer, Authorized by Human 2026-09-30）
 **归档生效时间戳**：2026-09-30T16:30:00Z
 
 ---

@@ -159,6 +159,12 @@ authoritative and this table must match it row for row:
   startup-file writes. `scene_rollback` recovers state (not destructive)
   but is not idempotent; `camera_create`/`camera_orbit`/`scene_checkpoint`
   mutate the scene/filesystem but are recoverable, so destructive=false.
+- `execute_code` executes arbitrary Python or MEL code with full session
+  privileges in the active Maya session; execution is irreversible and
+  cannot be automatically undone (TDQS behavior disclosure, D-174).
+  Similarly, `scene_validate` is read-only (destructive=false) and does
+  not perform auto_fix mutations (unlike `scene_plan` which can mutate
+  scene organization).
 
 ## 6. Audit log schema and replay
 
