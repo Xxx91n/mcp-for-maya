@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **MCP ImageContent camelCase attribute alignment** — align `mt.ImageContent`
+  instantiation to use pydantic camelCase `mimeType` instead of `mime_type`
+  (`src/maya_mcp_server/visual_tools.py:145`), resolving validation error
+  during viewport snapshot processing with updated MCP library versions
+  (`tests/test_visual_tools.py:245`).
+
+- **FastMCP 2.14.x / 4.x test harness compatibility** — adapt test suite for
+  library upgrades: import `ToolResult` directly from `fastmcp.tools.tool`
+  (`tests/test_pipeline.py:14`), invoke `server.execute_code.fn` and
+  `inspect.signature(server.add_session.fn)` on `FunctionTool` objects
+  (`tests/test_scene_tools_json.py:256`, `tests/test_qt_channel.py:636`), and
+  reposition `filterwarnings(category=Warning)` ahead of
+  `import requests.exceptions` in conftest (`tests/conftest.py:33`).
+
 ## [0.5.0] - 2026-09-30
 
 Verification-milestone release — **no runtime code changes since 0.4.1**.

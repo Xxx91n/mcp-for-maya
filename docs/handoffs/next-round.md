@@ -1,16 +1,20 @@
 ---
 generated: 2026-09-30
-from_round: R37（执行窗 A 首次门检落账 + 三帧续期生效 + fastmcp 2.14.7 兼容闭环，覆盖 D-168~170）
-ledger_head: GC-2026-09-30（账本总决策至 D-171，增补首检事件留痕）
-branch: exec/r37-gate-check-fixes（栈 qqz→xnw→unq，本地未推；堆叠于 grill/round36-v1-gate-path）
+from_round: R37（执行窗 A 首次门检落账 + 审计返修闭环 + 三帧续期生效，覆盖 D-168~170）
+ledger_head: GC-2026-09-30（账本总决策至 D-171，首检留痕补正权责分离与替代出路复验）
+branch: exec/r37-gate-check-fixes（栈 qqz→xnw→unq→ynz + 审计返修提交，本地未推；堆叠于 grill/round36-v1-gate-path）
 ---
 
 # 下轮任务书（rev48）
 
-## 状态总览（首检已落账）
+## 状态总览（首检已落账并通过审计返修）
 
 - **首次门检状态**：已完成（时间戳 `2026-09-30T15:31Z`）。三态读数：Pass=6（框3/6/7/8/9/10）、Waived=5（框1/2/2b/4/5）、Blocked=0。
-- **豁免到期处分**：框1、框4、框2b/2c 到期行已重验根因，完成 `renewals: 1` 续期并经用户显式核准，新 expiry 为「下次 gate-check 或 gate review 先到为准」。
+- **豁免到期处分与审计整改（V1/W1-W6）**：
+  - 框1、框4、框2b/2c 重验根因未消解，同时复验替代出路（Linux WSL 42/42 + mock 790 passed 均通畅，要件4 闭环）。
+  - 维护者 `@Xxx91n` 获人类用户明确赋权签署展期，生成独立签认工件 `docs/evidence/waiver-renewal-r37-signoff.md`（要件1 闭环，实现 owner=user 与 signer=@Xxx91n 权责分离）。
+  - 机检清单 `gate-waiver-list-1.0.0.json` 补齐 `probes/` 相对路径（W4），2b/2c 行明确配额共享机制（W3），`renewals: 1` 写入。
+  - `CHANGELOG.md [Unreleased]` 补正运行时与测试修复条目及 evidence 指针（W1）。
 - **基建闭环**：fastmcp 2.14.7 兼容性断裂点（`mimeType` / `ToolResult` / `FunctionTool.fn` / dist version）全数修复，790 passed / 2 failed（框2 VP2 豁免项）/ 19 skipped；编译、打包（sdist/wheel）、进程 STDIO initialize 探活全量绿。
 
 ---

@@ -5,7 +5,7 @@
     "env": "post real-Maya window 2026-09-30; table=docs/evidence/real-maya-window-2026-09-30.md",
     "purpose": "v1.0.0 gate 三态判定的机检清单（D-163）",
     "claim_boundary": "Waived rows carry reason+owner+expiry and fail-closed semantics (unresolved at expiry => Blocked). \"Waived\" is not \"Pass\". Re-read at every release-preflight.",
-    "renewal_law": "D-168/D-169/D-170/D-171：到期未消解行三车道 pass/Blocked/显式续期；续期五要件（owner 外门权者重签+新事件锚 expiry 三选一+每行上限 2 次第 2 次用户拍板+reason 重验+门审后豁免车道关闭）；renewals 字段 0/1/2 机检；descope 走 revise 车道与豁免永久隔离"
+    "renewal_law": "D-168/D-169/D-170/D-171：到期未消解行三车道 pass/Blocked/显式续期；续期五要件（owner 外门权者重签+新事件锚 expiry 三选一+每行上限 2 次第 2 次用户拍板+reason 重验+门审后豁免车道关闭）；renewals 字段 0/1/2 机检；2b/2c 合并行共享 renewals 计数直至拆行；descope 走 revise 车道与豁免永久隔离"
   },
   "gate": "v1.0.0",
   "rule": "Pass set all green AND Waived set all explicit (reason+owner+expiry) AND Blocked set empty",
@@ -19,7 +19,7 @@
       "expiry": "next gate-check or gate review, whichever first",
       "ref": "D-159",
       "renewals": 1,
-      "renewed_by": "user @2026-09-30"
+      "renewed_by": "@Xxx91n (authorized by human 2026-09-30)"
     },
     {
       "frame": 2,
@@ -28,7 +28,7 @@
       "reason": "deterministic capture_failed kFailure on this station (VP2 path; station-specific suspect — playblast path green)",
       "owner": "@Xxx91n",
       "expiry": "v1.0.0 gate review event (γ-B anchor) or second-station re-verify",
-      "ref": "Issue #53 + probe-box02-vp2-red.json",
+      "ref": "Issue #53 + probes/probe-box02-vp2-red.json",
       "renewals": 0
     },
     {
@@ -40,7 +40,8 @@
       "expiry": "next gate-check or gate review, whichever first",
       "ref": "D-149②",
       "renewals": 1,
-      "renewed_by": "user @2026-09-30"
+      "renewed_by": "@Xxx91n (authorized by human 2026-09-30)",
+      "note": "Combined frame for Maya 2025/2026 non-install; shares renewals counter (1/2) per D-149②/D-168④; scheduled for split upon individual install signals"
     },
     {
       "frame": 3,
@@ -57,7 +58,7 @@
       "expiry": "next gate-check or gate review, whichever first",
       "ref": "D-159",
       "renewals": 1,
-      "renewed_by": "user @2026-09-30"
+      "renewed_by": "@Xxx91n (authorized by human 2026-09-30)"
     },
     {
       "frame": 5,
@@ -66,7 +67,7 @@
       "reason": "Inspector --cli verified end-to-end incl. real image bytes; client-UI pixel render + claude/codex seats blocked at client model/provider layer",
       "owner": "user",
       "expiry": "first client-UI image render witnessed, or gate review",
-      "ref": "probe-box05-client-multiblock.json",
+      "ref": "probes/probe-box05-client-multiblock.json",
       "renewals": 0
     },
     {
@@ -74,20 +75,20 @@
       "item": "Qt RST/FIN semantics",
       "state": "pass",
       "note": "Windows framed channel green + Linux server-side green via WSL (42/42 qt_channel); residual=in-Maya Qt on Linux-hosted Maya → D-158/D-162",
-      "ref": "probe-qt-rst-fin.json + probe-box06-linux-wsl.json"
+      "ref": "probes/probe-qt-rst-fin.json + probes/probe-box06-linux-wsl.json"
     },
     {
       "frame": 7,
       "item": "cmds.* static audit vs docs",
       "state": "pass",
-      "ref": "probe-box07-cmds-audit.json"
+      "ref": "probes/probe-box07-cmds-audit.json"
     },
     {
       "frame": 8,
       "item": "signature→stub guardrail",
       "state": "pass",
       "note": "presence tier; signature tier structurally unavailable",
-      "ref": "probe-box08-signature-diff.json"
+      "ref": "probes/probe-box08-signature-diff.json"
     },
     {
       "frame": 9,
@@ -99,7 +100,7 @@
       "frame": 10,
       "item": "no-newline + 500ms commandPort",
       "state": "pass",
-      "ref": "probe-box07-box10.json"
+      "ref": "probes/probe-box07-box10.json"
     }
   ]
 }
