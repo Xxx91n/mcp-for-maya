@@ -309,3 +309,23 @@ _Avoid_: 静默续期、日历悬空 expiry、无限续期、续期不重验根�
 **缩门 (descope / gate-definition revision)**:
 把验收帧从门定义中移除的处置车道（D-171③）——本质=门本体修订非豁免：须走 revise 呈报（D-040 先例形态：原记录保留+指针）+披露义务；与豁免车道永久隔离（豁免=暂缓验证记理由，缩门=修改门定义本身）；判负压力下尤其禁止——「静默缩门」正是本门立法的防御对象（PMBOK：缩范围与加范围同级审批；K8s 摘 milestone=显式权力+理由+记录在案）。
 _Avoid_: 压力下顺手删行、把 descope 伪装成 waiver 续期、跳过披露义务
+
+**TDQS (Tool Definition Quality Score)**:
+Glama 对 MCP server 工具定义质量的第三方评分体系（ADR-0028，D-172~175 立法）——逐工具六维加权（Purpose25/Usage20/Behavior20/Params15/Conciseness10/Completeness10），服务器总分=0.7×描述质量（0.6×mean+0.4×min——最差工具被刻意放大：a single garbage definition degrades selection across the whole set）+0.3×四维 Coherence（disambiguation/naming/toolCount/completeness，tool-count 带 5分=3~15/3分=16~25）；描述↔annotations 矛盾=该维自动 1 分+公开旗标（校准纪律的自动化审计器同构：披露不足扣分、虚假披露定罪）；重评=merge to main 即触发（GitHub HEAD build，inputHash 增量继承）。本仓复合验收判据=线上 ≥4.0（目标 4.2 防 round1 边界效应）+min 逐工具 ≥3.0+零旗标。
+_Avoid_: 为分数做 API breaking（P3 合并须独立立项+semver major 裁决）、虚假披露、关键词堆砌、always-call-first 强制排序句式、本地复现分入 CI（生产 LLM 型号/温度未公开）
+
+**Boundary: 行**:
+工具描述内嵌的单向消歧惯例（D-174，扩用 introspect_tools scene_nodes 既有先例）——每件工具一句 `Boundary:` 点名 1~3 个兄弟分工（when/when-not 语义，TDQS Usage 维 5 分锚点）；单向点名=新工具自写边界句零改动旧件；逐件消歧矩阵=docs/adr/0028-elements.yaml 的 boundary_targets 单源；集中路由表对 TDQS 评审零贡献（Appendix B 评审输入只看 name+description），全局 instructions 仅跨模块分工用。
+_Avoid_: 双向点名（O(n²) 维护税）、强制排序句式（"A boundary is describable; a priority is not"）、把消歧职责堆进集中文档不进描述本体
+
+**要素存在性棘爪 (element-presence ratchet)**:
+描述披露要素的 CI 防回归断言形态（D-175）——断言「结构化要素存在」非「关键词字面」（Boundary: 行等自造结构分隔符=合法断言对象，措辞自由度在行内容）；要素清单单源=0028-elements.yaml（ADR 立法与 CI 断言同源，防「ADR 改了 CI 静默漂移」）；hard gate 入 lint job（确定性检查无 LLM，与 check 家族并列）；失败信息须指明缺失要素 id；清单变更须 PR 显式 review。
+_Avoid_: snapshot 式全文断言（合法措辞迭代误报）、词表双源、warn 级软化（Notion 实证 warnings 被无视）、改措辞顺手删断言、为存量豁免造 baseline 文件（要素全齐后无此需求）
+
+**debt_owner（欠账责任方）**:
+waiver 行 owner 字段的精确语义（D-176 拆词立法——原与「门权者」共用 user 一词致 D-168④ 条款字面自相矛盾，标 scoped revised）——=欠账责任承担方（可=user 或 env 责任面），与续期签署方权责分离（GRC「债务人不得自批豁免」普世条款：NHS 原文连最高执行官不得自批 waiver）。
+_Avoid_: 与 gate_authority 混用同一词、owner 字段被读成「批准人」、续期行 owner 写成签署人
+
+**gate_authority（门权者）**:
+waiver 续期重签的裁决位（D-176）——=human user 或其具名授权代理；代理代签合法性条款=renewed_by 录三元组「代理账号+authorized by=委托人+日期」，授权链具名可追溯即担责等价（UCC §3-402 同构：intra vires 行为责任归 principal；ISC2：审批人与委托人共担）；约束精确化=debt_owner≠签署方（防自查自批），非「owner 之外的 user」。
+_Avoid_: 欠账人自签、无名授权链、「authorized by human」当无凭据口头语、门审后仍走代理补豁免（车道已关）

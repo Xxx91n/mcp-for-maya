@@ -154,6 +154,10 @@ def register_scene_tools(mcp: Any) -> None:
         Returns a structured description of ALL objects with positions, sizes, and types.
         Call this once at the start of each workflow to establish spatial awareness.
 
+        Boundary: Disambiguated from scene_inspect (deep-dive inspection of
+        specific objects or zones) and scene_nodes (granular DAG/DG node
+        name discovery with pagination).
+
         Args:
             detail: Detail level - "compact" (fast),
                 "standard" (+materials/mesh stats), "full" (+vertices).
@@ -229,6 +233,10 @@ def register_scene_tools(mcp: Any) -> None:
 
         Returns detailed properties including transform, BBox, material, mesh stats,
         and optionally nearby objects with distances.
+
+        Boundary: Disambiguated from scene_snapshot (broad whole-scene
+        spatial overview) and scene_describe (API-level attribute metadata,
+        types, and connection wiring).
 
         Args:
             target: Object name or zone name to inspect.
@@ -419,6 +427,10 @@ result
         Use this after modifications to confirm the scene is in the desired state.
         Enforces the VERIFY step of the ICEV workflow.
 
+        Boundary: Disambiguated from scene_validate (checks relational
+        spatial constraints across zones rather than exact expected values
+        for named objects).
+
         Args:
             expectations: JSON string defining expected state.
                 Format: {"obj_name": {"position": [x,y,z], "bbox_max": [x,y,z], ...}}
@@ -466,7 +478,15 @@ result
         """Validate scene against spatial constraints.
 
         Checks the scene for constraint violations like minimum clearance,
-        object limits, overlaps, and height requirements.
+        object limits, overlaps, and height requirements. This is a read-only
+        check without auto_fix mutations (it cannot modify or repair objects;
+        for automated fixes, see scene_plan with auto_fix=True). Because it is
+        non-destructive, no undo rollback checkpoint is created.
+        Requires an active Maya session.
+
+        Boundary: Disambiguated from scene_review (full scene quality audit
+        across 11 dimensions) and scene_assert (verifies specific numeric
+        values or object existence).
 
         Args:
             rules: JSON string with constraint rules. Format:
@@ -720,6 +740,10 @@ result
 
         Returns an overall score (0-100) with grade (S/A/B/C/D/F) and improvement suggestions.
 
+        Boundary: Disambiguated from scene_review (scene_aesthetics evaluates
+        visual design theory and artistic harmony in depth, while
+        scene_review is a broad multi-system scene health audit).
+
         Args:
             format: Output format - "json" (default) or "cos" (chain-of-symbol, token-efficient).
             session_key: Maya session key.
@@ -805,6 +829,10 @@ result
         constraint validation, orphan detection, naming, componentization, conflicts, lighting quality, and scene organization. Returns a score (0-100)
         and detailed issue list.
 
+        Boundary: Disambiguated from scene_validate (narrow rule-based
+        spatial constraint checking) and scene_aesthetics (in-depth
+        5-dimension aesthetic theory scoring).
+
         Use this after any major scene modification to verify quality.
 
         Args:
@@ -857,6 +885,11 @@ result
 
         Based on blockout-first methodology: validate organization and proportions
         before committing to detailed modeling. Supports natural language objectives.
+
+        Boundary: Disambiguated from scene_review (scene_plan focuses on
+        forward-looking layout planning and actionable auto_fix
+        reorganization, whereas scene_review provides an overall
+        diagnostic audit score).
 
         Args:
             objective: Natural language goal description.

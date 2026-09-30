@@ -43,10 +43,11 @@ def register_introspect_tools(mcp: Any) -> None:
         """API-level self-description of ONE node (not spatial).
 
         Boundary: scene_inspect answers WHERE an object is (position,
-        bbox, neighbors); scene_describe answers WHAT the node is at the
-        API level - exact node type, per-attribute metadata, and
-        connection wiring - so you can compose accurate
-        execute_code/setAttr/connectAttr calls against real names.
+        bbox, neighbors); scene_nodes discovers candidate node names;
+        scene_describe answers WHAT the node is at the API level - exact
+        node type, per-attribute metadata, and connection wiring - so
+        you can compose accurate execute_code/setAttr/connectAttr calls
+        against real names.
 
         Args:
             node: Node name (short name or long DAG path).
@@ -136,7 +137,8 @@ def register_introspect_tools(mcp: Any) -> None:
         you call once per workflow; scene_nodes is the name-discovery
         complement for the API layer - it lists nodes a spatial view
         never shows (materials, shadingEngines, tool nodes) and pages
-        honestly: has_more/next_cursor tell you when the list was cut.
+        honestly: has_more/next_cursor tell you when the list was cut
+        (for attribute schema and connection inspection, call scene_describe).
 
         Args:
             type: Node type filter. With inherited=True (default) derived

@@ -287,30 +287,37 @@ async def write_module(
     overwrite: bool = False,
     session_key: str | None = None,
 ) -> str:
-    """
-    Create a virtual Python module in a Maya session.
+    """Create a virtual in-memory Python module in an active Maya session.
+
+    Injects reusable Python functions into the target Maya session's sys.modules.
+    Modules are virtual and in-memory: they do not persist across Maya restarts,
+    and existing modules are protected unless overwrite=True is explicitly set.
+    Requires an active Maya session.
+
+    Boundary: Use write_module to define reusable libraries and helper functions;
+    use execute_code for one-shot imperative execution or expression evaluation.
 
     Args:
         name: Module name. Can be a dotted path (e.g., 'mypackage.utils')
               in which case parent packages are created automatically.
         code: Python source code for the module.
-        overwrite: If True, replace existing module. If False, raise error
-                   if module already exists.
-        session_key: Session key (optional if only one session exists)
+        overwrite: If True, overwrite and replace existing module. If False,
+                   raise error if module already exists.
+        session_key: Maya session key (optional if only one active session exists).
 
     Returns:
-        Success message
+        Success message confirming module registration.
 
     Example:
         write_module("mytools", '''
         import maya.cmds as cmds
 
-        def create_cube(name="cube1"):
+        def create_cube(name="GEO_cube1"):
             return cmds.polyCube(name=name)[0]
         ''')
 
-        # Then use it:
-        execute_code("import mytools; mytools.create_cube('myCube')")
+        # Then use it via execute_code:
+        execute_code("import mytools; mytools.create_cube('GEO_myCube')")
     """
     # Semantic validation (generic checks run in the SecurityPipeline)
     validate_module_name(name)
@@ -332,26 +339,32 @@ async def execute_code(
     result_type: str = "NONE",
     session_key: str | None = None,
 ) -> Any:
-    """
-    Execute Python code in a Maya session.
+    """Execute arbitrary Python or MEL code in an active Maya session.
+
+    Runs arbitrary code with full session privileges of the connected Maya
+    process. Execution is irreversible and cannot be undone (modifications
+    do not register an automatic undo chunk). The return value shape is
+    governed by the result_type envelope parameter.
+    Requires an established Maya session (discoverable via list_sessions).
 
     Args:
-        code: Python code to execute.
-        result_type: How to handle the result:
-            - "NONE": Execute statements, don't capture result
-            - "JSON": Evaluate expression, JSON encode result
+        code: Python or MEL code to execute in Maya.
+        result_type: Return envelope handling for the execution result:
+            - "NONE": Execute statements, don't capture result (returns None)
+            - "JSON": Evaluate expression, JSON-encode result
             - "RAW": Evaluate expression, return string representation
-        session_key: Session key (optional if only one session exists)
+        session_key: Maya session key (optional if only one session exists).
 
     Returns:
-        Captured result (None if result_type is NONE)
+        Captured result formatted according to result_type (None if result_type is "NONE").
 
-    Note: stdout and stderr are captured and exposed via the
-    maya://sessions/{session_key}/output MCP Resource.
+    Note:
+        stdout and stderr are captured and exposed via the
+        maya://sessions/{session_key}/output MCP Resource.
 
     Example:
-        # Execute statements
-        execute_code("import maya.cmds as cmds; cmds.polyCube()")
+        # Execute statements (irreversible full privilege execution)
+        execute_code("import maya.cmds as cmds; cmds.polyCube(name='GEO_cube')")
 
         # Get JSON result
         execute_code("cmds.ls(type='mesh')", result_type="JSON")

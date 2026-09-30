@@ -48,6 +48,8 @@ jobs:
         run: python .github/scripts/check_tool_count_claims.py
       - name: monolith line budget (D-125)
         run: python .github/scripts/check_monolith_budget.py
+      - name: tdqs disclosure elements gate (D-175)
+        run: python .github/scripts/check_tdqs_disclosure.py
       - name: pre-commit fallback (all files)
         run: |
           pip install pre-commit

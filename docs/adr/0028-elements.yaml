@@ -1,0 +1,166 @@
+{
+  "schema": "tdqs-elements/1",
+  "note": "JSON-syntax YAML (YAML 1.2 is a strict superset of JSON): parseable by both yaml.safe_load and json.loads — stdlib-only CI consumption. This file is the SINGLE SOURCE for TDQS disclosure elements; legislated by ADR-0028, consumed by .github/scripts/check_tdqs_disclosure.py. Asserts element presence, NOT literal wording — wording freedom stays inside the line.",
+  "legislation": "docs/adr/0028-tdqs-description-quality.md",
+  "decisions": ["D-172", "D-173", "D-174", "D-175"],
+  "assert_semantics": {
+    "any": "element satisfied if ANY regex in the list matches the tool description/docstring",
+    "all": "element satisfied only if EVERY literal string in the list appears in the description",
+    "on_failure": "CI failure message MUST name the missing element id",
+    "change_review": "edits to this file require explicit PR review (prevents 'rewording slips deleting the assertion')"
+  },
+  "tools": {
+    "execute_code": {
+      "file": "src/maya_mcp_server/server.py",
+      "tier": "P0",
+      "required_elements": [
+        {
+          "id": "scope_arbitrary_code",
+          "why": "disclose that arbitrary code runs in the session",
+          "any": ["(?i)arbitrary", "(?i)any\\s+(valid\\s+)?python\\s+code", "(?i)arbitrary\\s+(MEL|python)"]
+        },
+        {
+          "id": "full_session_privileges",
+          "why": "privilege level disclosure",
+          "any": ["(?i)full\\s+(session\\s+)?(privileges|permissions)", "(?i)same\\s+privileges\\s+as", "(?i)user'?s?\\s+(Maya\\s+)?(session\\s+)?privileges", "(?i)with\\s+full\\s+.*(privileges|permissions)"]
+        },
+        {
+          "id": "irreversible",
+          "why": "undo-semantics disclosure",
+          "any": ["(?i)irreversible", "(?i)not\\s+undo", "(?i)cannot be undone", "(?i)no\\s+undo", "(?i)not\\s+reversible", "(?i)can'?t be undone"]
+        },
+        {
+          "id": "result_type_envelope",
+          "why": "return shape depends on result_type",
+          "any": ["result_type"]
+        },
+        {
+          "id": "session_prerequisite",
+          "why": "requires a live/connected session before use",
+          "any": ["(?i)(active|connected|open|live|established)\\s+(Maya\\s+)?session", "(?i)list_sessions", "(?i)session_key", "(?i)requires\\s+a\\s+session"]
+        }
+      ]
+    },
+    "scene_validate": {
+      "file": "src/maya_mcp_server/scene_tools.py",
+      "tier": "P0",
+      "required_elements": [
+        {
+          "id": "autofix_two_state",
+          "why": "auto_fix flips the tool from read-only check to mutating — the two states must both be stated",
+          "any": ["auto_fix"]
+        },
+        {
+          "id": "autofix_mutation",
+          "why": "auto_fix=true mutates the scene — must be disclosed as mutation, not framed as pure analysis",
+          "any": ["(?i)auto_fix[^\\n]{0,160}(mutat|modif|chang|fix|correct|repair|apply|edit)", "(?i)(mutat|modif|chang|fix|correct|repair|apply|edit)[^\\n]{0,160}auto_fix"]
+        },
+        {
+          "id": "irreversible_when_mutating",
+          "why": "mutation path undo-semantics disclosure",
+          "any": ["(?i)irreversible", "(?i)not\\s+undo", "(?i)cannot be undone", "(?i)no\\s+undo", "(?i)undo", "(?i)rollback", "(?i)checkpoint"]
+        },
+        {
+          "id": "session_prerequisite",
+          "why": "requires a live/connected session",
+          "any": ["(?i)(active|connected|open|live|established)\\s+(Maya\\s+)?session", "(?i)session_key", "(?i)requires\\s+a\\s+session"]
+        },
+        {
+          "id": "boundary_line",
+          "why": "one-way disambiguation marker (also a P1 scene_* member)",
+          "any": ["Boundary:"]
+        },
+        {
+          "id": "boundary_targets_named",
+          "why": "names sibling tools — vs scene_review (full audit) / scene_assert (expected values)",
+          "all": ["scene_review", "scene_assert"]
+        }
+      ]
+    },
+    "write_module": {
+      "file": "src/maya_mcp_server/server.py",
+      "tier": "P0",
+      "required_elements": [
+        {
+          "id": "session_prerequisite",
+          "why": "requires a live/connected session",
+          "any": ["(?i)(active|connected|open|live|established)\\s+(Maya\\s+)?session", "(?i)session_key", "(?i)requires\\s+a\\s+session"]
+        },
+        {
+          "id": "overwrite_or_persistence_semantics",
+          "why": "what gets destroyed / whether the module persists — lifecycle disclosure",
+          "any": ["(?i)overwrite", "(?i)in-memory", "(?i)virtual", "(?i)not\\s+persist", "(?i)does not persist", "(?i)teardown", "(?i)removed on"]
+        },
+        {
+          "id": "boundary_execute_code",
+          "why": "when/when-not boundary vs execute_code (reusable module vs one-shot execution)",
+          "all": ["execute_code"]
+        }
+      ]
+    },
+    "scene_snapshot": {
+      "file": "src/maya_mcp_server/scene_tools.py",
+      "tier": "P1",
+      "required_elements": [
+        {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
+        {"id": "boundary_targets_named", "why": "names sibling tools", "all": ["scene_inspect", "scene_nodes"]}
+      ]
+    },
+    "scene_inspect": {
+      "file": "src/maya_mcp_server/scene_tools.py",
+      "tier": "P1",
+      "required_elements": [
+        {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
+        {"id": "boundary_targets_named", "why": "names sibling tools", "all": ["scene_snapshot", "scene_describe"]}
+      ]
+    },
+    "scene_nodes": {
+      "file": "src/maya_mcp_server/introspect_tools.py",
+      "tier": "P1",
+      "required_elements": [
+        {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
+        {"id": "boundary_targets_named", "why": "names sibling tools", "all": ["scene_snapshot", "scene_describe"]}
+      ]
+    },
+    "scene_describe": {
+      "file": "src/maya_mcp_server/introspect_tools.py",
+      "tier": "P1",
+      "required_elements": [
+        {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
+        {"id": "boundary_targets_named", "why": "names sibling tools", "all": ["scene_nodes", "scene_inspect"]}
+      ]
+    },
+    "scene_assert": {
+      "file": "src/maya_mcp_server/scene_tools.py",
+      "tier": "P1",
+      "required_elements": [
+        {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
+        {"id": "boundary_targets_named", "why": "names sibling tools", "all": ["scene_validate"]}
+      ]
+    },
+    "scene_review": {
+      "file": "src/maya_mcp_server/scene_tools.py",
+      "tier": "P1",
+      "required_elements": [
+        {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
+        {"id": "boundary_targets_named", "why": "names sibling tools", "all": ["scene_validate", "scene_aesthetics"]}
+      ]
+    },
+    "scene_plan": {
+      "file": "src/maya_mcp_server/scene_tools.py",
+      "tier": "P1",
+      "required_elements": [
+        {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
+        {"id": "boundary_targets_named", "why": "names sibling tools", "all": ["scene_review"]}
+      ]
+    },
+    "scene_aesthetics": {
+      "file": "src/maya_mcp_server/scene_tools.py",
+      "tier": "P1",
+      "required_elements": [
+        {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
+        {"id": "boundary_targets_named", "why": "names sibling tools", "all": ["scene_review"]}
+      ]
+    }
+  }
+}

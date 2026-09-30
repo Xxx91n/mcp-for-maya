@@ -5,7 +5,8 @@
     "env": "post real-Maya window 2026-09-30; table=docs/evidence/real-maya-window-2026-09-30.md",
     "purpose": "v1.0.0 gate 三态判定的机检清单（D-163）",
     "claim_boundary": "Waived rows carry reason+owner+expiry and fail-closed semantics (unresolved at expiry => Blocked). \"Waived\" is not \"Pass\". Re-read at every release-preflight.",
-    "renewal_law": "D-168/D-169/D-170/D-171：到期未消解行三车道 pass/Blocked/显式续期；续期五要件（owner 外门权者重签+新事件锚 expiry 三选一+每行上限 2 次第 2 次用户拍板+reason 重验+门审后豁免车道关闭）；renewals 字段 0/1/2 机检；2b/2c 合并行共享 renewals 计数直至拆行；descope 走 revise 车道与豁免永久隔离"
+    "renewal_law": "D-168/D-169/D-170/D-171：到期未消解行三车道 pass/Blocked/显式续期；续期五要件（owner 外门权者重签+新事件锚 expiry 三选一+每行上限 2 次第 2 次用户拍板+reason 重验+门审后豁免车道关闭）；renewals 字段 0/1/2 机检；2b/2c 合并行共享 renewals 计数直至拆行；descope 走 revise 车道与豁免永久隔离",
+    "vocabulary": "D-176 拆词立法：rows[].owner=debt_owner（欠账责任方，原 user 值语义不变）；续期重签位=gate_authority（human user 或具名授权代理）；renewed_by 三元组={代理账号 + authorized by 委托人 + 日期}——现行值 '@Xxx91n (authorized by human 2026-09-30)' 已含三元组要素"
   },
   "gate": "v1.0.0",
   "rule": "Pass set all green AND Waived set all explicit (reason+owner+expiry) AND Blocked set empty",

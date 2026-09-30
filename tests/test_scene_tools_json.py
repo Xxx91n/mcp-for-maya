@@ -252,8 +252,9 @@ class TestErrorPassthrough:
         manager.get_client = AsyncMock(return_value=client)
         monkeypatch.setattr(server, "get_session_manager", lambda: manager)
 
+        execute_fn = getattr(server.execute_code, "fn", server.execute_code)
         with pytest.raises(MayaExecutionError, match="bad thing happened"):
-            await server.execute_code.fn(code="1+1", result_type="JSON")
+            await execute_fn(code="1+1", result_type="JSON")
 
     async def test_server_execute_code_ok(self, monkeypatch):
         from maya_mcp_server import server
@@ -266,5 +267,6 @@ class TestErrorPassthrough:
         manager.get_client = AsyncMock(return_value=client)
         monkeypatch.setattr(server, "get_session_manager", lambda: manager)
 
-        out = await server.execute_code.fn(code='{"a":1}', result_type="JSON")
+        execute_fn = getattr(server.execute_code, "fn", server.execute_code)
+        out = await execute_fn(code='{"a":1}', result_type="JSON")
         assert out == {"ok": 1}
