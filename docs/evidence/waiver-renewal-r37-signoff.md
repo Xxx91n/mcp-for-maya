@@ -58,3 +58,10 @@
 
 **签署人**：`@Xxx91n`（Project Maintainer, Authorized by Human 2026-09-30）  
 **归档生效时间戳**：2026-09-30T16:30:00Z
+
+---
+
+## 5. 追加注记（D-176 词义立法追认，2026-09-30）
+
+本工件 §1 之「欠债权属方（Debt Owner）/ 门权裁决方（Gate Authority）」分权表述，经 D-176 正式立法为 `debt_owner` / `gate_authority` 两词（CONTEXT.md 词条）；D-168④ 中「owner 之外门权者（user）重签」措辞位已标 scoped revised（原记录保留+指针）。
+授权链追认（**不重签**）：本工件 renewed_by 值 `@Xxx91n (authorized by human 2026-09-30)` 已满足 D-176② 三元组要件——代理账号=@Xxx91n / 委托人=human user / 日期=2026-09-30。

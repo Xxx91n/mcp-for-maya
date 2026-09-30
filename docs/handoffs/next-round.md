@@ -1,79 +1,73 @@
 ---
 generated: 2026-09-30
-from_round: R37（执行窗 A 首次门检落账 + 审计返修闭环 + 三帧续期生效，覆盖 D-168~170）
-ledger_head: GC-2026-09-30（账本总决策至 D-171，首检留痕补正权责分离与替代出路复验）
-branch: exec/r37-gate-check-fixes（栈 qqz→xnw→unq→ynz + 审计返修提交，本地未推；堆叠于 grill/round36-v1-gate-path）
+from_round: R38（Glama TDQS 提分题面 grill 定稿 + V1-R 词义拆修闭环，覆盖 D-172~176 + D-168④ scoped revised）
+ledger_head: D-176（账本 176 条 D 记录 + GC-2026-09-30 事件行；current 157 / revised 19）
+branch: grill/round38-tdqs-quality（栈 pxq→wnq→pto→vup→qwx + 收口 commit；堆叠于 5bacfe8 公共基线；本地未推）
 ---
 
-# 下轮任务书（rev48）
+# 下轮任务书（rev49）
 
-## 状态总览（首检已落账并通过审计返修）
+## 状态总览（R38 收口）
 
-- **首次门检状态**：已完成（时间戳 `2026-09-30T15:31Z`）。三态读数：Pass=6（框3/6/7/8/9/10）、Waived=5（框1/2/2b/4/5）、Blocked=0。
-- **豁免到期处分与审计整改（V1/W1-W6）**：
-  - 框1、框4、框2b/2c 重验根因未消解，同时复验替代出路（Linux WSL 42/42 + mock 790 passed 均通畅，要件4 闭环）。
-  - 维护者 `@Xxx91n` 获人类用户明确赋权签署展期，生成独立签认工件 `docs/evidence/waiver-renewal-r37-signoff.md`（要件1 闭环，实现 owner=user 与 signer=@Xxx91n 权责分离）。
-  - 机检清单 `gate-waiver-list-1.0.0.json` 补齐 `probes/` 相对路径（W4），2b/2c 行明确配额共享机制（W3），`renewals: 1` 写入。
-  - `CHANGELOG.md [Unreleased]` 补正运行时与测试修复条目及 evidence 指针（W1）。
-- **基建闭环**：fastmcp 2.14.7 兼容性断裂点（`mimeType` / `ToolResult` / `FunctionTool.fn` / dist version）全数修复，790 passed / 2 failed（框2 VP2 豁免项）/ 19 skipped；编译、打包（sdist/wheel）、进程 STDIO initialize 探活全量绿。
+- **题面**：Glama TDQS = **B 3.4/5.0**（2026-09-30 06:25 UTC，across 25 tools）——Disambiguation 3/5 + Tool Count 3/5（16~25 重端带顶）+ execute_code C 2.9（min-term 放大）三处失分源。
+- **已立法**：ADR-0028（要素集+单向 Boundary: 惯例+复合验收+生效面+棘爪）+ docs/adr/0028-elements.yaml（JSON-syntax YAML 单源，json.loads/yaml.safe_load 双解析）+ CONTEXT 五新词（TDQS/Boundary: 行/要素存在性棘爪/debt_owner/gate_authority）+ waiver JSON meta.vocabulary + 签认工件授权链注记 + ADR-0023 R36 块注记。
+- **开放项清零**：V1-R（D-168④ 词义碰撞）已拆词闭环；R2/R3/R4 残余仍挂（见承继项）。
 
 ---
 
-## 叙事窗 γ（锚已解锁：首检落账完成，立即开火）
+## 执行窗 A：TDQS 窄焦批（D-172/D-173/D-174）
 
-- **轻叙事轨**（构建实录 / known-limitations postmortem）：
-  - **只描已验证面**（D-163β① + D-149②）。
-  - 核心弹药：首次 gate-check 真实读数（6 Pass / 5 Waived / 0 Blocked）、waiver 重读留痕、三帧严格续期五要件（D-168④）治理实践、fastmcp 4.x/2.14.x 现代生态适配经验。
-  - 产出路径：`.scratch/r37-gate-check/narrative/` 或 docs 相关轻叙事位置。
-- **重叙事轨**（HN 格式：own voice / 无最高级 / 免费试用路径 / 链 repo）：
-  - 备稿**不发射**（D-163β② 锁：v1.0.0 门审通过 或 框5 像素面先到）。
-  - 覆盖 D-167γ / D-163β。
+单一 PR 收口（预估 150~350 行 diff，落 200~400 行评审甜区）：
 
----
+1. **P0 三件描述重写**（要素集=ADR-0028 §2 + elements.yaml 断言件）：
+   - `execute_code`（server.py）：任意代码全权限 / 不可逆 / result_type 信封 / 会话前置 —— 四必备
+   - `scene_validate`（scene_tools.py）：auto_fix 二态披露（false 只读 / true 变异）/ 变异时不可逆 / 会话前置 —— 三必备
+   - `write_module`（server.py）：会话前置 / overwrite-持久性语义 / vs execute_code 边界句 —— 三必备
+   - 措辞终稿=执行窗产物呈用户过目（判据立法/措辞执行两分，D-174③）
+2. **P1 九件消歧同批**：scene_snapshot/inspect/nodes/describe/validate/assert/review/plan/aesthetics 逐件加单向 `Boundary:` 行，点名目标=elements.yaml boundary_targets；**必须同批提交**（coherence 评审一致性，非 inputHash 硬约束）
+3. **P2 annotations 校正**：scene_validate destructive 语义与 auto_fix 披露一致——annotations 错比缺更糟（contradiction=自动 1 分+旗标）
+4. **联动面三面强制**：pipeline TOOL_ANNOTATIONS / server.py instructions / docs/threat-model.md（execute_code 披露双向对齐）；README 低优先（不进 TDQS 输入）
+5. **禁**：虚假披露/关键词堆砌/always-call-first 句式/动工具名或 wire signature/25 件增减
+6. 可选：开源 tdqs repo Appendix A/B prompt 本地预评——仅 PR 前回归参考不入 CI
+覆盖 D-172/D-173/D-174；执行分支建议=exec 窗分支堆叠于 grill/round38-tdqs-quality
 
-## 执行窗 B：债消解信号响应（常备规则，D-170）
+## 执行窗 B：要素棘爪 CI（D-175④⑥）
 
-user 侧义务信号清单（到场即当场跑门检落新快照）：
-- **mayapy 簇修复**或 Linux-capable/fixed-mayapy env 搭建（框1/4 | D-159）
-- **框5 像素面见证**：Maya GUI 在场 30s 客户端渲染点击 或 Inspector web（D-155β；兼重叙事解锁锚）
-- **第二站 VP2 插验**：第二台 Maya 2024 站在场时按 agent 预设备件跑 viewport_snapshot（D-151②）
-- **Maya 2025/2026 装机**（2b/2c，最低优先——not-verified 行保留本合规，装机仅收紧宣称）
-- **AC-06 残余**：Linux 宿主 Maya 内 Qt 通道（无 Linux Maya 可装=结构性等待 | D-158/D-162）
+- 新增 `.github/scripts/check_tdqs_disclosure.py`：读 0028-elements.yaml（stdlib json.loads 即可），断言结构化要素存在（`any`=任一 regex 命中 / `all`=全部字面词命中），失败输出指明缺失要素 id
+- 入 ci.yml lint job 与 check 家族并列=**hard gate**；Boundary:/P0 要素类保持 hard，个别实测误报高断言可降 warn
+- elements.yaml 变更须 PR 显式 review（防改措辞顺手删断言）
+- 覆盖 D-175
 
-任一信号到场 → **当场跑门检落新快照**（信号须对号到行 expiry/消解锚；同窗多信号幂等去重）。覆盖 D-158/D-159/D-162/D-151②/D-155β/D-170。
+## 验收窗：Glama 重评核对（D-173②/D-175②）
 
----
-
-## 执行窗 C：门审召集评估（D-170③/D-171）
-
-- 当前快照读数：「Blocked 空 + Waived 全有效」。
-- 依照 D-170③：快照已具备呈报终审条件，但当前存在 5 行豁免（框1/2/2b/4/5），由 **user 自行裁量何时召集终审（gate review）**。
-- 判负三轨兜底：当期不发布+案卷落账 / re-review 凭新快照重召集 / descope 走 revise 呈报+披露（**任何时点禁静默缩门**）。覆盖 D-170/D-171。
-
----
-
-## 观察窗（纯留痕）
-
-- **10-05 双源观测**：native cron `37 6 * * 1` + Task Scheduler 周一——`gh run list` 核自触发；未观测前禁写「已验证」（D-129）；双双失效 → D-135③ 升级。
-- **10-30 D-146 核销窗**：mcp.so/PulseMCP/VS Code gallery 收录态核验 + surfaces 表更新；顺带 D-147 Cline 信号。
-- **awesome PR #15382 合并跟踪**：OPEN 态中——合并后 distribution-surfaces.md 对应行转已合并（D-166 承接）。
-- **waiver 重读留痕**：每次 release-preflight 强制重算。
+- merge to main 后观察 Glama 页：last-scanned 时间戳 + 逐工具分 + 总分。复合判据=**≥4.0（目标 4.2 防 round1 边界）+ min 逐工具≥3.0 + 零 contradiction 旗标**
+- **金丝雀校验**：首个纯描述 commit merge 后若分数不动 → Dockerfile 走 PyPI 拉包分支实锤 → 描述随下一实质变更发版后复验（不为文本单独发版）
+- 达标后：账本事件行留痕 + docs/distribution-surfaces.md Glama 行同步
+- 覆盖 D-173/D-175
 
 ---
+
+## 承继项（rev48 不变）
+
+- **叙事窗 γ**：轻叙事只描已验证面（6 Pass/5 Waived+续期治理+fastmcp 适配+本轮新增弹药=TDQS 治理实录）；重叙事仍锁（v1.0.0 门审 或 框5 像素面先到）
+- **执行窗 B（债消解信号常备）**：mayapy/Linux env、框5 像素面见证、第二站 VP2、Maya 2025/2026 装机——到场即门检落新快照
+- **执行窗 C（门审召集）**：当前快照 Blocked 空+Waived 全有效，召集与裁决归 user 裁量
+- **观察窗**：10-05 双源观测 / 10-30 D-146 核销 / awesome PR #15382（OPEN）合并跟踪
+- **审计残余**：R2 根因 probe JSON 补强（可选）/ R3 拆行配额规则下次拆行立法 / R4 顺手补
 
 ## 边界警示
 
-- **执行窗≠grill 窗**：本任务书由执行窗 agent 接力；grill 大脑窗只做裁决/立法/文档。
-- atomcode 件偶发跨会话污染——入账前逐字核 repo slug（正确=`Xxx91n/mcp-for-maya`）/版本号/commit 哈希。
-- D-069 逐件过目授权链不变：外部可见动作发出前 user 保留最终否决点。
-- 续期上限每行 2 次（第 2 次须 user 显式拍板；当前框1/4/2b均为 renewals:1）；门审后豁免车道关闭（D-168④⑤）。
-- #7 关闭判据 ≡ 三态门通过（ADR-0023 R36 块已立等价关系）。
-
----
+- 执行窗≠grill 窗：措辞终稿归执行窗+人工过目；grill 立法的只是要素清单非措辞
+- P3 工具合并禁偷渡本轮（breaking 须独立立项+semver 裁决）
+- atomcode 件跨会话污染警惕（本轮剔除「ADR-0078」伪词条；正确 slug=Xxx91n/mcp-for-maya）
+- 续期上限每行 2 次（框1/4/2b 均 renewals:1）；debt_owner/gate_authority 拆词已立法——下次续期 renewed_by 按三元组
+- D-069 逐件过目链不变；勿 push / PR 除非用户令
+- #7 关闭判据 ≡ 三态门通过；门审后豁免车道关闭
 
 ## Suggested skills
 
-- `but`（GitButler）：分支/commit 管理，保持 `exec/r37-gate-check-fixes` 与主线协作，勿推勿 PR 除非用户令
-- `atomcode-research`：外部渠道动态或新生态调研（串行一次一跑）
-- `implement`：源码/测试/轻叙事文档写作与验证
+- `implement`：描述重写+消歧句+CI 脚本落地（执行窗主力）
+- `but`：分支/commit 管理
+- `atomcode-research`：外部生态/新题面调研（串行一次一跑）
+- `domain-modeling`：新词再落
 - `handoff`：再交接时任务书续写
