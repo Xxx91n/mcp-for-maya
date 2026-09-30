@@ -242,7 +242,7 @@ class TestSnapshotContract:
         assert len(out) == 2
         img, txt = out
         assert img.type == "image"
-        assert img.mime_type == "image/jpeg"
+        assert img.mimeType == "image/jpeg"
         assert list(img.annotations.audience) == ["assistant", "user"]
         raw = base64.b64decode(img.data)
         assert raw.startswith(b"\xff\xd8"), "jpeg magic"
@@ -256,7 +256,7 @@ class TestSnapshotContract:
     async def test_png_format_magic(self, vtools):
         out = await vtools.fns["scene_viewport_snapshot"](format="png")
         img = out[0]
-        assert img.mime_type == "image/png"
+        assert img.mimeType == "image/png"
         assert base64.b64decode(img.data).startswith(b"\x89PNG")
         assert _meta(out)["format"] == "png"
 

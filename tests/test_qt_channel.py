@@ -633,7 +633,7 @@ class TestModuleInjectionRouting:
 def test_add_session_default_port_is_7001():
     from maya_mcp_server import server
 
-    sig = inspect.signature(server.add_session)
+    sig = inspect.signature(server.add_session.fn)
     assert sig.parameters["port"].default == 7001
 
 

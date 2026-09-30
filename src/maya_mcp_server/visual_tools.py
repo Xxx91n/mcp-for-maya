@@ -142,7 +142,7 @@ def _mixed_result(result: dict[str, Any], raw: bytes, session_key: str, fmt: str
     image = mt.ImageContent(
         type="image",
         data=result["data_b64"],
-        mime_type=f"image/{fmt}",
+        mimeType=f"image/{fmt}",
         annotations=mt.Annotations(audience=["assistant", "user"]),
     )
     text = mt.TextContent(type="text", text=json.dumps(meta))
