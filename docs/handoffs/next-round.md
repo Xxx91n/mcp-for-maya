@@ -1,15 +1,16 @@
 ---
 generated: 2026-09-30
 from_round: R39（Glama TDQS B→A 收口路径 grill 定稿 + 对账整理闭环，覆盖 D-177~184）
-ledger_head: canonical=D-176；本会话 D-177~184 现存 .scratch/r39/decision-ledger.md（gitignored 过程件），canonical 迁入+四处 scoped revised 标注属 T-R40-01（P-A）原子义务——本文件「附」节内嵌 verbatim 待迁副本为防丢载体
-branch: grill/round39-tdqs-closeout（本整理批）+ 执行窗分支另立（建议堆叠于 main tip 45231a8）
+ledger_head: canonical=D-184（D-177~184 已于 T-R40-01 迁入 + 四处 scoped revised（D-172α/D-174①/D-173②/D-082⑦）+两处承接注记（D-172β/D-173）已落位）；.scratch/r39/decision-ledger.md 过程件按 append-only 留档不删——本文件「附」节 verbatim 副本已迁入留档勿重迁
+branch: grill/round39-tdqs-closeout（本整理批，yos 未 merge）+ 执行窗已建两分支堆叠 main tip 45231a8：exec/r40-tdqs-closeout（P-A，commit qkn）/ exec/r40-evidence-anchors（P-B，commit zry）——push/PR 未授权
 ---
 
-# 下轮任务书（rev50）
+# 下轮任务书（rev51）
 
 ## 状态总览（R39 收口）
 
 - **Glama 实况**：页面仍 B 3.4/5.0（Scored 2026-09-30 06:25 未动）——TDQS 描述批（PR #58~61）已 merge 但未触发重扫；金丝雀观察中（D-182 决策树，只写观察不写结论）。
+- **R40 执行窗实录（rev51）**：P-A 全项落地 commit qkn（账本迁入+四处 revised 中三处+两处注记/elements.yaml 对齐真实 API+camera_orbit 行/checker 极性原则+语料实测 339 匹配 53 假阳否决 naive 窗证成 opt-in 设计/ADR §2 注记+§4 重校准/camera_orbit 五要素/三面同步）；P-B 全项落地 commit zry（白名单单源+checker warn 级+模板两句+联动行+D-082⑦ revised+10 测试）；门检=803 pytest pass/ruff 预算过/mypy-baseline 0 new/pre-commit 全过/uv build 0.5.0/MCP initialize 握手实测通；observation 台账=checker 实跑 40 warnings（版本化文档裸 path:line 升级提示，exit 0）；push/PR 未授权。任务书本更新（rev51）属 grill lane 栈——须叠 rev50 载体不入 P-A diff，D-184⑤「P-A 含任务书更新」澄清为「任务书更新义务由执行窗承担、载体归 grill lane 原子面」。
 - **本轮七裁决全落账**（D-178..184，见附节 verbatim）：收口窗范围 / P3 推迟维持+gate 复议点 / S-02+S-03 两翼修法 / camera_orbit 单件处置 / 验收判据双轨重校准 / 证据指针纪律一般化 / 两 PR 落地编排。
 - **调研存档**：.scratch/r39/research-q1.md ~ research-q7.md（atomcode 七轮，逐题冲突标注在案）。
 - **四处 scoped revised 待落地**：D-172α、D-174①（scene_validate 要素行）、D-173②（验收判据句）、D-082⑦（指针形态条款——随 P-B 非 P-A，见编排注）。
@@ -44,6 +45,8 @@ branch: grill/round39-tdqs-closeout（本整理批）+ 执行窗分支另立（�
 6. warn 软化辨析已在 D-183 账本行写明——执行窗措辞不得把 warn 写成永久态。
 
 ## T-R40-03：Glama 金丝雀观察窗（持续，非 PR）
+
+观察台账（rev51）：金丝雀机制存在=.github/workflows/ci.yml drift+drift-notify 双 job；decision tree 未触发（无新 Scored 事件）；暂无需 docs/evidence 工件——继续观察至 release-preflight。
 
 覆盖 D-182③④。三分支：merge 后 last-scanned 动→HEAD-build 直接验收 / 不动→PyPI-pull 实锤→描述批搭下一实质发版车复验（禁为文本单发版，D-175③）/ 发版后仍不动→新缺口立项。账本事件行只写观察不写归因结论（D-129）。
 
@@ -82,7 +85,7 @@ branch: grill/round39-tdqs-closeout（本整理批）+ 执行窗分支另立（�
 
 ---
 
-## 附：R39 会话账本 verbatim（待迁区——canonical 以 T-R40-01 迁入为准，本区仅防丢载体）
+## 附：R39 会话账本 verbatim（已迁入 canonical D-177..184——本区留档对照勿重迁；canonical 行还额外带 scoped revised 注记）
 
 | D-177 | R39-Q1 题面范围裁决（A 窄窗=handoff 三件：S-02 ADR-0028 §2 表述失配/S-03 elements.yaml 断言极性盲视/证据纪律一般化；B TDQS 收口窗=三件+camera_orbit C2.9 缺口+重评触发时机+P3 推迟复核；C 全开=B+P3 工具合并解冻裁决） | 我倾向C，但是将当前问题完整提交 atomcode-research 深度调研，调研时必须回顾：decision-ledger 中全部 current 记录、docs/adr 与 CONTEXT.md 现有条目、工业界成熟落地的心智模型（重点），给出推荐与理由。调研的结果辩证性看待。若调研结论与账本中任何 current 决策冲突：禁止静默改向——把对应 D-xxx 标记为 revised（保留原记录），生成新的 D-xxx 记录呈报给我，等我拍板后才继续下探。 | R39 题面=全开五件：S-02 立法文本失配修法 + S-03 断言极性盲视修法 + 证据纪律一般化 + camera_orbit C2.9 漏网处置 + Glama 重评触发路径 + P3（25→~15 mode 参数化合并）推迟依据复核/解冻裁决；裁决前置=atomcode-research 深研一轮，输入须含账本全 current 记录+ADR 全量+CONTEXT+工业界成熟心智模型，产出=逐题推荐+理由 | ①调研结论辩证看待不照单全收；②若与任何 current D-xxx 冲突→禁止静默改向：原记录标 revised（保留原记录）+生成新 D-xxx 呈报、等拍板后才继续下探；③atomcode 串行一次一跑（skill 硬护栏）；④grill 中不动源码、不另设目标 | revised（最终选 B，见 D-178；调研前置委托已执行完毕）|
 | D-178 | R39-Q1' 题面范围裁决（atomcode 调研后重选同一题：A 窄窗=仅 handoff 三件；B TDQS 收口窗=三件照做+camera_orbit 处置+重评触发/验收复核+P3 推迟依据复核；C 全开=B+P3 解冻裁决） | 采纳B。但是我要重新给你提醒一下，atomcode调研之后给你的是要你改进Q的选项，而不是让Q++，不是让问题序号i++，所以我相当于是重新选中Q1的答案。Q2要重新出 | R39 题面=收口窗五件：S-02 ADR-0028 §2 表述失配修法 + S-03 elements.yaml 断言极性盲视修法 + 证据纪律（P-03b）一般化 + camera_orbit C2.9 处置 + Glama 重评触发/复合验收复核 + P3 推迟依据复核（不解冻裁决只复核依据）；调研四题推荐（P3 不解冻/camera_orbit 补描述/③两翼修法+澄清注记/金丝雀绑 0.5.0）作各题选项素材不自动成立 | ①atomcode 调研定位=改进当前题选项，禁 Q++ 前移（用户纠正的协议）；②题③ 推荐与 D-172α/D-174① 冲突→按 D-177② 呈报程序走（标 revised+新记录+拍板后下探）；③grill 不动源码；④P3 本轮只复核推迟依据非解冻裁决（C 的增量部分被调研结论吸收：不解冻） | current |
