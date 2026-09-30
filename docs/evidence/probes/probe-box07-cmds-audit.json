@@ -1,0 +1,229 @@
+{
+  "meta": {
+    "date": "2026-09-30",
+    "env": "Static AST audit vs Maya 2024 (24.0.0.4640) documented command surface",
+    "box": 7,
+    "purpose": "cmds.* call-surface static signature audit across injected modules",
+    "verdict": "0 illegal flags, 0 deprecated syntax, lookThru absent (D-039 fix closed). 48 distinct cmds functions in src/.",
+    "claim_boundary": "AST extraction of every cmds.* callsite in src/maya_mcp_server with literal flag sets; dynamic **kwargs sites resolved to their actual flag vocabularies (attributeQuery: 18 documented facet/range flags; ls: long/dagObjects/type/exactType). Flag names verified against the Maya 2024 documented Python command surface by expert review — no undocumented or deprecated flags present. Does NOT verify runtime arg VALUES or per-flag type constraints; positional string args recorded as pos:. Type-value correctness is covered by the presence/stub guard and GUI lane, not this audit."
+  },
+  "result": {
+    "distinct_functions": 48,
+    "illegal_flags": 0,
+    "deprecated_callsites": 0,
+    "lookThru_callsites": 0,
+    "dynamic_flag_sites": {
+      "attributeQuery(**kw)": "runtime facet flags: readable/writable/connectable/keyable/multi/hidden/storable/indexMatters + exists/listChildren/listEnum/enum/minimum/minExists/maximum/maxExists/softMin/softMinExists/softMax/softMaxExists — all documented",
+      "ls(**kw)": "long/dagObjects/type/exactType — all documented"
+    },
+    "flag_table": {
+      "about": [
+        "batch",
+        "version"
+      ],
+      "aimConstraint": [
+        "aimVector",
+        "upVector",
+        "worldUpType"
+      ],
+      "attributeQuery": [
+        "node",
+        "+runtime facet flags"
+      ],
+      "camera": [
+        "focalLength",
+        "horizontalFilmAperture",
+        "name"
+      ],
+      "commandPort": [
+        "name",
+        "sourceType"
+      ],
+      "connectAttr": [
+        "force"
+      ],
+      "currentTime": [
+        "edit",
+        "query"
+      ],
+      "currentUnit": [
+        "angle",
+        "linear",
+        "query",
+        "time"
+      ],
+      "delete": [],
+      "exactWorldBoundingBox": [],
+      "file": [
+        "expandName",
+        "exportAll",
+        "exportSelected",
+        "force",
+        "i",
+        "ignoreVersion",
+        "mergeNamespacesOnClash",
+        "modified",
+        "open",
+        "prompt",
+        "query",
+        "rename",
+        "sceneName",
+        "type"
+      ],
+      "getAttr": [
+        "lock",
+        "type"
+      ],
+      "getPanel": [
+        "type",
+        "withFocus"
+      ],
+      "group": [
+        "empty",
+        "name"
+      ],
+      "keyTangent": [
+        "edit",
+        "itt",
+        "ott"
+      ],
+      "listAttr": [],
+      "listConnections": [
+        "connections",
+        "destination",
+        "plugs",
+        "source",
+        "type"
+      ],
+      "listRelatives": [
+        "allDescendents",
+        "children",
+        "fullPath",
+        "parent",
+        "shapes",
+        "type"
+      ],
+      "loadPlugin": [
+        "quiet",
+        "pos:fbxmaya"
+      ],
+      "ls": [
+        "assemblies",
+        "long",
+        "materials",
+        "selection",
+        "type",
+        "+runtime flags"
+      ],
+      "lsUI": [
+        "editors"
+      ],
+      "modelEditor": [
+        "activeView",
+        "camera",
+        "query"
+      ],
+      "modelPanel": [
+        "camera",
+        "edit",
+        "exists",
+        "query"
+      ],
+      "move": [
+        "absolute"
+      ],
+      "nodeType": [],
+      "objExists": [],
+      "objectType": [
+        "isAType"
+      ],
+      "objectTypeUI": [],
+      "parent": [],
+      "playbackOptions": [
+        "max",
+        "min"
+      ],
+      "playblast": [
+        "completeFilename",
+        "compression",
+        "editorPanelName",
+        "forceOverwrite",
+        "format",
+        "frame",
+        "offScreen",
+        "percent",
+        "showOrnaments",
+        "viewer",
+        "widthHeight"
+      ],
+      "pluginInfo": [
+        "loaded",
+        "query",
+        "pos:fbxmaya"
+      ],
+      "polyCube": [
+        "constructionHistory",
+        "depth",
+        "height",
+        "name",
+        "width"
+      ],
+      "polyEvaluate": [
+        "face"
+      ],
+      "refresh": [
+        "force"
+      ],
+      "rename": [],
+      "rotate": [],
+      "select": [
+        "clear",
+        "replace"
+      ],
+      "setAttr": [
+        "type"
+      ],
+      "setKeyframe": [
+        "attribute"
+      ],
+      "sets": [
+        "edit",
+        "empty",
+        "forceElement",
+        "name",
+        "noSurfaceShader",
+        "query",
+        "renderable"
+      ],
+      "shadingNode": [
+        "asShader",
+        "asTexture",
+        "asUtility",
+        "name",
+        "pos:*type"
+      ],
+      "spaceLocator": [
+        "name"
+      ],
+      "undoInfo": [
+        "stateWithoutFlush"
+      ],
+      "upAxis": [
+        "axis",
+        "query"
+      ],
+      "warning": [],
+      "workspace": [
+        "query",
+        "rootDirectory"
+      ],
+      "xform": [
+        "q",
+        "ro",
+        "t",
+        "ws"
+      ]
+    }
+  },
+  "repro": "ast.walk over src/maya_mcp_server/*.py collecting Attribute calls on cmds + keyword arg names"
+}

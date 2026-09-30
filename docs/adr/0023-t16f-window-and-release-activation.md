@@ -88,6 +88,12 @@ Maya 开机激活整条阻塞链，本轮同裁：T-16f 执行面 + 通过后的
 - tag/Release 前向立法（D-150③）：自下一 tag 起统一 **annotated**——人工 `git tag -a` 建锚、GH Release 挂已存在 tag 不反向生成（git manpage「annotated=release」+GitHub REST tags API 只收 annotated；v0.2.0+ lightweight 系 GH Release 功能自身工具成因非纪律疏漏）；Release 标题=裸 `vX.Y.Z`；存量 tag/标题不回填（D-080/D-108① 冻结同源）。
 - 0.4.1 发版窗 preflight 两行：PyPI 双车道复核见 0.4.1（pip 车道+探针车道各带时间戳，T-30i/D-142γ 同型防 CDN 分裂致 D-146 锚悬空）；0.4.1 wheel 的 README 须含 `<!-- mcp-name: -->` 标记行（Registry publish 硬前提，D-143）。
 
+**R34 增补（D-163，2026-09-30）——0.5.x 插入与 v1.0.0 门三态化**：
+
+- **0.5.0 插入依据**：非援引本 ADR R28「真机窗 feature 级 blocker 除外」例外——框2 VP2 红经 Chromium 判定矩阵（severity 中×prevalence 站特异，playblast workaround 存在）判非 feature-blocker。新依据=真机窗成果兑现义务+轻叙事轨解锁+D-143α 收录动作绑发版窗。
+- **v1.0.0 门判定形态修订**：#7 十框「字面全绿」（D-040）→ 三态制「Pass 集全绿 + Waived 集逐行 reason+owner+expiry（fail-closed，到期未消解转 Blocked）+ Blocked 集=空」；机检 waiver 清单=docs/evidence/gate-waiver-list-1.0.0.json，每次 release-preflight 重读。D-040 标 revised 保留原记录。
+- **gate review 事件锚点**：= 本增补落地后首次 gate 核对执行时点（非编排轮开启时点）。
+
 ## D-069：#2/#7 发帖机制
 
 本窗口即发（备稿就绪+"≥0.1.0 已含"耐久真话不依赖 0.1.2）；执行=**agent 贴终稿→用户过目→gh 以用户账号发出**。过目为授权前置条件，发出前用户有最终否决点；其余四条（#1/#3/#4/#5）仍等 0.1.2 发布后同流程；一 issue 一评不追评纪律不变；措辞改动须回草稿重过目。

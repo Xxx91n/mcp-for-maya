@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "date": "2026-09-27",
+    "env": "MCP stdio pipeline, serverInfo mcp-for-maya 0.4.0, Windows host",
+    "purpose": "R27 stdio 测活：initialize + tools_list 全量回传",
+    "verdict": "stdio initialize OK, serverInfo=0.4.0, 25 tools listed",
+    "claim_boundary": "Proves stdio transport + tool enumeration at 0.4.0 only; does not prove tool-call correctness or Maya connectivity.",
+    "archived_from": ".scratch/maya-mcp-grill/reports/evidence/r27_stdio_probe.json"
+  },
+  "initialize": {
+    "ok": true,
+    "serverInfo": {
+      "name": "Maya MCP Server",
+      "version": "0.4.0"
+    }
+  },
+  "tools_list": {
+    "count": 25,
+    "names": [
+      "scene_snapshot",
+      "scene_inspect",
+      "scene_measure",
+      "scene_assert",
+      "scene_validate",
+      "scene_checkpoint",
+      "scene_rollback",
+      "scene_checkpoint_list",
+      "camera_create",
+      "camera_orbit",
+      "scene_aesthetics",
+      "scene_review",
+      "scene_plan",
+      "scene_viewport_snapshot",
+      "scene_render_preview",
+      "asset_search",
+      "asset_import",
+      "scene_export",
+      "scene_describe",
+      "scene_nodes",
+      "list_sessions",
+      "maya_setup_guide",
+      "write_module",
+      "execute_code",
+      "add_session"
+    ]
+  }
+}

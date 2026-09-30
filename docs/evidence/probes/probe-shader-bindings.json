@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "date": "2026-09-20",
+    "env": "Maya 2024 GUI facade scene (T-20 build)",
+    "purpose": "facade 场景材质 SG→surface 绑图实测",
+    "verdict": "MAT_*SG_surf 绑定映射捕获（red/green/blue/ring/stage/pedestal）; isg_members=[] isg_surf=[standardSurface1]",
+    "claim_boundary": "Binding map of the T-20 facade scene only; proves SG membership wiring at capture time, not render output.",
+    "archived_from": ".scratch/facade/shader_probe.json"
+  },
+  "MAT_redSG_surf": [
+    "MAT_red"
+  ],
+  "MAT_greenSG_surf": [
+    "MAT_green"
+  ],
+  "MAT_blueSG_surf": [
+    "MAT_blue"
+  ],
+  "MAT_ringSG_surf": [
+    "MAT_ring"
+  ],
+  "MAT_stageSG_surf": [
+    "MAT_stage"
+  ],
+  "MAT_pedestalSG_surf": [
+    "MAT_pedestal"
+  ],
+  "isg_members": [],
+  "isg_surf": [
+    "standardSurface1"
+  ]
+}

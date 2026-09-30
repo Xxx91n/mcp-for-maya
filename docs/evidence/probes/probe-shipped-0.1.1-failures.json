@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "date": "2026-09-20",
+    "env": "as-shipped 0.1.1 worktree via 1mcp proxy → Maya 2024 GUI pid 5396 :51217",
+    "purpose": "0.1.1 发布件实调失败捕获（历史缺陷实录）",
+    "verdict": "list_sessions OK; scene_snapshot isError — documents shipped defect state later fixed",
+    "claim_boundary": "Historical failure evidence against 0.1.1 — does NOT describe current behavior; post-fix verify lives in probe-post-fix-direct-harness.json.",
+    "archived_from": ".scratch/maya-mcp-grill/reports/evidence/2026-09-20-as-shipped-0.1.1-failures.json"
+  },
+  "captured_at": "2026-09-20",
+  "backend": "pid 3168 (python -m maya_mcp_server, 0.1.1 worktree code, via 1mcp proxy)",
+  "session": "127.0.0.1:51217 pid=5396 Maya 2024 GUI untitled",
+  "calls": [
+    {
+      "tool": "list_sessions",
+      "args": {},
+      "isError": false,
+      "result": "session 127.0.0.1:51217 maya_version=2024 scene_name=untitled pid=5396"
+    },
+    {
+      "tool": "scene_snapshot",
+      "args": {
+        "format": "json"
+      },
+      "isError": true,
+      "error": "Error calling tool 'scene_snapshot': 'str' object has no attribute 'value'"
+    },
+    {
+      "tool": "scene_review",
+      "args": {
+        "checks": "spatial",
+        "format": "json"
+      },
+      "isError": true,
+      "error": "Error calling tool 'scene_review': 'str' object has no attribute 'value'"
+    },
+    {
+      "tool": "scene_viewport_snapshot",
+      "args": {},
+      "isError": true,
+      "error": "Error calling tool 'scene_viewport_snapshot': 'str' object has no attribute 'value'"
+    },
+    {
+      "tool": "execute_code",
+      "args": {
+        "code": "import maya.cmds as cmds; cmds.ls(type='camera')",
+        "result_type": "JSON"
+      },
+      "isError": false,
+      "result": "[\"frontShape\",\"perspShape\",\"sideShape\",\"topShape\"]",
+      "note": "MCP tool survives: server.py:306 coerces via ResultType() before client call; Qt framed channel live through buggy backend"
+    }
+  ],
+  "conclusion": "D-046 confirmed on as-shipped 0.1.1: scene_* surface + visual main path all dead; MCP execute_code alive. Root cause = scene_tools.py:124 / visual_tools.py:86 pass bare \"JSON\" str into client.execute_code result_type.value (client.py:344)."
+}

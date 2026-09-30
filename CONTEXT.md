@@ -285,3 +285,7 @@ _Avoid_: 叙事帖在证据未固化时抢发、聚合器逐个手工直投、�
 **收录面三态判置 (listing three-state disposition)**:
 逐渠道收录处置一次立法固化于 docs/distribution-surfaces.md（D-144/D-145α）——三态=可行动/被动观察带触发条件/结构性否决永续（否决判据=结构匹配性一票否决：本地 stdio+Maya GUI 宿主可否承载其提交面/健康检查面，与 Smithery 同构判据）；未列出渠道默认=被动观察（catch-all），升级单向=被动观察→触发条件→可行动，防顺手提交滑梯（ADR-0027 同构）；兜底只豁免收录轨——叙事型投放位仍走双轨证据门（D-143γ）。
 -_Avoid_: 逐渠道周期性重开议事、未过结构匹配性判据即顺手提交、把被动观察误读为可行动、把结构性否决改写成临时推迟
+
+**发布门三态判定 (release-gate three-state disposition)**:
+v1.0.0 发布门对验收项的处置词表（D-163，工业映射=Autonoma/beefed go-no-go 框架+K8s EXCEPTIONS 例外制+Chromium release-blocker 矩阵）——三态=**Pass**（实测绿）/ **Waived**（显式豁免行：reason+owner+expiry 三要素缺一即不成立，到期未消解 fail-closed 自动转 Blocked）/ **Blocked**（一票否决）。机检清单工件=docs/evidence/gate-waiver-list-1.0.0.json，每次 release-preflight 重读；与「收录面三态判置」正交（彼管渠道处置、此管发布门项处置）。修订关系：D-040「十框字面全绿」标 revised（判定形态改三态，立法目的「真机层须实证」保留）；blocker 判据锚=Chromium severity×prevalence（「must not ship」才够格，有 workaround+站特异降格）。
+_Avoid_: waived 行当 pass 读、无 expiry 豁免（退化永久豁免）、把站特异红直接拔为 feature-blocker、叙事面把 waived 项描绿
