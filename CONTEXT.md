@@ -234,7 +234,7 @@ _Avoid_: 截图散落正文各处、GIF 锁进表格窄列、图片堆砌显自�
 _Avoid_: 凭记忆反驳、把对方指控照单全收（辩证=逐条实证）
 
 **证据指针 (evidence pointer)**:
-CHANGELOG/发布说明每条 Added/Fixed bullet 必须挂的可机检锚点——file:line 或测试 ID（D-xxx 引用已有，补齐指向可执行物证即完全体）；lint 可查形态，防「决策→文案」管线跑在「代码→对账」前面（CHANGELOG:33、manifest-based 两例病灶）。
+CHANGELOG/发布说明每条 Added/Fixed bullet 必须挂的可机检锚点——可接受形态白名单单源=.github/evidence-anchor-forms.yaml（pytest node ID＞path::symbol AST 验证＞sha:path:line＞裸 path:line 版本化文档 warn 升级提示、.scratch 合法过渡形态；D-183 scoped revised 细化 D-082⑦「file:line 或测试 ID」表述，机制本体不变）；lint 可查形态，防「决策→文案」管线跑在「代码→对账」前面（CHANGELOG:33、manifest-based 两例病灶）。
 _Avoid_: 无锚点承诺文案、先写机制名后补实现
 
 **裁决型证据 (decision-grade evidence / evidence binary)**:
