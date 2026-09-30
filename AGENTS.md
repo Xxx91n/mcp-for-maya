@@ -71,10 +71,11 @@ tests/
 ├── test_check_monolith_budget.py # monolith line-budget ratchet (D-125)
 ├── test_check_release_appendix.py # release-body appendix weak assertions (D-142β)
 ├── test_check_pypi_index.py   # PyPI simple+JSON dual-source probe lanes (D-142γ)
+├── test_check_tdqs_disclosure.py # TDQS structured disclosure ratchet test suite (D-175)
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
-├── adr/                   # ADR-0001..0027 architecture decision records
+├── adr/                   # ADR-0001..0028 architecture decision records (incl. 0028-elements.yaml)
 ├── decision-ledger.md     # grill decision ledger — canonical path since T-11a (D-041)
 ├── handoffs/              # round handoffs — canonical (next-round.md standing task book)
 ├── testing.md             # real-Maya manual tier checklist
@@ -94,6 +95,7 @@ docs/
 ├── scripts/check_monolith_budget.py # maya_scene_module.py line-count ratchet (D-125)
 ├── scripts/check_release_appendix.py # release-body disclosure-appendix weak assertions — release-preflight item 6, manual not push CI (D-142β)
 ├── scripts/check_pypi_index.py   # PyPI simple-index (PEP 691+HTML)/project-JSON probe lane in the weekly drift job (D-142γ)
+├── scripts/check_tdqs_disclosure.py # TDQS disclosure elements static ratchet script (D-175)
 ├── assets-src/            # reproducible capture scripts for README imagery (t20/ scene generators; T-19c scene_build.py + capture.py kept for reference)
 └── assets/                # published README imagery (populated only after sign-off)
 ```
@@ -232,6 +234,7 @@ Failure to update dependent files will cause integration failures.
 | `cos_formatter.py` | `scene_tools.py` (COS format output) | Formatter changes affect all tool COS outputs |
 | `maya_scene_module.py` (scene_review check names/semantics) | `skills/scene-review-playbook/SKILL.md` | Card documents the 11 checks + findings→actions; check renames/semantics changes must sync it |
 | `maya_scene_module.py` (line-count growth) | `.github/monolith-budget.json`, `.github/scripts/check_monolith_budget.py`, `tests/test_check_monolith_budget.py` | D-125 ratchet: growth past the frozen cap fails the lint job; legitimate additions need a human-approved budget edit in the same PR with the reason stated; new Maya-side capability routes to a same-unit separate file (ADR-0027 criterion 4), never appended to the monolith |
+| `docs/adr/0028-elements.yaml` / tool descriptions | `.github/scripts/check_tdqs_disclosure.py`, `tests/test_check_tdqs_disclosure.py`, `docs/adr/0028-tdqs-description-quality.md`, `src/maya_mcp_server/pipeline.py` | D-175 disclosure ratchet: tool description elements and boundary targets must strictly satisfy 0028-elements.yaml; changes require PR explicit review |
 
 ### Injected-module admission criteria (注入模块准入判据, ADR-0027 + D-095)
 
