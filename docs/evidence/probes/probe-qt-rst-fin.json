@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "date": "2026-09-20",
+    "env": "Qt framed channel 127.0.0.1:51217 in-Maya server (Maya 2024 pid 5396)",
+    "purpose": "RST/FIN 粗暴断连后 Qt 通道自愈语义实测（框6/AC-06 主张域）",
+    "verdict": "SO_LINGER abortive RST + shutdown(WR) FIN 后 fresh client ping+execute_code 均恢复（cameras 列表正确回读）",
+    "claim_boundary": "Proves Qt framed channel survives RST/FIN and re-bootstrap works on Windows loopback (Maya 2024); single-station evidence — does not cover Linux RST semantics (AC-06 Linux lane registered debt) nor commandPort channel.",
+    "archived_from": ".scratch/maya-mcp-grill/reports/evidence/2026-09-20-rst-fin-probe.json"
+  },
+  "captured_at": "2026-09-20",
+  "harness": ".scratch/maya-mcp-grill/harness/rst_fin_probe.py",
+  "target": "127.0.0.1:51217 Qt framed server (in-Maya, pid 5396)",
+  "method": "SO_LINGER(1,0) abortive close -> RST; shutdown(WR)+close -> FIN; fresh MayaQtClient ping+execute_code after each",
+  "result": {
+    "rst_sent": true,
+    "after_rst_alive": {
+      "ping": true,
+      "cameras": [
+        "frontShape",
+        "perspShape",
+        "sideShape",
+        "topShape"
+      ],
+      "error": null
+    },
+    "fin_sent": true,
+    "after_fin_alive": {
+      "ping": true,
+      "cameras": [
+        "frontShape",
+        "perspShape",
+        "sideShape",
+        "topShape"
+      ],
+      "error": null
+    },
+    "verdict": "PASS"
+  }
+}

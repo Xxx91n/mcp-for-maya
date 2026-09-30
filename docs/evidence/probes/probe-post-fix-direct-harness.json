@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "date": "2026-09-20",
+    "env": "worktree post-fix code → Qt framed channel Maya 2024 pid 5396",
+    "purpose": "T-13a result-type coerce 修复直验（str/enum/NONE/BOGUS 四类）",
+    "verdict": "str JSON→list PASS; enum JSON→[] PASS; str NONE→None PASS; BOGUS→InputValidationError PASS",
+    "claim_boundary": "Direct-harness verification of result-type coercion at that commit; regression suite coverage in tests/ is the durable guard.",
+    "archived_from": ".scratch/maya-mcp-grill/reports/evidence/2026-09-20-post-fix-direct-harness.json"
+  },
+  "captured_at": "2026-09-20",
+  "harness": ".scratch/maya-mcp-grill/harness/direct_client_verify.py",
+  "target": "127.0.0.1:51217 Qt framed channel (Maya 2024 pid 5396)",
+  "code": "worktree post-fix (impl/t13a-result-type-coerce @ commit mtp)",
+  "transcript": "connected: True\nstr 'JSON' -> ['frontShape', 'perspShape', 'sideShape', 'topShape'] | error: None | PASS\nenum JSON -> [] | error: None | PASS\nstr NONE -> None | error: None | PASS\nBOGUS -> InputValidationError | [invalid_input] Invalid result_type 'BOGUS': must be NONE, JSON, or RAW | PASS\nRESULT: ALL PASS\n",
+  "verdict": "ALL PASS — str/enum/NONE execute_code forms + typed invalid-input rejection over the REAL framed transport"
+}

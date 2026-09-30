@@ -1,0 +1,66 @@
+{
+  "meta": {
+    "date": "2026-09-20",
+    "env": "Maya 2024 GUI session (Qt framed)",
+    "purpose": "GUI 实机验证汇总：签名采集判定 + checkpoint/rollback 引用编辑语义",
+    "verdict": "signature_collection=COLLECTED (omui.MImage absent); checkpoint/rollback ref-edit verification recorded",
+    "claim_boundary": "Aggregated results of that-day GUI verification run; see sub-sections for per-claim boundaries; Maya 2024 single-station.",
+    "archived_from": ".scratch/maya-mcp-grill/reports/evidence/gui_verify_results.json"
+  },
+  "signature_collection": {
+    "symbols": 49,
+    "missing_in_real_maya": [
+      "omui.MImage"
+    ],
+    "with_signature": 0,
+    "baseline_file": "D:\\Aworker\\maya\\maya-mcp-server\\.scratch\\maya-mcp-grill\\reports\\evidence\\signature-baseline.maya2024.json",
+    "verdict": "COLLECTED"
+  },
+  "checkpoint_rollback_ref_edit": {
+    "setup": {
+      "ref_node": "v7ref:GEO_ref_cube",
+      "main_file": "D:/Aworker/maya/maya-mcp-server/.scratch/maya-mcp-grill/tmp_ckpt/main.ma"
+    },
+    "save_checkpoint": {
+      "name": "v7_ref_case",
+      "filename": "cp_v7_ref_case.ma",
+      "path": "D:\\Aworker\\maya\\maya-mcp-server\\.scratch\\maya-mcp-grill\\tmp_ckpt\\checkpoints\\cp_v7_ref_case.ma",
+      "timestamp": "20260920_131033",
+      "object_count": 5,
+      "mesh_count": 1,
+      "light_count": 0,
+      "original_file_status": "saved",
+      "adhoc": false,
+      "scene_rebound_to": null,
+      "preserved_as": "prev_20260920_131033_cp_v7_ref_case.ma"
+    },
+    "rollback": {
+      "success": true,
+      "rolled_back_to": "cp_v7_ref_case.ma",
+      "scene_name_before": "D:\\Aworker\\maya\\maya-mcp-server\\.scratch\\maya-mcp-grill\\tmp_ckpt\\main.ma",
+      "scene_name_after": "D:\\Aworker\\maya\\maya-mcp-server\\.scratch\\maya-mcp-grill\\tmp_ckpt\\main.ma",
+      "original_file_status": "saved",
+      "scene_rebound_to": "D:\\Aworker\\maya\\maya-mcp-server\\.scratch\\maya-mcp-grill\\tmp_ckpt\\main.ma",
+      "safety_snapshot": "D:\\Aworker\\maya\\maya-mcp-server\\.scratch\\maya-mcp-grill\\tmp_ckpt\\checkpoints\\cp_auto_before_rollback_20260920_131033.ma",
+      "object_count": 5
+    },
+    "post_rollback": {
+      "GEO_after_exists": false,
+      "ref_survivors": [
+        "v7ref:GEO_ref_cube",
+        "v7ref:GEO_ref_cubeShape"
+      ]
+    },
+    "cleanup": "file(new) -> untitled empty scene",
+    "verdict": "PASS"
+  },
+  "commandport_newline_probe": {
+    "no_newline_recv": "2\n\u0000",
+    "evals_without_newline": true,
+    "incomplete_recv": "invalid syntax (<string>, line 1)\n\u0000",
+    "incomplete_evals_immediately": true,
+    "next_chunk_recv": "1\n\u0000",
+    "semantics": "per-chunk eager eval (no newline trigger, no cross-chunk buffer)",
+    "verdict": "PASS"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "artifact": "probe-box05-client-multiblock.json",
+  "box": 5,
+  "date": "2026-09-30",
+  "env": "Host Windows 11; published artifact uvx mcp-for-maya@0.4.1 (FastMCP 4.0.10); Maya 2024 GUI PID 14284 exited mid-window (clean exit, no crash events)",
+  "verdict": "conditional — protocol layer partially verified; image-render face unverified",
+  "claim_boundary": "Protocol layer verified: published artifact spawns under Inspector --cli, tools/list returns 25 tools, error path returns structured isError ToolResult (session_unavailable). NOT verified: multi-block image render in any client (Maya offline → no live tool result carrying image); Claude Code seat blocked at client model layer (custom model kimi-k3 unrecognized by SDK path; --model sonnet attempt timed out 90s); Codex seat blocked at provider layer (custom provider deepseekpro via CC Switch local proxy 127.0.0.1:15721 → 502, never reached MCP layer; upstream #24135 exec auto-cancel remains untested on this machine). AC-05 card stays unchecked/conditional.",
+  "result": {
+    "inspector_cli": {
+      "server_spawn": "uvx mcp-for-maya@0.4.1 OK (70 pkgs, FastMCP 4.0.10)",
+      "tools_list": "25 tools returned",
+      "error_path": "add_session→[maya_unavailable] WinError 1225 isError ToolResult (Maya port dead)"
+    },
+    "claude_code_headless": {
+      "attempt1": "claude -p --mcp-config temp.json → [claude-code:unrecognized_model] {model: kimi-k3}",
+      "attempt2": "--model sonnet → timed out 90s",
+      "status": "blocked-client-model-layer"
+    },
+    "codex_exec": {
+      "config": "inline -c mcp_servers.maya (zero file writes)",
+      "result": "session started then 502 Bad Gateway from CC Switch proxy (provider omni/deepseekpro, upstream connect fail) before any MCP call",
+      "status": "blocked-provider-layer; #24135 untested"
+    },
+    "inspector_web_pixel": "not run (requires live Maya image result)",
+    "codex_tui": "not run (user presence pending; same provider-proxy risk)"
+  },
+  "owner": "user",
+  "expiry": "Codex seat render test completed, or v1.0.0 gate review, whichever first",
+  "repro": "npx @modelcontextprotocol/inspector --cli uvx mcp-for-maya@0.4.1 --method tools/list|tools/call"
+}

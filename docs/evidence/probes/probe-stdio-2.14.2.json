@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "date": "2026-09-22",
+    "env": "MCP stdio pipeline, server reporting \"Maya MCP Server 2.14.2\", Windows host",
+    "purpose": "stdio 测活：initialize + tools_list（早期版本线）",
+    "verdict": "stdio initialize OK, 20 tools listed at server version 2.14.2",
+    "claim_boundary": "Version-line boundary: captured at server 2.14.2 (pre-0.x public versioning); lineage to current mcp-for-maya 0.x not established in this artifact — treat as environment-era evidence, not current-lineage proof.",
+    "archived_from": ".scratch/maya-mcp-grill/reports/evidence/mcp_stdio_probe.json"
+  },
+  "initialize": {
+    "ok": true,
+    "server": {
+      "name": "Maya MCP Server",
+      "version": "2.14.2"
+    }
+  },
+  "tools_list": {
+    "count": 20,
+    "names": [
+      "scene_snapshot",
+      "scene_inspect",
+      "scene_measure",
+      "scene_assert",
+      "scene_validate",
+      "scene_checkpoint",
+      "scene_rollback",
+      "scene_checkpoint_list",
+      "camera_create",
+      "camera_orbit",
+      "scene_aesthetics",
+      "scene_review",
+      "scene_plan",
+      "scene_viewport_snapshot",
+      "scene_render_preview",
+      "list_sessions",
+      "maya_setup_guide",
+      "write_module",
+      "execute_code",
+      "add_session"
+    ]
+  },
+  "scene_snapshot": {
+    "isError": true,
+    "first_text": "Error calling tool 'scene_snapshot': [session_unavailable] No Maya sessions available (suggestion: call add_session(host, port) first, or maya_setup_guide() for setup)",
+    "dead_signature": false
+  },
+  "scene_viewport_snapshot": {
+    "isError": true,
+    "content_kinds": [
+      "text"
+    ],
+    "meta_text": "Error calling tool 'scene_viewport_snapshot': [session_unavailable] No Maya sessions available (suggestion: call add_session(host, port) first, or maya_setup_guide() for setup)",
+    "dead_signature": false
+  }
+}

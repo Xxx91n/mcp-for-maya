@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "date": "2026-09-20",
+    "env": "MCP stdio pipeline, server reporting \"Maya MCP Server 2.14.7\", Windows host",
+    "purpose": "stdio 测活（pre-audit 时点）",
+    "verdict": "stdio initialize OK, 20 tools listed at server version 2.14.7",
+    "claim_boundary": "Version-line boundary: captured at server 2.14.7 (pre-0.x public versioning); lineage to current mcp-for-maya 0.x not established — environment-era evidence only.",
+    "archived_from": ".scratch/maya-mcp-grill/reports/evidence/mcp_stdio_probe.pre-audit.json"
+  },
+  "initialize": {
+    "ok": true,
+    "server": {
+      "name": "Maya MCP Server",
+      "version": "2.14.7"
+    }
+  },
+  "tools_list": {
+    "count": 20,
+    "names": [
+      "scene_snapshot",
+      "scene_inspect",
+      "scene_measure",
+      "scene_assert",
+      "scene_validate",
+      "scene_checkpoint",
+      "scene_rollback",
+      "scene_checkpoint_list",
+      "camera_create",
+      "camera_orbit",
+      "scene_aesthetics",
+      "scene_review",
+      "scene_plan",
+      "scene_viewport_snapshot",
+      "scene_render_preview",
+      "list_sessions",
+      "maya_setup_guide",
+      "write_module",
+      "execute_code",
+      "add_session"
+    ]
+  },
+  "scene_snapshot": {
+    "isError": false,
+    "first_text": "{\n  \"scene\": {\n    \"objects\": [\n      {\n        \"n\": \"front\",\n        \"t\": \"camera\",\n        \"p\": [\n          0.0,\n          0.0,\n          1000.1\n        ],\n        \"b\": [\n          0.0,\n          0.0,\n          1000.1,\n          0.0,\n          0.0,\n          1000.1\n        ],\n        \"c\": 1\n      },\n      {\n        \"n\": \"persp\",\n        \"t\": \"camera\",\n        \"p\": [\n          288.0,\n          216.0,\n          288.0\n        ],\n        \"b\": [\n          288.0,\n          216.0,\n          288.0,\n          288.0,\n          216.0,\n          288.0\n        ],\n        \"c\": 1\n      },\n      {\n        \"",
+    "dead_signature": false
+  },
+  "scene_viewport_snapshot": {
+    "isError": false,
+    "content_kinds": [
+      "image",
+      "text"
+    ],
+    "meta_text": "{\"session\": \"127.0.0.1:57040\", \"camera\": \"|persp\", \"width\": 200, \"height\": 128, \"format\": \"png\", \"bytes\": 976, \"panel\": \"modelPanel4\"}",
+    "dead_signature": false
+  }
+}
