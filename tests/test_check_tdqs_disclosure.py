@@ -48,7 +48,7 @@ def test_missing_element_fails(tmp_path):
         encoding="utf-8",
     )
 
-    ok, errors, count = mod.check(tmp_path, elements_file)
+    ok, errors, _warnings, count = mod.check(tmp_path, elements_file)
     assert not ok
     assert count == 2
     assert any("must_have_foo" in err for err in errors)
@@ -81,7 +81,7 @@ def test_satisfied_element_passes(tmp_path):
         encoding="utf-8",
     )
 
-    ok, errors, count = mod.check(tmp_path, elements_file)
+    ok, errors, _warnings, count = mod.check(tmp_path, elements_file)
     assert ok
     assert errors == []
     assert count == 2
@@ -104,7 +104,7 @@ def test_missing_file_reports_error(tmp_path):
         encoding="utf-8",
     )
 
-    ok, errors, _ = mod.check(tmp_path, elements_file)
+    ok, errors, _warnings, _ = mod.check(tmp_path, elements_file)
     assert not ok
     assert any("file not found" in err for err in errors)
 
@@ -130,7 +130,7 @@ def test_missing_function_or_docstring_reports_error(tmp_path):
         encoding="utf-8",
     )
 
-    ok, errors, _ = mod.check(tmp_path, elements_file)
+    ok, errors, _warnings, _ = mod.check(tmp_path, elements_file)
     assert not ok
     assert any("tool function 'target_tool' or docstring not found" in err for err in errors)
 
@@ -162,3 +162,190 @@ def test_main_cli_entrypoint(tmp_path, monkeypatch, capsys):
     assert mod.main() == 0
     captured = capsys.readouterr().out
     assert "TDQS disclosure check OK" in captured
+
+
+def test_polarity_negated_only_match_warns_not_fails(tmp_path):
+    """D-180: a mutation assertion satisfied only by a negated statement
+    produces a warning during the observation period, never an error."""
+    mod = _load()
+    src_file = tmp_path / "src" / "tool.py"
+    src_file.parent.mkdir(parents=True)
+    src_file.write_text(
+        "def demo_tool():\n"
+        '    """A check without auto_fix mutations \u2014 it does not modify."""\n'
+        "    pass\n",
+        encoding="utf-8",
+    )
+
+    elements_file = tmp_path / "elements.yaml"
+    elements_file.write_text(
+        json.dumps(
+            {
+                "tools": {
+                    "demo_tool": {
+                        "file": "src/tool.py",
+                        "required_elements": [
+                            {
+                                "id": "mutates_scene",
+                                "why": "mutation disclosure",
+                                "polarity_aware": True,
+                                "any": [r"(?i)auto_fix\s+mutations"],
+                            }
+                        ],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    ok, errors, warnings, _ = mod.check(tmp_path, elements_file)
+    assert ok
+    assert errors == []
+    assert len(warnings) == 1
+    assert "negated" in warnings[0]
+    assert "mutates_scene" in warnings[0]
+
+
+def test_polarity_positive_match_satisfies(tmp_path):
+    mod = _load()
+    src_file = tmp_path / "src" / "tool.py"
+    src_file.parent.mkdir(parents=True)
+    src_file.write_text(
+        'def demo_tool():\n    """Mutates the scene: creates a camera in the scene."""\n    pass\n',
+        encoding="utf-8",
+    )
+
+    elements_file = tmp_path / "elements.yaml"
+    elements_file.write_text(
+        json.dumps(
+            {
+                "tools": {
+                    "demo_tool": {
+                        "file": "src/tool.py",
+                        "required_elements": [
+                            {
+                                "id": "mutates_scene",
+                                "why": "mutation disclosure",
+                                "polarity_aware": True,
+                                "any": [r"(?i)creates?\s+a\s+camera"],
+                            }
+                        ],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    ok, errors, warnings, _ = mod.check(tmp_path, elements_file)
+    assert ok
+    assert errors == []
+    assert warnings == []
+
+
+def test_polarity_no_match_at_all_still_errors(tmp_path):
+    mod = _load()
+    src_file = tmp_path / "src" / "tool.py"
+    src_file.parent.mkdir(parents=True)
+    src_file.write_text('def demo_tool():\n    """A simple tool."""\n    pass\n', encoding="utf-8")
+
+    elements_file = tmp_path / "elements.yaml"
+    elements_file.write_text(
+        json.dumps(
+            {
+                "tools": {
+                    "demo_tool": {
+                        "file": "src/tool.py",
+                        "required_elements": [
+                            {
+                                "id": "mutates_scene",
+                                "why": "mutation disclosure",
+                                "polarity_aware": True,
+                                "any": [r"(?i)creates?\s+a\s+camera"],
+                            }
+                        ],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    ok, errors, warnings, _ = mod.check(tmp_path, elements_file)
+    assert not ok
+    assert any("mutates_scene" in err for err in errors)
+    assert warnings == []
+
+
+def test_polarity_all_branch_negated_literal_warns(tmp_path):
+    """D-180: 'all' elements are polarity-aware too \u2014 a literal surviving
+    only inside a negation window warns instead of silently passing."""
+    mod = _load()
+    src_file = tmp_path / "src" / "tool.py"
+    src_file.parent.mkdir(parents=True)
+    src_file.write_text(
+        'def demo_tool():\n    """Does not modify the scene at all."""\n    pass\n',
+        encoding="utf-8",
+    )
+    elements_file = tmp_path / "elements.yaml"
+    elements_file.write_text(
+        json.dumps(
+            {
+                "tools": {
+                    "demo_tool": {
+                        "file": "src/tool.py",
+                        "required_elements": [
+                            {
+                                "id": "mutation_targets",
+                                "why": "mutation targets disclosed",
+                                "polarity_aware": True,
+                                "all": ["modify", "the scene"],
+                            }
+                        ],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    ok, errors, warnings, _ = mod.check(tmp_path, elements_file)
+    assert ok
+    assert errors == []
+    assert len(warnings) == 1
+    assert "mutation_targets" in warnings[0]
+
+
+def test_polarity_all_branch_positive_literals_satisfy(tmp_path):
+    mod = _load()
+    src_file = tmp_path / "src" / "tool.py"
+    src_file.parent.mkdir(parents=True)
+    src_file.write_text(
+        'def demo_tool():\n    """May modify the scene. It does not modify config."""\n    pass\n',
+        encoding="utf-8",
+    )
+    elements_file = tmp_path / "elements.yaml"
+    elements_file.write_text(
+        json.dumps(
+            {
+                "tools": {
+                    "demo_tool": {
+                        "file": "src/tool.py",
+                        "required_elements": [
+                            {
+                                "id": "mutation_targets",
+                                "why": "mutation targets disclosed",
+                                "polarity_aware": True,
+                                "all": ["modify", "the scene"],
+                            }
+                        ],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    ok, errors, warnings, _ = mod.check(tmp_path, elements_file)
+    assert ok
+    assert errors == []
+    assert warnings == []

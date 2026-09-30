@@ -311,8 +311,8 @@ _Avoid_: 静默续期、日历悬空 expiry、无限续期、续期不重验根�
 _Avoid_: 压力下顺手删行、把 descope 伪装成 waiver 续期、跳过披露义务
 
 **TDQS (Tool Definition Quality Score)**:
-Glama 对 MCP server 工具定义质量的第三方评分体系（ADR-0028，D-172~175 立法）——逐工具六维加权（Purpose25/Usage20/Behavior20/Params15/Conciseness10/Completeness10），服务器总分=0.7×描述质量（0.6×mean+0.4×min——最差工具被刻意放大：a single garbage definition degrades selection across the whole set）+0.3×四维 Coherence（disambiguation/naming/toolCount/completeness，tool-count 带 5分=3~15/3分=16~25）；描述↔annotations 矛盾=该维自动 1 分+公开旗标（校准纪律的自动化审计器同构：披露不足扣分、虚假披露定罪）；重评=merge to main 即触发（GitHub HEAD build，inputHash 增量继承）。本仓复合验收判据=线上 ≥4.0（目标 4.2 防 round1 边界效应）+min 逐工具 ≥3.0+零旗标。
-_Avoid_: 为分数做 API breaking（P3 合并须独立立项+semver major 裁决）、虚假披露、关键词堆砌、always-call-first 强制排序句式、本地复现分入 CI（生产 LLM 型号/温度未公开）
+Glama 对 MCP server 工具定义质量的第三方评分体系（ADR-0028，D-172~175 立法）——逐工具六维加权（Purpose25/Usage20/Behavior20/Params15/Conciseness10/Completeness10），服务器总分=0.7×描述质量（0.6×mean+0.4×min——最差工具被刻意放大：a single garbage definition degrades selection across the whole set）+0.3×四维 Coherence（disambiguation/naming/toolCount/completeness，tool-count 带 5分=3~15/3分=16~25）；描述↔annotations 矛盾=该维自动 1 分+公开旗标（校准纪律的自动化审计器同构：披露不足扣分、虚假披露定罪）；重评=merge to main 即触发（GitHub HEAD build，inputHash 增量继承）。本仓复合验收判据=Glama 页面字母档 A+min 逐件 ≥3.0+零 annotation contradiction 旗标（三要件全锚 TDQS spec 官方成文条款——字母档 A=≥3.5、「tier-B passing bar」逐件 ≥3.0；D-182 重校准，stretch=3.8 系本仓自设推断非官方阈值）。
+_Avoid_: 为分数做 API breaking（P3 合并须独立立项+semver major 裁决（D-179 注记：本轮推迟真理由=D-094 异构合并禁令+在飞批撞车+gate 三态清账带宽，非 semver 成本——0.x breaking 合法））、虚假披露、关键词堆砌、always-call-first 强制排序句式、本地复现分入 CI（生产 LLM 型号/温度未公开）
 
 **Boundary: 行**:
 工具描述内嵌的单向消歧惯例（D-174，扩用 introspect_tools scene_nodes 既有先例）——每件工具一句 `Boundary:` 点名 1~3 个兄弟分工（when/when-not 语义，TDQS Usage 维 5 分锚点）；单向点名=新工具自写边界句零改动旧件；逐件消歧矩阵=docs/adr/0028-elements.yaml 的 boundary_targets 单源；集中路由表对 TDQS 评审零贡献（Appendix B 评审输入只看 name+description），全局 instructions 仅跨模块分工用。

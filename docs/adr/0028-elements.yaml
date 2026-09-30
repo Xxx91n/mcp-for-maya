@@ -2,12 +2,13 @@
   "schema": "tdqs-elements/1",
   "note": "JSON-syntax YAML (YAML 1.2 is a strict superset of JSON): parseable by both yaml.safe_load and json.loads — stdlib-only CI consumption. This file is the SINGLE SOURCE for TDQS disclosure elements; legislated by ADR-0028, consumed by .github/scripts/check_tdqs_disclosure.py. Asserts element presence, NOT literal wording — wording freedom stays inside the line.",
   "legislation": "docs/adr/0028-tdqs-description-quality.md",
-  "decisions": ["D-172", "D-173", "D-174", "D-175"],
+  "decisions": ["D-172", "D-173", "D-174", "D-175", "D-180", "D-181"],
   "assert_semantics": {
     "any": "element satisfied if ANY regex in the list matches the tool description/docstring",
     "all": "element satisfied only if EVERY literal string in the list appears in the description",
     "on_failure": "CI failure message MUST name the missing element id",
-    "change_review": "edits to this file require explicit PR review (prevents 'rewording slips deleting the assertion')"
+    "change_review": "edits to this file require explicit PR review (prevents 'rewording slips deleting the assertion')",
+    "polarity_aware": "mutation-class existence assertions MUST be polarity-aware (D-180): a match inside a negation window does not satisfy the element; negated-only matches are WARN-level during the observation period — mechanism form is execution-window owned and must pass the 25-docstring corpus with zero false rejections before hardening"
   },
   "tools": {
     "execute_code": {
@@ -46,34 +47,57 @@
       "tier": "P0",
       "required_elements": [
         {
-          "id": "autofix_two_state",
-          "why": "auto_fix flips the tool from read-only check to mutating — the two states must both be stated",
-          "any": ["auto_fix"]
+                  "id": "read_only_disclosure",
+                  "why": "read-only check disclosure — the description must state it does not modify the scene (real API has no auto_fix parameter; revised from autofix_two_state/autofix_mutation per D-180)",
+                  "any": [
+                            "(?i)read[-\\s]?only",
+                            "(?i)non-destructive",
+                            "(?i)does not (modify|mutate|change|alter)",
+                            "(?i)cannot (modify|mutate|repair|change|alter)",
+                            "(?i)without\\s+[^\\n]{0,40}(mutat|modif|alter)"
+                  ]
         },
         {
-          "id": "autofix_mutation",
-          "why": "auto_fix=true mutates the scene — must be disclosed as mutation, not framed as pure analysis",
-          "any": ["(?i)auto_fix[^\\n]{0,160}(mutat|modif|chang|fix|correct|repair|apply|edit)", "(?i)(mutat|modif|chang|fix|correct|repair|apply|edit)[^\\n]{0,160}auto_fix"]
+                  "id": "repair_redirect",
+                  "why": "routes callers needing automated repair to the tool that owns mutation — scene_plan with auto_fix (redirect target names, not a mutation claim)",
+                  "all": [
+                            "scene_plan",
+                            "auto_fix"
+                  ]
         },
         {
-          "id": "irreversible_when_mutating",
-          "why": "mutation path undo-semantics disclosure",
-          "any": ["(?i)irreversible", "(?i)not\\s+undo", "(?i)cannot be undone", "(?i)no\\s+undo", "(?i)undo", "(?i)rollback", "(?i)checkpoint"]
+                  "id": "no_mutation_no_undo",
+                  "why": "no-mutation implies no-undo consequence disclosed (revised from irreversible_when_mutating per D-180)",
+                  "any": [
+                            "(?i)non-destructive[^\\n]{0,120}(no|without)[^\\n]{0,40}(undo|rollback)",
+                            "(?i)(no|without)[^\\n]{0,40}(undo|rollback)\\s+checkpoint",
+                            "(?i)no\\s+undo\\s+rollback",
+                            "(?i)does not (create|require)[^\\n]{0,40}(undo|rollback|checkpoint)"
+                  ]
         },
         {
-          "id": "session_prerequisite",
-          "why": "requires a live/connected session",
-          "any": ["(?i)(active|connected|open|live|established)\\s+(Maya\\s+)?session", "(?i)session_key", "(?i)requires\\s+a\\s+session"]
+                  "id": "session_prerequisite",
+                  "why": "requires a live/connected session",
+                  "any": [
+                            "(?i)(active|connected|open|live|established)\\s+(Maya\\s+)?session",
+                            "(?i)session_key",
+                            "(?i)requires\\s+a\\s+session"
+                  ]
         },
         {
-          "id": "boundary_line",
-          "why": "one-way disambiguation marker (also a P1 scene_* member)",
-          "any": ["Boundary:"]
+                  "id": "boundary_line",
+                  "why": "one-way disambiguation marker (also a P1 scene_* member)",
+                  "any": [
+                            "Boundary:"
+                  ]
         },
         {
-          "id": "boundary_targets_named",
-          "why": "names sibling tools — vs scene_review (full audit) / scene_assert (expected values)",
-          "all": ["scene_review", "scene_assert"]
+                  "id": "boundary_targets_named",
+                  "why": "names sibling tools — vs scene_review (full audit) / scene_assert (expected values)",
+                  "all": [
+                            "scene_review",
+                            "scene_assert"
+                  ]
         }
       ]
     },
@@ -160,6 +184,65 @@
       "required_elements": [
         {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
         {"id": "boundary_targets_named", "why": "names sibling tools", "all": ["scene_review"]}
+      ]
+    },
+    "camera_orbit": {
+      "file": "src/maya_mcp_server/scene_tools.py",
+      "tier": "P1",
+      "required_elements": [
+        {
+                  "id": "mutation_side_effects",
+                  "why": "creates a camera and animation curves and marks the scene dirty — mutation side effects must be disclosed (polarity_aware per D-180: a negated claim must not satisfy)",
+                  "polarity_aware": true,
+                  "any": [
+                            "(?i)creat(e|es|ed|ing)\\s+a\\s+(new\\s+)?camera",
+                            "(?i)animation\\s+curves?",
+                            "(?i)(marks?|flags?)\\s+(the\\s+)?scene\\s+(as\\s+)?dirty",
+                            "mark_dirty"
+                  ]
+        },
+        {
+                  "id": "non_idempotent",
+                  "why": "repeat calls add another camera — call multiplicity disclosed",
+                  "any": [
+                            "(?i)not\\s+idempotent",
+                            "(?i)non-idempotent",
+                            "(?i)each\\s+(call|invocation)\\s+(adds|creates|produces)",
+                            "(?i)repeat(ed)?\\s+calls?\\s+(create|add|produce)",
+                            "(?i)additional\\s+camera"
+                  ]
+        },
+        {
+                  "id": "session_prerequisite",
+                  "why": "requires a live/connected session",
+                  "any": [
+                            "(?i)(active|connected|open|live|established)\\s+(Maya\\s+)?session",
+                            "(?i)session_key",
+                            "(?i)requires\\s+a\\s+session"
+                  ]
+        },
+        {
+                  "id": "center_json_semantics",
+                  "why": "center arrives as a JSON-encoded string, not a structured array parameter",
+                  "any": [
+                            "(?i)JSON\\s+(string|array)",
+                            "(?i)\\[x,\\s*y,\\s*z\\]"
+                  ]
+        },
+        {
+                  "id": "boundary_line",
+                  "why": "one-way disambiguation marker (D-174 one-way convention)",
+                  "any": [
+                            "Boundary:"
+                  ]
+        },
+        {
+                  "id": "boundary_targets_named",
+                  "why": "names sibling tool — vs camera_create (static shot-type framing)",
+                  "all": [
+                            "camera_create"
+                  ]
+        }
       ]
     }
   }
