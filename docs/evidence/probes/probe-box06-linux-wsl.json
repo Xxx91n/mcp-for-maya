@@ -1,0 +1,15 @@
+{
+  "artifact": "probe-box06-linux-wsl.json",
+  "box": 6,
+  "date": "2026-09-30",
+  "env": "WSL2 Kali GNU/Linux Rolling, Python 3.13.12, uv 0.12.21, repo via /mnt/d (drvfs); run as root",
+  "verdict": "server-side Linux lane GREEN: pytest suite 784 passed / 1 failed (env artifact) / 15 skipped / 11 mayapy-deselected in 281s; test_qt_channel.py 42/42 PASSED (RST/FIN socket semantics, retry/timeout, oversized-frame rejection, real-socket roundtrip, module-injection routing, headless guard); published artifact uvx mcp-for-maya@0.4.1 installs (70 pkgs ~1s) and boots stdio on Linux (FastMCP 4.0.10 banner + --help surface OK)",
+  "claim_boundary": "Verifies the SERVER-SIDE Linux surface: package installability, stdio transport, MCP protocol layer, and Qt-channel client socket semantics on Linux. Does NOT verify the in-Maya side on Linux — no Linux Maya install exists on this host; Qt framed channel inside a Linux-hosted Maya remains unverified (narrowed residual). The single test failure is an environment artifact: running as root bypasses chmod(S_IREAD) failure injection so the warn-once path cannot trigger — product behavior unchanged, harness portability note.",
+  "result": {
+    "pytest_linux": "784 passed / 1 failed (test_write_failure_does_not_raise — root bypasses chmod) / 15 skipped / 11 deselected mayapy",
+    "qt_channel_linux": "42/42 PASSED (27.31s)",
+    "uvx_linux": "mcp-for-maya@0.4.1 — 70 pkgs installed, CLI help + stdio boot banner verified",
+    "residual": "in-Maya Qt channel under Linux-hosted Maya — needs real Linux Maya install (not available)"
+  },
+  "repro": "wsl: uv run pytest tests/ -q -m \"not mayapy\"; uv run pytest tests/test_qt_channel.py -v; uvx mcp-for-maya@0.4.1 --help"
+}
