@@ -322,7 +322,7 @@ This project follows [Semantic Versioning](https://semver.org/):
 
 - **0.x (through 0.3.x, Alpha)**: the tool surface could still change; minor bumps carried features, no compatibility freeze.
 - **Beta (0.4.0)**: feature-complete tier — external testing begins here (classifier `4 - Beta`).
-- **1.0.0**: public API freeze — tool surface and output schemas stable per semver; breaking changes require 2.0.0. Promoted together with the `5 - Production/Stable` classifier in one commit; gated by the [#7 real-machine checklist](https://github.com/Xxx91n/mcp-for-maya/issues/7) (all-green required).
+- **1.0.0**: public API freeze — tool surface and output schemas stable per semver; breaking changes require 2.0.0. Promoted together with the `5 - Production/Stable` classifier in one commit; gated by the [#7 real-machine checklist](https://github.com/Xxx91n/mcp-for-maya/issues/7) (Pass-set green + explicit waived items with owner/expiry — three-state gate, D-163).
 
 The **public API** is the MCP tool surface: tool names, their input/output shapes, the two-layer error contract (host `isError` failures vs `{error:{code,message,suggestion}}` domain results), and tool-annotation semantics ([docs/threat-model.md §5](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)). Additive changes (new tools, new optional response fields) ship as minor releases; breaking changes ship as a major bump. 1.0.0 is a freeze commitment on this surface — not a quality certification: the remaining real-machine verification surface is tracked explicitly in #7 rather than implied away.
 

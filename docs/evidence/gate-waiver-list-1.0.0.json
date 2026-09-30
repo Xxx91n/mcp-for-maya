@@ -1,0 +1,96 @@
+{
+  "meta": {
+    "artifact": "gate-waiver-list-1.0.0.json",
+    "date": "2026-09-30",
+    "env": "post real-Maya window 2026-09-30; table=docs/evidence/real-maya-window-2026-09-30.md",
+    "purpose": "v1.0.0 gate 三态判定的机检清单（D-163）",
+    "claim_boundary": "Waived rows carry reason+owner+expiry and fail-closed semantics (unresolved at expiry => Blocked). \"Waived\" is not \"Pass\". Re-read at every release-preflight."
+  },
+  "gate": "v1.0.0",
+  "rule": "Pass set all green AND Waived set all explicit (reason+owner+expiry) AND Blocked set empty",
+  "rows": [
+    {
+      "frame": 1,
+      "item": "mayapy Tier-2 suite",
+      "state": "waived",
+      "reason": "mayapy env-broken on host (AV 0xC0000005)",
+      "owner": "user",
+      "expiry": "first gate-check execution after D-163 lands, or Linux-capable/fixed-mayapy env available, whichever first",
+      "ref": "D-159"
+    },
+    {
+      "frame": 2,
+      "item": "GUI Tier-3 (2024) viewport_snapshot + VP2 orientation",
+      "state": "waived",
+      "reason": "deterministic capture_failed kFailure on this station (VP2 path; station-specific suspect — playblast path green)",
+      "owner": "@Xxx91n",
+      "expiry": "v1.0.0 gate review event (γ-B anchor) or second-station re-verify",
+      "ref": "Issue #53 + probe-box02-vp2-red.json"
+    },
+    {
+      "frame": "2b/2c",
+      "item": "GUI Tier-3 on Maya 2025/2026",
+      "state": "waived",
+      "reason": "not-verified — no installs on host",
+      "owner": "user",
+      "expiry": "first gate-check execution after D-163 lands (explicit not-verified rows preserved)",
+      "ref": "D-149②"
+    },
+    {
+      "frame": 3,
+      "item": "PySide2 framed Qt real session",
+      "state": "pass",
+      "ref": "GUI suite + live :7001 2026-09-30"
+    },
+    {
+      "frame": 4,
+      "item": "headless temp-file injection on mayapy",
+      "state": "waived",
+      "reason": "mayapy env-broken (same root as frame 1)",
+      "owner": "user",
+      "expiry": "same as frame 1",
+      "ref": "D-159"
+    },
+    {
+      "frame": 5,
+      "item": "multi-client multi-block render",
+      "state": "waived",
+      "reason": "Inspector --cli verified end-to-end incl. real image bytes; client-UI pixel render + claude/codex seats blocked at client model/provider layer",
+      "owner": "user",
+      "expiry": "first client-UI image render witnessed, or gate review",
+      "ref": "probe-box05-client-multiblock.json"
+    },
+    {
+      "frame": 6,
+      "item": "Qt RST/FIN semantics",
+      "state": "pass",
+      "note": "Windows framed channel green + Linux server-side green via WSL (42/42 qt_channel); residual=in-Maya Qt on Linux-hosted Maya → D-158/D-162",
+      "ref": "probe-qt-rst-fin.json + probe-box06-linux-wsl.json"
+    },
+    {
+      "frame": 7,
+      "item": "cmds.* static audit vs docs",
+      "state": "pass",
+      "ref": "probe-box07-cmds-audit.json"
+    },
+    {
+      "frame": 8,
+      "item": "signature→stub guardrail",
+      "state": "pass",
+      "note": "presence tier; signature tier structurally unavailable",
+      "ref": "probe-box08-signature-diff.json"
+    },
+    {
+      "frame": 9,
+      "item": "modelPanel call-form smoke",
+      "state": "pass",
+      "ref": "GUI suite"
+    },
+    {
+      "frame": 10,
+      "item": "no-newline + 500ms commandPort",
+      "state": "pass",
+      "ref": "probe-box07-box10.json"
+    }
+  ]
+}
