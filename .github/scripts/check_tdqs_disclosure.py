@@ -13,11 +13,20 @@ a statement like "without auto_fix mutations" must not satisfy an
 assertion that a mutation exists (S-03 lesion: the old autofix_mutation
 assertion was satisfied by the negated sentence and CI went fake-green).
 Elements opt in via 'polarity_aware: true'; during the legislated
-observation period a match occurring only inside a negation window is
-reported as a warning, not an error. Mechanism form (window width / cue
-list / positive exemptions) is execution-window owned: it had to pass
-the live 25-docstring corpus with zero false rejections before landing,
-and may be promoted from warn to hard only after the corpus stays clean.
+observation period a match occurring only inside a negation scope is
+reported as a warning, not an error.
+
+D-190 hardened the mechanism form (execution-window product, deliberately
+not legislated here): the negation scope is the enclosing CLAUSE instead of
+a fixed 80-char window, and an element may list the legitimate
+negation-form phrases that forgive a cue in 'positive_exemptions'.
+Direction limit (D-190 3): polarity_aware belongs only on mutation-class
+existence assertions whose pattern set is purely positive \u2014 negation-form
+pattern elements stay unguarded and rely on the exemption list instead.
+The hardened form passed the live corpus with zero false rejections
+(asserted in tests/test_check_tdqs_disclosure.py); warn may be promoted to
+hard only after that corpus stays clean, reviewed at the 0.6.0 preflight
+(D-189/D-190 4).
 
 Hard-gated in the CI lint job alongside other check scripts.
 """
@@ -34,30 +43,73 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent.parent
 DEFAULT_ELEMENTS = REPO / "docs" / "adr" / "0028-elements.yaml"
 
-# Execution-window-owned mechanism form (D-180, warn observation period):
-# a match is negated when a negation cue appears inside the window before
-# the match start. The cue list stays deliberately small \u2014 broad lists
+# Execution-window-owned mechanism form (D-190, warn observation period):
+# a match is negated when a negation cue appears in the same CLAUSE before
+# the match start. Clause scope, not a fixed window — the retired 80-char
+# form flagged legitimate disclosures whose cue sat in an earlier clause
+# ("Not idempotent \u2014 each call adds another camera").
+#
+# Corpus evidence — both tracks, reproduced by
+# .github/scripts/polarity_corpus_probe.py (stdlib, manual: run it, do not
+# wire it into CI; it measures, it does not gate). PRIMARY surface, the
+# denominator the D-190(4) zero-false-rejection judgement uses: each tool
+# against its own docstring and its own elements = 36 elements, 1 guarded,
+# 0 negated-only, asserted live by
+# tests/test_check_tdqs_disclosure.py::test_live_corpus_has_no_polarity_warnings
+# STRESS surface, diagnostic only: 287 docstring-bearing functions x every
+# element pattern = 357 matches, 53 inside the retired naive 80-char window,
+# 4 inside clause scope (49 false rejections forgiven). All 4 survivors are
+# correct negative-form disclosures on NEGATION-form elements (irreversible /
+# read_only_disclosure / no_mutation_no_undo /
+# overwrite_or_persistence_semantics), which carry no polarity_aware guard by
+# the direction limit below, so they are never judged.
+#
+# Caliber note (D-191 1c): the stress denominator is 287 docstring-bearing
+# functions. The 264 figure in the pre-hardening evidence was a probe artifact
+# -- that probe keyed docstrings by bare function name into one dict, silently
+# collapsing 23 same-named functions. Do not compare the two numbers as if
+# they were the same corpus.
+#
+# The narrowed scope trades that FP class for cross-clause false negatives —
+# the legislated direction (D-190 1: on a fake-green-prone gate an FN hurts
+# less than FP noise).
+#
+# The boundary set is clause TERMINATORS only. A line wrap is deliberately
+# not a boundary: the D-180 lesion sentence wraps in real docstrings, and
+# forgiving it would reopen the fake-green hole. A terminator counts only
+# when followed by whitespace, so decimals ("0.5.0") and abbreviations
+# ("e.g.") do not split a clause.
+CLAUSE_BOUNDARIES = re.compile(r"[.!?;:\u2014\u2013](?=\s|$)")
+# The cue list stays deliberately small \u2014 broad lists
 # false-positive on correct negative-form disclosures like "cannot be
 # undone" / "does not persist" (five negation-form tokens already live in
 # the elements file's own patterns).
-#
-# Corpus evidence (2026-09-30, all 264 src docstrings x every element
-# pattern): 339 pattern matches, 53 fall inside a naive window — nearly all
-# legitimate negative-form disclosures ("no undo rollback checkpoint",
-# "cannot modify", "not idempotent — each call adds"). That is exactly why
-# the flag is opt-in per element (mutation-class positive assertions only)
-# and why hardening needs a refined mechanism (clause-scope window,
-# positive exemptions) — not this naive window — before it may error.
-POLARITY_WINDOW = 80
 NEGATION_CUES = re.compile(
     r"(?i)\b(?:no|not|never|without|cannot|can't|won't|don't|doesn't|didn't"
     r"|nor|neither)\b|\bnon[-\s]|instead of|rather than|free of"
 )
 
 
-def _negated(docstring: str, start: int) -> bool:
-    """Match at start is negated if a cue sits in the window before it."""
-    window = docstring[max(0, start - POLARITY_WINDOW) : start]
+def _clause_start(docstring: str, start: int) -> int:
+    """Index at which the clause containing start begins (D-190 1)."""
+    boundaries = list(CLAUSE_BOUNDARIES.finditer(docstring, 0, start))
+    return boundaries[-1].end() if boundaries else 0
+
+
+def _negated(docstring: str, start: int, exemptions: tuple[str, ...]) -> bool:
+    """Match at start is negated if a cue sits in its clause before it.
+
+    ``exemptions`` is the element's positive_exemptions list (D-190 2): a
+    cue that BELONGS to one of those legitimate negation-form phrases is
+    forgiven, because the phrase documents the negated property itself
+    rather than negating this match. Scoped to the cue, not to the clause --
+    each listed phrase is blanked out before the cue search, so one listed
+    phrase cannot forgive an unrelated real negation in the same clause.
+    """
+    window = docstring[_clause_start(docstring, start) : start].lower()
+    for phrase in exemptions:
+        if phrase:
+            window = window.replace(phrase.lower(), " ")
     return bool(NEGATION_CUES.search(window))
 
 
@@ -78,7 +130,7 @@ def check(root: Path, elements_path: Path) -> tuple[bool, list[str], list[str], 
     """Validate disclosure elements against tool docstrings.
 
     Returns (ok, errors, warnings, checked_count). Polarity-aware
-    elements whose only matches sit inside negation windows produce
+    elements whose only matches sit inside a negation scope produce
     warnings during the observation period, never errors.
     """
     try:
@@ -117,7 +169,10 @@ def check(root: Path, elements_path: Path) -> tuple[bool, list[str], list[str], 
             checked_elements += 1
             eid = elem.get("id", "<unnamed>")
             why = elem.get("why", "")
+            # Direction limit (D-190 3): only purely-positive pattern sets
+            # carry the guard; negation-form elements stay unguarded.
             polarity = bool(elem.get("polarity_aware"))
+            exempt = tuple(elem.get("positive_exemptions", ()))
 
             matched = False
             negated_only = False
@@ -127,7 +182,7 @@ def check(root: Path, elements_path: Path) -> tuple[bool, list[str], list[str], 
                     positive = negated = False
                     for pat in patterns:
                         for m in re.finditer(pat, docstring):
-                            if _negated(docstring, m.start()):
+                            if _negated(docstring, m.start(), exempt):
                                 negated = True
                             else:
                                 positive = True
@@ -147,7 +202,7 @@ def check(root: Path, elements_path: Path) -> tuple[bool, list[str], list[str], 
                         occ = list(re.finditer(re.escape(lit), docstring))
                         if not occ:
                             matched = False
-                        elif all(_negated(docstring, m.start()) for m in occ):
+                        elif all(_negated(docstring, m.start(), exempt) for m in occ):
                             matched = False
                             lit_negated = True
                     negated_only = lit_negated

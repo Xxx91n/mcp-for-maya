@@ -2,13 +2,14 @@
   "schema": "tdqs-elements/1",
   "note": "JSON-syntax YAML (YAML 1.2 is a strict superset of JSON): parseable by both yaml.safe_load and json.loads — stdlib-only CI consumption. This file is the SINGLE SOURCE for TDQS disclosure elements; legislated by ADR-0028, consumed by .github/scripts/check_tdqs_disclosure.py. Asserts element presence, NOT literal wording — wording freedom stays inside the line.",
   "legislation": "docs/adr/0028-tdqs-description-quality.md",
-  "decisions": ["D-172", "D-173", "D-174", "D-175", "D-180", "D-181"],
+  "decisions": ["D-172", "D-173", "D-174", "D-175", "D-180", "D-181", "D-190"],
   "assert_semantics": {
     "any": "element satisfied if ANY regex in the list matches the tool description/docstring",
     "all": "element satisfied only if EVERY literal string in the list appears in the description",
     "on_failure": "CI failure message MUST name the missing element id",
     "change_review": "edits to this file require explicit PR review (prevents 'rewording slips deleting the assertion')",
-    "polarity_aware": "mutation-class existence assertions MUST be polarity-aware (D-180): a match inside a negation window does not satisfy the element; negated-only matches are WARN-level during the observation period — mechanism form is execution-window owned and must pass the 25-docstring corpus with zero false rejections before hardening"
+    "polarity_aware": "mutation-class existence assertions MUST be polarity-aware (D-180): a match whose preceding clause text carries a negation cue does not satisfy the element; negated-only matches are WARN-level during the observation period. Direction limit (D-190 3): the guard is mandatory only on mutation-class existence assertions whose pattern set is purely positive (current sole instance: camera_orbit/mutation_side_effects) — negation-form pattern elements stay unguarded and are protected by positive_exemptions instead, otherwise the two rules cancel each other out. Enforcement is by PINNING the guarded set (LEGISLATED_GUARDED in tests/test_check_tdqs_disclosure.py), not by a pattern-purity lint — mounting the guard on a negation-form element yields matched=True and zero warnings, so the assertion layer cannot detect it; see the ADR-0028 gap disclosure",
+    "positive_exemptions": "element-level list of legitimate negation-form disclosure phrases; a cue inside the match clause that belongs to one of these phrases is forgiven (D-190 2). Without this list, widening the guard to a negation-form pattern element makes every correct negative disclosure self-reject — 'not idempotent' always carries the cue 'not'"
   },
   "tools": {
     "execute_code": {
@@ -192,8 +193,12 @@
       "required_elements": [
         {
                   "id": "mutation_side_effects",
-                  "why": "creates a camera and animation curves and marks the scene dirty — mutation side effects must be disclosed (polarity_aware per D-180: a negated claim must not satisfy)",
+                  "why": "creates a camera and animation curves and marks the scene dirty — mutation side effects must be disclosed (polarity_aware per D-180: a negated claim must not satisfy; pure-positive pattern set, the only guarded element per D-190 3)",
                   "polarity_aware": true,
+                  "positive_exemptions": [
+                            "not idempotent",
+                            "non-idempotent"
+                  ],
                   "any": [
                             "(?i)creat(e|es|ed|ing)\\s+a\\s+(new\\s+)?camera",
                             "(?i)animation\\s+curves?",
