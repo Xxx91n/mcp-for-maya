@@ -25,6 +25,8 @@
 | `scene_validate` | auto_fix 二态披露（false 只读检查 / true 变异场景）/ 变异时不可逆 / 会话前置 |
 | `write_module` | 会话前置 / 不可逆（overwrite 语义）/ 与 execute_code 的 when/when-not 边界句 |
 
+> 澄清注记（D-180②，R39 增补）：本表 scene_validate 行立法时误以 scene_plan 的 auto_fix 面为其面——真实 API 的 scene_validate 无 auto_fix 参数（签名为 rules/format/session_key），其披露义务实为「只读披露+修复导流+无变异故无 undo」语义；机检单源以修订版 0028-elements.yaml 为准（read_only_disclosure+repair_redirect(all:[scene_plan,auto_fix])+no_mutation_no_undo+会话前置）。A 案（裸否定词表极性守卫）否决依据实证存档：现行要素词表已含 5 个否定式 token（"not\s+undo"/"cannot be undone"/"no\s+undo"/"not\s+persist"/"does not persist"），一刀切守卫落地即自伤。
+
 限流/安全管道等防护实现细节**不进必备**（TDQS 评描述对行为的透明度非防护清单；除非它改变调用者决策）。机检形态=`docs/adr/0028-elements.yaml` 单源清单（本 ADR 引用 + CI 消费——立法与断言同源防漂移）。
 
 ### 3. 消歧惯例=单向 `Boundary:` 行（D-174②）
@@ -33,9 +35,11 @@
 集中路由表对 TDQS **零贡献**（评审输入只看 name+description）；全局 instructions 仅跨模块分工用。
 **禁句式**：「always call this first」类强制排序（spec 原话 "A boundary is describable; a priority is not"——写边界满分、写强制序反扣）。
 
-### 4. 验收=复合判据（D-173②）
+### 4. 验收=复合判据（D-173②，D-182 重校准）
 
-Glama 线上重评 **≥4.0（目标 4.2 防 round1 边界效应）+ min 逐工具 ≥3.0 无 C 级 + 零 annotation contradiction 旗标**。本地可用开源 tdqs repo 的 Appendix A/B prompt 预评——**仅作 PR 前回归参考，不入 CI 不作验收门**（Glama 生产 LLM 型号/温度未公开=官方自认管线唯一非确定性步骤，本地分与生产分不可对齐）。
+Glama 页面**字母档 A + min 逐工具 ≥3.0 + 零 annotation contradiction 旗标**——三要件全锚 TDQS spec 官方成文条款（字母档 A=≥3.5、「tier-B passing bar」逐件 ≥3.0、contradiction 自动 1 分+公开旗标），零推断成分。stretch=3.8 系本仓自设推断目标（乐观推演值非官方阈值，禁入对外宣称文本，D-149）。本地可用开源 tdqs repo 的 Appendix A/B prompt 预评——**仅作 PR 前回归参考，不入 CI 不作验收门**（Glama 生产 LLM 型号/温度未公开=官方自认管线唯一非确定性步骤，本地分与生产分不可对齐）。
+
+> 原判据存照（R38 D-173② 立法原文，经 D-182 重校准不删）：「线上重评 ≥4.0（目标 4.2 防 round1 边界效应）+ min 逐工具 ≥3.0 无 C 级 + 零旗标」——4.0/4.2 系「字母档阈值官方未发文」期防御性推断；R39 复核 spec 正文已成文规定字母档（A=≥3.5/B=≥3.0「tier-B passing bar」），原推断值降 stretch 双轨，「无 C 级」并入 min≥3.0 蕴含。（GM-22-001 多基线惯例保留供审计。）
 
 ### 5. 生效面与发版纪律（D-175①③）
 

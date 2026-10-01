@@ -44,6 +44,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   security threat model (`docs/threat-model.md:162`) to reflect `execute_code`
   arbitrary execution privilege and `scene_validate` read-only constraint semantics.
 
+- **TDQS polarity mechanism hardened to clause scope (D-190)** — the
+  mutation-class existence guard in
+  `.github/scripts/check_tdqs_disclosure.py::_negated` scopes the negation
+  window to the enclosing clause instead of a fixed 80-char window, and
+  `docs/adr/0028-elements.yaml` gains the element-level `positive_exemptions`
+  field plus the polarity direction limit (the guard applies only to purely
+  positive pattern sets; negation-form elements stay unguarded). Negated-only
+  matches stay warn-level. The two-track corpus measurement D-191①c requires is
+  now a committed instrument instead of a per-round scratch probe:
+  `.github/scripts/polarity_corpus_probe.py` (manual, not wired into CI).
+  Evidence — environment: Python 3.11.9 on Windows;
+  `python -m pytest tests/test_check_tdqs_disclosure.py -q` -> exit 0,
+  17 passed, artifact in-repo
+  (`tests/test_check_tdqs_disclosure.py::test_polarity_cross_clause_cue_does_not_negate`,
+  `tests/test_check_tdqs_disclosure.py::test_polarity_same_clause_exemption_forgives_cue`,
+  `tests/test_check_tdqs_disclosure.py::test_live_corpus_has_no_polarity_warnings`);
+  `python .github/scripts/check_tdqs_disclosure.py` -> exit 0, 36 elements
+  across 12 tools, artifact `.github/scripts/check_tdqs_disclosure.py`.
+
 ### Fixed
 
 - **MCP ImageContent snake_case attribute alignment** — align `mt.ImageContent`

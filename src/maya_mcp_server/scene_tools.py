@@ -693,12 +693,19 @@ result
         name: str = "CAM_orbit",
         session_key: str | None = None,
     ) -> str:
-        """Create a camera that orbits around a point with animation.
+        """Create an orbiting camera with turntable animation around a point.
+
+        Side effects: creates a new camera and animation curves in the
+        scene and marks the scene dirty. Not idempotent — each call adds
+        another camera. Requires an active Maya session.
+
+        Boundary: Disambiguated from camera_create (static shot-type
+        framing; use camera_orbit only when an animated orbit is needed).
 
         Args:
-            center: JSON string with center position [x, y, z].
+            center: Orbit center as a JSON string "[x, y, z]".
             radius: Orbit radius in scene units.
-            frames: Number of frames for full orbit.
+            frames: Number of frames for one full orbit.
             name: Camera name.
             session_key: Maya session key.
 
