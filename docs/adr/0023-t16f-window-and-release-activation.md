@@ -105,6 +105,13 @@ Maya 开机激活整条阻塞链，本轮同裁：T-16f 执行面 + 通过后的
 - **披露**：续期上限 2 次=GRCOPILOT 惯例级非 ISO/SOC2 规范级；「门审由烧债完成度触发」=NASA 分级链+D-167β 同构推导非直接工业同名先例。
 - **R38 注记（D-176）**：本块及 D-168~171 中「owner 之外门权者（user）重签」之 user 义=gate_authority（门权者=human user 或具名授权代理，代签须录 renewed_by 三元组）；waiver 行 owner 字段=debt_owner（欠账责任方，数据语义不变仅获术语名）；D-168④ 措辞位已标 scoped revised，词条见 CONTEXT.md。
 
+**R41 增补（D-187/D-189/D-191/D-192，2026-10-01）——0.6.0 车选、expiry 复核规程、门测量口径与门审前置议题登记**：
+
+- **0.6.0 minor 车选（D-187）**：下一发版=0.6.0 minor——gr→P-A→P-B 三独立 PR（D-186）全合+CI 绿+本 ADR preflight 清单全过+人工确认门点头后切 `v0.6.0`；annotated tag+GH Release 页义务位循 R32/D-084 惯例。定性=两个新 CI 机件（TDQS 棘爪+evidence-anchors）+披露批+修复批的 minor 功能窗非文本专列（D-175③ 标的=pure-text 专列不涉本批）；兼作「Glama 重扫源=PyPI-pull」假说的决定性自然实验（D-182③ 忠实执行）。
+- **release-preflight 第 7 行（D-189）——evidence-anchor expiry 复核**：每次 release-preflight 窗内跑 `check_evidence_anchors.py` 并按锚点形态分桶——裸 `path:line` 类=设计内 advisory 永久 warn 不计误报分母（存量约 40 条登记升级债逐步消化，触发债纪律 D-122）；可硬化类（`path::symbol` unresolvable/pytest node ID/`sha:path:line` not-exist-at-HEAD）逐条人工核验分真假（`_symbol_exists` 只认顶层 def/class+一层方法，`__all__`/动态名/深层嵌套=AST 盲区→记 FP）；FP 率=FP/(TP+FP) 仅对可硬化类计；判据=零/低误报→该形态升 hard、>30%→退人工抽查+修 checker 债（D-183④ 原文）；结果=账本事件行（时间戳+逐类计数+FP率+判定）+分类工件归档 docs/evidence/。人工执行项不进 push CI——复核=measurement 非 gate（循第 6 行先例）。
+- **门测量口径（D-191）**：diff 行数 canonical=numstat（--stat vs numstat 差=口径非错误）；TDQS 要素/工具计数以 `0028-elements.yaml` 解析值为唯一真值（运行快照计数差=时点差非缺陷，报告须注明快照时点）；极性零误拒语料分母=真实校验面为主测（工具↔其要素断言面）+全量 docstrings 笛卡尔积作压测面，两轨口径禁混淆；mypy `new:0` 语义=raw 过滤 baseline 后无新增（现行 raw 184 vs baseline 199，增量判新细则见 AGENTS.md mypy 实践行）。
+- **gate review 前置议题登记块（D-192）**：v1.0.0 门审前置独立议题（非门清单行，D-171 隔离条款）=**P3 工具面合并复议**。判据=D-179② 原文（同构族测试=3+ 操作共享大部分参数+合并前 LLM 驱动实测选错率）；触发债三条件=D-179③ 原文摘录（Disambiguation 仍 3/5 且真实客户端实证选错 / Glama 调分带收益归零自动作废 / 工具面越 ~35 件转可用性题）；证据指针占位=Glama 批后维度读数快照+客户端实测报告+工具面计数；**骨架禁含判决倾向**——材料于门审召集窗按当刻快照重算（陈旧快照判案=门审 _Avoid_）。
+
 ## D-069：#2/#7 发帖机制
 
 本窗口即发（备稿就绪+"≥0.1.0 已含"耐久真话不依赖 0.1.2）；执行=**agent 贴终稿→用户过目→gh 以用户账号发出**。过目为授权前置条件，发出前用户有最终否决点；其余四条（#1/#3/#4/#5）仍等 0.1.2 发布后同流程；一 issue 一评不追评纪律不变；措辞改动须回草稿重过目。
