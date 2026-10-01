@@ -235,6 +235,7 @@ Failure to update dependent files will cause integration failures.
 | `maya_scene_module.py` (scene_review check names/semantics) | `skills/scene-review-playbook/SKILL.md` | Card documents the 11 checks + findings→actions; check renames/semantics changes must sync it |
 | `maya_scene_module.py` (line-count growth) | `.github/monolith-budget.json`, `.github/scripts/check_monolith_budget.py`, `tests/test_check_monolith_budget.py` | D-125 ratchet: growth past the frozen cap fails the lint job; legitimate additions need a human-approved budget edit in the same PR with the reason stated; new Maya-side capability routes to a same-unit separate file (ADR-0027 criterion 4), never appended to the monolith |
 | `docs/adr/0028-elements.yaml` / tool descriptions | `.github/scripts/check_tdqs_disclosure.py`, `tests/test_check_tdqs_disclosure.py`, `docs/adr/0028-tdqs-description-quality.md`, `src/maya_mcp_server/pipeline.py` | D-175 disclosure ratchet: tool description elements and boundary targets must strictly satisfy 0028-elements.yaml; changes require PR explicit review |
+| `CHANGELOG.md` / `docs/decision-ledger.md` / `docs/adr/**` / `docs/evidence/**` (证据指针) | `.github/evidence-anchor-forms.yaml`, `.github/scripts/check_evidence_anchors.py`, `tests/test_check_evidence_anchors.py`, `.github/workflows/ci.yml` | D-183 锚点形态白名单单源——脚本与模板双消费防双真源；裸 path:line=warn 升级提示，sha 钉死除漂移 |
 
 ### Injected-module admission criteria (注入模块准入判据, ADR-0027 + D-095)
 
@@ -277,13 +278,25 @@ Rule: the client.py module_call family only accepts domain-agnostic
 call-construction primitives — no domain semantics. Drifted domain
 variants inline back per the D-090 playbook.
 
-### Changelog Evidence Rule (D-082⑦)
+### Changelog Evidence Rule (D-082⑦, D-183)
 
 Every `Added`/`Fixed`/`Changed` bullet in CHANGELOG.md MUST carry an
-executable evidence pointer — a `path:line` or a test node ID — so a
-wording drift like the 0.2.0 "manifest-based cache" line (which claimed
-a mechanism the code never had) is lint-checkable by inspection. The
-`[0.2.1]` section is the first compliant section.
+executable evidence pointer — so a wording drift like the 0.2.0
+"manifest-based cache" line (which claimed a mechanism the code never
+had) is lint-checkable by inspection.
+Anchor forms are whitelisted by the single source
+`.github/evidence-anchor-forms.yaml` (D-183): pytest node ID >
+`path::symbol` (AST-verified) > `sha:path:line` > bare `path:line` —
+the bare form is a warn-level upgrade hint in versioned docs and stays a
+legitimate transient form in `.scratch/`. Two structured requirements:
+every evidence command records the environment + exit code + artifact
+path triple; every `Fixed` entry records the broken version → fixed
+version field.
+`.github/scripts/check_evidence_anchors.py` runs in the lint job —
+`::warning::` + exit 0 during the observation period — checking pointer
+reachability + structural existence only; content truth, fix direction,
+and reproducibility remain human-review responsibilities. The `[0.2.1]`
+section is the first compliant section.
 
 ### Asset Directory Discipline (D-082⑥⑤)
 

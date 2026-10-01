@@ -50,6 +50,9 @@ jobs:
         run: python .github/scripts/check_monolith_budget.py
       - name: tdqs disclosure elements gate (D-175)
         run: python .github/scripts/check_tdqs_disclosure.py
+
+      - name: evidence anchors check (D-183)
+        run: python .github/scripts/check_evidence_anchors.py
       - name: pre-commit fallback (all files)
         run: |
           pip install pre-commit
