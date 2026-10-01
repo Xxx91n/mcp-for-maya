@@ -68,6 +68,21 @@ CI 断言「结构化要素存在」非「关键词字面」（`Boundary:` 行=�
 - Dockerfile 分支（推断构建走 PyPI 拉包时 merge 不生效）置信度中——金丝雀实验兜底。
 - TDQS 对消歧形态无逐项官方表态（内嵌胜出系 Appendix B 评审输入面高置信推断）。
 
+## R41 增补（D-188/D-190，2026-10-01）——判负决策树与极性硬化形态
+
+**判负决策树（唯一真源=账本 D-188 行）**：Glama 重评后按可观测信号分四支——
+
+| 分支 | 信号 | 归因假设 | 合法动作 |
+|---|---|---|---|
+| Br-a | 字母升档但某件 min<3.0 | 单件执行/描述质量 | 描述再修（非破坏）；结构性归因（如 schema 多类型/必填参数）→D-181③ schema/breaking 窗另裁 |
+| Br-b | min 全过但整体仍 B | coherence 结构性拖（Disambiguation/Tool Count 文本够不到面） | 三档只记观察——P3 触发债条件①复合核验=「是-可即兑 / 是-实证义务已触发 / 否」+如实记读数；**P3 解冻判定权归 gate review 前置议题（ADR-0023 R41 登记块，D-192），本树不直接触发** |
+| Br-c | Scored 时间戳不动 | PyPI-pull 实锤或更深缺口 | 0.6.0 publish 后 PyPI 拉取核验→仍不动则新缺口立项（D-182③+D-187③） |
+| Br-d | annotation 旗标非零 | 描述自相矛盾 | 逐旗检修描述（最直接可修面） |
+
+判据值源=账本 D-182① 三要件未减；判负≠缩门（D-171③ 车道隔离）；全过=验收（D-182②）→账本事件行+docs/evidence/ 快照归档+distribution-surfaces 同步；**Glama 徽章达标前禁写、达标后可选**（滚动宣称纪律 D-149/D-184③）。
+
+**极性硬化形态立法（D-190，唯一真源=账本行）**：①子句级否定窗——cue 与 match 之间无子句边界才算否定（80char 固定窗=被淘汰的 NegEx 前形态；收窄方向 FP 必降，代价=跨子句真否定漏判归 FN 面，防假绿场景 FN 危害远低 FP）；②`0028-elements.yaml` 新增 `positive_exemptions` 要素级字段枚举合法否定式披露短语（ConText pseudo-trigger 同构——无豁免表则强制挂扩面时否定式 pattern 要素全自伤）；③方向限定条款——`polarity_aware: true` 强制挂载仅限 pattern 集纯肯定式的 mutation 存在性断言（现行唯一实例=camera_orbit/mutation_side_effects）；否定式 pattern 要素不挂守卫、其保护走豁免表；④warn 起步挂 0.6.0 preflight 复核——分母=被判 negated_only 的 polarity_aware 要素数、分子=其中实为合法肯定披露，零误拒→升 hard、>30%→退人工抽查。切分符/cue 表/豁免短语清单禁入立法行只进执行窗产物（D-180③）；warn 降级仅限 negated_only 分支，P0/Boundary 存在性判定保持 hard。
+
 ## 关联
 
 - 前置：ADR-0012（对标与宣称纪律链）、ADR-0023（发布门三态——本轮为 listing 面非门清单项）、ADR-0027（消歧惯例先例出处域）
