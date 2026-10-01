@@ -329,3 +329,31 @@ _Avoid_: 与 gate_authority 混用同一词、owner 字段被读成「批准人�
 **gate_authority（门权者）**:
 waiver 续期重签的裁决位（D-176）——=human user 或其具名授权代理；代理代签合法性条款=renewed_by 录三元组「代理账号+authorized by=委托人+日期」，授权链具名可追溯即担责等价（UCC §3-402 同构：intra vires 行为责任归 principal；ISC2：审批人与委托人共担）；约束精确化=debt_owner≠签署方（防自查自批），非「owner 之外的 user」。
 _Avoid_: 欠账人自签、无名授权链、「authorized by human」当无凭据口头语、门审后仍走代理补豁免（车道已关）
+
+**极性感知断言 (polarity-aware assertion)**:
+mutation 类披露的存在性断言必须区分肯定/否定极性的立法原则（D-180——S-03 病灶实证：autofix_mutation 断言被否定句「without auto_fix mutations」反向满足=CI 假绿，且现行要素词表已含 5 个否定式 token，朴素守卫落地即自伤）——断言对象=肯定性披露，否定句式不充数；机制形态经 D-190 立法=子句级窗+positive_exemptions 豁免表+方向限定条款（承接注记——切分符/豁免短语清单细则仍归执行窗产物）；与「要素存在性棘爪」分工=棘爪管结构化要素存在，极性感知管 mutation 类断言不得被否定句满足。
+_Avoid_: 裸关键词断言管 mutation 面、否定 token 一刀切误杀自带否定的正确披露（"cannot be undone"/"does not modify"）、把未实测正则形态钉进立法、个案修复不留原则致下一件 mutation 断言复刻盲视
+
+**锚点形态白名单 (anchor-form whitelist)**:
+证据指针可接受形态的优先级序（D-183——P-03b 行号漂移一般化：裸 path:line 每次编辑即失效属结构性缺陷）——pytest node ID＞path::symbol（AST 符号存在性抗漂移）＞sha:path:line（commit 钉死断面）＞裸 path:line；裸 path:line 在版本化文档=warn 提示升级的合法临时态，.scratch 过程报告中合法形态；白名单为单源机读件，机检脚本与文档模板双消费防双真源；「可执行证据指针」词条的形态细则由本单源细化（D-082⑦ scoped revised 随机件批落地）。
+_Avoid_: 裸行号当永久锚、模板与脚本各执一套形态表（双真源）、无 expiry 锚长期挂 warn（warnings 被无视反模式）、对 .scratch 面装机检（CI checkout 不可达 gitignored 文件）
+
+**承接注记 (carry-over annotation)**:
+对既有决策保留原文、append 修正/继承注记的「改指针不改语义」惯例（D-108② 先例定型，D-179/D-181 承用）——适用面=理由锚修正、范围注记级扩界、勘误链指向；与 scoped revised 分工：注记管理由层/范围注记层（结论不变仅论据或边界细化），revised 管条款语义层反转（须保留原记录+新 D-xxx 呈报）。
+_Avoid_: 静默改写原条目、把实质条款反转包装成注记（那须走 revised 呈报车道）、注记藏在修订文本里不复指原行
+
+**验收门/stretch 双轨 (committed gate vs aspirational stretch)**:
+验收判据的双轨表述纪律（D-182）——验收门锚官方成文语义（Glama 字母档 A=≥3.5 spec 正文+min 逐件≥3.0 tier-B passing bar+零 contradiction 旗标），stretch=本仓自设推断目标（3.8=乐观推演值）如实标注自设非官方；判据修订走重基线惯例（原判据保留在 ADR 被否选项/修订注记不删=多基线供审计，GM-22-001 同构）；stretch 值禁入对外宣称文本（D-149 校准宣称）。
+_Avoid_: 推断值立为验收门（已知不可达的门逼出未来口径游戏）、门与 stretch 混写不分轨、对外宣称引 stretch 值充门、为达标缩门静默改写（须走 revise 呈报+披露义务）
+
+**判负决策树 (fail-branch decision tree)**:
+验收门判负处置的预注册分流表（D-188——SRE「SLO without policy is just another KPI」同构：判据三要件+判负树合起来才是有牙的门）——按可观测信号分四支（字母升但 min<3.0=执行质量件返修或走 D-181③ schema 窗 / min 全过但整体 B=coherence 结构性拖只记观察 / Scored 时间戳不动=扫源假说核验开新缺口 / annotation 旗标=逐旗检修），临场即兴归因是缩门与乱开 P3 的温床故树须先于判负时刻立法（D-171③ 防御延伸）。
+_Avoid_: 判负当刻现编归因、把结构性判负包装成执行质量返修、绕过决策树直接触发 P3 解冻（判定权归门审）、拿决策树当缩门工具
+
+**前置议题登记 (pre-agenda registration)**:
+gate review 等终审事件的前置议题在立法面注册的骨架形态（D-192——ADR-0023 R41 登记块为首例）——含议题槽+判据引用+触发债条件摘录+证据指针占位符+「材料于召集窗按当刻快照重算」标注；骨架本身零结论、禁预制判决倾向，登记面须与门同寿（瞬态任务书会逐轮重写漂移）。
+_Avoid_: 骨架内预写结论或判决倾向、拿占位符当证据本身、议题放瞬态载体随批遗失、召集窗不重算材料直接拿登记时快照判案
+
+**发版车 (release train)**:
+发布动作的「有车即搭」心智模型（D-187——semver §7 批量取最高跳档+changelog 即发版触发器：Unreleased 节有实质条目即装货完毕该发车）——发版位=既有纪律的人工确认门非编排裁决面；发版密度受 PyPI append-only 对单次发版的质量门约束而非频率上限（D-093）；文本专列=无实质内容的为文本单发版，被 D-175③ 禁止，与「实质批搭车」合法形态区隔。
+_Avoid_: 为文本单发版空驶、实质批攒批不发致门状态悬空、把发版车等当审批门（判据仍是 preflight+人工确认门）
