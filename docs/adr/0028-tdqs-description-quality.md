@@ -67,7 +67,8 @@ CI 断言「结构化要素存在」非「关键词字面」（`Boundary:` 行=�
 - Glama 各字母带阈值官方未发文（≥4.0/目标 4.2 系边界余量防御性推断）；生产评分 LLM 型号/温度未公开。
 - Dockerfile 分支（推断构建走 PyPI 拉包时 merge 不生效）置信度中——金丝雀实验兜底。
 - TDQS 对消歧形态无逐项官方表态（内嵌胜出系 Appendix B 评审输入面高置信推断）。
-
+- 极性方向限定（D-190③）**仅由受守卫集合钉死强制，pattern 纯度无机检**（2026-10-02 审计实证）：否定式要素在同一子句通常既有正命中又有负命中，而 `negated_only = negated and not positive` 使 `matched=True`，故把 `polarity_aware` 挂到否定式 pattern 要素后 `check()` 返回 ok=True / 0 errors / 0 warnings（实测五件否定式要素 `execute_code/irreversible`、`scene_validate/read_only_disclosure`、`scene_validate/no_mutation_no_undo`、`write_module/overwrite_or_persistence_semantics`、`camera_orbit/non_idempotent` 全挂亦然）。断言层原理上测不出该违规；残余强制=人工 review。不做正则纯度 lint 的理由=那正是 D-180③/D-190③ 禁入立法面的未实测正则形态，且需自带语料验证窗。
+- 子句级否定窗换来的**假阴性（FN）面从未测量**（2026-10-02 审计提出）：D-190① 明知收窄方向以 FN 换 FP，但本窗只测了 FP 下降（naive 53 → 子句级 4），未构造任何真否定跨子句的语料来量 FN。此项直接卡住 D-190④ 的 warn→hard 升档——升档判据需要误拒分母，而反向的漏判分母尚无基线。
 ## R41 增补（D-188/D-190，2026-10-01）——判负决策树与极性硬化形态
 
 **判负决策树（唯一真源=账本 D-188 行）**：Glama 重评后按可观测信号分四支——
@@ -82,6 +83,8 @@ CI 断言「结构化要素存在」非「关键词字面」（`Boundary:` 行=�
 判据值源=账本 D-182① 三要件未减；判负≠缩门（D-171③ 车道隔离）；全过=验收（D-182②）→账本事件行+docs/evidence/ 快照归档+distribution-surfaces 同步；**Glama 徽章达标前禁写、达标后可选**（滚动宣称纪律 D-149/D-184③）。
 
 **极性硬化形态立法（D-190，唯一真源=账本行）**：①子句级否定窗——cue 与 match 之间无子句边界才算否定（80char 固定窗=被淘汰的 NegEx 前形态；收窄方向 FP 必降，代价=跨子句真否定漏判归 FN 面，防假绿场景 FN 危害远低 FP）；②`0028-elements.yaml` 新增 `positive_exemptions` 要素级字段枚举合法否定式披露短语（ConText pseudo-trigger 同构——无豁免表则强制挂扩面时否定式 pattern 要素全自伤）；③方向限定条款——`polarity_aware: true` 强制挂载仅限 pattern 集纯肯定式的 mutation 存在性断言（现行唯一实例=camera_orbit/mutation_side_effects）；否定式 pattern 要素不挂守卫、其保护走豁免表；④warn 起步挂 0.6.0 preflight 复核——分母=被判 negated_only 的 polarity_aware 要素数、分子=其中实为合法肯定披露，零误拒→升 hard、>30%→退人工抽查。切分符/cue 表/豁免短语清单禁入立法行只进执行窗产物（D-180③）；warn 降级仅限 negated_only 分支，P0/Boundary 存在性判定保持 hard。
+
+**执行窗落地注记（D-190，2026-10-02）**：立法面只到形态层，机制清单按 D-180③ 纪律不入本节。清单落点两处且互不重叠——**子句切分符集合 + cue 表**属机制形态，单源在 `.github/scripts/check_tdqs_disclosure.py`（`CLAUSE_BOUNDARIES` / `NEGATION_CUES`）；**要素级豁免短语**属要素数据，与其余要素字段同处 `docs/adr/0028-elements.yaml` 的 `positive_exemptions`（含 D-190③ 方向限定条款）。落地判据（常驻可复跑）= 主测面零误拒，由 `tests/test_check_tdqs_disclosure.py::test_live_corpus_has_no_polarity_warnings` 断言；方向限定条款（D-190③）的强制方式是**受守卫集合精确钉死**，不是警告机制：测试常量 `LEGISLATED_GUARDED` 断言受守卫集合恰为 `camera_orbit/mutation_side_effects`，任何新增挂载即转红（2026-10-02 实测：给 `scene_validate/read_only_disclosure` 挂守卫 → `AssertionError: guarded set drifted`，exit 1）。**钉死式强制不覆盖 pattern 纯度**——见下方缺口披露第 4 条。压测面计数由 `.github/scripts/polarity_corpus_probe.py`（手工测量件，不入 CI）两轨分报：主测 36 要素 / 1 挂守卫 / 0 误拒；压测 287 个带 docstring 的函数 × 全要素 pattern = 357 匹配，naive 80 字符窗 53 → 子句级 4（豁免 49 次误拒）。分母口径注记（D-191①c）：早前证据中的 264 系探针把 docstring 按裸函数名收进单个 dict、塌缩 23 个同名函数所致，非语料属性，勿与 287 直接比较。warn → hard 仍待 0.6.0 preflight 复核（D-189）。
 
 ## 关联
 
