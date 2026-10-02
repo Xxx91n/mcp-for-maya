@@ -36,6 +36,72 @@ class TestWorldBbox:
         assert gaps[2] == pytest.approx(0.8 - math.sqrt(2) / 2, abs=1e-2)
         assert m["bbox_overlap"] is False
 
+    def test_measure_clearance_zero_does_not_mean_merely_touching(self, maya_env):
+        """A 0 clearance is NOT proof the boxes only touch.
+
+        Per-axis gap is +separated / 0=touching / -penetrating. Here X and Z
+        penetrate by 0.5 while Y is exactly touching, so the implementation
+        takes the "at least one axis >= 0" branch and computes the euclidean
+        distance over the POSITIVE parts only -- which is zero. Reading 0 as
+        "the boxes just touch" would miss a real 0.5cm interpenetration.
+
+        This is the counterexample that pinned the scene_measure docstring
+        rewrite: the old wording claimed "0 means the boxes touch on every
+        axis", which this configuration contradicts.
+        """
+        maya_env.scene.add_mesh(
+            "GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9)
+        )
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(-9.5, -9, -9.5), bbox_max=(-8.5, -8, -8.5)
+        )
+        m = maya_env.module.measure("GEO_a", "GEO_b", "clearance")
+
+        gaps = m["details"]["clearances_xyz"]
+        assert gaps[0] == pytest.approx(-0.5, abs=1e-6), "X must read as penetrating"
+        assert gaps[1] == pytest.approx(0.0, abs=1e-6), "Y must read as exactly touching"
+        assert gaps[2] == pytest.approx(-0.5, abs=1e-6), "Z must read as penetrating"
+
+        assert m["distance"] == pytest.approx(0.0, abs=1e-6), (
+            "distance collapses to 0 even though two axes interpenetrate"
+        )
+        assert m["bbox_overlap"] is False, (
+            "bbox_overlap is all-three-penetrating only, so 2-of-3 reads false"
+        )
+
+    def test_measure_clearance_negative_is_shallowest_penetration(self, maya_env):
+        """All three axes penetrate -> distance is the shallowest one, i.e.
+        the minimum translation that separates the boxes."""
+        maya_env.scene.add_mesh(
+            "GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9)
+        )
+        # X and Y shift by 0.5 (gap -0.5 each); Z is coincident (gap -1.0).
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(-9.5, -9.5, -10.0), bbox_max=(-8.5, -8.5, -9.0)
+        )
+        m = maya_env.module.measure("GEO_a", "GEO_b", "clearance")
+        assert m["details"]["clearances_xyz"] == pytest.approx([-0.5, -0.5, -1.0], abs=1e-6)
+        assert m["distance"] == pytest.approx(-0.5, abs=1e-6), (
+            "the SHALLOWEST penetration (-0.5) is reported, not the deepest (-1.0)"
+        )
+        assert m["bbox_overlap"] is True
+
+    def test_measure_clearance_positive_ignores_penetrating_axes(self, maya_env):
+        """A separated axis dominates: Y is clear by 2.5 while X and Z
+        penetrate, so the distance is 3.0 and the penetration is invisible."""
+        maya_env.scene.add_mesh(
+            "GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9)
+        )
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(-9.5, -6.5, -9.5), bbox_max=(-8.5, -5.5, -8.5)
+        )
+        m = maya_env.module.measure("GEO_a", "GEO_b", "clearance")
+        # Y separation = B.y_min - A.y_max = -6.5 - (-9) = 2.5
+        assert m["distance"] == pytest.approx(2.5, abs=1e-6), (
+            "only the separated axis contributes; X and Z penetration is invisible"
+        )
+        assert m["details"]["clearances_xyz"][0] == pytest.approx(-0.5, abs=1e-6)
+
     def test_measure_center_mode(self, maya_env):
         maya_env.scene.add_mesh("GEO_a", t=(10, 0, 0))
         maya_env.scene.add_mesh("GEO_b", t=(0, 0, 30))

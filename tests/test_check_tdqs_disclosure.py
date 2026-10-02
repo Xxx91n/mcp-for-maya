@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -548,8 +551,13 @@ def _live_data(mod):
 
 
 def _covers_err(mod, data, needle):
-    errs = mod.check_coverage_and_derivation(mod.REPO, data)
+    errs, _warns = mod.check_coverage_and_derivation(mod.REPO, data)
     return [e for e in errs if needle in e]
+
+
+def _covers_warn(mod, data, needle):
+    _errs, warns = mod.check_coverage_and_derivation(mod.REPO, data)
+    return [w for w in warns if needle in w]
 
 
 def test_live_coverage_floor_holds():
@@ -561,7 +569,8 @@ def test_live_coverage_floor_holds():
     assert annotated - covered == set(), (
         "tools with neither elements nor an exemption: " f"{sorted(annotated - covered)}"
     )
-    assert not mod.check_coverage_and_derivation(mod.REPO, data)
+    errs, _warns = mod.check_coverage_and_derivation(mod.REPO, data)
+    assert errs == []
 
 
 def test_live_no_stale_elements_entries():
@@ -718,11 +727,131 @@ def _guarded(mod):
     ]
 
 
+
+# ---------------------------------------------------------------------------
+# F2 rot guard. A hand-pinned corpus count in a comment goes stale silently,
+# and this file already carried one that the probe contradicted. The numbers
+# live in polarity_corpus_probe.py; the invariant lives here.
+# ---------------------------------------------------------------------------
+
+_ROT_PATTERNS = (
+    re.compile(r"=\s*\d+\s+(?:elements|matches)"),
+    re.compile(r"\d+\s+false\s+rejections"),
+    re.compile(r"\d+\s+docstring-bearing\s+functions"),
+    re.compile(r"=\s*\d+\s*,\s*\d+\s+guarded"),
+)
+
+
+def test_no_hand_pinned_corpus_counts():
+    """No live-corpus count may be quoted in the checker's own prose."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    offenders = []
+    for n, line in enumerate(text.split("\n"), 1):
+        stripped = line.lstrip()
+        if not (stripped.startswith("#") or stripped.startswith('"')):
+            continue
+        for pat in _ROT_PATTERNS:
+            if pat.search(stripped):
+                offenders.append(f"{n}: {stripped}")
+                break
+    assert offenders == [], (
+        "hand-pinned corpus counts reintroduced (read them off "
+        "polarity_corpus_probe.py instead):\n" + "\n".join(offenders)
+    )
+
+
+def test_probe_is_the_single_source_for_corpus_counts():
+    """The probe reports counts; this test only pins that they are derivable
+    at run time, i.e. the claim above stays true."""
+    out = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "polarity_corpus_probe.py")],
+        capture_output=True, text=True, check=False,
+    )
+    assert out.returncode == 0, out.stderr[-2000:]
+    assert "PRIMARY:" in out.stdout and "STRESS:" in out.stdout, out.stdout[-2000:]
+
+
+# ---------------------------------------------------------------------------
+# F4: the 'due' is compared against the project version, not merely non-empty.
+# ---------------------------------------------------------------------------
+
+
+def test_live_no_exemption_is_overdue():
+    mod = _load()
+    data = _live_data(mod)
+    version = mod.project_version(mod.REPO)
+    assert version is not None, "pyproject.toml must be readable for due checks"
+    assert _covers_warn(mod, data, "is due") == [], (
+        f"version {'.'.join(map(str, version))} has reached an exemption deadline"
+    )
+
+
+def test_due_fires_once_the_project_version_reaches_it(monkeypatch):
+    mod = _load()
+    data = _live_data(mod)
+    monkeypatch.setattr(mod, "project_version", lambda root: (99, 0, 0))
+    hits = _covers_warn(mod, data, "is due 0.7.0")
+    assert len(hits) == 12, hits
+    assert "D-195 4" in hits[0]
+
+
+def test_due_boundary_is_inclusive(monkeypatch):
+    mod = _load()
+    data = _live_data(mod)
+    monkeypatch.setattr(mod, "project_version", lambda root: (0, 6, 9))
+    assert _covers_warn(mod, data, "is due") == [], "0.6.9 is still short of 0.7.0"
+    monkeypatch.setattr(mod, "project_version", lambda root: (0, 7, 0))
+    assert _covers_warn(mod, data, "is due"), "0.7.0 has reached the deadline"
+
+
+def test_unparseable_due_is_an_error_not_a_silent_pass():
+    mod = _load()
+    data = _live_data(mod)
+    data["coverage_exemptions"]["camera_create"] = {"reason": "x", "due": "next release"}
+    assert _covers_err(mod, data, "not a dotted numeric version")
+
+
+def test_unreadable_version_warns_instead_of_silently_passing(monkeypatch):
+    """If the version cannot be read, an overdue exemption would pass
+    unnoticed. That must be loud, not silent."""
+    mod = _load()
+    data = _live_data(mod)
+    monkeypatch.setattr(mod, "project_version", lambda root: None)
+    hits = _covers_warn(mod, data, "was NOT checked")
+    assert len(hits) == 12, hits
+
+
+def test_project_version_reads_the_project_field():
+    mod = _load()
+    text = (mod.REPO / "pyproject.toml").read_text(encoding="utf-8")
+    expected = tuple(
+        int(x) for x in re.search(r'(?m)^version\s*=\s*"([0-9.]+)"', text).group(1).split(".")
+    )
+    assert mod.project_version(mod.REPO) == expected
+    assert mod._version_tuple("0.7.0") == (0, 7, 0)
+    assert mod._version_tuple("v0.7.0") is None
+    assert mod._version_tuple("") is None
+
+
+# ---------------------------------------------------------------------------
+# D-199: fixtures are BOUND to the element they exercise, so the subset
+# assertion can actually fail. An unbound list of strings cannot contradict
+# anything, which is what the audit caught.
+# ---------------------------------------------------------------------------
+
+# (tool, element_id, text). The binding is load-bearing: it is what lets
+# test_negation_fixtures_are_a_subset_of_guarded_elements fail when a fixture
+# targets something that is not guarded, and what makes a newly guarded element
+# demand its own fixture.
 NEGATION_FIXTURES = [
-    "This call does not create a new camera.",
-    "It never adds animation curves to the scene.",
-    "Calling this twice will not create a new camera.",
-    "This call does not mark the scene dirty.",
+    ("camera_orbit", "mutation_side_effects", "This call does not create a new camera."),
+    ("camera_orbit", "mutation_side_effects", "It never adds animation curves to the scene."),
+    (
+        "camera_orbit",
+        "mutation_side_effects",
+        "Calling this twice will not create a new camera.",
+    ),
+    ("camera_orbit", "mutation_side_effects", "This call does not mark the scene dirty."),
 ]
 
 
@@ -739,10 +868,12 @@ def test_every_guarded_element_has_a_firing_negation_fixture():
     import re
 
     for tool, elem in _guarded(mod):
+        bound = [f for f in NEGATION_FIXTURES if f[0] == tool and f[1] == elem["id"]]
+        assert bound, f"{tool}/{elem['id']} has no bound negation fixture"
         patterns = elem.get("any", [])
         exempt = tuple(elem.get("positive_exemptions", ()))
         fired = False
-        for text in NEGATION_FIXTURES:
+        for _t, _e, text in bound:
             pos = neg = 0
             for pat in patterns:
                 for m in re.finditer(pat, text):
@@ -763,8 +894,12 @@ def test_negation_fixtures_are_a_subset_of_guarded_elements():
     otherwise the fixture list grows a second, unpinned notion of guarded."""
     mod = _load()
     guarded = {f"{t}/{e['id']}" for t, e in _guarded(mod)}
-    fixture_targets = set(LEGISLATED_GUARDED)
-    assert fixture_targets <= guarded, (
-        f"fixtures target non-guarded elements: {sorted(fixture_targets - guarded)}"
+    targets = {f"{t}/{e}" for t, e, _text in NEGATION_FIXTURES}
+    assert targets, "the fixture list must not be emptied"
+    assert targets <= guarded, (
+        f"fixtures target non-guarded elements: {sorted(targets - guarded)}"
     )
-    assert NEGATION_FIXTURES, "the fixture list must not be emptied"
+    # every guarded element is covered by the fixtures, not just the reverse
+    assert guarded <= targets, (
+        f"guarded elements without a fixture: {sorted(guarded - targets)}"
+    )

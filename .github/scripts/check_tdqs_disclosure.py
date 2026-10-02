@@ -49,26 +49,35 @@ DEFAULT_ELEMENTS = REPO / "docs" / "adr" / "0028-elements.yaml"
 # form flagged legitimate disclosures whose cue sat in an earlier clause
 # ("Not idempotent \u2014 each call adds another camera").
 #
-# Corpus evidence — both tracks, reproduced by
+# Corpus evidence. Both tracks are reproduced by
 # .github/scripts/polarity_corpus_probe.py (stdlib, manual: run it, do not
-# wire it into CI; it measures, it does not gate). PRIMARY surface, the
-# denominator the D-190(4) zero-false-rejection judgement uses: each tool
-# against its own docstring and its own elements = 36 elements, 1 guarded,
-# 0 negated-only, asserted live by
-# tests/test_check_tdqs_disclosure.py::test_live_corpus_has_no_polarity_warnings
-# STRESS surface, diagnostic only: 287 docstring-bearing functions x every
-# element pattern = 357 matches, 53 inside the retired naive 80-char window,
-# 4 inside clause scope (49 false rejections forgiven). All 4 survivors are
-# correct negative-form disclosures on NEGATION-form elements (irreversible /
-# read_only_disclosure / no_mutation_no_undo /
-# overwrite_or_persistence_semantics), which carry no polarity_aware guard by
-# the direction limit below, so they are never judged.
+# wire it into CI; it measures, it does not gate).
 #
-# Caliber note (D-191 1c): the stress denominator is 287 docstring-bearing
-# functions. The 264 figure in the pre-hardening evidence was a probe artifact
-# -- that probe keyed docstrings by bare function name into one dict, silently
-# collapsing 23 same-named functions. Do not compare the two numbers as if
-# they were the same corpus.
+# No corpus counts are quoted in this file on purpose. A hand-pinned count in a
+# No corpus counts are quoted in this file on purpose. A hand-pinned count in a
+# comment goes stale the moment the corpus moves, and this block did carry such
+# a set, which the probe later contradicted. The probe is the single source
+# here is the invariant, not the reading of the day. A guard test
+# (tests/test_check_tdqs_disclosure.py::test_no_hand_pinned_corpus_counts)
+# keeps the rot class out.
+#
+# PRIMARY surface, the denominator the D-190(4) zero-false-rejection judgement
+# uses: each tool against its own docstring and its own elements. The invariant
+# is asserted live rather than quoted:
+# tests/test_check_tdqs_disclosure.py::test_live_corpus_has_no_polarity_warnings
+# pins the guarded set AND requires zero negated-only.
+# STRESS surface, diagnostic only: every docstring-bearing function x every
+# element pattern. Its surviving negated clauses are correct negative-form
+# disclosures on NEGATION-form elements (irreversible / read_only_disclosure /
+# no_mutation_no_undo / overwrite_or_persistence_semantics), which carry no
+# polarity_aware guard by the direction limit below, so they are never judged.
+#
+# Caliber note (D-191 1c): the stress denominator counts every function/async
+# function carrying a docstring, per OCCURRENCE -- nothing de-duplicated. The
+# 264 figure quoted in the pre-hardening evidence was a probe artifact: that
+# probe keyed docstrings by bare function name into a single dict and silently
+# collapsed same-named functions. Do not compare the two numbers as if they
+# were the same corpus.
 #
 # The narrowed scope trades that FP class for cross-clause false negatives —
 # the legislated direction (D-190 1: on a fake-green-prone gate an FN hurts
@@ -145,7 +154,9 @@ def check(root: Path, elements_path: Path) -> tuple[bool, list[str], list[str], 
     errors: list[str] = []
     warnings: list[str] = []
     checked_elements = 0
-    errors.extend(check_coverage_and_derivation(root, data))
+    cov_errors, cov_warnings = check_coverage_and_derivation(root, data)
+    errors.extend(cov_errors)
+    warnings.extend(cov_warnings)
 
     for tool_name, tool_cfg in sorted(tools.items()):
         file_rel = tool_cfg.get("file")
@@ -289,9 +300,13 @@ SIBLING_FAMILIES: tuple[frozenset[str], ...] = (
     frozenset({"asset_search", "asset_import"}),
     frozenset({"list_sessions", "add_session", "maya_setup_guide"}),
 )
-# Frozen legacy derivation violations (D-195 2). These predate the floor and
-# are scheduled to converge by their coverage_exemptions 'due'. The gate
-# fails only when this set GROWS; shrink it as each tool converges.
+# Frozen legacy derivation violations (D-195 2). This is the ONLY ledger for
+# derivation debt, and it is deliberately NOT coverage_exemptions: these 8 pairs
+# are tools that DO carry a full 'tools' entry but miss an element derivable
+# from their own signature, so by the coverage rule they cannot be exempted
+# (covered-and-exempt is itself an error). They are pinned here until each
+# tool gains the element. The gate fails when this set GROWS and also when it
+# SHRINKS, so a converged tool cannot rot into a permanent free pass.
 DERIVATION_BASELINE: frozenset[tuple[str, str]] = frozenset({
     ("scene_aesthetics", "session_prerequisite"),
     ("scene_assert", "session_prerequisite"),
@@ -357,6 +372,27 @@ def tool_signatures(root: Path) -> dict[str, dict]:
     return out
 
 
+def _version_tuple(text: str) -> tuple[int, ...] | None:
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", text):
+        return None
+    return tuple(int(part) for part in text.split("."))
+
+
+def project_version(root: Path) -> tuple[int, ...] | None:
+    """Version from pyproject.toml, as a comparable tuple.
+
+    Regex rather than tomllib: the project still supports 3.10 and tomllib is
+    3.11+. ``^version`` will not match ``requires-python``, so this picks the
+    [project] field and nothing else.
+    """
+    try:
+        text = (root / "pyproject.toml").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    m = re.search(r'(?m)^version\s*=\s*"([0-9]+(?:\.[0-9]+)*)"', text)
+    return tuple(int(part) for part in m.group(1).split(".")) if m else None
+
+
 def derivable_elements(tool: str, sig: dict, families: tuple[frozenset[str], ...]) -> list[str]:
     """Elements implied by this tool's own signature (D-195 2)."""
     derived: list[str] = []
@@ -367,7 +403,7 @@ def derivable_elements(tool: str, sig: dict, families: tuple[frozenset[str], ...
     return derived
 
 
-def check_coverage_and_derivation(root: Path, data: dict) -> list[str]:
+def check_coverage_and_derivation(root: Path, data: dict) -> tuple[list[str], list[str]]:
     """Enumeration-completeness + derivable-minimum-set gate (D-195 1/2).
 
     Coverage is absolute: every annotated tool must be covered or explicitly
@@ -386,15 +422,17 @@ def check_coverage_and_derivation(root: Path, data: dict) -> list[str]:
     # assert -- return clean instead of inventing a failure. The real repo root
     # always has this file; test_live_coverage_floor_holds pins that.
     if not (root / "src" / "maya_mcp_server" / "pipeline.py").exists():
-        return []
+        return [], []
 
     errors: list[str] = []
+    warnings: list[str] = []
+    current = project_version(root)
     try:
         annotated = annotated_tools(root)
     except ValueError as e:
-        return [f"::error file={PIPELINE.name}::{e}"]
+        return [f"::error file={PIPELINE.name}::{e}"], []
     if not annotated:
-        return [f"::error file={PIPELINE.name}::TOOL_ANNOTATIONS resolved to zero tools"]
+        return [f"::error file={PIPELINE.name}::TOOL_ANNOTATIONS resolved to zero tools"], []
 
     tools = data.get("tools", {}) or {}
     exempt = data.get("coverage_exemptions", {}) or {}
@@ -426,10 +464,32 @@ def check_coverage_and_derivation(root: Path, data: dict) -> list[str]:
                 f"::error file=0028-elements.yaml::exemption for '{tool}' needs a non-empty "
                 f"'reason' — absence is a CI failure, not a silent skip (D-195 1)"
             )
-        elif not str(entry.get("due", "")).strip():
+            continue
+        due_raw = str(entry.get("due", "")).strip()
+        if not due_raw:
             errors.append(
                 f"::error file=0028-elements.yaml::exemption for '{tool}' needs a 'due' — an "
                 f"open-ended exemption is the new-code blind spot (D-195 4)"
+            )
+            continue
+        due = _version_tuple(due_raw)
+        if due is None:
+            errors.append(
+                f"::error file=0028-elements.yaml::exemption for '{tool}' has due '{due_raw}', "
+                f"which is not a dotted numeric version — the deadline cannot be compared"
+            )
+        elif current is None:
+            warnings.append(
+                f"::warning file=0028-elements.yaml::cannot read the project version from "
+                f"pyproject.toml, so the '{tool}' due ({due_raw}) was NOT checked — an "
+                f"overdue exemption would pass unnoticed on a tree without pyproject.toml"
+            )
+        elif current >= due:
+            warnings.append(
+                f"::warning file=0028-elements.yaml::exemption for '{tool}' is due {due_raw} and "
+                f"the project version is "
+                f"{'.'.join(str(v) for v in current)} — cover the tool or re-legislate the "
+                f"deadline; D-195 4 forbids an open-ended exemption"
             )
 
     # -- derivable minimum set, as a shrink-only ratchet ------------------
@@ -469,7 +529,7 @@ def check_coverage_and_derivation(root: Path, data: dict) -> list[str]:
                 f"DERIVATION_BASELINE in .github/scripts/check_tdqs_disclosure.py "
                 f"(D-195 4, tighten only)"
             )
-    return errors
+    return errors, warnings
 
 
 
