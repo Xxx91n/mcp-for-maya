@@ -380,21 +380,50 @@ result
         format: str = "cos",
         session_key: str | None = None,
     ) -> str:
-        """Measure spatial relationship between two objects.
+        """Measure the spatial relationship between two objects.
+
+        Call this in the COMPUTE step of the ICEV workflow, to turn a spatial
+        question into a number before you execute a change: size a clearance
+        before moving something, prove two objects interpenetrate before you
+        separate them, or get the axis detail behind an overlap that
+        scene_validate reported.
+
+        Read-only and idempotent: it queries world-space bounding boxes and
+        never modifies the scene, so no undo checkpoint is created.
+        Requires an active Maya session.
+
+        Every mode measures world-space AABBs, not the mesh surface and not
+        the object origin. The modes differ in what the number means:
+          center     distance between the AABB midpoints.
+          surface    distance between the closest facing AABB corners — an
+                     axis-aligned approximation, so it over-reports clearance
+                     for rotated or concave geometry.
+          clearance  SIGNED. Positive is the euclidean gap across the
+                     separating axes; negative is the penetration depth, the
+                     minimum translation needed to pull the objects apart;
+                     0 means the boxes touch on every axis.
+          bbox       overlap test. On overlap, distance is 0 and overlap_dims
+                     holds the per-axis penetration extents; otherwise
+                     distance is euclidean and gaps_xyz holds the per-axis gaps.
+
+        Distances are in the scene's current linear unit (cm, m or mm), not
+        always centimetres.
+
+        Boundary: Disambiguated from scene_inspect (per-object property
+        deep-dive), scene_snapshot (whole-scene spatial overview) and
+        scene_assert (checks the scene against expected values rather than
+        measuring one pair).
 
         Args:
             obj_a: First object name.
             obj_b: Second object name.
-            mode: Measurement type:
-                - "center": Center-to-center distance (default)
-                - "surface": Closest surface point distance
-                - "clearance": Gap/clearance distance
-                - "bbox": Bounding box overlap detection
+            mode: What the returned number means — see the list above.
             format: Output format - "cos" or "json".
             session_key: Maya session key.
 
         Returns:
-            Measurement result with distance, overlap info, and axis details.
+            Measurement result with the mode's distance, per-axis details,
+            and bbox_overlap flag.
 
         Example:
             scene_measure("wall_north", "counter_A", mode="clearance")
