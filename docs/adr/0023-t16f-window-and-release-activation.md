@@ -114,6 +114,18 @@ Maya 开机激活整条阻塞链，本轮同裁：T-16f 执行面 + 通过后的
 
 - **R44 增补（D-197，2026-10-02）——0.6.0 时序与 Glama 评分链路解耦认知**：0.6.0 走串行单跳——tag 挂「R44 描述修复批（scene_measure 重写）落地」为前置，但理由=发布语义连贯性（pip 用户拿到好描述+Unreleased 不半空）非评分必需；Glama methodology 原文实证其扫描管线吃 git 源码（push 分钟级同步、commit 驱动全量重扫、inputHash 按定义变更重评分）——**评分与发版/PyPI 解耦**，camera_orbit C2.9 定性修正为扫描时滞伪影（随下次重扫自愈，不赖发版车）。排序显式化=scene_measure 重写列下一窗第一优先、落地即 preflight→人工门→tag、其他 minor 内容不插队单发；熔断=重写超 2 窗未落地则放弃等批切 0.6.0，scene_measure 随下一个含包内实质变更版本顺带发出，绝不单发纯文本 patch（0.6.1 纯 docstring patch 撞文本专列限制 D-175③）。附加行动项=核 Glama last-scanned 时间戳，合入超合理时滞仍 C2.9 则向 glama-ai 提 issue（inputHash 重扫异常可审计）。
 
+- **R45 增补（D-204/D-208/D-209，2026-10-02）——preflight 两行与范式 pitch 登记块扩列**：
+  - **release-preflight 第 8 行（D-204）——TDQS 豁免到期阻塞**：每次 release-preflight 窗内跑 `check_tdqs_disclosure.py`——存在 `current>=due` 到期豁免且未消解且未按 D-168 waiver 续期纪律显式延期→no-go。人工执行项不进 push CI（循第 6/7 行先例）。
+  - **release-preflight 第 9 行（D-208）——pitch/observe 触发条件呈报义务**：每次 release-preflight 窗内人工盘点下块中非机检触发条件的达成状态（pitch③④⑤⑥+遥测 observe 项），结果落账本观察行；如实披露「无自动探针」缺口——不假装有在看。
+  - **范式 pitch 登记块扩列（D-208，observe 态）**：六件竞品范式（对标本机 clone dcc-mcp-maya v0.9.33）登记为候选 pitch——本轮未 bet，每条只放可 bet 性路标（动机+不-bet 理由+re-shape 触发条件+证据指针占位），完整论证属触发成就后的 shaping 工作禁入本块；「登记面与门同寿」语义扩为「**与登记所锚事件同寿**」——各条显式标事件锚；条目措辞统一 observe 态「本轮未 bet，re-shape 触发条件=X」禁拒绝/否决字样：
+    - **pitch-1 skill 包制**——动机=域级打包按需装载；不-bet=25 件包装开销>收益且无域分化；事件锚=0.7+ shape 轮；触发=工具面超 ~35 件（tool-count CI 闸可检）∨域分化实证。
+    - **pitch-2 minimal/渐进加载**——动机=default_active 只读组+显式升级省上下文；不-bet=D-207① strict 旗标已取走安全默认切片、25 件全量成本有限；事件锚=**v1.0.0 门审，与 P3 议题同窗竞裁**（P3=合并减件 vs 本 pitch=分组藏件，同一病灶 Disambiguation 3/5 的两反向解，不分别处置）；触发=D-179③ 条件①原文。
+    - **pitch-3 Rust sidecar 网关**——动机=进程监督+机器级注册；不-bet=其动机链全指向我方不存在的架构前提（网关/多实例注册表/LAN 面）；事件锚=0.7+ shape 轮；触发=多实例部署需求实证（须附 SessionManager 不可满足的具体场景——跨机/进程级隔离/独立失败域，D-209② 加固）。
+    - **pitch-4 Streamable HTTP**——动机=MCP 官方远程传输轨；不-bet=stdio=本地一等公民无迁移压力、迁移驱动全为远程/共享部署语义；事件锚=0.7+ shape 轮；触发=远程会话/render-farm/CI 远操实证。
+    - **pitch-5 dcc-mcp-cli 控制面**——pitch-3 的伴生面（无网关即无语义），**禁独立 re-shape**。
+    - **pitch-6 core 共享多适配器**——动机=多 DCC 摊销；不-bet=单 DCC 仓抽 core=抽象税零收益；事件锚=第二 DCC 立项（fail-loud 事件，立项即呈报非持续观测）。
+    - 遥测 observe 项（D-209③，非 pitch 不入上列）：本地审计聚合首选形态注记+触发=0.6.0 后≥1 季度真实使用窗口+「改进依据不足」具体痛点；采集面落地前须过 threat-model 披露面扩展裁决（D-030 zero-telemetry 宣称修订前提）；不引入任何当前行为变更。
+
 ## D-069：#2/#7 发帖机制
 
 本窗口即发（备稿就绪+"≥0.1.0 已含"耐久真话不依赖 0.1.2）；执行=**agent 贴终稿→用户过目→gh 以用户账号发出**。过目为授权前置条件，发出前用户有最终否决点；其余四条（#1/#3/#4/#5）仍等 0.1.2 发布后同流程；一 issue 一评不追评纪律不变；措辞改动须回草稿重过目。
