@@ -398,10 +398,21 @@ result
           surface    distance between the closest facing AABB corners — an
                      axis-aligned approximation, so it over-reports clearance
                      for rotated or concave geometry.
-          clearance  SIGNED. Positive is the euclidean gap across the
-                     separating axes; negative is the penetration depth, the
-                     minimum translation needed to pull the objects apart;
-                     0 means the boxes touch on every axis.
+          clearance  SIGNED, and 0 is NOT a "merely touching" signal. Per
+                     axis the gap is +separated / 0=touching / -penetrating:
+                     > 0  euclidean distance across the STRICTLY SEPARATED
+                          axes only. Penetrating axes contribute 0, so they
+                          are invisible in this number.
+                     = 0  no axis is strictly separated and at least one axis
+                          is exactly touching. The other axes may be deeply
+                          penetrating, so 0 does NOT mean the boxes just touch.
+                     < 0  all three axes penetrate; the value is the
+                          SHALLOWEST penetration depth, the minimum
+                          translation needed to pull them apart.
+                     bbox_overlap is true only when all three axes strictly
+                     penetrate, so it reads false even when two of three do.
+                     Read details.clearances_xyz for the signed per-axis truth
+                     before concluding anything from distance alone.
           bbox       overlap test. On overlap, distance is 0 and overlap_dims
                      holds the per-axis penetration extents; otherwise
                      distance is euclidean and gaps_xyz holds the per-axis gaps.
