@@ -357,3 +357,24 @@ _Avoid_: 骨架内预写结论或判决倾向、拿占位符当证据本身、�
 **发版车 (release train)**:
 发布动作的「有车即搭」心智模型（D-187——semver §7 批量取最高跳档+changelog 即发版触发器：Unreleased 节有实质条目即装货完毕该发车）——发版位=既有纪律的人工确认门非编排裁决面；发版密度受 PyPI append-only 对单次发版的质量门约束而非频率上限（D-093）；文本专列=无实质内容的为文本单发版，被 D-175③ 禁止，与「实质批搭车」合法形态区隔。
 _Avoid_: 为文本单发版空驶、实质批攒批不发致门状态悬空、把发版车等当审批门（判据仍是 preflight+人工确认门）
+
+**枚举完整性断言 (enumeration-completeness assertion)**:
+注册面与断言面逐键对齐的覆盖率检查（D-195——Sonar coverage-on-new-code 分档同构）——注册表（TOOL_ANNOTATIONS）每个键必须出现在要素登记（0028-elements.yaml）中：挂要素或显式 exempt+理由字段，缺席即 CI 红；与质量类断言分工=完整性断言只管「在不在册」不管「写得好不好」。_Avoid_: 豁免当免责出口随手用（缺席=疏忽非决定）、注册面换载体后断言锚点不同步、把质量维度检查塞进完整性断言
+
+**推导最低集 (derivable minimum set)**:
+按签名可机检事实推导的必挂要素下限（D-195）——带 session_key→session_prerequisite 必挂、有功能兄弟面→boundary_line+boundary_targets_named 必挂；映射表落代码内常量+测试走 PR 评审不落版本化文档（D-191① 缓解）；增量立即生效、存量限期收敛只收紧不放松。_Avoid_: 映射表写成新立法文档（撞裁决面禁令）、存量无限期豁免（Sonar new-code 盲区教训）、覆盖率层引入极性盲断言（mutation 工具沿用极性感知）
+
+**判据集 (reference corpus)**:
+三轨语料中唯一合法的 FN 分母轨（D-198——ConText/eds-nlp 人工标注判据集同构）——手工合成标注+每条一句可独立辩护理由；轨①真实语料管 FP/赦免面、轨③程序化变异集只报绝对数与构式覆盖永不作分母（变异样本人工确认真否定后可晋升轨②）。三轨分报、数字禁同现一个比值。_Avoid_: 拿生成规则自证的变异集当分母（分母污染）、三轨合并成单一比值、判据集条目无可辩护理由
+
+**设计已知限制 (known design limitation)**:
+按设计有意漏判的跨子句否定类样本的计数归宿（D-198）——与真 FN 分桶单列，不阻断 hard 化但须在判定输出显式区分；是「机制按立法语义忠实执行的结果」非缺陷。_Avoid_: 混进 FN 分母（三轨下最隐蔽的污染路径）、记成缺陷逼机制越立法面
+
+**开火 fixture (firing fixture)**:
+每个 polarity_aware 要素随附的否定语境样本+断言守卫产出 negated_only 的测试件（D-199——ESLint post-run 运行时断言/RuleTester 负向断言同构）——「能写出开火 fixture」与「守卫可挂载」逻辑等价，误挂靠在 fixture 构造期即不可表达=构造性排除；缺 fixture warn→error、不开火即 error；fixture⊆LEGISLATED_GUARDED 交叉断言双锚；原料复用判据集同分布语料防假绿。_Avoid_: 手工造句恰好绕过正命中路径的假绿 fixture、人工 review 升格回主强制面（已实证漏过一次）、拿正则纯度 lint 替代行为断言
+
+**扫描时滞伪影 (scan-staleness artifact)**:
+外部目录评分滞后于源码真相的时点差现象（D-197——Glama methodology 实证：扫 git 源码 push 分钟级同步、commit 驱动全量重扫、inputHash 按定义变更重评分）——评分与发版/PyPI 解耦；camera_orbit C2.9=该伪影实例（v0.5.0 文本被评、main 已修复、随下次重扫自愈）；与发版滞后归因分工：时滞在扫描管线不在发布车。_Avoid_: 把时滞读数当源码缺陷再修一遍、拿发版当重评触发器（解耦）、超合理时滞不动仍不查 last-scanned/issue
+
+**缺口披露节 (gap disclosure section)**:
+ADR 内常设的 known-gap 注册表宿主章节（D-200——ADR-0028 缺口披露节为首例，「找家≠新建房产」）——每条记「缺口+影响面+兜底」三件套，账本债行作指针；不新建独立注册表文件（D-191① 不新增版本化裁决面）。_Avoid_: 另建注册表文件制造第二真源、把披露节写成运维手册、缺口结案后删原文（留结案注记保审计链）

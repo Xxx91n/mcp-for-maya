@@ -71,8 +71,8 @@ CI 断言「结构化要素存在」非「关键词字面」（`Boundary:` 行=�
 - Glama 各字母带阈值官方未发文（≥4.0/目标 4.2 系边界余量防御性推断）；生产评分 LLM 型号/温度未公开。
 - Dockerfile 分支（推断构建走 PyPI 拉包时 merge 不生效）置信度中——金丝雀实验兜底。
 - TDQS 对消歧形态无逐项官方表态（内嵌胜出系 Appendix B 评审输入面高置信推断）。
-- 极性方向限定（D-190③）**仅由受守卫集合钉死强制，pattern 纯度无机检**（2026-10-02 审计实证）：否定式要素在同一子句通常既有正命中又有负命中，而 `negated_only = negated and not positive` 使 `matched=True`，故把 `polarity_aware` 挂到否定式 pattern 要素后 `check()` 返回 ok=True / 0 errors / 0 warnings（实测五件否定式要素 `execute_code/irreversible`、`scene_validate/read_only_disclosure`、`scene_validate/no_mutation_no_undo`、`write_module/overwrite_or_persistence_semantics`、`camera_orbit/non_idempotent` 全挂亦然）。断言层原理上测不出该违规；残余强制=人工 review。不做正则纯度 lint 的理由=那正是 D-180③/D-190③ 禁入立法面的未实测正则形态，且需自带语料验证窗。
-- 子句级否定窗换来的**假阴性（FN）面从未测量**（2026-10-02 审计提出）：D-190① 明知收窄方向以 FN 换 FP，但本窗只测了 FP 下降（naive 53 → 子句级 4），未构造任何真否定跨子句的语料来量 FN。此项直接卡住 D-190④ 的 warn→hard 升档——升档判据需要误拒分母，而反向的漏判分母尚无基线。
+- 极性方向限定（D-190③）**仅由受守卫集合钉死强制，pattern 纯度无机检**（2026-10-02 审计实证）：否定式要素在同一子句通常既有正命中又有负命中，而 `negated_only = negated and not positive` 使 `matched=True`，故把 `polarity_aware` 挂到否定式 pattern 要素后 `check()` 返回 ok=True / 0 errors / 0 warnings（实测五件否定式要素 `execute_code/irreversible`、`scene_validate/read_only_disclosure`、`scene_validate/no_mutation_no_undo`、`write_module/overwrite_or_persistence_semantics`、`camera_orbit/non_idempotent` 全挂亦然）。断言层原理上测不出该违规；残余强制=人工 review。不做正则纯度 lint 的理由=那正是 D-180③/D-190③ 禁入立法面的未实测正则形态，且需自带语料验证窗。 〔结案注记 2026-10-02（R44，D-199）：改判为「挂载性=可证伪机械事实」——立法「每个 polarity_aware 要素随附否定语境 fixture+测试断言守卫开火产出 negated_only」，误挂载在写 fixture 时构造性不可表达（详见下方 R44 增补节）；人工 review 降格为过渡冗余非终点。〕
+- 子句级否定窗换来的**假阴性（FN）面从未测量**（2026-10-02 审计提出）：D-190① 明知收窄方向以 FN 换 FP，但本窗只测了 FP 下降（naive 53 → 子句级 4），未构造任何真否定跨子句的语料来量 FN。此项直接卡住 D-190④ 的 warn→hard 升档——升档判据需要误拒分母，而反向的漏判分母尚无基线。 〔处置路径已立法 2026-10-02（R44，D-198）：FN 唯一合法分母=轨②手工标注判据集，轨③变异面只报计数不作分母；测量执行挂任务书，测得前此缺口保持 open 半结案态。〕
 ## R41 增补（D-188/D-190，2026-10-01）——判负决策树与极性硬化形态
 
 **判负决策树（唯一真源=账本 D-188 行）**：Glama 重评后按可观测信号分四支——
@@ -89,6 +89,18 @@ CI 断言「结构化要素存在」非「关键词字面」（`Boundary:` 行=�
 **极性硬化形态立法（D-190，唯一真源=账本行）**：①子句级否定窗——cue 与 match 之间无子句边界才算否定（80char 固定窗=被淘汰的 NegEx 前形态；收窄方向 FP 必降，代价=跨子句真否定漏判归 FN 面，防假绿场景 FN 危害远低 FP）；②`0028-elements.yaml` 新增 `positive_exemptions` 要素级字段枚举合法否定式披露短语（ConText pseudo-trigger 同构——无豁免表则强制挂扩面时否定式 pattern 要素全自伤）；③方向限定条款——`polarity_aware: true` 强制挂载仅限 pattern 集纯肯定式的 mutation 存在性断言（现行唯一实例=camera_orbit/mutation_side_effects）；否定式 pattern 要素不挂守卫、其保护走豁免表；④warn 起步挂 0.6.0 preflight 复核——分母=被判 negated_only 的 polarity_aware 要素数、分子=其中实为合法肯定披露，零误拒→升 hard、>30%→退人工抽查。切分符/cue 表/豁免短语清单禁入立法行只进执行窗产物（D-180③）；warn 降级仅限 negated_only 分支，P0/Boundary 存在性判定保持 hard。
 
 **执行窗落地注记（D-190，2026-10-02）**：立法面只到形态层，机制清单按 D-180③ 纪律不入本节。清单落点两处且互不重叠——**子句切分符集合 + cue 表**属机制形态，单源在 `.github/scripts/check_tdqs_disclosure.py`（`CLAUSE_BOUNDARIES` / `NEGATION_CUES`）；**要素级豁免短语**属要素数据，与其余要素字段同处 `docs/adr/0028-elements.yaml` 的 `positive_exemptions`（含 D-190③ 方向限定条款）。落地判据（常驻可复跑）= 主测面零误拒，由 `tests/test_check_tdqs_disclosure.py::test_live_corpus_has_no_polarity_warnings` 断言；方向限定条款（D-190③）的强制方式是**受守卫集合精确钉死**，不是警告机制：测试常量 `LEGISLATED_GUARDED` 断言受守卫集合恰为 `camera_orbit/mutation_side_effects`，任何新增挂载即转红（2026-10-02 实测：给 `scene_validate/read_only_disclosure` 挂守卫 → `AssertionError: guarded set drifted`，exit 1）。**钉死式强制不覆盖 pattern 纯度**——见下方缺口披露第 4 条。压测面计数由 `.github/scripts/polarity_corpus_probe.py`（手工测量件，不入 CI）两轨分报：主测 36 要素 / 1 挂守卫 / 0 误拒；压测 287 个带 docstring 的函数 × 全要素 pattern = 357 匹配，naive 80 字符窗 53 → 子句级 4（**子句收窄**赦免 49 次 naive 误拒；`positive_exemptions` 豁免表今日改变判定 0 次，测得值见探针 `exemption_list_changed_verdicts=0`——勿把两者混为一谈）。分母口径注记（D-191①c）：早前证据中的 264 系探针把 docstring 按裸函数名收进单个 dict、塌缩 23 个同名函数所致，非语料属性，勿与 287 直接比较。warn → hard 仍待 0.6.0 preflight 复核（D-189）。
+
+## R44 增补（D-195/D-196/D-198/D-199/D-200，2026-10-02）——零断言地板、三轨语料与 fixture 开火
+
+**枚举完整性断言（D-195）**：checker 新增覆盖率面——`pipeline.py` `TOOL_ANNOTATIONS` 每个键必须在 `0028-elements.yaml` 出现（挂要素或显式 `exempt`+理由字段），缺席即 CI 红；登记断言立即全员强制、零存量豁免（账本完整性非质量负担）。**推导最低集**：按签名事实推导必挂要素——带 `session_key`→`session_prerequisite` 必挂、有功能兄弟面→`boundary_line`+`boundary_targets_named` 必挂；对新增/被修改工具立即生效，存量 13 件限期一个 minor 窗收敛（补挂或显式 exempt），此后只收紧不放松。推导映射表实现为 checker 代码内常量+测试、走 PR 评审，不落版本化文档（D-191① 冲突缓解经呈报采纳）。接 CI 红前必先对现有 25 件 dry-run 验误报；mutation 工具推导最低集沿用极性感知，覆盖率层禁引入极性盲断言。
+
+**scene_measure 处置（D-196）**：tier=P1+推导最低集三件入 yaml（PR review 义务照常触发，D-175④）；描述批按四失分维度回写——Boundary 行点名兄弟+使用触发句+行为语境（session 前提/只读幂等）+mode 语义差异补 schema 之缺；删 docstring 中 schema 已覆盖的参数枚举复述段（Conciseness 权重 10% 同样因复述扣分）；验收门维持既定三要件（tier A+min≥3.0+零旗标），「五维≥4」降格为质量志向非门——第三方 LLM 评分方差不可作验收方差。
+
+**三轨语料口径（D-198）**：轨①287 真实 docstring=FP/赦免面；轨②手工合成标注判据集=**唯一合法 FN 分母**（每条须一句可独立辩护的标注理由）；轨③程序化变异集=压测/覆盖面，只报绝对数与构式覆盖、**永不作分母**，样本经人工确认真否定可晋升轨②。三类标签=真否定应触发/否定式披露应赦免/跨子句按设计漏判——第三类计「设计已知限制」计数而非 FN（不阻断 hard 化，须显式区分防混入分母）。hard 准入双要件=主测零误拒（已达成）AND 轨② FN 率≤阈值——阈值先记录不设阈、测得后再立法。三轨数字禁同现一个比值（D-191①c 口径注记扩展）；标签枚举清单只进执行产物。
+
+**fixture 开火立法（D-199）**：每个 `polarity_aware` 要素须随附一条否定语境 fixture 样本+测试断言守卫开火（产出 `negated_only`）——「能写出开火 fixture」与「守卫可挂载」在体系内逻辑等价=构造性排除（误挂载在写 fixture 时即不可表达）。分档：缺 fixture→warn、fixture 不开火→error 立即（硬逻辑违规非风格），存量补齐后缺 fixture 亦升 error。fixture 原料复用轨②判据集「真否定应触发」类样本（同源语料喂两机制，防手工造句绕过正命中路径的假绿）；`LEGISLATED_GUARDED` 钉死集合×fixture 清单交叉断言（fixture⊆guarded 双锚）；PR 复核行保留为过渡冗余不升格为准机制。
+
+**三待裁项清零（D-200）**：①warn→hard 老 0/1 分母口径作废——判据=D-198 双要件+最小样本量下限内置（轨②未达下限时第二要件判「未可判」维持 warn；Ro3 惯例参照 n≥30、本仓可另定口径，此为类比推理无直接判例）；②`positive_exemptions` 保留作前向守卫（YAGNI 不适用于防御性机制）+实测零改判如实注记维持+触发条件式出口锚——「若挂载规则扩面仍未产生首次改判届时按 YAGNI 复议移除」；③known-gap 注册表=本 ADR 缺口披露节常设章节+账本债行指针（「找家≠新建房产」，T-R42-09 结案无新面），披露节只记「缺口+影响面+兜底」不长成运维手册。
 
 ## 关联
 
