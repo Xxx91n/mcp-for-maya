@@ -145,6 +145,7 @@ def check(root: Path, elements_path: Path) -> tuple[bool, list[str], list[str], 
     errors: list[str] = []
     warnings: list[str] = []
     checked_elements = 0
+    errors.extend(check_coverage_and_derivation(root, data))
 
     for tool_name, tool_cfg in sorted(tools.items()):
         file_rel = tool_cfg.get("file")
@@ -260,6 +261,216 @@ def tools_map(elements_path: Path) -> dict:
         return json.loads(elements_path.read_text(encoding="utf-8")).get("tools", {})
     except Exception:
         return {}
+
+
+
+# ---------------------------------------------------------------------------
+# D-195 coverage floor + derivable minimum set
+# ---------------------------------------------------------------------------
+
+PIPELINE = REPO / "src" / "maya_mcp_server" / "pipeline.py"
+
+# Functional sibling faces (D-195 2). A tool in one of these families competes
+# for the agent's choice with the others, so it must say how it differs:
+# boundary_line + boundary_targets_named are derived from membership alone.
+#
+# execute_code / write_module are deliberately absent. They form a pair, but
+# they do not compete with a scene_* read for the same intent, and they already
+# carry their own disambiguation element (boundary_execute_code), which is
+# asserted. Adding boundary_line there would assert a second convention rather
+# than a missing disclosure.
+SIBLING_FAMILIES: tuple[frozenset[str], ...] = (
+    frozenset({"scene_snapshot", "scene_inspect", "scene_measure", "scene_assert"}),
+    frozenset({"scene_validate", "scene_review", "scene_assert"}),
+    frozenset({"scene_inspect", "scene_describe", "scene_nodes"}),
+    frozenset({"scene_viewport_snapshot", "scene_render_preview"}),
+    frozenset({"scene_checkpoint", "scene_checkpoint_list", "scene_rollback"}),
+    frozenset({"camera_create", "camera_orbit"}),
+    frozenset({"asset_search", "asset_import"}),
+    frozenset({"list_sessions", "add_session", "maya_setup_guide"}),
+)
+# Frozen legacy derivation violations (D-195 2). These predate the floor and
+# are scheduled to converge by their coverage_exemptions 'due'. The gate
+# fails only when this set GROWS; shrink it as each tool converges.
+DERIVATION_BASELINE: frozenset[tuple[str, str]] = frozenset({
+    ("scene_aesthetics", "session_prerequisite"),
+    ("scene_assert", "session_prerequisite"),
+    ("scene_describe", "session_prerequisite"),
+    ("scene_inspect", "session_prerequisite"),
+    ("scene_nodes", "session_prerequisite"),
+    ("scene_plan", "session_prerequisite"),
+    ("scene_review", "session_prerequisite"),
+    ("scene_snapshot", "session_prerequisite"),
+})
+
+
+
+def annotated_tools(root: Path) -> set[str]:
+    """Every key of pipeline.TOOL_ANNOTATIONS, read via AST.
+
+    The coverage floor is anchored on this map rather than on a hand-kept
+    list, so registering a new tool is enough to make the gate fire.
+    """
+    try:
+        tree = ast.parse((root / PIPELINE.relative_to(REPO)).read_text(encoding="utf-8"))
+    except (OSError, SyntaxError) as e:
+        raise ValueError(f"cannot read {PIPELINE}: {e}") from e
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AnnAssign) and getattr(node.target, "id", "") == "TOOL_ANNOTATIONS":
+            assert isinstance(node.value, ast.Dict), "TOOL_ANNOTATIONS is not a dict literal"
+            out = set()
+            for k in node.value.keys:
+                if isinstance(k, ast.Constant) and isinstance(k.value, str):
+                    out.add(k.value)
+            return out
+    raise ValueError("TOOL_ANNOTATIONS not found in pipeline.py")
+
+
+def tool_signatures(root: Path) -> dict[str, dict]:
+    """Map each @mcp.tool-decorated function to its file and parameter names.
+
+    Used to derive the minimum set from the signature alone, so the rule
+    cannot drift from the real parameter list.
+    """
+    out: dict[str, dict] = {}
+    for path in sorted((root / "src" / "maya_mcp_server").rglob("*.py")):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            decorated = any(
+                isinstance(d, ast.Call)
+                and getattr(getattr(d, "func", None), "attr", None) == "tool"
+                for d in node.decorator_list
+            )
+            if not decorated:
+                continue
+            a = node.args
+            names = [x.arg for x in (*a.posonlyargs, *a.args, *a.kwonlyargs)]
+            out[node.name] = {
+                "file": path.relative_to(root).as_posix(),
+                "session_key": "session_key" in names,
+            }
+    return out
+
+
+def derivable_elements(tool: str, sig: dict, families: tuple[frozenset[str], ...]) -> list[str]:
+    """Elements implied by this tool's own signature (D-195 2)."""
+    derived: list[str] = []
+    if sig.get("session_key"):
+        derived.append("session_prerequisite")
+    if any(tool in fam for fam in families):
+        derived += ["boundary_line", "boundary_targets_named"]
+    return derived
+
+
+def check_coverage_and_derivation(root: Path, data: dict) -> list[str]:
+    """Enumeration-completeness + derivable-minimum-set gate (D-195 1/2).
+
+    Coverage is absolute: every annotated tool must be covered or explicitly
+    exempt with a reason, and the reverse direction is asserted too so a stale
+    entry cannot rot unnoticed.
+
+    Derivation is a ratchet, not an absolute floor. Tools that predate the
+    floor are listed in DERIVATION_BASELINE; the gate fails only when the
+    violation set GROWS, and shrinks as each tool converges. That is the same
+    shape as check_ruff_budget.py / check_monolith_budget.py, and it is what
+    makes "tighten only" enforceable rather than aspirational.
+    """
+    # Both halves of this gate are anchored on the live source tree. A caller
+    # pointing at a synthetic root (the tmp_path fixtures in the test suite)
+    # has no pipeline to read, so there is nothing to anchor on and nothing to
+    # assert -- return clean instead of inventing a failure. The real repo root
+    # always has this file; test_live_coverage_floor_holds pins that.
+    if not (root / "src" / "maya_mcp_server" / "pipeline.py").exists():
+        return []
+
+    errors: list[str] = []
+    try:
+        annotated = annotated_tools(root)
+    except ValueError as e:
+        return [f"::error file={PIPELINE.name}::{e}"]
+    if not annotated:
+        return [f"::error file={PIPELINE.name}::TOOL_ANNOTATIONS resolved to zero tools"]
+
+    tools = data.get("tools", {}) or {}
+    exempt = data.get("coverage_exemptions", {}) or {}
+    sigs = tool_signatures(root)
+
+    # -- coverage, forward ------------------------------------------------
+    for tool in sorted(annotated - set(tools) - set(exempt)):
+        errors.append(
+            f"::error file=0028-elements.yaml::tool '{tool}' is in TOOL_ANNOTATIONS but "
+            f"neither 'tools' nor 'coverage_exemptions' — add disclosure elements or an "
+            f"explicit exemption with a reason (D-195 1)"
+        )
+    # -- coverage, reverse (no rot) --------------------------------------
+    for tool in sorted(set(tools) - annotated):
+        errors.append(
+            f"::error file=0028-elements.yaml::tool '{tool}' has elements but is not in "
+            f"TOOL_ANNOTATIONS — stale entry, the gate would never check it (D-195 1)"
+        )
+    # -- ambiguity: covered AND exempt ------------------------------------
+    for tool in sorted(set(tools) & set(exempt)):
+        errors.append(
+            f"::error file=0028-elements.yaml::tool '{tool}' is both covered and exempt — "
+            f"pick one, or the exemption silently rots (D-195 1)"
+        )
+    # -- every exemption must justify itself ------------------------------
+    for tool, entry in sorted(exempt.items()):
+        if not isinstance(entry, dict) or not str(entry.get("reason", "")).strip():
+            errors.append(
+                f"::error file=0028-elements.yaml::exemption for '{tool}' needs a non-empty "
+                f"'reason' — absence is a CI failure, not a silent skip (D-195 1)"
+            )
+        elif not str(entry.get("due", "")).strip():
+            errors.append(
+                f"::error file=0028-elements.yaml::exemption for '{tool}' needs a 'due' — an "
+                f"open-ended exemption is the new-code blind spot (D-195 4)"
+            )
+
+    # -- derivable minimum set, as a shrink-only ratchet ------------------
+    violations: set[tuple[str, str]] = set()
+    for tool, cfg in sorted(tools.items()):
+        if not isinstance(cfg, dict):
+            continue
+        present = {
+            e.get("id")
+            for e in cfg.get("required_elements", [])
+            if isinstance(e, dict)
+        }
+        sig = sigs.get(tool)
+        if sig is None:
+            errors.append(
+                f"::error file=0028-elements.yaml::tool '{tool}' has elements but no "
+                f"@mcp.tool function was found — the signature cannot be derived"
+            )
+            continue
+        for eid in derivable_elements(tool, sig, SIBLING_FAMILIES):
+            if eid not in present:
+                violations.add((tool, eid))
+
+    new = violations - DERIVATION_BASELINE
+    for tool, eid in sorted(new):
+        errors.append(
+            f"::error file=0028-elements.yaml::tool '{tool}' is missing '{eid}', which is "
+            f"derivable from its own signature — the floor tightens, add it (D-195 2)"
+        )
+    if violations != DERIVATION_BASELINE:
+        stale = DERIVATION_BASELINE - violations
+        if stale:
+            errors.append(
+                "::error file=0028-elements.yaml::derivable-minimum-set ratchet shrank but the "
+                f"baseline still lists {len(stale)} violation(s) "
+                f"({', '.join(f'{t}/{e}' for t, e in sorted(stale))}) — drop them from "
+                f"DERIVATION_BASELINE in .github/scripts/check_tdqs_disclosure.py "
+                f"(D-195 4, tighten only)"
+            )
+    return errors
+
 
 
 if __name__ == "__main__":

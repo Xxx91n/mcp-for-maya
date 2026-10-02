@@ -134,6 +134,191 @@ def stress_track(checker, tools, docs):
         print(f"  surviving negated clause: {n} x {eid}: {clause!r}")
 
 
+# ---------------------------------------------------------------------------
+# D-198 track 2 -- hand-labelled criteria corpus. The ONLY false-negative
+# denominator (D-191 1c): every sample carries a label and a one-sentence
+# defensible reason, so a disagreement is a conversation, not a number.
+#
+# Three labels, and the third is NOT a false negative:
+#   true_negative       the sentence really does negate the claim, so the
+#                       guard must answer negated_only
+#   forgiven            a correct negation-FORM disclosure ("not idempotent")
+#                       that the exemption list must forgive
+#   known_limitation    a real negation the clause-scope rule deliberately
+#                       forgives because the cue sits in an EARLIER clause.
+#                       This is the traded-away false-positive class from
+#                       D-190 1, counted as a design limitation, never as an FN.
+# ---------------------------------------------------------------------------
+
+TRUE_NEGATIVE = "true_negative"
+FORGIVEN = "forgiven"
+KNOWN_LIMITATION = "known_limitation"
+
+LABELLED_CORPUS = [
+    {
+        "label": TRUE_NEGATIVE,
+        "text": "This tool does not create a new camera.",
+        "why": "the claim is genuinely denied in the same clause, so a positive "
+               "match would be a fake green",
+    },
+    {
+        "label": TRUE_NEGATIVE,
+        "text": "It never adds animation curves to the scene.",
+        "why": "'never' is a cue and the match follows it inside one clause",
+    },
+    {
+        "label": TRUE_NEGATIVE,
+        "text": "Calling this twice will not create a new camera.",
+        "why": "the cue precedes the match with no clause terminator between them",
+    },
+    {
+        "label": TRUE_NEGATIVE,
+        "text": "This call does not mark the scene dirty.",
+        "why": "exercises the scene-dirty pattern, not only the camera one",
+    },
+    {
+        "label": FORGIVEN,
+        "text": "Not idempotent \u2014 each call creates a new camera.",
+        "why": "'not idempotent' is the canonical disclosure of the property, "
+               "listed in positive_exemptions",
+    },
+    {
+        "label": FORGIVEN,
+        "text": "This tool is non-idempotent: it creates a new camera every time.",
+        "why": "the non-idempotent form is listed too, and must be forgiven the same way",
+    },
+    {
+        "label": FORGIVEN,
+        "text": "Not idempotent, so it creates a new camera on every invocation.",
+        "why": "the exemption is scoped to the phrase, not the clause, so a "
+               "later true claim still counts",
+    },
+    {
+        "label": KNOWN_LIMITATION,
+        "text": "It does not delete anything. The tool creates a new camera.",
+        "why": "the cue sits in an earlier clause; clause scope forgives it by design (D-190 1)",
+    },
+    {
+        "label": KNOWN_LIMITATION,
+        "text": "No geometry is removed; instead a camera is created and animated.",
+        "why": "semicolon splits the clause, so the guard sees only the positive second half",
+    },
+]
+
+# Below this many labelled samples the corpus is a smoke test, not evidence.
+# The ruling keeps such a run at "not yet adjudicable" rather than promoting
+# a verdict off a handful of samples.
+MIN_ADJUDICABLE = 12
+
+
+def labelled_track(checker, tools):
+    """Track 2. Prints the FN denominator; never combines with track 3."""
+    guarded = _guarded_elements(tools)
+    if not guarded:
+        print("TRACK2 (labelled): no polarity_aware element to exercise")
+        return
+    counts = {TRUE_NEGATIVE: 0, FORGIVEN: 0, KNOWN_LIMITATION: 0}
+    unexpected = []
+    for tool, elem in guarded:
+        patterns = elem.get("any", [])
+        exempt = tuple(elem.get("positive_exemptions", ()))
+        for sample in LABELLED_CORPUS:
+            pos = neg = 0
+            for pat in patterns:
+                for m in re.finditer(pat, sample["text"]):
+                    if checker._negated(sample["text"], m.start(), exempt):
+                        neg += 1
+                    else:
+                        pos += 1
+            if neg and not pos:
+                verdict = TRUE_NEGATIVE
+            elif pos:
+                verdict = FORGIVEN if sample["label"] == FORGIVEN else "saw-positive"
+            else:
+                verdict = "no-match"
+            counts[sample["label"]] += 1
+            if sample["label"] in (TRUE_NEGATIVE, FORGIVEN) and verdict != sample["label"]:
+                unexpected.append(
+                (tool, elem["id"], sample["label"], verdict, sample["text"])
+            )
+    print(f"TRACK2 (labelled): samples={len(LABELLED_CORPUS)} per guarded element={len(guarded)}")
+    print(f"  labels: true_negative={counts[TRUE_NEGATIVE]} forgiven={counts[FORGIVEN]} "
+          f"known_limitation={counts[KNOWN_LIMITATION]}")
+    print(f"  FN denominator (true_negative only) = {counts[TRUE_NEGATIVE]}")
+    print(f"  disagreements with the hand labels = {len(unexpected)}")
+    for row in unexpected:
+        print(
+            f"    MISMATCH {row[0]}/{row[1]}: labelled {row[2]}, "
+            f"guard said {row[3]} -- {row[4]!r}"
+        )
+    if len(LABELLED_CORPUS) < MIN_ADJUDICABLE:
+        print(
+            f"  NOT YET ADJUDICABLE: {len(LABELLED_CORPUS)} < "
+            f"MIN_ADJUDICABLE={MIN_ADJUDICABLE}; verdict stays warn, "
+            "no promotion off this sample"
+        )
+    elif unexpected:
+        print("  REGRESSION: a labelled expectation did not hold")
+    else:
+        print("  labels hold; still not a promotion signal on its own")
+
+
+# ---------------------------------------------------------------------------
+# D-198 track 3 -- programmatic mutation surface. Reports absolute counts and
+# construction coverage ONLY. It is never a denominator: a generated sentence
+# has no ground truth, so any ratio computed over it would be a made-up
+# number. Promotion into track 2 requires a human confirming a true negative.
+# ---------------------------------------------------------------------------
+
+MUTATION_CUES = ["does not", "never", "without", "cannot"]
+MUTATION_SPLITS = [". ", "; ", ", and ", " but "]
+
+
+def mutation_track(checker, tools):
+    docs = corpus(REPO / "src" / "maya_mcp_server")
+    guarded = _guarded_elements(tools)
+    total = 0
+    flipped = 0
+    shapes: dict[tuple[str, str], int] = {}
+    for _key, doc in docs:
+        for _tool, elem in guarded:
+            exempt = tuple(elem.get("positive_exemptions", ()))
+            for pat in elem.get("any", []):
+                for m in re.finditer(pat, doc):
+                    total += 1
+                    clause = doc[checker._clause_start(doc, m.start()) : m.end()]
+                    for cue in MUTATION_CUES:
+                        mutated = f"{cue} {clause}"
+                        if checker._negated(mutated, len(cue) + 1, exempt):
+                            flipped += 1
+                            shapes[(cue, "prefix")] = shapes.get((cue, "prefix"), 0) + 1
+                    for split in MUTATION_SPLITS:
+                        mutated = f"{MUTATION_CUES[0]} {clause}{split}and {clause}"
+                        first = mutated.find(clause)
+                        second = mutated.find(clause, first + 1)
+                        if second < 0:
+                            continue
+                        key = (split.strip(), "split")
+                        shapes[key] = shapes.get(key, 0) + 1
+                        if not checker._negated(mutated, second, exempt):
+                            flipped += 1
+    print(f"TRACK3 (mutation): seed_matches={total} negated_after_mutation={flipped}")
+    print(f"  constructions exercised={len(shapes)} (cue-prefix and clause-split)")
+    for (shape, kind), n in sorted(shapes.items()):
+        print(f"    {kind}: {shape!r} -> {n}")
+    print("  absolute counts only -- track 3 is NEVER a denominator (D-198)")
+
+
+def _guarded_elements(tools):
+    out = []
+    for tool, cfg in sorted(tools.items()):
+        for elem in cfg.get("required_elements", []):
+            if elem.get("polarity_aware"):
+                out.append((tool, elem))
+    return out
+
+
+
 def main():
     checker = load_checker()
     tools = json.loads(ELEMENTS.read_text(encoding="utf-8")).get("tools", {})
@@ -147,6 +332,8 @@ def main():
     print(f"elements: {elements} across {len(tools)} tools")
     primary_track(checker, tools, by_name)
     stress_track(checker, tools, docs)
+    labelled_track(checker, tools)
+    mutation_track(checker, tools)
     return 0
 
 

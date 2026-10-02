@@ -532,3 +532,239 @@ def test_live_corpus_has_no_polarity_warnings():
     assert errors == []
     assert warnings == []
     assert checked == sum(len(cfg.get("required_elements", [])) for cfg in data["tools"].values())
+
+
+# ---------------------------------------------------------------------------
+# D-195 coverage floor + derivable minimum set
+#
+# Every assertion below is written as a COUNTERFACTUAL: it mutates the loaded
+# elements data and asserts the gate goes red. A test that only asserts the
+# live state green proves nothing about the gate -- that is the R43 lesson.
+# ---------------------------------------------------------------------------
+
+
+def _live_data(mod):
+    return json.loads(mod.DEFAULT_ELEMENTS.read_text(encoding="utf-8"))
+
+
+def _covers_err(mod, data, needle):
+    errs = mod.check_coverage_and_derivation(mod.REPO, data)
+    return [e for e in errs if needle in e]
+
+
+def test_live_coverage_floor_holds():
+    """All 25 annotated tools are covered or explicitly exempt."""
+    mod = _load()
+    data = _live_data(mod)
+    annotated = mod.annotated_tools(mod.REPO)
+    covered = set(data["tools"]) | set(data.get("coverage_exemptions", {}))
+    assert annotated - covered == set(), (
+        "tools with neither elements nor an exemption: " f"{sorted(annotated - covered)}"
+    )
+    assert not mod.check_coverage_and_derivation(mod.REPO, data)
+
+
+def test_live_no_stale_elements_entries():
+    mod = _load()
+    data = _live_data(mod)
+    assert not _covers_err(mod, data, "stale entry")
+
+
+def test_live_every_exemption_has_reason_and_due():
+    """D-195 1/4: an exemption without a reason is a silent skip; without a
+    due it is the new-code blind spot. Neither may pass."""
+    mod = _load()
+    data = _live_data(mod)
+    for tool, entry in data["coverage_exemptions"].items():
+        assert entry.get("reason", "").strip(), tool
+        assert entry.get("due", "").strip(), tool
+
+
+def test_live_repo_root_is_not_skipped_by_the_synthetic_root_guard():
+    """The skip above must only ever apply to synthetic roots. If it ever
+    swallowed the real repo, the whole coverage floor would be silently dead."""
+    mod = _load()
+    assert (mod.REPO / "src" / "maya_mcp_server" / "pipeline.py").exists()
+    assert mod.annotated_tools(mod.REPO), "the real repo must resolve its annotations"
+
+
+def test_coverage_fires_when_a_tool_is_neither_covered_nor_exempt():
+    mod = _load()
+    data = _live_data(mod)
+    data["coverage_exemptions"].pop("camera_create")
+    hits = _covers_err(mod, data, "'camera_create' is in TOOL_ANNOTATIONS")
+    assert hits, "removing an exemption must make the coverage gate fire"
+
+
+def test_coverage_fires_on_a_stale_entry():
+    mod = _load()
+    data = _live_data(mod)
+    data["tools"]["scene_nonexistent"] = {"file": "src/maya_mcp_server/scene_tools.py",
+                                           "tier": "P1", "required_elements": []}
+    assert _covers_err(mod, data, "stale entry"), "an entry for a non-existent tool must fire"
+
+
+def test_coverage_fires_when_a_tool_is_both_covered_and_exempt():
+    mod = _load()
+    data = _live_data(mod)
+    data["coverage_exemptions"]["scene_measure"] = {"reason": "x", "due": "0.7.0"}
+    assert _covers_err(mod, data, "both covered and exempt")
+
+
+def test_coverage_fires_on_an_exemption_without_a_reason():
+    mod = _load()
+    data = _live_data(mod)
+    data["coverage_exemptions"]["camera_create"] = {"due": "0.7.0"}
+    assert _covers_err(mod, data, "needs a non-empty 'reason'")
+
+
+def test_coverage_fires_on_an_exemption_without_a_due():
+    mod = _load()
+    data = _live_data(mod)
+    data["coverage_exemptions"]["camera_create"] = {"reason": "because"}
+    assert _covers_err(mod, data, "needs a 'due'")
+
+
+def test_derivation_fires_on_a_new_violation():
+    """Dropping a derivable element that is NOT in the frozen baseline is a
+    regression and must be red immediately -- that is the 'tighten only'
+    direction."""
+    mod = _load()
+    data = _live_data(mod)
+    ids = [e["id"] for e in data["tools"]["scene_measure"]["required_elements"]]
+    assert "session_prerequisite" in ids
+    data["tools"]["scene_measure"]["required_elements"] = [
+        e for e in data["tools"]["scene_measure"]["required_elements"]
+        if e["id"] != "session_prerequisite"
+    ]
+    hits = _covers_err(mod, data, "missing 'session_prerequisite'")
+    assert hits, "dropping a non-baseline derivable element must fire"
+    assert any("scene_measure" in h for h in hits)
+
+
+def test_derivation_fires_when_the_floor_shrinks_but_the_baseline_stays():
+    """The reverse guard. Without it the baseline could silently rot into a
+    permanent free pass for tools that already converged."""
+    mod = _load()
+    data = _live_data(mod)
+    # give a baselined tool its missing element -> violation set shrinks
+    data["tools"]["scene_snapshot"]["required_elements"].append(
+        {"id": "session_prerequisite", "why": "test", "any": ["session_key"]}
+    )
+    hits = _covers_err(mod, data, "ratchet shrank")
+    assert hits, "a stale baseline entry must fire"
+    assert any("scene_snapshot/session_prerequisite" in h for h in hits), hits
+
+
+def test_derivation_baseline_is_the_observed_legacy_set():
+    """Pin the frozen baseline so an unnoticed element change cannot quietly
+    reclassify a legacy gap as a fresh regression (or the reverse)."""
+    mod = _load()
+    data = _live_data(mod)
+    sigs = mod.tool_signatures(mod.REPO)
+    live = set()
+    for tool, cfg in data["tools"].items():
+        present = {e.get("id") for e in cfg.get("required_elements", []) if isinstance(e, dict)}
+        for eid in mod.derivable_elements(tool, sigs[tool], mod.SIBLING_FAMILIES):
+            if eid not in present:
+                live.add((tool, eid))
+    assert live == set(mod.DERIVATION_BASELINE), (
+        f"baseline drifted; live={sorted(live)} baseline={sorted(mod.DERIVATION_BASELINE)}"
+    )
+
+
+def test_tools_without_session_key_need_no_session_prerequisite():
+    """T-R44-04 dry-run, locked in. The rule abstains on tools that take no
+    session_key instead of firing on them -- that abstention is what makes the
+    gate safe to turn hard."""
+    mod = _load()
+    data = _live_data(mod)
+    sigs = mod.tool_signatures(mod.REPO)
+    no_key = {t for t, s in sigs.items() if not s["session_key"]}
+    assert no_key, "expected at least one tool that takes no session_key"
+    for tool in sorted(no_key):
+        assert "session_prerequisite" not in mod.derivable_elements(
+            tool, sigs[tool], mod.SIBLING_FAMILIES
+        ), tool
+    # and none of them may be forced to declare it
+    for tool in sorted(no_key & set(data["tools"])):
+        ids = {e.get("id") for e in data["tools"][tool]["required_elements"]}
+        assert "session_prerequisite" not in ids, tool
+
+
+def test_sibling_family_members_derive_the_boundary_pair():
+    mod = _load()
+    tool = "scene_measure"
+    assert any(tool in fam for fam in mod.SIBLING_FAMILIES)
+    derived = set(mod.derivable_elements(tool, {"session_key": True}, mod.SIBLING_FAMILIES))
+    assert {"boundary_line", "boundary_targets_named"} <= derived
+
+
+# ---------------------------------------------------------------------------
+# D-199 firing fixtures. Every polarity_aware element must be able to prove it
+# fires: a guarded element with no negation fixture could be silently inert.
+# Fixture material is reused from the track-2 "true negative" samples, so the
+# corpus and the firing proof cannot drift apart.
+# ---------------------------------------------------------------------------
+
+
+def _guarded(mod):
+    data = _live_data(mod)
+    return [
+        (tool, elem)
+        for tool, cfg in sorted(data["tools"].items())
+        for elem in cfg.get("required_elements", [])
+        if elem.get("polarity_aware")
+    ]
+
+
+NEGATION_FIXTURES = [
+    "This call does not create a new camera.",
+    "It never adds animation curves to the scene.",
+    "Calling this twice will not create a new camera.",
+    "This call does not mark the scene dirty.",
+]
+
+
+def test_guarded_set_is_legislated():
+    mod = _load()
+    got = sorted(f"{t}/{e['id']}" for t, e in _guarded(mod))
+    assert got == LEGISLATED_GUARDED
+
+
+def test_every_guarded_element_has_a_firing_negation_fixture():
+    """D-199: each guarded element must produce negated_only on a genuine
+    negation. An element that cannot fire is an untested gate."""
+    mod = _load()
+    import re
+
+    for tool, elem in _guarded(mod):
+        patterns = elem.get("any", [])
+        exempt = tuple(elem.get("positive_exemptions", ()))
+        fired = False
+        for text in NEGATION_FIXTURES:
+            pos = neg = 0
+            for pat in patterns:
+                for m in re.finditer(pat, text):
+                    if mod._negated(text, m.start(), exempt):
+                        neg += 1
+                    else:
+                        pos += 1
+            if neg and not pos:
+                fired = True
+                break
+        assert fired, (
+            f"{tool}/{elem['id']} has no fixture that makes it report negated_only"
+        )
+
+
+def test_negation_fixtures_are_a_subset_of_guarded_elements():
+    """Cross-assertion (D-199): fixtures may only exist for guarded elements,
+    otherwise the fixture list grows a second, unpinned notion of guarded."""
+    mod = _load()
+    guarded = {f"{t}/{e['id']}" for t, e in _guarded(mod)}
+    fixture_targets = set(LEGISLATED_GUARDED)
+    assert fixture_targets <= guarded, (
+        f"fixtures target non-guarded elements: {sorted(fixture_targets - guarded)}"
+    )
+    assert NEGATION_FIXTURES, "the fixture list must not be emptied"
