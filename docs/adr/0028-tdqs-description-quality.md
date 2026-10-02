@@ -106,3 +106,12 @@ CI 断言「结构化要素存在」非「关键词字面」（`Boundary:` 行=�
 
 - 前置：ADR-0012（对标与宣称纪律链）、ADR-0023（发布门三态——本轮为 listing 面非门清单项）、ADR-0027（消歧惯例先例出处域）
 - 同步工件：`docs/adr/0028-elements.yaml`（单源）、`docs/evidence/gate-waiver-list-1.0.0.json`（无涉——本轮非门面）、`docs/distribution-surfaces.md`（Glama 行同步）
+
+### 执行窗结果（R44 执行窗 + 独立审计，2026-10-02）
+
+上述「存量 13 件」是立法时的零断言数，本节不改写该记录（保留多基线供审计，GM-22-001），只记录实际执行结果：
+
+- **13 → 12**：执行窗已将 `scene_measure` 补入覆盖面，实际 `coverage_exemptions` = **12 件**，每件带 `reason` + `due`（`0.7.0`）。
+- **推导债 8 对不在豁免表**：它们是已带完整 `tools` 条目、但缺一个可推导要素的工具；覆盖与豁免互斥本身就是门规，所以这 8 对只能存在 checker 内的 `DERIVATION_BASELINE` 常量里。
+- **`due` 已接机制**：checker 把 `due` 解析为版本号与 `pyproject.toml` 的 `version` 比较，到期点名不刷。不可解析的 `due` 报错；读不到版本号时报 **warning**（避免静默过期）。
+- **事实更正（F1，P0）**：`scene_measure` 首版重写曾写错 `clearance` 语义（断言「0 意味着各轴恰好相切」，实际可能是两轴穿透+一轴相切仍返回 0），已按 `maya_scene_module.py` 实现重写并补 stub 回归用例。

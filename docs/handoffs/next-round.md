@@ -10,7 +10,7 @@ branch: 清场后三 lane 布局（D-201）——grill/round44-sub-a-closeout（
 ## 状态总览（R44 收口）
 
 - **Glama 实况**（2026-10-02 抓取）：25 件工具 24A（3.6~4.9）/1B/1C——**camera_orbit=C2.9**（Behavior 2/5，评的是 v0.5.0 旧一行描述）、**scene_measure=B3.1**（Behavior/Usage 各 2、Completeness/Parameters 各 3、Purpose 4、Conciseness 5）。
-- **两低分归因分离**：camera_orbit=**扫描时滞伪影**（Glama 吃 git 源码非 PyPI——push 分钟级同步+commit 驱动重扫+inputHash；富描述已在 main e595b0f，随下次重扫自愈，**非发版滞后非描述缺陷**）；scene_measure=**真缺口**（0.5.0 与 main docstring 相同、从未进描述批、elements.yaml 零断言）。
+- **两低分归因分离**：camera_orbit=**扫描时滞伪影**（Glama 吃 git 源码非 PyPI——push 分钟级同步+commit 驱动重扫+inputHash；富描述已入 main（`ac153fc`。【修正 2026-10-02】原记「e595b0f」为悬空 commit，不在任何分支上——富描述实际经 `ac153fc` 入 main），随下次重扫自愈，**非发版滞后非描述缺陷**）；scene_measure=**真缺口**（0.5.0 与 main docstring 相同、从未进描述批、elements.yaml 零断言）。
 - **R44 八裁决全落账**（D-194..201，附节 verbatim+canonical）：全案范围/零断言地板立法（枚举完整性断言+推导最低集 ratchet）/scene_measure 处置（P1+三件+四维回写+删 schema 复述+验收门不扩）/0.6.0 串行单跳+熔断+解耦认知/三轨语料（轨②唯一 FN 分母）/fixture 开火立法/三待裁清零（分母换代+豁免出口锚+缺口节即注册表，T-R42-09 结案）/三 lane 编排。
 - **立法批本批已落盘**：canonical 迁入 8 行+ADR-0023 R44 增补 bullet（0.6.0 时序+解耦）+ADR-0028 R44 增补节+两缺口结案/半结案注记+CONTEXT 七新词（枚举完整性断言/推导最低集/判据集/设计已知限制/开火 fixture/扫描时滞伪影/缺口披露节）+本任务书。
 - **调研存档**：.scratch/r44/research-q2.md ~ research-q8.md（atomcode 七轮；Q1/Q3 范围与处置直裁+调研复核）。
@@ -40,7 +40,7 @@ branch: 清场后三 lane 布局（D-201）——grill/round44-sub-a-closeout（
 
 ## T-R44-04：exec-A——推导最低集 dry-run 验证（接红前置）
 
-覆盖 D-195 负①④。推导规则对现有 25 件 dry-run 出误报清单先行核验；存量 13 件限期一个 minor 窗收敛（补挂或显式 exempt+理由字段），只收紧不放松。
+覆盖 D-195 负①④。推导规则对现有 25 件 dry-run 出误报清单先行核验；存量限期一个 minor 窗收敛（补挂或显式 exempt+理由字段），只收紧不放松。**【修正 2026-10-02】**原写「存量 13 件」：13 是 D-195 立法时的零断言数，执行窗已把 scene_measure 补入覆盖面，实际剩 **12 件**（`coverage_exemptions`，due=0.7.0）+ 推导基线 **8 对**（全在 `tools` 内，不在豁免表——覆盖与豁免互斥是门规）。执行窗已完成，本项保留作历史记录。
 
 ## T-R44-05：exec-B——枚举完整性断言+推导映射表
 
