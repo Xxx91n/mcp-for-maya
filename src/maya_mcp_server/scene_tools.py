@@ -409,8 +409,10 @@ result
                      < 0  all three axes penetrate; the value is the
                           SHALLOWEST penetration depth, the minimum
                           translation needed to pull them apart.
-                     bbox_overlap is true only when all three axes strictly
-                     penetrate, so it reads false even when two of three do.
+                     bbox_overlap is true if and only if all three axes
+                     strictly penetrate. A single penetrating axis already
+                     makes it read false, so it can never be read as "no
+                     penetration".
                      Read details.clearances_xyz for the signed per-axis truth
                      before concluding anything from distance alone.
           bbox       overlap test. On overlap, distance is 0 and overlap_dims
