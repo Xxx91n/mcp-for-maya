@@ -1,105 +1,108 @@
 ---
-generated: 2026-10-01
-from_round: R41（Glama TDQS B→A 落地链路+机制收口 grill 定稿 + 对账整理闭环，覆盖 D-185~193）
-ledger_head: canonical=D-193（D-185..193 已随本批迁入）；.scratch/r41/decision-ledger.md 过程件按 append-only 留档不删——本文件「附」节 verbatim 副本已迁入留档勿重迁
-branch: grill/round41-gate-path（本整理批，未 merge）+ 既有三 lane 未 push：grill/round39-tdqs-closeout（gr，yos+ppw）/ exec/r40-tdqs-closeout（P-A，qkn）/ exec/r40-evidence-anchors（P-B，zry）——push/PR 未授权
+generated: 2026-10-02
+from_round: R44（Glama sub-A 两工具收口+极性误差面双向测绘 grill 定稿+对账整理闭环，覆盖 D-194~201）
+ledger_head: canonical=D-201（D-194..201 已随本批迁入）；.scratch/r44/decision-ledger.md 过程件 append-only 留档不删——本文件「附」节 verbatim 副本已迁入留档勿重迁
+branch: 清场后三 lane 布局（D-201）——grill/round44-sub-a-closeout（本整理批）/ exec/r44-description-floor（exec-A，发版前置）/ exec/r44-checker-mechanics（exec-B，纯 CI 面）；merge 序 gr→exec-A→exec-B；push/PR 未授权
 ---
 
-# 下轮任务书（rev52）
+# 下轮任务书（rev53）
 
-## 状态总览（R41 收口）
+## 状态总览（R44 收口）
 
-- **Glama 实况**：页面仍 B 3.4/5.0（Scored 2026-09-30 06:25 未动，25 tools）——P-A/P-B/gr 三 lane 全部落地完毕但**未 push**；B 态根因=改进批未出本地，非文本质量剩余缺陷。
-- **R41 九裁决全落账**（D-185..193，见附节 verbatim + canonical）：收口窗范围 / 三独立 PR 编排（gr→P-A→P-B+互链序声明+原子声明+gr merge 金丝雀对照点）/ 0.6.0 minor 车选 / 重评验收+四分支判负预案 / evidence-anchor expiry 复核规程（preflight 第 7 行）/ 极性硬化形态立法（子句窗+positive_exemptions+方向限定+双档判据）/ 杂项三面计数口径 / P3 前置议题登记块（ADR-0023）/ 本批编排（本 lane）。
-- **立法批本批已落盘**：canonical 迁入 9 行 + ADR-0023 R41 增补块（车选/preflight 第 7 行/门测量口径/P3 登记块）+ ADR-0028 R41 增补节（判负决策树+极性硬化形态）+ CONTEXT 三新词+一注记 + 本任务书。
-- **调研存档**：.scratch/r41/research-q1.md ~ research-q6.md（atomcode 六轮；q7~q9 直裁无调研）。
-- **审计 loop2 机件实测在案**：TDQS 36/12 OK / anchors 40 warn exit 0 / 极性语料 264docstrings→339 匹配 53 落 naive 窗（主因=无子句边界非 cue 表）。
-
----
-
-## T-R42-01：三 PR 编排执行（push 授权后）
-
-覆盖 D-186 + D-184②④⑤ + D-193。
-
-1. `but push` 三 lane + `but pr new` 各开独立 PR——merge 序=gr（docs）→P-A→P-B；三 PR 描述互链+序声明行；P-A/P-B 各带「账本迁入/revised 属被修对象原子记录面」声明（D-109③/D-153①）。
-2. gr merge 当金丝雀对照点：merge 后看 Glama last-scanned 动不动=HEAD-build vs PyPI-pull 判别素材（账本只写观察，D-129）。
-3. elements.yaml 禁跨 PR 分批改（D-175④）——R40+R41 的 yaml 改动须全在 P-A 面一次 review 完。
-4. **勿 push 除非用户令**——授权语义本批沿用。
-
-## T-R42-02：极性硬化执行批（P-A lane 追加 commit 或 P-A merge 后独立小 PR，执行编排裁定）
-
-覆盖 D-190 + D-180③。
-
-1. `_negated` 窗口改子句级——cue 与 match 之间有子句边界则不判否定；切分符集合=执行窗产物（禁回立法行）。
-2. `0028-elements.yaml` 新增 `positive_exemptions` 要素级字段枚举合法否定式披露短语（如 "not idempotent"）。
-3. `polarity_aware: true` 强制挂仅限纯肯定式 pattern 的 mutation 存在性断言（现行唯一实例=camera_orbit/mutation_side_effects）；否定式 pattern 要素不挂守卫走豁免表。
-4. 仍 warn 起步（negated_only→::warning::）；测试：跨子句 cue 不误伤/同子句豁免短语不误伤/肯定式漏报仍 error。
-5. 语料分母口径先行（D-191①c）：主测=真实校验面（工具↔其要素）+压测=264 docstrings 笛卡尔积——两轨分别报数禁混淆。
-
-## T-R42-03：0.6.0 发版链（人工确认门后执行）
-
-覆盖 D-187 + D-084/D-143/D-150③ 惯例。
-
-preflight 全过（含新第 7 行 expiry 复核=T-R42-04）→ 人工确认门点头 → `git tag -a v0.6.0`（annotated 惯例）→ push tag → release.yml PyPI → GH Release 页（minor 义务位兑现）→ PyPI 双车道复核见 0.6.0（T-30i/D-142γ 同型）。
-
-## T-R42-04：evidence-anchor expiry 复核首跑（随 0.6.0 preflight）
-
-覆盖 D-189 + D-183③④。
-
-按 ADR-0023 R41 增补第 7 行执行：分桶（裸 path:line=合法 advisory 不计分母 / 可硬化类逐条人工核验）→ FP/(TP+FP) 仅对可硬化类 → 判据直引 D-183④（零/低→升 hard；>30%→退人工抽查+修 checker 债）→ 账本事件行+分类工件归档 docs/evidence/。存量 ~40 条裸 path:line=登记升级债逐步消化不强清零（T-R42-08）。
-
-## T-R42-05：Glama 重评验收（Scored 事件触发）
-
-覆盖 D-188 + D-182①②③。
-
-三步核验=字母档+min 逐件+旗标零；判负走 ADR-0028 R41 增补四分支树（Br-a 执行质量返修或 D-181③ schema 窗 / Br-b 触发态三档只记观察 P3 解冻权归门审 / Br-c PyPI-pull 核验开新缺口 / Br-d 逐旗检修）；达标=账本事件行+docs/evidence/ 页快照归档+distribution-surfaces 同步+徽章可选（**达标前禁写**）。
-
-## T-R42-06：金丝雀观察窗（持续，非 PR）
-
-覆盖 D-182③ + D-187③。观测点=gr merge 后时间戳 / 0.6.0 publish 后时间戳；账本只写观察。
-
-## T-R42-07：P3 复议议程材料填充（门审召集窗）
-
-覆盖 D-192 + D-179②③。ADR-0023 R41 登记块为骨架本体；召集窗按当刻快照填证据指针（Glama 批后维度读数/客户端实测/工具面计数）；**禁预填判决倾向**。
-
-## T-R42-08：升级债+housekeeping 承继
-
-覆盖 D-189⑦ + rev50 遗留项。
-
-- 存量 ~40 条裸 `path:line` 锚点按白名单优先级逐步升级（触发债登记，非本窗清零义务）。
-- housekeeping 遗留：license 文件残留判断 / mystubs CI 页脚残留 / Glama 收录动作绑维护页签期窗（等首次门检结果定剪除窗口）/ sync matrix 单任务字段修剪 / docs/testing.md 增量轮更新。
-
-## T-R42-09：known-gap 登记（tools/list live 捕获局限）
-
-覆盖 D-191②。审计部分 PASS 项——处置=按 D-183⑤ 模板挂「环境+退出码+工件落点」三联证据指针入 known-gap 登记，非缺陷。
+- **Glama 实况**（2026-10-02 抓取）：25 件工具 24A（3.6~4.9）/1B/1C——**camera_orbit=C2.9**（Behavior 2/5，评的是 v0.5.0 旧一行描述）、**scene_measure=B3.1**（Behavior/Usage 各 2、Completeness/Parameters 各 3、Purpose 4、Conciseness 5）。
+- **两低分归因分离**：camera_orbit=**扫描时滞伪影**（Glama 吃 git 源码非 PyPI——push 分钟级同步+commit 驱动重扫+inputHash；富描述已入 main（`ac153fc`。【修正 2026-10-02】原记「e595b0f」为悬空 commit，不在任何分支上——富描述实际经 `ac153fc` 入 main），随下次重扫自愈，**非发版滞后非描述缺陷**）；scene_measure=**真缺口**（0.5.0 与 main docstring 相同、从未进描述批、elements.yaml 零断言）。
+- **R44 八裁决全落账**（D-194..201，附节 verbatim+canonical）：全案范围/零断言地板立法（枚举完整性断言+推导最低集 ratchet）/scene_measure 处置（P1+三件+四维回写+删 schema 复述+验收门不扩）/0.6.0 串行单跳+熔断+解耦认知/三轨语料（轨②唯一 FN 分母）/fixture 开火立法/三待裁清零（分母换代+豁免出口锚+缺口节即注册表，T-R42-09 结案）/三 lane 编排。
+- **立法批本批已落盘**：canonical 迁入 8 行+ADR-0023 R44 增补 bullet（0.6.0 时序+解耦）+ADR-0028 R44 增补节+两缺口结案/半结案注记+CONTEXT 七新词（枚举完整性断言/推导最低集/判据集/设计已知限制/开火 fixture/扫描时滞伪影/缺口披露节）+本任务书。
+- **调研存档**：.scratch/r44/research-q2.md ~ research-q8.md（atomcode 七轮；Q1/Q3 范围与处置直裁+调研复核）。
 
 ---
 
-## 承继项（自 rev48~51 不变）
+## T-R44-01：工作区清场+三 lane 开建（第一优先）
+
+覆盖 D-201①②⑤ + D-193 承接注记。
+
+1. 逐 lane `git diff` 验证三旧 lane（grill/round39-tdqs-closeout / exec/r40-tdqs-closeout / exec/r40-evidence-anchors / grill/round41-gate-path）squash 产物等价 main=7fb33a4——**非凭 PR merged 标记推定**；验证通过才删 lane，删除被拒则逐条确认后走确认路径/必要时 --allow-merged。
+2. `but pull` 至 7fb33a4。
+3. 开三 lane：`grill/round44-sub-a-closeout` / `exec/r44-description-floor` / `exec/r44-checker-mechanics`。
+4. **勿 push/PR 除非用户令**——授权语义本批沿用。
+
+## T-R44-02：docs 整理批 commit 至 grill lane（本批本体）
+
+覆盖 D-194..201 迁入部分。账本迁入+ADR-0023/0028 增补+CONTEXT 七词+本任务书——落 `grill/round44-sub-a-closeout` 单 commit；若 GitButler 依赖模型再撞墙按 D-193 承接注记惯例改载体不改语义。
+
+## T-R44-03：exec-A——scene_measure 处置批（发版前置内容）
+
+覆盖 D-196 + D-195②。
+
+1. `scene_tools.py` scene_measure docstring 四维回写：Boundary 行点名兄弟（scene_inspect/scene_assert/scene_snapshot）+使用触发句+行为语境（session 前提/只读幂等不改场景）+mode 语义差异补 schema 之缺（clearance 0=表面接触/bbox 返重叠体积类真语义）；**删 docstring 中 schema 已覆盖的参数枚举复述段**（Conciseness 扣分面）。
+2. `0028-elements.yaml` 新增 scene_measure 条目：tier=P1+推导最低集三件（session_prerequisite+boundary_line+boundary_targets_named）。
+3. elements.yaml=单源件（D-175④）：全部 yaml 变更在 exec-A 单 PR 一次 review 完。
+
+## T-R44-04：exec-A——推导最低集 dry-run 验证（接红前置）
+
+覆盖 D-195 负①④。推导规则对现有 25 件 dry-run 出误报清单先行核验；存量限期一个 minor 窗收敛（补挂或显式 exempt+理由字段），只收紧不放松。**【修正 2026-10-02】**原写「存量 13 件」：13 是 D-195 立法时的零断言数，执行窗已把 scene_measure 补入覆盖面，实际剩 **12 件**（`coverage_exemptions`，due=0.7.0）+ 推导基线 **8 对**（全在 `tools` 内，不在豁免表——覆盖与豁免互斥是门规）。执行窗已完成，本项保留作历史记录。
+
+## T-R44-05：exec-B——枚举完整性断言+推导映射表
+
+覆盖 D-195①③。checker 新增 TOOL_ANNOTATIONS⊆elements.yaml 断言（挂要素或 exempt+理由，缺席即红）；映射表=checker 代码内常量+测试走 PR 评审不落版本化文档；mutation 工具沿用极性感知勿引极性盲断言。
+
+## T-R44-06：exec-B——三轨语料探针扩展
+
+覆盖 D-198 + D-191①c。
+
+1. 轨②手工合成标注判据集构建——三类标签（真否定应触发/否定式披露应赦免/跨子句按设计漏判），每条一句可辩护理由；第三类计「设计已知限制」计数非 FN。
+2. 轨③程序化变异面——只报绝对数与构式覆盖永不作分母；晋升轨②规则=人工确认真否定。
+3. 探针输出三轨分报、禁同现一个比值；轨②规模未达最小样本下限时「未可判」维持 warn。
+
+## T-R44-07：exec-B——fixture 开火测试件
+
+覆盖 D-199。每个 polarity_aware 要素随附否定语境 fixture+断言产出 negated_only；缺 fixture warn（存量补齐后升 error）/不开火即 error；fixture 原料复用轨②「真否定应触发」样本；LEGISLATED_GUARDED×fixture 清单交叉断言（fixture⊆guarded）；PR 模板加复核行作过渡冗余。
+
+## T-R44-08：Glama last-scanned 核验
+
+覆盖 D-197 负②。核 camera_orbit 合入 main 时点 vs Glama last-scanned；超合理时滞仍 C2.9→向 glama-ai 提 issue（inputHash 重扫异常可审计）；账本只写观察（D-129）。
+
+## T-R44-09：0.6.0 发版链（人工确认门后执行）
+
+覆盖 D-197 + D-187 + T-R42-04（expiry 复核并入 preflight）。排序=T-R44-03 落地（第一优先）→preflight 全过→人工门点头→`git tag -a v0.6.0`→push tag→release.yml→GH Release；熔断=重写超 2 窗未落地则放弃等批切 0.6.0、scene_measure 随下一含实质变更版本顺带发。
+
+## T-R44-10：Glama 重评验收（Scored 事件触发）
+
+覆盖 D-188 + D-182①②③。四分支判负树执行（Br-c 分支因解耦认知修正为「last-scanned 不动→issue/新缺口」表述）；达标=账本事件行+docs/evidence/ 快照+distribution-surfaces 同步+徽章可选（**达标前禁写**）。
+
+## T-R44-11：承继观察窗与债
+
+- P3 复议材料填充（T-R42-07 原样承继，D-192 登记块为骨架本体，召集窗重算不预填倾向）。
+- 升级债+housekeeping（T-R42-08 原样承继：~40 条裸 path:line 锚点消化、license/mystubs/收录剪除等遗留）。
+- 金丝雀观察窗承继（T-R42-06→D-197 更新表述：观察点=last-scanned 时间戳演化）。
+
+---
+
+## 承继项（自 rev52 不变）
 
 - **叙事窗 γ**：轻叙事只描已验证面；重叙事仍锁（v1.0.0 门审或框5像素面先到）。
-- **债消解信号常备**：mayapy/Linux env、框5 像素面见证、第二站 VP2、Maya 2025/2026 装机——到场即门检落新快照。
+- **债消解信号常备**：mayapy/Linux env、框5 像素面见证、第二站 VP2、Maya 2025/2026 装机。
 - **门审召集**：归 user 裁量。
-- **观察窗**：10-30 D-146 核销 / awesome PR #15382（OPEN）合并跟踪 / Glama Scored 时间戳（金丝雀）。
-- **审计残余**：R2 根因 probe JSON 补强（可选）/ R3 拆行配额规则下次拆行立法 / R4 顺手补。
+- **观察窗**：10-30 D-146 核销 / awesome PR #15382 合并跟踪 / Glama Scored 时间戳。
+- **审计残余**：R2 probe JSON 补强 / R3 拆行配额规则 / R4 顺手补。
 
 ## 边界警示
 
-- 执行窗≠grill 窗：措辞终稿+极性切分符/cue 表/豁免短语清单全归执行窗产物（D-174③/D-180③/D-190 负①）——立法只到形态层。
-- P3 工具合并仍锁——D-179 立法推迟至 gate review 复议；合并集仅限同构子集（D-094 硬约束），异构合并须先 revise D-094；Br-b 观察≠P3 解冻（D-192 登记块才持判定权）。
-- atomcode 件跨会话污染警惕延续（正确 slug=Xxx91n/mcp-for-maya）。
-- 续期上限每行 2 次不变；debt_owner/gate_authority 拆词已立法。
+- 执行窗≠grill 窗：docstring 措辞终稿/标签枚举清单/映射表细节全归执行窗产物（D-180③ 边界延续）。
+- Glama 评分与发版解耦（D-197）：camera_orbit C 不赖发版车、scene_measure 重写推 main 即重评。
+- 三轨口径：轨②唯一 FN 分母、轨③永不作分母、三数禁同现一比值（D-198）；「设计已知限制」≠FN。
+- elements.yaml=单源件（D-175④）：yaml 变更走 PR 显式 review 禁跨 PR 分批——本轮 yaml 变更全集中 exec-A。
+- 0.6.0 前须人工门点头（D-187）；annotated tag 惯例；熔断条款防无限等批（D-197）。
 - 勿 push/PR 除非用户令；版本控制走 but。
-- elements.yaml=单源件（D-175④）：任何变更走 PR 显式 review，禁跨 PR 分批改。
-- stretch=3.8 禁入对外宣称文本（D-149）；Glama 徽章达标前禁写（D-188）。
-- 0.6.0 发版动作前须有人工确认门点头（D-187）；annotated tag 惯例（D-150③）。
+- P3 仍锁；Br-b 观察≠解冻（D-192）。
+- 续期上限每行 2 次不变；debt_owner/gate_authority 拆词已立法。
 
 ## Suggested skills
 
-- $implement：T-R42-02 极性硬化执行批（checker+yaml+测试）
-- $but：三 lane push/PR 编排（T-R42-01）+0.6.0 tag（T-R42-03）
-- $tdd：极性窗/豁免表测试随行为同 commit
-- $code-review：P-A 追加 commit 前自审
+- $implement：T-R44-03 描述批+T-R44-05/06/07 机件批
+- $tdd：fixture 开火测试+覆盖率断言测试随行为同 commit（R43 反事实纪律）
+- $but：清场+三 lane 编排+0.6.0 tag（T-R44-01/09）
+- $code-review：exec-A yaml 变更显式 review（D-175④）
 - $atomcode-research：新题面调研（串行一次一跑）
 - $domain-modeling：新词再落；$handoff：再交接时续写
 
@@ -128,3 +131,14 @@ preflight 全过（含新第 7 行 expiry 复核=T-R42-04）→ 人工确认门�
 | D-192 | R41-Q8 P3 复议议程骨架载体裁决 | a（采纳 A） | A=ADR-0023 gate review 节增设「前置议题登记」块：①议题槽=P3 工具面合并复议作 v1.0.0 gate review 前置独立议题（非门清单行，D-171 隔离条款）；②判据直引 D-179② 原文（同构族测试=3+操作共享大部分参数+合并前 LLM 驱动实测选错率）；③触发债三条件原文摘录（D-179③：Disambiguation 仍3/5 且真实客户端实证选错/Glama 调分带收益归零自动作废/工具面越~35 件转可用性题）；④证据指针占位符（Glama 批后维度读数快照/客户端实测报告/工具面计数——占位待门审窗填）；⑤标注「材料于门审召集窗按快照重算」零结论禁预制判决倾向 | 负向：①骨架禁含判决倾向（门审 _Avoid_ 陈旧快照判案）；②任务书 T-R40-04 保留瞬态指针改指 ADR-0023 登记块防双真源；③D-094 异构禁令仍是 P3 硬前提不入骨架正文仅作判据引用层 | current |
 
 | D-193 | R41-Q9 R41 立法批落地编排裁决 | a（采纳 A） | A=新开 grill lane（grill/round41-gate-path）+第四独立 docs PR：①承载=D-185..192 canonical 迁入 append+ADR-0023 两处（preflight 复核规程行+P3 前置议题登记块）+ADR-0028 §4 判负决策树附件+杂项登记三件+任务书 rev52；②与 D-186 三 PR 编排同构顺延，docs-only 零代码依赖，合入序排 P-B 后或视评审并行；③极性硬化执行批（checker+yaml 改动）归执行窗——建议随 P-A lane 追加 commit（D-175④ 单源件同批 review）或 P-A merge 后独立小 PR 由执行编排裁定 | 负向：①禁并入 round39 既有 gr lane（命名失真两轮混栈）；②禁攒批悬置（D-153① 本窗落仓）；③本批仍受防丢纪律——落账先行、迁入随编排批 | current  〔承接注记 2026-10-01（D-108②）：「新开 grill/round41-gate-path 独立 lane」因 GitButler 依赖模型物理不可行——本批 hunks 坐在三条未 merge lane 内容上（CONTEXT/任务书属 gr、账本尾部属 exec 双 lane），并行 lane 共享同一 base 无法承载跨 lane 依赖。实际落法=docs 四件入 gr 追加 commit zko+账本迁入入 xe 追加 commit wnn（同类迁入操作同 lane 惯例）；语义等效载体层不同，merge 序 gr→P-A→P-B 不变〕 |
+## 附：R44 会话账本 verbatim（已迁入 canonical D-194..201——本区留档对照勿重迁）
+
+| D-194 | R44-Q1 R44 题面范围裁决 | A | A=全案四工件：①两件 sub-A 处置（scene_measure 描述批归属+camera_orbit 走 0.6.0 发版兑现验证非再修描述）；②零断言工具面立法（13/25 无要素挂载，scene_measure=盲区实证样本，地板形态 Q2 展开）；③handoff 委托题=极性双向误差面测绘（FN 语料构法+pattern 纯度盲区处置）；④三待裁项了结（known-gap 选址撞 D-191① / warn→hard 分母 0/1 / positive_exemptions 零改判去留）+0.6.0 时序（发版车是否等 scene_measure 修复同载） | 负向：①grill 窗不动源码（既定纪律）；②事实锚=2026-10-02 抓取读数 24A/1B/1C，禁凭记忆引旧读数；③camera_orbit C 定性=发版滞后伪影（v0.5.0 逐字一致）非描述再修；④三待裁项须在本轮全部有归宿不得再挂 | current |
+> 〔承接注记 2026-10-02（D-108②）：负向③「发版滞后伪影」归因经 atomcode 调研证伪——Glama methodology 原文示扫描管线吃 git 源码（push 分钟级同步、commit 驱动全量重扫、inputHash 按定义变更重评分），正确定性=**扫描时滞伪影**；camera_orbit C 不需发版即随下次重扫自愈。决策本体（全案范围）不受影响。详见 D-197。〕
+| D-195 | R44-Q2' 零断言工具面立法形态裁决（atomcode 调研辩证版：TDQS rollup=0.6mean+0.4min 外部锚+Sonar Coverage-on-New-Code 分档+smell 论文 arXiv2602.14878 批 C+枚举完整性门vs质量门双类检查心智；置信度高） | 采纳 | A（ratchet 分档版）=①checker 新增覆盖率断言：TOOL_ANNOTATIONS 全 25 键必须在 elements.yaml 出现（挂要素或显式 exempt+理由字段），缺席即 CI 红——登记断言立即全员强制零存量豁免（账本完整性非质量负担）；②签名可推导最低集：带 session_key→session_prerequisite 必挂、有功能兄弟面→boundary_line+boundary_targets_named 必挂；对新增/被修改工具立即生效，存量 13 件限期一个 minor 窗收敛（补挂或显式 exempt），此后只收紧不放松；③推导映射表实现为 checker 代码内常量+测试走 PR 评审不落版本化文档（D-191① 冲突缓解方案——经呈报采纳） | 负向：①接 CI 红前必先对现有 25 件 dry-run 推导规则验误报（调研信息缺口项）；②mutation 工具推导最低集沿用极性感知勿在覆盖率层引入极性盲断言；③exempt 须附理由字段且缺席即红不许静默缺席；④存量限期非无限期豁免（Sonar new-code 盲区教训）；⑤D-191① 部分冲突已显式标注经用户裁决通过映射表代码化缓解 | current |
+| D-196 | R44-Q3' scene_measure 处置形态裁决（atomcode 调研辩证版：AWS 六要素描述模型+Anthropic extremely-detailed 官方锚+TDQS 规范 smell=维度<3/竞争选择原文+arXiv 2602.14878+Docs-to-Descriptions 10831 服务器实证+6pp/+260%；验收标准修正点采纳；置信度高） | 采纳 | A（修正版）=①tier=P1+推导最低集三件（session_prerequisite+boundary_line+boundary_targets_named）入 elements.yaml（D-175④ PR review 义务照常触发）；②描述批重写按四失分维度回写：Boundary 行点名兄弟（scene_inspect/scene_assert 等）+使用触发句+行为语境句（session 前提/只读幂等）+mode 语义差异补 schema 之缺（clearance 0=表面接触/bbox 返重叠体积类）；③删 docstring 中 schema 已覆盖的参数枚举复述段（Conciseness 10% 权重同样因复述扣分，参数语义归 inputSchema per-parameter description）；④验收标准修正采纳：门维持既定三要件（tier A+min≥3.0+零旗标），「五维全≥4」降格为质量志向非门（第三方 LLM 评分方差不可作验收方差） | 负向：①验收门不扩不缩（D-171③/182）；②要素仍只断言存在性不管行文质量（D-180③ 边界）；③重写行文中 mode 语义差异须是真语义非 schema 复述；④B 结构性否决锚=Usage2/Behavior2 双 smell 在既定门下永不过；⑤调研小偏差已标：「无需动 yaml」不准确，scene_measure 须新增入 yaml | current |
+| D-197 | R44-Q4' 0.6.0 发版时序裁决（atomcode 调研辩证版：Glama methodology 原文证伪「吃 PyPI 产物」前提——实吃 git 源码 push 分钟级同步+commit 驱动全量重扫+inputHash 机制；D-194③ 归因被修正；置信度高） | 采纳 | A（修正版）=0.6.0 串行单跳：①tag 挂「R44 描述修复批落地」为前置——但理由改写为发布语义连贯性（pip 用户拿到好描述+Unreleased 不半空），非评分必需——Glama 评分与发版解耦，scene_measure 重写推 main 即被重评、camera_orbit C 属扫描时滞伪影下次重扫自愈；②排序显式化：scene_measure 重写列下一窗第一优先，落地即 preflight→人工门→tag，其他 minor 内容不插队单发；③熔断条款：重写超约定窗口（2 窗）未落地则放弃等批切 0.6.0，scene_measure 随下一个含包内实质变更版本顺带发出，绝不单发纯文本 patch | 负向：①Glama 评分链路认知更新——重扫由 push 驱动非 tag/PyPI 发布驱动；②附加行动项：核对 Glama last-scanned 时间戳，合入超合理时滞仍 C2.9 则向 glama-ai 提 issue（inputHash 重扫异常可审计）；③「0.6.1 纯 docstring patch」形态撞文本专列限制且 wheel 近逐字节同=噪音；④B 卖点「早拿发版后重扫时延」证伪——测的是不存在的因果变量 | current |
+| D-198 | R44-Q5' 极性 FN 语料构法裁决（atomcode 调研辩证版：ConText PMC2757457 120+120 人工判据集+eds-nlp CAS/ESSAI vs NegParHyp 双集分报+变异集文献定位=augmentation 非分母；结论=三条既定决策联合锁定的唯一合法解；置信度高） | 采纳 | C（三轨版）=①轨②手工合成标注判据集为唯一合法 FN 分母，每条须一句标注理由可独立辩护；②轨③程序化变异生成集只报绝对数与构式覆盖、永不作分母，轨③样本经人工抽验确认真否定可晋升轨②；③轨①287 真实 docstring 继续只管 FP/赦免面；④三类标签：真否定应触发/否定式披露应赦免/跨子句按设计漏判——第三类计入「设计已知限制」计数而非 FN（不阻断 hard 化但须在判定输出显式区分，防混入 FN 分母）；⑤hard 准入扩为双要件：主测 0 误拒（已达成）AND 轨② FN 率≤阈值——阈值先记录不设阈、测得后再立法 | 负向：①三数字禁同现一个比值（口径注记扩展，D-191①c 格式沿用）；②三类标签枚举清单只进执行产物（探针 fixture），ADR 只写存在+语义定义（positive_exemptions 先例）；③变异集数字禁止进入任何 FN 率表述；④A 单用=升档口径漏洞、B 单用=分母污染（生成规则自证）均否决 | current |
+| D-199 | R44-Q6' pattern 纯度盲区处置裁决（atomcode 调研辩证版：ESLint#18008 post-run 运行时断言同构先例+typescript-eslint RuleTester suggestions:null 负向断言一等机制+Stryker survived-mutant 语义+devcom 人工 review 失效清单；置信度高） | 采纳 | C（改进版）=①立法「每个 polarity_aware 要素须随附否定语境 fixture 样本+测试断言守卫开火（产出 negated_only）」——挂载性=可证伪机械事实，「能写出开火 fixture」与「守卫可挂载」逻辑等价=构造性排除；②分档执行：缺 fixture→warn、fixture 不开火→error 立即（不开火=硬逻辑违规非风格），存量补齐后缺 fixture 亦升 error；③fixture 原料复用轨②判据集「真否定应触发」类样本（同一份人工标注语料喂两机制，防手工造句绕过正命中路径的假绿）；④LEGISLATED_GUARDED 钉死集合×fixture 清单交叉断言（fixture⊆guarded meta 一致性双锚）；⑤PR 复核行作过渡冗余不升格为准机制 | 负向：①fixture 语料必须与生产语料同分布可信（实施前先钉死）；②人工 review 残余面降格为冗余非终点（该通道已实证漏过一次）；③立法内容=「随附 fixture+断言产出」的测试义务非正则枚举（D-180③ 边界）；④B 单选否决锚=失效通道正式化不如冗余化 | current |
+| D-200 | R44-Q7' 三待裁项清零裁决（atomcode 调研辩证版：Hanley&Hand Rule-of-Three 零事件 n≥30 才可推断上界+LaunchDarkly/Harness「Needs more data」制度化状态+Fowler YAGNI 边界不适用于安全控制/可改性+feature flag 文献 kill-switch=永久旗标非债+ozimmer ADR 十误；置信度高，①属类比推理已如实标注无直接判例） | 采纳 | A（改进版）三件全清：①warn→hard 老 0/1 口径作废声明+D-198 双要件确立+**最小样本量下限内置判据**——轨②标注集未达下限时第二要件判「未可判」维持 warn（Ro3 惯例参照 n≥30，本仓可按自身分母口径另定）；②positive_exemptions 保留作前向守卫（YAGNI 不适用于防御性机制、移除/重建成本皆零、kill-switch 型永久旗标）+实测零改判如实注记维持+**触发条件式出口锚**替代复查门——条目注记「若挂载规则扩面仍未产生首次改判届时按 YAGNI 复议移除」，expiry 钉条件非日历；③known-gap 注册表=ADR 缺口披露节常设章节+账本债行指针——「找家≠新建房产」已存在即结案，T-R42-09 就此关闭无新面；披露节只记「缺口+影响面+兜底」不长成运维手册 | 负向：①「另建复查门」选项被 D-191① 原则否掉不采用；②独立注册表文件否决（新增版本化面）；③分母 0/1 直接判例不存在、Ro3 属类比推理须在裁决文本如实标注；④豁免表扩面触发条件措辞落地时须对照 D-190③ 方向限定条款原文校准 | current |
+| D-201 | R44-Q8' R44 批落地编排裁决（atomcode 调研辩证版：squash-merge 后本地分支=尸体须删重建非复用（三独立文+SO 共识）+GitButler 官方 mutation 默认拒触已落 target 历史/--allow-merged 逃生旗标+stacked PR lane=原子单元语义；置信度高） | 采纳 | A（护栏版）=①清场顺序即护栏：逐 lane git diff 验证 squash 产物等价 main=7fb33a4（非凭 merged 标记推定）→验证通过才删三旧 lane→but pull 至 HEAD；删除被拒时逐条确认等价后走确认路径/必要时 --allow-merged；②三 lane 三 PR：grill/round44-sub-a-closeout（docs 批=账本 D-194..200 迁入+ADR-0023/0028 增补+CONTEXT 新词+任务书 rev53）/exec/r44-description-floor（scene_measure docstring+elements.yaml 条目+覆盖率 exempt 结构+最低集挂载——发版前置内容）/exec/r44-checker-mechanics（覆盖断言+推导规则+三轨探针+fixture 测试——纯 CI 面不进包）；③merge 序 gr→exec-A→exec-B（exec 批引用 D-194..200 在 docs 迁入前悬空）；④0.6.0 tag 挂 exec-A 落地为前置（D-197 排序显式化兑现）；⑤push/PR 留待用户授权 | 负向：①B 否决=污染基线合法化+已知必现问题推迟成事故；②C 否决=违原子记录面+异质混装+破坏 merge 序；③清场每步删前必过 diff 断言；④旧 lane 内容已证在 main 才可删（squash 不等价已核 PR#63-65 合入） | current |
