@@ -37,6 +37,15 @@ DOC = REPO / "docs" / "guide" / "error-codes.md"
 # Doc rows carry the code in a leading inline-code span: | `invalid_input` | ...
 _DOC_ROW = re.compile(r"^\|\s*`([a-z0-9_]+)`\s*\|", re.MULTILINE)
 
+# The page carries the same codes twice: once in the body table (code -> class,
+# meaning, what to do) and once in the "Test anchors" table (code -> pytest node
+# ID). Scanning the whole file therefore let the anchor table satisfy a code
+# whose body row had been deleted - the gate printed "doc set == code set" while
+# the page documented nothing about that code. Exactly the empty-claim state
+# D-207 4 forbids. So the two tables are read as two separate sets and each must
+# be complete on its own.
+_ANCHORS_HEADING = "## Test anchors"
+
 
 def code_set() -> dict[str, str]:
     """{code: class name} for every PipelineError subclass, via AST.
@@ -108,10 +117,30 @@ def _rel(path: Path) -> str:
         return path.name
 
 
+def _split_doc(text: str) -> tuple[str, str]:
+    """(body, anchors). The heading is the boundary; a missing heading yields an
+    empty anchors section rather than silently folding anchor rows into the body
+    set, which is the hole this scoping exists to close."""
+    i = text.find(_ANCHORS_HEADING)
+    if i < 0:
+        return text, ""
+    return text[:i], text[i:]
+
+
 def doc_set() -> set[str]:
+    """Codes the page actually documents in its body table."""
     if not DOC.exists():
         return set()
-    return set(_DOC_ROW.findall(DOC.read_text(encoding="utf-8")))
+    body, _anchors = _split_doc(DOC.read_text(encoding="utf-8"))
+    return set(_DOC_ROW.findall(body))
+
+
+def anchor_set() -> set[str]:
+    """Codes the page pins to a test node ID."""
+    if not DOC.exists():
+        return set()
+    _body, anchors = _split_doc(DOC.read_text(encoding="utf-8"))
+    return set(_DOC_ROW.findall(anchors))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -141,6 +170,9 @@ def main(argv: list[str] | None = None) -> int:
     implemented = set(codes)
     missing = sorted(implemented - documented)
     extra = sorted(documented - implemented)
+    anchored = anchor_set()
+    unpinned = sorted(implemented - anchored)
+    overpinned = sorted(anchored - implemented)
 
     for code in missing:
         print(
@@ -154,10 +186,24 @@ def main(argv: list[str] | None = None) -> int:
             f"documented but no PipelineError subclass declares it - remove the row "
             f"(D-207 4)"
         )
-    if missing or extra:
+    for code in unpinned:
+        print(
+            f"::error file={_rel(DOC)}::code '{code}' has no row in the "
+            f"'{_ANCHORS_HEADING}' table - the page claims every code is pinned to a "
+            f"test, so an unpinned code is an unbacked claim (D-207 4)"
+        )
+    for code in overpinned:
+        print(
+            f"::error file={_rel(DOC)}::'{_ANCHORS_HEADING}' pins '{code}' but no "
+            f"PipelineError subclass declares it - remove the row (D-207 4)"
+        )
+    if missing or extra or unpinned or overpinned:
         return 1
 
-    print(f"Error-code check OK: {len(codes)} codes, doc set == code set (D-207 4).")
+    print(
+        f"Error-code check OK: {len(codes)} codes; body set == code set and "
+        f"anchor set == code set (D-207 4)."
+    )
     return 0
 
 

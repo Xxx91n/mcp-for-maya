@@ -48,6 +48,12 @@ LISTENing.
 
 ## Anchors
 
+All eight anchors resolve in the tree; the composition is machine-checked by
+`tests/test_check_d207_gates.py::TestErrorCodesChecker::test_session_lifecycle_anchor_composition_is_what_the_changelog_claims`
+rather than by reading this sentence.
+Nine references: **eight `path::symbol` anchors and one ADR file path** (a document
+rather than by reading this sentence.
+
 - Scan loop and backoff ceiling: `src/maya_mcp_server/session_manager.py::_background_scan`
 - Prune path: `src/maya_mcp_server/session_manager.py::_prune_dead_sessions`
 - Manager stop: `src/maya_mcp_server/session_manager.py::stop`
@@ -56,4 +62,4 @@ LISTENing.
 - Shutdown wiring (the `finally:` a hard kill skips): `src/maya_mcp_server/__main__.py::run_server`
 - Session-manager teardown body: `src/maya_mcp_server/server.py::shutdown_session_manager`
 - Qt primary channel decisions: `docs/adr/0010-qt-primary-channel.md`
-- Teardown protocol behaviour: `tests/test_module_teardown.py`
+- Teardown protocol behaviour: `tests/test_module_teardown.py::TestCreateModuleTeardown`

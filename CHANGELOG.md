@@ -40,7 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session-lifecycle matrix (D-207 ③)** — `docs/guide/session-lifecycle.md`,
   one page, four columns (exit path × teardown trigger × residual state ×
   worst-case residual window), marked as a summary view subordinate to the ADR.
-  Evidence: its 9 `path::symbol` anchors each verified to resolve in the named file;
+  Evidence: its nine anchor references — eight `path::symbol` plus one ADR file
+  path — each verified to resolve, with the composition itself machine-checked by
+  `tests/test_check_d207_gates.py::TestErrorCodesChecker::test_session_lifecycle_anchor_composition_is_what_the_changelog_claims`;
   `tests/test_session_manager.py::TestCodedSessionErrors::test_no_sessions_raises_coded`,
   `tests/test_module_teardown.py::TestCreateModuleTeardown::test_teardown_called_and_resources_closed`.
 
