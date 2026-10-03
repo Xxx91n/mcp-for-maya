@@ -54,7 +54,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gets deleted, and a deleted gate is worse than none.
   Evidence: `tests/test_check_d207_gates.py::TestVersionConsistency` (6 tests).
 
+- **Pin registry + consistency gate (D-215, ADR-0029 §5)** —
+  `.github/gate-registry.yaml` records, for every governance surface in
+  `.github/scripts/`, its bound class, where its expectation is derived, which
+  pytest nodes pin it, and any exemption. `check_gate_registry.py` enumerates
+  the bound set from the filesystem and reports the set difference in both
+  directions, so a gate added without being registered goes red. Six rules:
+  unregistered bound object, unresolvable pin node or expectation pointer,
+  stale registration, `bound_class: gate` with no workflow invoking it
+  (veto-power drift), exemption with no `expires|issue` or an expired one, and
+  a zero-pin guard for `gate`/`manual_preflight`. It ships `::warning::` for one
+  observation period. The flip condition is stated in the gate-registry step comment
+  in `.github/workflows/ci.yml` and legislated in ADR-0029 section 5; it is
+  deliberately not mirrored into the registry data file, which is a machine-read
+  index. (An earlier version of this entry pointed at a registry key that does
+  not exist — the R46 audit caught the phantom pointer.)
+  What is machine-checked is **registration discipline, not pin effectiveness** —
+  a hollow pin passes every rule, and that residual is disclosed rather than
+  papered over.
+  Evidence: `tests/test_check_gate_registry.py` (24 tests),
+  `python .github/scripts/check_gate_registry.py` → registry OK, 17 entries.
+
+- **Bare count-claims gate (D-216)** — `check_count_claims.py` is one entry
+  point with per-family AST derivers dispatched internally, a family table fixed
+  in the script, and a denylist layer for historically drifted strings. Three
+  families are asserted against live source literals: `scene_review`'s 11
+  checks, the 5 aesthetic dimensions, and `SHOT_TYPES`' 8 entries. Frozen
+  release sections are exempt as point-in-time records; a doc that transcribes
+  an already-gated count needs no second assertion.
+  Evidence: `tests/test_check_count_claims.py` (16 tests),
+  `python .github/scripts/check_count_claims.py` → `checks=11, aesthetic
+dimensions=5, shot types=8`.
+
+- **Governance constants moved to per-domain spec files (D-214)** —
+  `MIN_ADJUDICABLE`/`MIN_TN_PER_ELEMENT`, `llms.txt`'s `LINE_CAP`, the
+  append-only `GUARDED` prefixes, the release-appendix `ISSUE` default and the
+  liveness probe's `PROTOCOL` revision now live in five `.github/*-spec.yaml`
+  files and are derived at load time. Each constant's basis, caliber and
+  reversal-test reasoning travels with it. Object-derivable values were
+  deliberately left alone — a spec file mirroring object state would just be a
+  second source of truth.
+  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_min_adjudicable_has_a_provenance_note`,
+  `tests/test_liveness_probe_sensitivity.py::test_the_protocol_revision_comes_from_the_spec_file`.
+
 ### Fixed
+
+- **The polarity sample floor was counting each sample once per guarded element
+  (D-221 ② / S4)** — the label tally sat inside the per-element loop, so the
+  floor numerator came out multiplied by the number of guarded elements. With
+  one guarded element the arithmetic coincides with the correct reading, which
+  is exactly why the live-green test could not see it.
+  Broken: through 0.5.0 (unreleased lane) · Fixed: 0.5.0 → [Unreleased].
+  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_per_element_counting_unit_is_the_sample_not_the_element_pair`;
+  `python .github/scripts/polarity_corpus_probe.py` → `samples=14`,
+  `adjudicable (true_negative + forgiven) = 12`, per D-203's arithmetic.
+
+- **`scene_review` was described as having 11 "dimensions" in two places** —
+  the 11 are checks; the aesthetic dimensions are 5
+  (`color_theory`, `spatial_composition`, `proportion_scale`,
+  `lighting_quality`, `visual_flow`). A reader following the old wording would
+  have looked for an 11-dimension breakdown that does not exist. Both strings
+  were agent-facing, and the count-claims gate reads docs rather than source,
+  so nothing else would have caught it.
+  Broken: through 0.5.0 · Fixed: 0.5.0 → [Unreleased].
+  Evidence: `tests/test_check_count_claims.py::test_derivers_read_live_source_literals`;
+  `python .github/scripts/check_count_claims.py` → `aesthetic dimensions=5`.
+
+- **The track-2 floor report omitted D-198 ⑤'s second precondition
+  (D-221 ② / S3)** — hard admission to the TDQS gate needs the floor AND the
+  primary track's zero-false-rejection verdict, but printing only the floor
+  verdict let "floor met" read as the whole promotion decision.
+  Broken: through 0.5.0 · Fixed: 0.5.0 → [Unreleased].
+  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_s3_two_precondition_caveat_is_printed`.
+
+- **`check_readme_skeleton` had been a CI gate with no pins since D-072** —
+  it resolved the repo root inline inside `main()`, so no pin could hand it a
+  corrupted copy, which is why a real gate sat in the lint job for months with
+  nothing able to fail it. It now takes a `check(repo)` seam and carries 11 tests: 8 counterfactual
+  reds plus 3 green controls, of which 4 are registered as pins. It was the one entry the new registry's zero-pin guard
+  flagged on arrival.
+  Broken: through 0.5.0 · Fixed: 0.5.0 → [Unreleased].
+  Evidence: `tests/test_check_readme_skeleton.py` (11 tests, incl.
+  `test_dropped_heading_in_the_mirror_is_red` and
+  `test_the_real_repo_mirror_is_green`).
 
 - **An overdue TDQS exemption could not fail CI (D-204)** — the `due` field was
   compared with `current >= due` and always warned, so a waiver left past its
@@ -73,16 +155,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path raised `ValueError` instead of reporting drift. Caught by
   `tests/test_check_d207_gates.py::TestErrorCodesChecker::test_undocumented_code_is_reported`
   and fixed
-  in the checker rather than by widening the test. Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  in the checker rather than by widening the test.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   `.github/scripts/check_error_codes.py::_rel`.
-
 
 - **`llms.txt` linked to a repository this project has never occupied** — the
   generator hardcoded an owner name, and because the gate compared the generated
   file against its own constants the wrong links reported green indefinitely. That
   was a fabricated identifier, not a typo. Every URL now derives from
   `[project.urls] Repository` in `pyproject.toml`, so a fork or a rename moves
-  the links with the project. Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  the links with the project.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_doc_urls_are_derived_from_pyproject_not_hardcoded`,
   `.github/scripts/check_llms_txt.py::repo_url`.
 
@@ -91,7 +174,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   matters (a tool added to the registry and to no heading, where the renderer
   drops it and therefore produces no diff) it could not fire. Coverage is now
   asserted independently of the comparison, and an incomplete section map is
-  itself an error. Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  itself an error.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_a_tool_absent_from_the_page_is_reported`.
 
 - **The per-element sample floor could report a false green** — the thin-element
@@ -99,15 +183,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   element with zero true negatives had no key, was skipped, and fell through to
   the branch announcing that every element cleared the floor. The floor verdict is
   now reported independently of the label-agreement verdict, so a disagreement
-  can no longer swallow a floor violation. Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  can no longer swallow a floor violation.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_element_with_zero_true_negatives_is_reported_not_passed`.
 
 - **The overdue-exemption message misdescribed the D-168 ④ renewal requirements** —
   it listed five items of our own invention. The real five (D-168 ④ as revised by
   D-176) are a `gate_authority` countersignature distinct from the `debt_owner`, an
   event-anchored rather than calendar expiry, the per-row renewal cap of 2, a
-  re-validated reason, and the waiver lane closing after gate review. Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  re-validated reason, and the waiver lane closing after gate review.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`.
+
 ### Changed
 
 - **Sample-size floor counts verdict-bearing labels only (D-203)** —
@@ -124,7 +211,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `python .github/scripts/polarity_corpus_probe.py` → `TRACK2 (labelled)`.
 
 - **Line endings land in pre-commit, not CI (D-205 ③)** — `mixed-line-ending
-  --fix=lf` added to `.pre-commit-config.yaml`. The justification is measured,
+--fix=lf` added to `.pre-commit-config.yaml`. The justification is measured,
   not asserted: before this hook landed, on this Windows host, 29 tracked files
   carried CRLF in the worktree while 0 of those carried CRLF in their HEAD blob.
   So `.gitattributes` already normalises at commit, and a CI line-ending scan
@@ -353,7 +440,7 @@ executed and its results are now in-repo, machine-readable form.
   `.github/scripts/check_assets_append_only.py:68` runs in the lint job:
   pure additions under `.github/assets/` pass, while
   delete/modify/rename fail the job (`git diff --no-renames
-  --diff-filter=DMRT`; merge-base three-dot on pull_request,
+--diff-filter=DMRT`; merge-base three-dot on pull_request,
   `before..after` on main pushes, all-zero `before` skips). Escape
   hatch: maintainer-aware merge with the removal stated in the PR body
   plus a ledger note. Tests: tests/test_check_assets_append_only.py.
@@ -405,8 +492,8 @@ executed and its results are now in-repo, machine-readable form.
   (38 stale entries removed, 237→199), `.pre-commit-config.yaml`
   exclude updated. Evidence: `docs/adr/0003-single-source-aesthetic-engine.md:9`
   (errata + status notes) + `docs/decision-ledger.md` D-038/D-124 rows
-  + `tests/test_maya_scene_module.py::test_aesthetics_sampling`
-  (production-path coverage). Recall path: `git log -G aesthetic_engine`.
+  - `tests/test_maya_scene_module.py::test_aesthetics_sampling`
+    (production-path coverage). Recall path: `git log -G aesthetic_engine`.
 
 ## [0.3.0] - 2026-09-27
 
@@ -426,7 +513,7 @@ executed and its results are now in-repo, machine-readable form.
   drives exportSelected with the prior selection restored in a finally;
   `prompt=False`/`force=True` forced; scene modified flag untouched.
   Returns `{path, format, objects_exported, size_bytes, duration_ms,
-  warnings}` with a structured domain-error family
+warnings}` with a structured domain-error family
   (invalid_format/invalid_path/empty_objects/missing_objects/
   plugin_missing/export_failed). Alembic deliberately excluded —
   AbcExport is not a cmds.file surface.
@@ -443,15 +530,15 @@ executed and its results are now in-repo, machine-readable form.
   name, one trigger, one failure domain; no `_mcp_introspect` module
   exists. Host tool layer: `src/maya_mcp_server/introspect_tools.py`,
   25 tools total. `scene_describe(node, attrs=None,
-  include_values=False, include_connections=True)` returns per-attribute
+include_values=False, include_connections=True)` returns per-attribute
   metadata (attr_type/readable/writable/connectable/keyable/multi/
   hidden/locked/storable/children/index_matters/enum/listEnum/min/max,
   values+soft ranges behind include_values) plus directional plug-level
   connections {src_plug, dst_plug, direction}; domain errors
   node_not_found/attr_not_found (named-attr aborts the whole call, no
   partial metadata) /query_failed. `scene_nodes(type=None, pattern=None,
-  dag_only=False, inherited=True, limit=50, cursor=None,
-  include_type_counts=False)` enumerates DAG + dependency nodes with
+dag_only=False, inherited=True, limit=50, cursor=None,
+include_type_counts=False)` enumerates DAG + dependency nodes with
   honest pagination (total_count/has_more/next_cursor, hard cap 100,
   invalid_cursor on stale tokens). Boundaries are explicit:
   scene_describe is API-level self-description (spatial stays with
@@ -525,7 +612,7 @@ executed and its results are now in-repo, machine-readable form.
   `scene_tools.py::_ensure_module_injected` staged module source at a
   predictable shared temp path with default perms and no cleanup; it
   now uses `mkstemp` under `platformdirs.user_cache_dir("mcp-for-maya")
-  /inject`, chmod `0600`, try/finally unlink on success and failure
+/inject`, chmod `0600`, try/finally unlink on success and failure
   (`tests/test_scene_tools.py::TestInjectionHygiene`,
   `tests/test_asset_tools.py::TestInjectionHygiene`,
   `tests/test_qt_channel.py::test_native_client_keeps_tempfile_fallback`).
@@ -558,12 +645,12 @@ executed and its results are now in-repo, machine-readable form.
   runtime variable (cross-GPU differences were a known blind spot);
   `visual_module._vp2_direction` now resolves it per-session on first
   capture via an asymmetric pure-color probe — disposable ortho camera
-  + red `surfaceShader` cube, net-zero (undo recording suspended
-  without flushing, selection / panel camera / scene-dirty flag
-  restored, every node deleted on every path). The constant is demoted
-  to fallback default; `MAYA_MCP_VP2_BOTTOM_UP=0|1` is the documented
-  override (`src/maya_mcp_server/visual_module.py::_probe_vp2_direction`,
-  `tests/test_visual_tools.py::TestVp2DirectionProbe`).
+  - red `surfaceShader` cube, net-zero (undo recording suspended
+    without flushing, selection / panel camera / scene-dirty flag
+    restored, every node deleted on every path). The constant is demoted
+    to fallback default; `MAYA_MCP_VP2_BOTTOM_UP=0|1` is the documented
+    override (`src/maya_mcp_server/visual_module.py::_probe_vp2_direction`,
+    `tests/test_visual_tools.py::TestVp2DirectionProbe`).
 - **0.2.0 changelog wording correction (D-082c)** — the cache
   mechanism was described as "manifest-based"; the actual mechanism is
   fresh-metadata revalidation + per-file size/md5 re-verification
@@ -631,7 +718,7 @@ executed and its results are now in-repo, machine-readable form.
     default 100k-face polycount gate (`allow_high_polycount`
     override, audited), post-import dims sanity warnings, texture
     auto-wiring by filename suffix (`diff/rough/metal/nor_gl/ao/disp/
-    arm`) with sRGB/Raw color spaces and bump2d normal maps.
+arm`) with sRGB/Raw color spaces and bump2d normal maps.
   - Both tools carry audit rows incl. download URL/size/hash detail,
     and are the first tools annotated `openWorldHint=True`
     (threat-model §4/§5 updated accordingly).
@@ -713,7 +800,6 @@ executed and its results are now in-repo, machine-readable form.
   commandPort — on either the explicit native branch or the fallback
   path — is closed on `disconnect()` instead of leaking (T-18a).
 
-
 - `execute_code` coerces `result_type` to `ResultType` at the client
   entry — bare `"JSON"` strings passed by `scene_tools`/`visual_tools`
   crashed with `'str' object has no attribute 'value'`, taking down the
@@ -762,7 +848,7 @@ executed and its results are now in-repo, machine-readable form.
   skeletons — agents execute and leave evidence, sign-off is human
   (D-049a).
 - Presence-baseline ratchet (D-049b/D-056①): `tests/maya_stub/
-  presence-baseline.json` collected on live Maya 2024 + allowlist +
+presence-baseline.json` collected on live Maya 2024 + allowlist +
   auto-diff tests — a stub symbol missing from real Maya now fails the
   build unless explicitly allowlisted with a reason. (Renamed from
   signature-baseline: cmds builtins carry no inspectable signature, so
