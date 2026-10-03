@@ -527,7 +527,7 @@ result
         Requires an active Maya session.
 
         Boundary: Disambiguated from scene_review (full scene quality audit
-        across 11 dimensions) and scene_assert (verifies specific numeric
+        across 11 checks) and scene_assert (verifies specific numeric
         values or object existence).
 
         Args:
