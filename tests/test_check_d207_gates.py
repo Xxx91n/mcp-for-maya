@@ -86,11 +86,67 @@ class TestErrorCodesChecker:
         monkeypatch.setattr(mod, "DOC", page)
         assert mod.main([]) == 1, "a doc row with no class behind it must fail"
 
+    def test_the_two_tables_are_read_as_separate_sets(self):
+        """Regression: the page carries every code twice (body table + anchor
+        table) and the set was extracted from the whole file, so deleting a BODY
+        row left the anchor row to satisfy it - the gate printed "doc set == code
+        set" while the page documented nothing about that code. That is the
+        empty-claim state D-207 4 forbids."""
+        mod = _load("check_error_codes")
+        text = (REPO / "docs" / "guide" / "error-codes.md").read_text(encoding="utf-8")
+        codes = set(mod.code_set())
+        assert mod.doc_set() == codes, "the body table must cover every code"
+        assert mod.anchor_set() == codes, "the anchor table must cover every code"
+        body, anchors = mod._split_doc(text)
+        assert anchors.strip(), "the anchors heading must exist"
+        assert mod.doc_set() <= set(mod._DOC_ROW.findall(body))
+        assert "capture_invalid" in mod.doc_set()
+
+    def test_a_deleted_body_row_fails_the_gate(self, tmp_path, monkeypatch):
+        """The exact counterfactual: remove one body row, keep its anchor row."""
+        mod = _load("check_error_codes")
+        real = (REPO / "docs" / "guide" / "error-codes.md").read_text(encoding="utf-8")
+        lines = real.split("\n")
+        cut = lines.index(next(x for x in lines if "## Test anchors" in x))
+        cut = next(
+            i
+            for i, ln in enumerate(lines)
+            if i < cut and re.match(r"^\|\s*`capture_invalid`\s*\|", ln)
+        )
+        lines.pop(cut)
+        page = tmp_path / "error-codes.md"
+        page.write_text("\n".join(lines), encoding="utf-8")
+        monkeypatch.setattr(mod, "DOC", page)
+        assert "capture_invalid" in mod.anchor_set(), "precondition: anchor row survives"
+        assert mod.main([]) == 1, "a code with no body row must fail the gate"
+
+    def test_a_deleted_anchor_row_fails_the_gate(self, tmp_path, monkeypatch):
+        mod = _load("check_error_codes")
+        real = (REPO / "docs" / "guide" / "error-codes.md").read_text(encoding="utf-8")
+        lines = real.split("\n")
+        after = lines.index(next(x for x in lines if "## Test anchors" in x))
+        cut = next(
+            i
+            for i, ln in enumerate(lines)
+            if i > after and re.match(r"^\|\s*`capture_invalid`\s*\|", ln)
+        )
+        lines.pop(cut)
+        page = tmp_path / "error-codes.md"
+        page.write_text("\n".join(lines), encoding="utf-8")
+        monkeypatch.setattr(mod, "DOC", page)
+        assert "capture_invalid" in mod.doc_set(), "precondition: body row survives"
+        assert mod.main([]) == 1, "a code with no anchor row must fail the gate"
+
     def test_exact_match_passes(self, tmp_path, monkeypatch):
         mod = _load("check_error_codes")
-        rows = "".join(f"| `{c}` |\n" for c in sorted(mod.code_set()))
+        codes = sorted(mod.code_set())
+        body = "".join(f"| `{c}` |\n" for c in codes)
+        anchors = "".join(f"| `{c}` |\n" for c in codes)
         page = tmp_path / "error-codes.md"
-        page.write_text(f"| Code |\n|------|\n{rows}", encoding="utf-8")
+        page.write_text(
+            f"| Code |\n|------|\n{body}\n## Test anchors\n\n| Code |\n|------|\n{anchors}",
+            encoding="utf-8",
+        )
         monkeypatch.setattr(mod, "DOC", page)
         assert mod.main([]) == 0
 
@@ -112,6 +168,44 @@ class TestErrorCodesChecker:
                 assert re.search(pattern, source), (
                     f"{node_id} is cited but {symbol} is not defined in {path}"
                 )
+
+    def test_session_lifecycle_anchor_composition_is_what_the_changelog_claims(self):
+        """A count in a versioned doc is a machine-checked carrier (D-205), not
+        prose. An earlier revision of this window wrote "9 path::symbol anchors"
+        when the real composition was 8 plus one ADR file path, and then
+        overrode a correct review that said so. The numbers are derived here."""
+        doc = (REPO / "docs" / "guide" / "session-lifecycle.md").read_text(encoding="utf-8")
+        section = doc[doc.index("## Anchors") :]
+        # Only the LIST ITEMS are anchors. Counting every backticked token in the
+        # section would sweep up the prose that describes the anchors - including
+        # this test's own name, which is cited there - and inflate the count the
+        # test is asserting. That is the same class of error as the one it pins.
+        items = [ln for ln in section.split("\n") if ln.startswith("- ")]
+        refs = [
+            m
+            for ln in items
+            for m in re.findall(r"`([^`]+)`", ln)
+            if "::" in m or re.search(r"\.(py|md|yaml)$", m)
+        ]
+        path_symbol = [
+            r
+            for r in refs
+            if ".py::" in r and re.match(r"^(src|tests|docs|\.github)/", r.split("::")[0])
+        ]
+        doc_paths = [r for r in refs if "::" not in r]
+        assert len(refs) == 9, f"expected 9 references, found {len(refs)}: {refs}"
+        assert len(path_symbol) == 8, f"expected 8 path::symbol, got {len(path_symbol)}"
+        assert len(doc_paths) == 1, f"expected 1 file path, got {doc_paths}"
+        for ref in path_symbol:
+            path, _, symbols = ref.partition("::")
+            assert (REPO / path).is_file(), ref
+            source = (REPO / path).read_text(encoding="utf-8")
+            assert re.search(rf"(?:class|def) {re.escape(symbols)}\b", source), ref
+        # and the CHANGELOG must quote these measured numbers, not its own
+        changelog = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
+        entry = changelog[changelog.index("Session-lifecycle matrix") :][:900]
+        assert "eight `path::symbol`" in entry, entry[:400]
+        assert "nine anchor references" in entry, entry[:400]
 
     def test_every_documented_code_cites_a_pytest_node_id(self):
         """D-207 4: each code row must carry an anchor, so 'documented' does not
