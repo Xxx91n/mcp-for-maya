@@ -378,3 +378,15 @@ _Avoid_: 为文本单发版空驶、实质批攒批不发致门状态悬空、�
 
 **缺口披露节 (gap disclosure section)**:
 ADR 内常设的 known-gap 注册表宿主章节（D-200——ADR-0028 缺口披露节为首例，「找家≠新建房产」）——每条记「缺口+影响面+兜底」三件套，账本债行作指针；不新建独立注册表文件（D-191① 不新增版本化裁决面）。_Avoid_: 另建注册表文件制造第二真源、把披露节写成运维手册、缺口结案后删原文（留结案注记保审计链）
+
+**判决承载标签 (adjudication-bearing label)**:
+判定强度地板（MIN_ADJUDICABLE）的合法计数基（D-203）——只数能产生「标签 vs 守卫」分歧的语料标签子集（true_negative+forgiven）；known_limitation 类按设计永不进判决故从地板剔除（KL 充数=稀释判决强度=同函数内分母排 KL 而地板含 KL 的内部不一致病灶）。_Avoid_: 地板口径与判定口径不一致、拿不计判决的标签凑样本量达标
+
+**候选 pitch 登记 (pitch registration / observe state)**:
+范式级方案「本轮不 bet 但保留回归路径」的登记形态（D-208——Shape Up fat-marker 心智模型）——载体=ADR-0023 前置议题登记块紧凑条目（≤5 行：动机+不-bet 理由+re-shape 触发条件+证据指针占位）；措辞=observe 态「本轮未 bet」禁拒绝/否决字样；登记面寿命=与登记所锚事件同寿（各自标事件锚：v1.0.0 门审/0.7+ shape 轮/fail-loud 立项事件，非一律与门同寿）。_Avoid_: 登记块写完整论证（属触发成就后 shaping）、observe 条目被误读为永久关闭清单、非机检触发条件不挂 preflight 呈报义务行（不假装有在看）
+
+**机制 vs 范式分离 (mechanism-vs-paradigm separation)**:
+竞品/外来方案采纳裁决的第一过滤判据（D-207/208/209）——先问「这个东西在其原生架构里为什么存在」，答案若指向我方不存在的架构前提（网关/机器级注册表/渐进加载面）则机制即 reject、仅架构无关的范式可议；reject 交付物与 pitch 登记范式回归路径可共存不矛盾（宾语不同层：机制层 vs 需求层）。_Avoid_: 绑定不存在前提的机制照搬、不带触发条件的裸 reject（永久失明）、把伴生面当独立候选捞起
+
+**结案判定词 (closeout verdict)**:
+审计/评审发现项的结案标签三态（D-210——ISO 9001 APG/SOC2 evidence-vs-documentation/PMBOK assumption log 判据面对号）——verified-fixed=纠正+原因分析+防再发三证据齐；no-actionable=决策级层已 canonical 无须新增面（触发性未来需求以触发条件债形态登记非口头备注）；open-assumption=未验证推断登记+触发式验证协议+显式出口锚（两窗未复现→「维持未验证」显式关闭不无限挂）。_Avoid_: 判定词混用（open-assumption 写成 wontfix）、结案不留证据指针、非缺陷类发现新增裁决面（D-004/065/122 先例=登记级归置）
