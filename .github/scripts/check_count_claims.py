@@ -66,6 +66,19 @@ CHANGELOG = Path("CHANGELOG.md")
 
 # Assertion surface. Whole file for normative docs (D-216①: a reader decides on
 # them now). CHANGELOG is handled separately — topmost release section only.
+# KNOWN BLIND SPOT, found by the R46 audit and recorded rather than quietly
+# left: this surface deliberately excludes `.github/`. That means this gate
+# cannot police the count claims written in the files that DESCRIBE the gates
+# -- `.github/gate-registry.yaml`, the `.github/*-spec.yaml` notes, and the
+# checker docstrings themselves. The audit's concrete instance: four wrong
+# numbers were written into the registry and CHANGELOG in the same round that
+# shipped this gate, and nothing here saw them.
+#
+# Widening the surface is a NEW RULING, not a tweak. These files mix normative
+# claims with historical records and with per-domain vocabularies -- a spec note
+# legitimately says the tool COUNT is derived and therefore deliberately absent.
+# Flagged as the next grill direction rather than half-implemented.
+
 SURFACE_FILES = ("README.md", "README.zh-CN.md", "AGENTS.md", "llms.txt", "CONTEXT.md")
 SURFACE_DIRS = ("docs", "skills")
 

@@ -35,10 +35,16 @@ is the honest delivery; a rule that re-reports the same fact under a second id
 would be ceremony that reads as coverage.
 
 Transition posture (D-215 4): this ships as ``::warning::`` and exits 0 for one
-observation period. The flip to hard red is pinned in the registry's
-``governance.warning_to_blocking_flip`` block -- L1 landed, first normal PR cycle
-completed, coverage self-check in the same flip commit. Warnings must not
-become permanent.
+observation period. The flip to hard red is stated in the ``gate-registry
+consistency`` step comment in ``.github/workflows/ci.yml`` -- L1 landed, first
+normal PR cycle completed on top of it, coverage self-check in the same flip
+commit -- and legislated in ADR-0029 section 5. It is deliberately NOT mirrored
+into the registry data file: that file is a machine-read index, and a prose
+ruling kept in two places is a second source of truth. (An earlier draft of this
+docstring pointed at ``governance.warning_to_blocking_flip`` in the registry,
+which no such key ever existed under -- caught by the R46 audit. Same class of
+defect as the phantom WORKFLOW.md 4.2 citation this repo keeps having to
+correct.) Warnings must not become permanent.
 
 Scope honesty (D-215 6): what is checked here is REGISTRATION DISCIPLINE, not
 pin effectiveness. A hollow pin passes every rule below and is still not a pin.
@@ -182,13 +188,47 @@ def resolve_pointer(root: Path, pointer: str) -> str | None:
     return None
 
 
+def _collectible_names(path: Path) -> set[str]:
+    """Names pytest could actually COLLECT from this file, and nothing else.
+
+    Added after an audit finding: the first version of this resolver returned
+    every top-level name, so ``tests/test_x.py::_fixed_probe`` and
+    ``tests/test_x.py::ALL_TOOLS`` both "resolved" and would have been accepted
+    as registered pins. A helper is not a pin and a constant is not a pin, so
+    accepting them made the registry look covered while pinning nothing —
+    precisely the shape D-213 2 legislates against ("only running without
+    asserting is not a pin", ESLint's "invalid cases must have at least one
+    error").
+
+    The rule mirrors pytest's own default ``python_functions = test*``: a
+    module-level function counts only if its name starts with ``test``, and
+    inside a class only if the METHOD does. Module-level constants are excluded
+    outright, because ``Assign`` targets are not functions at all.
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    names: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name.startswith("test"):
+                names.add(node.name)
+        elif isinstance(node, ast.ClassDef):
+            if not node.name.startswith("Test"):
+                continue
+            for sub in node.body:
+                if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)) and sub.name.startswith(
+                    "test"
+                ):
+                    names.add(f"{node.name}::{sub.name}")
+    return names
+
+
 def resolve_pin_node(root: Path, node_id: str) -> str | None:
     """Return None if the pytest node resolves, else a reason.
 
     Resolves by AST, not by running pytest: this runs inside the lint job where
     a collection pass over the whole suite is far too expensive to do on every
-    PR, and the question being asked is "does this node still exist", not "does
-    it still pass".
+    PR, and the question being asked is "does this node still exist and is it
+    something pytest would collect", not "does it still pass".
     """
     parts = node_id.split("::")
     rel = parts[0]
@@ -196,21 +236,18 @@ def resolve_pin_node(root: Path, node_id: str) -> str | None:
     if not path.is_file():
         return f"{rel} does not exist"
     try:
-        names = _python_symbols(path)
+        names = _collectible_names(path)
     except (OSError, ValueError, SyntaxError) as e:
         return f"{rel} could not be parsed: {e}"
     symbols = parts[1:]
     if not symbols:
         return f"{rel}: no node name after the path"
-    owner = symbols[0]
-    if owner not in names:
-        return f"{rel} has no {owner!r}"
-    if len(symbols) == 1:
-        return None
-    # ``Class::method`` -- the qualified name is what the module recorded.
     qualified = "::".join(symbols)
     if qualified not in names:
-        return f"{rel} has no {qualified!r}"
+        return (
+            f"{rel} has no collectible test {qualified!r} "
+            "(a pin must name a pytest-collectible test, not a helper or constant)"
+        )
     return None
 
 

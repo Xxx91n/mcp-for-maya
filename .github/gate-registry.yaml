@@ -122,7 +122,7 @@
         "tests/test_check_readme_skeleton.py::test_missing_synced_with_anchor_is_red"
       ],
       "exemption": null,
-      "note": "Arrived at the L1 landing with ZERO pins and was the one bound_class=gate entry the registry's own zero-pin guard flagged on first run. Backfilled by the L4 pin lane (T-R46-06): 11 counterfactual pins, each paired with the live-green mirror check. Backfilling required giving the script a check(repo) seam -- it used to resolve the repo inline inside main(), which is why a real CI gate had been unpinnable since D-072."
+      "note": "Arrived at the L1 landing with ZERO pins and was the one bound_class=gate entry the registry's own zero-pin guard flagged on first run. Backfilled by the L4 pin lane (T-R46-06): 11 tests total = 8 counterfactual reds + 3 green controls, of which 4 are registered below as pin node IDs. (An earlier version of this note conflated the test count with the counterfactual count; the R46 audit caught it, and the wrong figure is deliberately not repeated here.) Backfilling required giving the script a check(repo) seam -- it used to resolve the repo inline inside main(), which is why a real CI gate had been unpinnable since D-072."
     },
     {
       "gate_id": "check_release_appendix",

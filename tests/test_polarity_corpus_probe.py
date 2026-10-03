@@ -16,6 +16,7 @@ What D-203 changed and what would regress if it silently reverted:
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 from pathlib import Path
@@ -171,6 +172,63 @@ class TestD203FloorCaliber:
         # semantics differ, which is what makes this a real counterfactual.
         assert len(guarded) >= 1
 
+    def test_s2_review_covers_the_actual_track_3_cohort(self):
+        """R46 audit finding, and the sharpest of the four.
+
+        The first version of the S2 record reviewed the wrong five samples: it
+        took the FORGIVEN cohort instead of the samples the probe file actually
+        marks as track-3 promotions, so three genuine promotions went
+        unadjudicated and three non-promotions got reviewed. It also claimed no
+        promotion record existed, which the marker comment at
+        polarity_corpus_probe.py:206-215 refutes.
+
+        A label is not a cohort. This pin derives the cohort from the marker
+        comment the way a reviewer must, then asserts the record names every
+        member of it. Reorder or edit the corpus and the pin goes red, forcing
+        the record to be revisited rather than left describing a set that no
+        longer exists."""
+        source = SCRIPT.read_text(encoding="utf-8")
+        marker = "--- track-3 promotions (D-203) ---"
+        assert marker in source, (
+            "the track-3 promotion marker is gone; the S2 record's cohort "
+            "definition no longer has anything to derive from"
+        )
+        # Derive structurally by AST, not by substring. A substring match
+        # silently drops any sample whose "text" is wrapped across two source
+        # lines -- which is exactly one of the five, so the naive version
+        # derived 4 and would have let this pin pass on a partial cohort.
+        marker_line = source[: source.index(marker)].count("\n") + 1
+        corpus_node = None
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "LABELLED_CORPUS" for t in node.targets
+            ):
+                corpus_node = node.value
+        assert corpus_node is not None, "LABELLED_CORPUS not found"
+        mod = _load()
+        promoted = [
+            s["text"]
+            for s, el in zip(mod.LABELLED_CORPUS, corpus_node.elts)
+            if el.lineno > marker_line
+        ]
+        assert len(promoted) == 5, (
+            f"expected the five samples after the track-3 marker, derived "
+            f"{len(promoted)}: {promoted}"
+        )
+        record = (
+            REPO / "docs" / "evidence" / "polarity-corpus-s2-post-hoc-review-2026-10-03.md"
+        ).read_text(encoding="utf-8")
+        missing = [t for t in promoted if t not in record]
+        assert not missing, f"the S2 record does not adjudicate these promoted samples: {missing}"
+        # and the forgiven set must NOT be a substitute for the cohort
+        forgiven = [s for s in mod.LABELLED_CORPUS if s["label"] == mod.FORGIVEN]
+        non_promoted = [s["text"] for s in forgiven if s["text"] not in promoted]
+        assert len(non_promoted) == 3, (
+            "expected exactly three forgiven samples that are NOT track-3 "
+            "promotions (the cohort must not be interchangeable with the "
+            f"forgiven label); derived {len(non_promoted)}"
+        )
+
     def test_s2_post_hoc_record_is_labelled_as_post_hoc(self):
         """D-221 3 3: fabricating a pre-registration timestamp for the S2
         review is forbidden. The record exists, names the five samples it
@@ -187,13 +245,14 @@ class TestD203FloorCaliber:
             "the S2 record must state what it did NOT establish -- an S2 record "
             "that claims full coverage is the fabrication D-221 3 forbids"
         )
-        # it must cover exactly the forgiven cohort it says it covers
-        mod = _load()
-        forgiven = [s for s in mod.LABELLED_CORPUS if s["label"] == mod.FORGIVEN]
-        assert forgiven, "no forgiven samples to adjudicate"
+        # The record must state a result for the cohort it actually reviewed.
+        # After the R46 audit that cohort is the track-3 promotion set, NOT
+        # the forgiven set -- the first version conflated the two, and these
+        # assertions are what stop the wording drifting back.
         assert "5 of 5 confirmed" in text, (
-            f"the record must state its own result for the {len(forgiven)}-sample forgiven cohort"
+            "the record must state its own result for the five promoted samples"
         )
+        assert "promotions" in text, "the record must name the track-3 promotion cohort it reviewed"
 
     def test_s3_two_precondition_caveat_is_printed(self):
         """D-221 2 (S3): clearing the floor is ONE of two preconditions for

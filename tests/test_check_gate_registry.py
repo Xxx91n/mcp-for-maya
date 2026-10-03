@@ -205,6 +205,78 @@ def test_a_method_missing_from_an_existing_class_is_still_red(tmp_path):
     assert any("test_never_written" in f for f in mod.check(root, reg))
 
 
+def test_a_helper_function_is_not_accepted_as_a_pin(tmp_path):
+    """R46 audit finding. The first resolver returned every top-level name, so a
+    private helper registered as a "pin" resolved fine. A helper asserts nothing
+    about the gate, so accepting one makes the registry look covered while
+    pinning nothing -- the exact hollow-pin shape D-213 2 legislates against."""
+    mod = _load()
+    root = _tree(tmp_path, scripts=["check_demo"], wired=["check_demo"])
+    (root / "tests" / "test_helper.py").write_text(
+        "def _build_tree():\n    return 1\n\n\ndef test_real():\n    assert True\n",
+        encoding="utf-8",
+    )
+    reg = _write_registry(root, [_good_entry(pin_node_ids=["tests/test_helper.py::_build_tree"])])
+    findings = mod.check(root, reg)
+    assert findings, "a helper function must not satisfy the pin obligation"
+    assert any("_build_tree" in f and "collectible test" in f for f in findings), findings
+
+
+def test_a_module_constant_is_not_accepted_as_a_pin(tmp_path):
+    mod = _load()
+    root = _tree(tmp_path, scripts=["check_demo"], wired=["check_demo"])
+    (root / "tests" / "test_const.py").write_text(
+        'TOOLS = {"a", "b"}\n\n\ndef test_real():\n    assert True\n', encoding="utf-8"
+    )
+    reg = _write_registry(root, [_good_entry(pin_node_ids=["tests/test_const.py::TOOLS"])])
+    findings = mod.check(root, reg)
+    assert any("TOOLS" in f and "collectible test" in f for f in findings), findings
+
+
+def test_a_non_test_class_method_is_not_accepted_as_a_pin(tmp_path):
+    mod = _load()
+    root = _tree(tmp_path, scripts=["check_demo"], wired=["check_demo"])
+    (root / "tests" / "test_cls2.py").write_text(
+        "class TestThing:\n    def _setup(self):\n        return 1\n",
+        encoding="utf-8",
+    )
+    reg = _write_registry(
+        root, [_good_entry(pin_node_ids=["tests/test_cls2.py::TestThing::_setup"])]
+    )
+    assert any("_setup" in f for f in mod.check(root, reg))
+
+
+def test_a_class_not_named_test_prefix_is_not_collectible(tmp_path):
+    """pytest's default ``python_classes = Test*`` is the rule; a helper class
+    that happens to live in a test file is still not collectible."""
+    mod = _load()
+    root = _tree(tmp_path, scripts=["check_demo"], wired=["check_demo"])
+    (root / "tests" / "test_cls3.py").write_text(
+        "class Helper:\n    def test_looks_like_a_test(self):\n        assert True\n",
+        encoding="utf-8",
+    )
+    reg = _write_registry(
+        root, [_good_entry(pin_node_ids=["tests/test_cls3.py::Helper::test_looks_like_a_test"])]
+    )
+    assert any("Helper" in f for f in mod.check(root, reg))
+
+
+def test_every_registered_pin_in_the_real_registry_is_collectible():
+    """Live control for the four reds above: if the tightening were too strict,
+    the real registry would start failing and this would say so."""
+    mod = _load()
+    import json
+
+    data = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    offenders = [
+        node
+        for entry in data["entries"]
+        for node in entry["pin_node_ids"]
+        if mod.resolve_pin_node(REPO, node) is not None
+    ]
+    assert offenders == [], f"registered pins that are not collectible: {offenders}"
+
+
 # --- R3 stale registration ------------------------------------------------
 
 
