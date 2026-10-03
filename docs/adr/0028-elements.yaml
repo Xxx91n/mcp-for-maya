@@ -2,13 +2,16 @@
   "schema": "tdqs-elements/1",
   "note": "JSON-syntax YAML (YAML 1.2 is a strict superset of JSON): parseable by both yaml.safe_load and json.loads — stdlib-only CI consumption. This file is the SINGLE SOURCE for TDQS disclosure elements; legislated by ADR-0028, consumed by .github/scripts/check_tdqs_disclosure.py. Asserts element presence, NOT literal wording — wording freedom stays inside the line.",
   "legislation": "docs/adr/0028-tdqs-description-quality.md",
-  "decisions": ["D-172", "D-173", "D-174", "D-175", "D-180", "D-181", "D-190"],
+  "decisions": ["D-172", "D-173", "D-174", "D-175", "D-180", "D-181", "D-190", "D-195", "D-196"],
   "assert_semantics": {
     "any": "element satisfied if ANY regex in the list matches the tool description/docstring",
     "all": "element satisfied only if EVERY literal string in the list appears in the description",
     "on_failure": "CI failure message MUST name the missing element id",
     "change_review": "edits to this file require explicit PR review (prevents 'rewording slips deleting the assertion')",
     "polarity_aware": "mutation-class existence assertions MUST be polarity-aware (D-180): a match whose preceding clause text carries a negation cue does not satisfy the element; negated-only matches are WARN-level during the observation period. Direction limit (D-190 3): the guard is mandatory only on mutation-class existence assertions whose pattern set is purely positive (current sole instance: camera_orbit/mutation_side_effects) — negation-form pattern elements stay unguarded and are protected by positive_exemptions instead, otherwise the two rules cancel each other out. Enforcement is by PINNING the guarded set (LEGISLATED_GUARDED in tests/test_check_tdqs_disclosure.py), not by a pattern-purity lint — mounting the guard on a negation-form element yields matched=True and zero warnings, so the assertion layer cannot detect it; see the ADR-0028 gap disclosure",
+    "coverage_floor": "every tool in pipeline.TOOL_ANNOTATIONS must appear in 'tools' OR in 'coverage_exemptions' with a non-empty reason; absence is a CI error, never a silent skip (D-195 1). The reverse direction is asserted too, so a stale entry cannot rot unnoticed.",
+    "derivable_minimum_set": "for a tool carrying a full 'tools' entry two elements are derivable from its signature: a session_key parameter implies session_prerequisite, and membership in a sibling family implies boundary_line + boundary_targets_named. Enforced immediately for new or modified tools. Legacy derivation debt is NOT held in coverage_exemptions: a tool missing a derivable element still carries a full 'tools' entry, so the coverage rule forbids exempting it (covered-and-exempt is itself an error). That debt lives in the DERIVATION_BASELINE constant in .github/scripts/check_tdqs_disclosure.py, which fails when the set grows and also when it shrinks (D-195 2). The sibling-family table lives in that same file as a code constant (D-195 3).",
+    "coverage_exemptions": "grandfather register for tools that predate the floor entirely, i.e. tools with no 'tools' entry at all. Each entry needs a reason and a due. The due is enforced mechanically rather than by prose: the checker parses it as a dotted version, compares it against the version in pyproject.toml, and emits a WARNING naming the tool once the project version has reached it — so an exemption cannot quietly become open-ended (D-195 4). A due that is not a dotted numeric version is an error, because an unparseable deadline is no deadline. This register is a different ledger from the derivation baseline; see derivable_minimum_set.",
     "positive_exemptions": "element-level list of legitimate negation-form disclosure phrases; a cue inside the match clause that belongs to one of these phrases is forgiven (D-190 2). Without this list, widening the guard to a negation-form pattern element makes every correct negative disclosure self-reject — 'not idempotent' always carries the cue 'not'"
   },
   "tools": {
@@ -139,6 +142,15 @@
         {"id": "boundary_targets_named", "why": "names sibling tools", "all": ["scene_snapshot", "scene_describe"]}
       ]
     },
+    "scene_measure": {
+      "file": "src/maya_mcp_server/scene_tools.py",
+      "tier": "P1",
+      "required_elements": [
+        {"id": "session_prerequisite", "why": "requires a live/connected session before use", "any": ["(?i)(active|connected|open|live|established)\\s+(Maya\\s+)?session", "(?i)session_key", "(?i)requires\\s+a\\s+session"]},
+        {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
+        {"id": "boundary_targets_named", "why": "names sibling tools — per-object inspect vs whole-scene overview vs expected-value check", "all": ["scene_inspect", "scene_snapshot", "scene_assert"]}
+      ]
+    },
     "scene_nodes": {
       "file": "src/maya_mcp_server/introspect_tools.py",
       "tier": "P1",
@@ -250,5 +262,19 @@
         }
       ]
     }
+  },
+  "coverage_exemptions": {
+    "add_session": {"reason": "session-management surface; takes no session_key (T-R44-04 dry-run), so no session_prerequisite is derivable", "due": "0.7.0"},
+    "asset_import": {"reason": "session-scoped importer \u2014 it DOES take session_key, so the full floor applies; this is the first legacy gap scheduled to be filled", "due": "0.7.0"},
+    "asset_search": {"reason": "host-side index search with no Maya session involved; takes no session_key (T-R44-04 dry-run)", "due": "0.7.0"},
+    "camera_create": {"reason": "sibling of camera_orbit, which is covered; camera_create itself has no entry yet", "due": "0.7.0"},
+    "list_sessions": {"reason": "enumerates sessions and takes no session_key by design (T-R44-04 dry-run), so the session_prerequisite half of the floor does not apply; the boundary half is not written yet", "due": "0.7.0"},
+    "maya_setup_guide": {"reason": "connection-management surface; takes no session_key (T-R44-04 dry-run), so no session_prerequisite is derivable", "due": "0.7.0"},
+    "scene_checkpoint": {"reason": "mutation-class tool with no mutation_side_effects / non_idempotent assertions yet", "due": "0.7.0"},
+    "scene_checkpoint_list": {"reason": "session-scoped; the sibling floor against scene_checkpoint / scene_rollback is not written yet", "due": "0.7.0"},
+    "scene_export": {"reason": "currently a single-member surface, so the boundary half is not derivable yet; mutation and overwrite assertions are absent", "due": "0.7.0"},
+    "scene_render_preview": {"reason": "GUI-only tool; the sibling floor against scene_viewport_snapshot is not written yet", "due": "0.7.0"},
+    "scene_rollback": {"reason": "mutation-class tool with no mutation_side_effects / non_idempotent assertions yet", "due": "0.7.0"},
+    "scene_viewport_snapshot": {"reason": "GUI-only tool; the sibling floor against scene_render_preview is not written yet", "due": "0.7.0"}
   }
 }
