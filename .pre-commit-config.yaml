@@ -12,6 +12,11 @@ repos:
       - id: check-case-conflict
       - id: end-of-file-fixer
       - id: trailing-whitespace
+      # D-205④: line endings are a WORKTREE property, not a blob property -
+      # .gitattributes normalises at commit, so pre-commit is the landing layer
+      # (measured 2026-10-02: 29 tracked files CRLF in the worktree, 0 in HEAD).
+      - id: mixed-line-ending
+        args: [--fix=lf]
       - id: debug-statements
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.8 # aligned with ci.yml (uvx ruff@0.16.8) and the dev venv

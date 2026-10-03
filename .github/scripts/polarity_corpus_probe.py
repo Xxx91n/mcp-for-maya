@@ -203,25 +203,96 @@ LABELLED_CORPUS = [
         "text": "No geometry is removed; instead a camera is created and animated.",
         "why": "semicolon splits the clause, so the guard sees only the positive second half",
     },
+    # --- track-3 promotions (D-203) ---
+    # Track 3 mutates the 4 real seed clauses found in the docstrings by 4 cue
+    # prefixes and 4 clause splits, and reports absolute counts only. Promotion
+    # into this corpus means a human confirmed the mutated sentence really is a
+    # true negative / a forgiven negation-form disclosure. The five below were
+    # chosen to cover cue and clause-position shapes the corpus did not have:
+    # 'cannot' and 'without' were never exercised as prefixes, and no sample yet
+    # put the negated match BEFORE a split while the second clause carried none
+    # (the existing clause-split sample is the opposite shape and is labelled
+    # known_limitation). Seed clauses are verbatim from the source docstrings.
+    {
+        "label": TRUE_NEGATIVE,
+        "text": "This tool cannot create a new camera.",
+        "why": "'cannot' is a cue track 3 exercised but this corpus never covered; "
+        "the match follows it inside one clause",
+    },
+    {
+        "label": TRUE_NEGATIVE,
+        "text": "Returns success without creating a new camera.",
+        "why": "'without' is the fourth track-3 prefix; a cue may precede the match "
+        "without being the sentence subject",
+    },
+    {
+        "label": TRUE_NEGATIVE,
+        "text": "This tool does not create a new camera; the scene is untouched.",
+        "why": "the negated match sits BEFORE the '; ' split and the second clause "
+        "carries no match - the mirror image of the known_limitation sample, "
+        "so a clause-position regression would show up as a disagreement",
+    },
+    {
+        "label": FORGIVEN,
+        "text": "Non-idempotent by design; each call creates a new camera and animation curves.",
+        "why": "the non-idempotent form is exempt and the true claim follows it "
+        "across a '; ' split - the exemption is phrase-scoped, so a later "
+        "positive still counts",
+    },
+    {
+        "label": FORGIVEN,
+        "text": "Not idempotent - calling this twice creates a new camera and "
+        "marks the scene dirty.",
+        "why": "two matches follow one exempt phrase; forgiven must apply to the "
+        "sentence, not only to its first match",
+    },
 ]
 
-# Below this many labelled samples the corpus is a smoke test, not evidence.
-# The ruling keeps such a run at "not yet adjudicable" rather than promoting
-# a verdict off a handful of samples.
+# Below this many ADJUDICABLE samples the corpus is a smoke test, not evidence.
+# The ruling keeps such a run at "not yet adjudicable" rather than promoting a
+# verdict off a handful of samples.
+#
+# D-203 changed the counting basis. The floor counts ONLY the two labels whose
+# samples actually carry a verdict about the guard:
+#
+#     true_negative     the guard must answer negated_only for this sentence
+#     forgiven          the guard must answer positive, via the exemption list
+#
+# known_limitation is EXCLUDED. Those samples record a clause-scope trade the
+# design made on purpose (D-190 1); they can never move a verdict, so counting
+# them let the corpus reach a floor by adding sentences that adjudicate nothing.
+# The old basis counted every row, which made the floor reachable with samples
+# that could not support the conclusion it was supposed to gate.
+#
+# 12 is not re-derived here: it is the value D-203 legislated for the TN+F
+# caliber, carried over from the pre-D-203 number rather than recomputed from
+# this corpus (recomputing the floor from the sample it gates is circular).
 MIN_ADJUDICABLE = 12
 
+# D-203: a floor that the corpus as a whole clears is not enough. One element
+# carrying every sample would satisfy it while that element is the only one the
+# guard ever runs on. Each guarded element must independently carry enough true
+# negatives to have been adjudicated on its own.
+MIN_TN_PER_ELEMENT = 3
 
-def labelled_track(checker, tools):
-    """Track 2. Prints the FN denominator; never combines with track 3."""
-    guarded = _guarded_elements(tools)
-    if not guarded:
-        print("TRACK2 (labelled): no polarity_aware element to exercise")
-        return
+# The labels that carry a verdict; known_limitation is deliberately absent.
+ADJUDICABLE_LABELS = (TRUE_NEGATIVE, FORGIVEN)
+
+
+def adjudicate(checker, guarded):
+    """Adjudicate the corpus once and return everything the report needs.
+
+    Returns (counts, per_element_tn, unexpected). Kept separate from the
+    printing so a test can assert the arithmetic without scraping stdout -
+    this instrument is read by humans, so stdout is a report, not an interface.
+    """
     counts = {TRUE_NEGATIVE: 0, FORGIVEN: 0, KNOWN_LIMITATION: 0}
-    unexpected = []
+    per_element_tn: dict[tuple[str, str], int] = {}
+    unexpected: list[tuple[str, str, str, str, str]] = []
     for tool, elem in guarded:
         patterns = elem.get("any", [])
         exempt = tuple(elem.get("positive_exemptions", ()))
+        key = (tool, elem["id"])
         for sample in LABELLED_CORPUS:
             pos = neg = 0
             for pat in patterns:
@@ -237,8 +308,22 @@ def labelled_track(checker, tools):
             else:
                 verdict = "no-match"
             counts[sample["label"]] += 1
-            if sample["label"] in (TRUE_NEGATIVE, FORGIVEN) and verdict != sample["label"]:
-                unexpected.append((tool, elem["id"], sample["label"], verdict, sample["text"]))
+            if sample["label"] in ADJUDICABLE_LABELS:
+                if verdict == TRUE_NEGATIVE:
+                    per_element_tn[key] = per_element_tn.get(key, 0) + 1
+                if verdict != sample["label"]:
+                    unexpected.append((tool, elem["id"], sample["label"], verdict, sample["text"]))
+    return counts, per_element_tn, unexpected
+
+
+def labelled_track(checker, tools):
+    """Track 2. Prints the FN denominator; never combines with track 3."""
+    guarded = _guarded_elements(tools)
+    if not guarded:
+        print("TRACK2 (labelled): no polarity_aware element to exercise")
+        return
+    counts, per_element_tn, unexpected = adjudicate(checker, guarded)
+    adjudicated = sum(counts[label] for label in ADJUDICABLE_LABELS)
     print(f"TRACK2 (labelled): samples={len(LABELLED_CORPUS)} per guarded element={len(guarded)}")
     print(
         f"  labels: true_negative={counts[TRUE_NEGATIVE]} forgiven={counts[FORGIVEN]} "
@@ -250,16 +335,50 @@ def labelled_track(checker, tools):
         print(
             f"    MISMATCH {row[0]}/{row[1]}: labelled {row[2]}, guard said {row[3]} -- {row[4]!r}"
         )
-    if len(LABELLED_CORPUS) < MIN_ADJUDICABLE:
+    # D-203: the floor is over TN+F only. known_limitation is reported above for
+    # transparency and deliberately excluded from the count that gates.
+    # Iterate the guarded ELEMENTS, not the per_element_tn keys. An element
+    # with zero true negatives has no key at all, so keying off the dict made
+    # exactly the failing case invisible and fell through to the else branch
+    # below, which then printed the opposite of the truth.
+    thin = [
+        (tool, elem["id"], per_element_tn.get((tool, elem["id"]), 0))
+        for tool, elem in guarded
+        if per_element_tn.get((tool, elem["id"]), 0) < MIN_TN_PER_ELEMENT
+    ]
+    for tool, eid in sorted({(t, e) for t, e, _ in thin}):
         print(
-            f"  NOT YET ADJUDICABLE: {len(LABELLED_CORPUS)} < "
-            f"MIN_ADJUDICABLE={MIN_ADJUDICABLE}; verdict stays warn, "
-            "no promotion off this sample"
+            f"    PER-ELEMENT TN {tool}/{eid}: "
+            f"{per_element_tn.get((tool, eid), 0)} true negatives "
+            f"(D-203 floor {MIN_TN_PER_ELEMENT})"
         )
-    elif unexpected:
-        print("  REGRESSION: a labelled expectation did not hold")
+    print(
+        f"  adjudicable (true_negative + forgiven) = {adjudicated} "
+        f"[known_limitation excluded by D-203: {counts[KNOWN_LIMITATION]}]"
+    )
+    # The floor verdict is reported INDEPENDENTLY of the label-agreement verdict.
+    # Chaining them with elif let a label disagreement swallow a floor
+    # violation, which is the same silence D-203 was legislated against: two
+    # independent questions, two independent answers.
+    if adjudicated < MIN_ADJUDICABLE:
+        print(
+            f"  NOT YET ADJUDICABLE: {adjudicated} adjudicable "
+            f"(true_negative+forgiven) < MIN_ADJUDICABLE={MIN_ADJUDICABLE}; "
+            f"verdict stays warn, no promotion off this sample"
+        )
+    elif thin:
+        print(
+            f"  PER-ELEMENT FLOOR NOT MET by {len(thin)} element(s) "
+            f"(D-203: >= {MIN_TN_PER_ELEMENT} true negatives each)"
+        )
     else:
-        print("  labels hold; still not a promotion signal on its own")
+        print(
+            f"  floor met: {adjudicated} adjudicable clears "
+            f"MIN_ADJUDICABLE={MIN_ADJUDICABLE} and every guarded element "
+            f"carries >= {MIN_TN_PER_ELEMENT} true negatives (D-203)"
+        )
+    if unexpected:
+        print("  REGRESSION: a labelled expectation did not hold")
 
 
 # ---------------------------------------------------------------------------

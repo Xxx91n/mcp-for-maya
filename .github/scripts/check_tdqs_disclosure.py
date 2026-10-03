@@ -484,12 +484,27 @@ def check_coverage_and_derivation(root: Path, data: dict) -> tuple[list[str], li
                 f"pyproject.toml, so the '{tool}' due ({due_raw}) was NOT checked — an "
                 f"overdue exemption would pass unnoticed on a tree without pyproject.toml"
             )
-        elif current >= due:
+        elif current == due:
+            # D-204 tiering: at the deadline the exemption is merely ripe —
+            # warn. Past it, the waiver has expired and the gate must bite.
             warnings.append(
-                f"::warning file=0028-elements.yaml::exemption for '{tool}' is due {due_raw} and "
-                f"the project version is "
-                f"{'.'.join(str(v) for v in current)} — cover the tool or re-legislate the "
-                f"deadline; D-195 4 forbids an open-ended exemption"
+                f"::warning file=0028-elements.yaml::exemption for '{tool}' is DUE {due_raw} "
+                f"(project version {'.'.join(str(v) for v in current)}) — cover the tool this "
+                f"release or file a D-168 waiver renewal; the next version bump turns this "
+                f"into an error"
+            )
+        elif current > due:
+            # D-204 tiering: past the deadline. A warning here would be a
+            # dead check — D-210 closed "overdue passes unnoticed" only for
+            # the un-readable-version branch, not for a real overdue waiver.
+            errors.append(
+                f"::error file=0028-elements.yaml::exemption for '{tool}' EXPIRED at {due_raw} "
+                f"(project version {'.'.join(str(v) for v in current)}) — cover the tool, or "
+                f"renew via a D-168§4 waiver renewal carrying all five of its "
+                f"elements: a gate_authority countersignature distinct from the "
+                f"debt_owner (D-176), a new expiry anchored to an event rather than "
+                f"the calendar, the per-row renewal cap of 2, a re-validated "
+                f"reason, and the waiver lane closing after gate review"
             )
 
     # -- derivable minimum set, as a shrink-only ratchet ------------------

@@ -786,27 +786,56 @@ def test_live_no_exemption_is_overdue():
     data = _live_data(mod)
     version = mod.project_version(mod.REPO)
     assert version is not None, "pyproject.toml must be readable for due checks"
-    assert _covers_warn(mod, data, "is due") == [], (
+    assert _covers_warn(mod, data, "is DUE") == [], (
         f"version {'.'.join(map(str, version))} has reached an exemption deadline"
+    )
+    assert _covers_err(mod, data, "EXPIRED") == [], (
+        f"version {'.'.join(map(str, version))} has passed an exemption deadline"
     )
 
 
-def test_due_fires_once_the_project_version_reaches_it(monkeypatch):
+def test_due_warns_but_does_not_bite_on_the_deadline_itself(monkeypatch):
+    """D-204 tiering: at 'due' the waiver is merely ripe. It warns so the
+    team sees it coming, but it stays a warning so the lint job is green
+    through the release that lands ON the deadline."""
     mod = _load()
     data = _live_data(mod)
-    monkeypatch.setattr(mod, "project_version", lambda root: (99, 0, 0))
-    hits = _covers_warn(mod, data, "is due 0.7.0")
+    monkeypatch.setattr(mod, "project_version", lambda root: (0, 7, 0))
+    hits = _covers_warn(mod, data, "is DUE 0.7.0")
     assert len(hits) == 12, hits
-    assert "D-195 4" in hits[0]
+    assert "D-168 waiver renewal" in hits[0]
+    assert _covers_err(mod, data, "EXPIRED") == [], "the deadline itself is not overdue"
+
+
+def test_past_the_deadline_is_an_error_not_a_warning(monkeypatch):
+    """D-204 tiering: past 'due' the gate must bite. A warning here is a dead
+    check - the exemption silently stays open-ended, which is exactly what
+    D-195 4 exists to prevent."""
+    mod = _load()
+    data = _live_data(mod)
+    monkeypatch.setattr(mod, "project_version", lambda root: (0, 7, 1))
+    hits = _covers_err(mod, data, "EXPIRED at 0.7.0")
+    assert len(hits) == 12, hits
+    assert _covers_warn(mod, data, "is DUE") == [], "expired is an error, not a warning"
+    # D-168 4 (as revised by D-176) - not a generic five-item checklist.
+    for required in (
+        "gate_authority",  # countersignature distinct from debt_owner
+        "expiry",  # event-anchored, not calendar
+        "cap of 2",  # per-row renewal cap
+        "reason",  # re-validated on each renewal
+        "gate review",  # waiver lane closes after gate review
+    ):
+        assert required in hits[0], f"D-168(4) renewal must name {required}"
 
 
 def test_due_boundary_is_inclusive(monkeypatch):
     mod = _load()
     data = _live_data(mod)
     monkeypatch.setattr(mod, "project_version", lambda root: (0, 6, 9))
-    assert _covers_warn(mod, data, "is due") == [], "0.6.9 is still short of 0.7.0"
+    assert _covers_warn(mod, data, "is DUE") == [], "0.6.9 is still short of 0.7.0"
     monkeypatch.setattr(mod, "project_version", lambda root: (0, 7, 0))
-    assert _covers_warn(mod, data, "is due"), "0.7.0 has reached the deadline"
+    assert _covers_warn(mod, data, "is DUE"), "0.7.0 has reached the deadline"
+    assert _covers_err(mod, data, "EXPIRED") == [], "0.7.0 is the deadline, not past it"
 
 
 def test_unparseable_due_is_an_error_not_a_silent_pass():

@@ -11,17 +11,26 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import mcp.types as mt
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 
+
+try:
+    from fastmcp.tools.base import Tool  # fastmcp 4.x
+except ImportError:  # pragma: no cover - exercised by the other resolution arm
+    from fastmcp.tools import Tool  # fastmcp 2.x
+
 from maya_mcp_server.security import (
     AuditLogger,
     PatternBlockedError,
     PipelineError,
+    PolicyDisabledError,
     RateLimiter,
     RateLimitExceededError,
     SecurityConfig,
@@ -117,6 +126,47 @@ def tool_annotations(name: str) -> mt.ToolAnnotations:
 
 
 # ---------------------------------------------------------------------------
+# Strict policy mode (D-207 1/7) — operator-side misuse guardrails.
+#
+# This is NOT a hostile-agent boundary: an agent that can still call
+# execute_code is inside the trust boundary already, and no env flag changes
+# that. What these flags buy is the opposite direction — an operator (or a
+# host that embeds this server) who wants a smaller blast radius for a
+# mistake, a demo, or a CI sandbox can remove the dangerous tools from the
+# surface entirely instead of trusting everyone to pass the right arguments.
+# docs/threat-model.md says so in the same words.
+#
+# Enforcement lives here and nowhere else: on_call_tool denies the call and
+# on_list_tools hides the tool, so there is one choke point rather than a
+# per-tool check that a future tool could forget.
+# ---------------------------------------------------------------------------
+
+POLICY_ENV_FLAGS: dict[str, frozenset[str]] = {
+    "MAYA_MCP_DISABLE_EXECUTE": frozenset({"execute_code"}),
+    "MAYA_MCP_DISABLE_WRITE_MODULE": frozenset({"write_module"}),
+    # the umbrella: every tool that writes a startup file or runs arbitrary code
+    "MAYA_MCP_DISABLE_ARBITRARY": frozenset({"execute_code", "write_module", "maya_setup_guide"}),
+}
+
+POLICY_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def policy_disabled_tools(env: dict[str, str] | None = None) -> frozenset[str]:
+    """Tools disabled by the current environment.
+
+    Read per call rather than at import: the flags are process configuration
+    and a test (or an embedding host that sets them late) must not be frozen
+    out by module import order.
+    """
+    source = os.environ if env is None else env
+    disabled: set[str] = set()
+    for flag, tools in POLICY_ENV_FLAGS.items():
+        if source.get(flag, "").strip().lower() in POLICY_TRUTHY:
+            disabled |= tools
+    return frozenset(disabled)
+
+
+# ---------------------------------------------------------------------------
 # Pipeline middleware
 # ---------------------------------------------------------------------------
 
@@ -151,6 +201,21 @@ class SecurityPipeline(Middleware):
             max_calls=self.config.rate_limit_write_max_calls,
         )
 
+    async def on_list_tools(
+        self,
+        context: MiddlewareContext[mt.ListToolsRequest],
+        call_next: CallNext[mt.ListToolsRequest, Sequence[Tool]],
+    ) -> Sequence[Tool]:
+        """Hide policy-disabled tools from tools/list (D-207 1).
+
+        A tool the agent cannot see is one it will not plan around; on_call_tool
+        still denies it, because hiding is an affordance and not a boundary.
+        """
+        disabled = policy_disabled_tools()
+        if not disabled:
+            return await call_next(context)
+        return [tool for tool in await call_next(context) if tool.name not in disabled]
+
     async def on_call_tool(
         self,
         context: MiddlewareContext[mt.CallToolRequestParams],
@@ -166,6 +231,17 @@ class SecurityPipeline(Middleware):
         warnings: list[dict[str, str]] = []
         try:
             session_id = _resolve_session_id(context, args)
+            # 0. strict policy mode (D-207 1) — before validation and rate
+            # limiting, so a denied call costs nothing and never consumes a token.
+            if tool_name in policy_disabled_tools():
+                raise PolicyDisabledError(
+                    f"{tool_name} is disabled by policy on this server "
+                    f"(see POLICY_ENV_FLAGS for the governing flag)",
+                    suggestion=(
+                        "unset the governing MAYA_MCP_DISABLE_* flag, or use a "
+                        "read-class tool instead"
+                    ),
+                )
             # 1. host-side validation (tool-semantic checks stay in tool bodies)
             if "session_key" in args:
                 validate_session_key(args.get("session_key"))

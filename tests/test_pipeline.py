@@ -23,14 +23,17 @@ except ImportError:
 from mcp.types import CallToolRequestParams
 
 from maya_mcp_server.pipeline import (
+    POLICY_ENV_FLAGS,
     TOOL_ANNOTATIONS,
     SecurityPipeline,
+    policy_disabled_tools,
     tool_annotations,
 )
 from maya_mcp_server.security import (
     AuditLogger,
     InputValidationError,
     PatternBlockedError,
+    PolicyDisabledError,
     RateLimitExceededError,
     SecurityConfig,
     SessionLookupError,
@@ -487,3 +490,118 @@ async def test_in_tool_pipeline_error_counts_as_error(tmp_path):
     assert "call add_session" in str(ei.value)
     events = [json.loads(line) for line in log_path.read_text().splitlines() if line.strip()]
     assert events[-1]["outcome"] == "error"
+
+
+# ---------------------------------------------------------------------------
+# D-207 7: strict policy mode. Stub tier, in CI: assert the flag bites and
+# assert the read-only surface is untouched. A guardrail with no acceptance
+# test is an adoption without acceptance.
+# ---------------------------------------------------------------------------
+
+
+class _FakeTool:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+def _list_ctx() -> MiddlewareContext:
+    return MiddlewareContext(message=None, method="tools/list")
+
+
+def _listing(*names: str):
+    async def _next(context):
+        return [_FakeTool(n) for n in names]
+
+    return _next
+
+
+ALL_TOOLS = tuple(TOOL_ANNOTATIONS)
+
+
+class TestStrictPolicyMode:
+    """operator-side misuse guardrails (D-207 1) - not a hostile-agent boundary."""
+
+    @pytest.mark.parametrize(
+        "flag,tool",
+        [
+            ("MAYA_MCP_DISABLE_EXECUTE", "execute_code"),
+            ("MAYA_MCP_DISABLE_WRITE_MODULE", "write_module"),
+        ],
+    )
+    async def test_flag_denies_its_tool(self, tmp_path, monkeypatch, flag, tool):
+        monkeypatch.setenv(flag, "1")
+        pipe, _audit, log = _pipeline(tmp_path)
+        with pytest.raises(PolicyDisabledError) as exc:
+            await pipe.on_call_tool(_ctx(tool, {"code": "print(1)"}), _ok_next)
+        assert exc.value.code == "policy_disabled"
+        assert flag in str(exc.value) or "MAYA_MCP_DISABLE" in str(exc.value)
+        events = _read_events(log)
+        assert events[-1]["outcome"] == "rejected", "a policy denial must be audited"
+        assert events[-1]["tool_name"] == tool
+
+    async def test_arbitrary_flag_denies_every_dangerous_tool(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("MAYA_MCP_DISABLE_ARBITRARY", "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        for tool in POLICY_ENV_FLAGS["MAYA_MCP_DISABLE_ARBITRARY"]:
+            with pytest.raises(PolicyDisabledError):
+                await pipe.on_call_tool(_ctx(tool), _ok_next)
+
+    async def test_read_only_surface_is_unaffected(self, tmp_path, monkeypatch):
+        """The guard narrows the dangerous tools only. A read-class tool still
+        dispatches with every flag on - otherwise the flag would be a mute
+        button rather than a guardrail."""
+        for flag in POLICY_ENV_FLAGS:
+            monkeypatch.setenv(flag, "1")
+        pipe, _audit, log = _pipeline(tmp_path)
+        for tool in ("scene_snapshot", "scene_measure", "list_sessions"):
+            result = await pipe.on_call_tool(_ctx(tool), _ok_next)
+            assert result.content[0].text == "ok", f"{tool} must still dispatch"
+        outcomes = {(e["tool_name"], e["outcome"]) for e in _read_events(log)}
+        assert outcomes == {
+            ("scene_snapshot", "success"),
+            ("scene_measure", "success"),
+            ("list_sessions", "success"),
+        }
+
+    async def test_disabled_tool_is_hidden_from_tools_list(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("MAYA_MCP_DISABLE_ARBITRARY", "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        listed = await pipe.on_list_tools(_list_ctx(), _listing(*ALL_TOOLS))
+        names = {t.name for t in listed}
+        assert "execute_code" not in names
+        assert "scene_snapshot" in names
+
+    async def test_tools_list_untouched_when_no_flag_is_set(self, tmp_path, monkeypatch):
+        for flag in POLICY_ENV_FLAGS:
+            monkeypatch.delenv(flag, raising=False)
+        pipe, _audit, _log = _pipeline(tmp_path)
+        listed = await pipe.on_list_tools(_list_ctx(), _listing(*ALL_TOOLS))
+        assert {t.name for t in listed} == set(ALL_TOOLS)
+
+    @pytest.mark.parametrize("value", ["", "0", "false", "no", "off", "  "])
+    def test_falsy_values_do_not_disable(self, value):
+        assert policy_disabled_tools({flag: value for flag in POLICY_ENV_FLAGS}) == frozenset()
+
+    @pytest.mark.parametrize("value", ["1", "TRUE", "yes", " On "])
+    def test_truthy_values_disable(self, value):
+        disabled = policy_disabled_tools({flag: value for flag in POLICY_ENV_FLAGS})
+        assert disabled == frozenset({"execute_code", "write_module", "maya_setup_guide"})
+
+    def test_flags_are_read_per_call_not_frozen_at_import(self, monkeypatch):
+        monkeypatch.delenv("MAYA_MCP_DISABLE_EXECUTE", raising=False)
+        assert "execute_code" not in policy_disabled_tools()
+        monkeypatch.setenv("MAYA_MCP_DISABLE_EXECUTE", "1")
+        assert "execute_code" in policy_disabled_tools()
+
+    def test_every_flag_target_is_an_annotated_tool(self):
+        """A typo in a flag's target would silently guard nothing."""
+        for flag, tools in POLICY_ENV_FLAGS.items():
+            unknown = set(tools) - set(TOOL_ANNOTATIONS)
+            assert not unknown, f"{flag} names unannotated tool(s): {unknown}"
+
+    def test_the_three_dangerous_tools_are_exactly_the_covered_set(self):
+        """MAYA_MCP_DISABLE_ARBITRARY is the umbrella over the destructive
+        class - if a fourth destructive tool appears and is not added, this
+        fails rather than letting the umbrella quietly mean less than it says."""
+        destructive = {n for n, a in TOOL_ANNOTATIONS.items() if a.destructive_hint}
+        assert destructive == POLICY_ENV_FLAGS["MAYA_MCP_DISABLE_ARBITRARY"]

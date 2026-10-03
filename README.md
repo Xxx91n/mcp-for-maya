@@ -314,6 +314,7 @@ Two **Experimental** process cards ship in `skills/`:
 - **Local, single-user**: the command port binds localhost only; the connected MCP client is trusted.
 - **Safety net**: a unified pipeline (`pipeline.py` + `security.py`) validates arguments + token-bucket rate limits (~100/60s reads, ~20/60s writes, per session) + pattern scan (warn-only by default) + an independent JSONL audit log across all 25 tools. It catches accidents, not malicious clients — full model in [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
 - **Transactional safety**: `scene_checkpoint`/`scene_rollback` give in-memory snapshots and explicit rollback (no undo history; references flattened).
+- **Strict policy mode (optional)**: set `MAYA_MCP_DISABLE_EXECUTE=1`, `MAYA_MCP_DISABLE_WRITE_MODULE=1`, or `MAYA_MCP_DISABLE_ARBITRARY=1` (all three) to remove the escape-hatch tools from `tools/list` and deny the call with `[policy_disabled]`. Read-only tools are unaffected. These are **misuse guardrails, not a hostile-agent boundary** — an agent that still holds `execute_code` is already inside the trust boundary; what they buy is a smaller blast radius for a demo, a mistake, or a CI sandbox. Rationale: [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md). Per-code reference: [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md).
 - Vulnerability reporting: [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md).
 
 ## Versioning

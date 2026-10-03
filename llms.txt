@@ -1,0 +1,75 @@
+# Maya MCP Server
+
+> MCP server for Autodesk Maya: spatial awareness, scene audit, camera
+> planning, checkpoint/rollback, and asset import. Every scene change
+> follows INSPECT -> COMPUTE -> EXECUTE -> VERIFY. This file is
+> generated from the tool registry (v0.5.0); do not hand-edit it.
+
+## Docs
+
+- [README](https://github.com/Xxx91n/mcp-for-maya/blob/main/README.md): install, transport, and full tool reference
+- [Error codes](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md): every `[code]` an agent can see in an isError body
+- [Session lifecycle](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/session-lifecycle.md): how a session is established, lost, and cleaned up
+- [Threat model](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md): what is and is not a security boundary
+
+## Sessions
+
+- [add_session](#add_session): mutation - Manually add a Maya session at a specific host and port.
+- [list_sessions](#list_sessions): read-only - List all active Maya sessions.
+
+## Spatial awareness
+
+- [scene_assert](#scene_assert): read-only - Verify scene state matches expected values.
+- [scene_inspect](#scene_inspect): read-only - Deep inspection of a specific object or zone.
+- [scene_measure](#scene_measure): read-only - Measure the spatial relationship between two objects.
+- [scene_snapshot](#scene_snapshot): read-only - Get a complete spatial overview of the current Maya scene.
+- [scene_validate](#scene_validate): read-only - Validate scene against spatial constraints.
+
+## Introspection
+
+- [scene_describe](#scene_describe): read-only - API-level self-description of ONE node (not spatial).
+- [scene_nodes](#scene_nodes): read-only - Bounded enumeration of scene nodes - including non-DAG nodes.
+
+## Analysis
+
+- [scene_aesthetics](#scene_aesthetics): read-only - Professional-grade aesthetic analysis with 5 design dimensions.
+- [scene_review](#scene_review): read-only - Comprehensive scene audit - reviews all aspects after operations.
+
+## Transactions
+
+- [scene_checkpoint](#scene_checkpoint): mutation - Save a real scene snapshot (exportAll of in-memory state).
+- [scene_checkpoint_list](#scene_checkpoint_list): read-only - List all saved checkpoints for the current scene state.
+- [scene_rollback](#scene_rollback): mutation - Open a checkpoint and rebind the scene to its original path (S2).
+
+## Scene planning
+
+- [scene_plan](#scene_plan): mutation - Holistic scene planning with organization validation and layout optimization.
+
+## Cameras
+
+- [camera_create](#camera_create): mutation - Create a camera positioned for a specific shot type.
+- [camera_orbit](#camera_orbit): mutation - Create an orbiting camera with turntable animation around a point.
+
+## Export
+
+- [scene_export](#scene_export): mutation - Export the Maya scene (or named objects) to a local file.
+
+## Assets (Poly Haven, CC0)
+
+- [asset_import](#asset_import): mutation, open-world - Import a Poly Haven CC0 model into Maya (find ids via asset_search).
+- [asset_search](#asset_search): read-only, open-world - Search the Poly Haven CC0 asset index (host-side, no Maya needed).
+
+## Visual loop (GUI sessions only)
+
+- [scene_render_preview](#scene_render_preview): read-only - Single-frame playblast preview from a camera (clean, no HUD).
+- [scene_viewport_snapshot](#scene_viewport_snapshot): read-only - Capture the active viewport as an image (WYSIWYG).
+
+## Escapes (policy-disableable)
+
+- [execute_code](#execute_code): destructive - Execute arbitrary Python or MEL code in an active Maya session.
+- [maya_setup_guide](#maya_setup_guide): destructive - Maya connection setup guide and diagnostics.
+- [write_module](#write_module): destructive - Create a virtual in-memory Python module in an active Maya session.
+
+## Scope note
+
+- `execute_code`, `write_module` and `maya_setup_guide` are escape hatches: an agent holding one is inside the trust boundary. Operators can remove them with `MAYA_MCP_DISABLE_ARBITRARY=1`.
