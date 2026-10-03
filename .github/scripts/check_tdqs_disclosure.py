@@ -274,7 +274,6 @@ def tools_map(elements_path: Path) -> dict:
         return {}
 
 
-
 # ---------------------------------------------------------------------------
 # D-195 coverage floor + derivable minimum set
 # ---------------------------------------------------------------------------
@@ -307,17 +306,18 @@ SIBLING_FAMILIES: tuple[frozenset[str], ...] = (
 # (covered-and-exempt is itself an error). They are pinned here until each
 # tool gains the element. The gate fails when this set GROWS and also when it
 # SHRINKS, so a converged tool cannot rot into a permanent free pass.
-DERIVATION_BASELINE: frozenset[tuple[str, str]] = frozenset({
-    ("scene_aesthetics", "session_prerequisite"),
-    ("scene_assert", "session_prerequisite"),
-    ("scene_describe", "session_prerequisite"),
-    ("scene_inspect", "session_prerequisite"),
-    ("scene_nodes", "session_prerequisite"),
-    ("scene_plan", "session_prerequisite"),
-    ("scene_review", "session_prerequisite"),
-    ("scene_snapshot", "session_prerequisite"),
-})
-
+DERIVATION_BASELINE: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("scene_aesthetics", "session_prerequisite"),
+        ("scene_assert", "session_prerequisite"),
+        ("scene_describe", "session_prerequisite"),
+        ("scene_inspect", "session_prerequisite"),
+        ("scene_nodes", "session_prerequisite"),
+        ("scene_plan", "session_prerequisite"),
+        ("scene_review", "session_prerequisite"),
+        ("scene_snapshot", "session_prerequisite"),
+    }
+)
 
 
 def annotated_tools(root: Path) -> set[str]:
@@ -497,11 +497,7 @@ def check_coverage_and_derivation(root: Path, data: dict) -> tuple[list[str], li
     for tool, cfg in sorted(tools.items()):
         if not isinstance(cfg, dict):
             continue
-        present = {
-            e.get("id")
-            for e in cfg.get("required_elements", [])
-            if isinstance(e, dict)
-        }
+        present = {e.get("id") for e in cfg.get("required_elements", []) if isinstance(e, dict)}
         sig = sigs.get(tool)
         if sig is None:
             errors.append(
@@ -530,7 +526,6 @@ def check_coverage_and_derivation(root: Path, data: dict) -> tuple[list[str], li
                 f"(D-195 4, tighten only)"
             )
     return errors, warnings
-
 
 
 if __name__ == "__main__":

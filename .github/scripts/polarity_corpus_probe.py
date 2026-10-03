@@ -159,7 +159,7 @@ LABELLED_CORPUS = [
         "label": TRUE_NEGATIVE,
         "text": "This tool does not create a new camera.",
         "why": "the claim is genuinely denied in the same clause, so a positive "
-               "match would be a fake green",
+        "match would be a fake green",
     },
     {
         "label": TRUE_NEGATIVE,
@@ -180,7 +180,7 @@ LABELLED_CORPUS = [
         "label": FORGIVEN,
         "text": "Not idempotent \u2014 each call creates a new camera.",
         "why": "'not idempotent' is the canonical disclosure of the property, "
-               "listed in positive_exemptions",
+        "listed in positive_exemptions",
     },
     {
         "label": FORGIVEN,
@@ -191,7 +191,7 @@ LABELLED_CORPUS = [
         "label": FORGIVEN,
         "text": "Not idempotent, so it creates a new camera on every invocation.",
         "why": "the exemption is scoped to the phrase, not the clause, so a "
-               "later true claim still counts",
+        "later true claim still counts",
     },
     {
         "label": KNOWN_LIMITATION,
@@ -238,18 +238,17 @@ def labelled_track(checker, tools):
                 verdict = "no-match"
             counts[sample["label"]] += 1
             if sample["label"] in (TRUE_NEGATIVE, FORGIVEN) and verdict != sample["label"]:
-                unexpected.append(
-                (tool, elem["id"], sample["label"], verdict, sample["text"])
-            )
+                unexpected.append((tool, elem["id"], sample["label"], verdict, sample["text"]))
     print(f"TRACK2 (labelled): samples={len(LABELLED_CORPUS)} per guarded element={len(guarded)}")
-    print(f"  labels: true_negative={counts[TRUE_NEGATIVE]} forgiven={counts[FORGIVEN]} "
-          f"known_limitation={counts[KNOWN_LIMITATION]}")
+    print(
+        f"  labels: true_negative={counts[TRUE_NEGATIVE]} forgiven={counts[FORGIVEN]} "
+        f"known_limitation={counts[KNOWN_LIMITATION]}"
+    )
     print(f"  FN denominator (true_negative only) = {counts[TRUE_NEGATIVE]}")
     print(f"  disagreements with the hand labels = {len(unexpected)}")
     for row in unexpected:
         print(
-            f"    MISMATCH {row[0]}/{row[1]}: labelled {row[2]}, "
-            f"guard said {row[3]} -- {row[4]!r}"
+            f"    MISMATCH {row[0]}/{row[1]}: labelled {row[2]}, guard said {row[3]} -- {row[4]!r}"
         )
     if len(LABELLED_CORPUS) < MIN_ADJUDICABLE:
         print(
@@ -316,7 +315,6 @@ def _guarded_elements(tools):
             if elem.get("polarity_aware"):
                 out.append((tool, elem))
     return out
-
 
 
 def main():

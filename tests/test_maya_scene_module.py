@@ -49,12 +49,8 @@ class TestWorldBbox:
         rewrite: the old wording claimed "0 means the boxes touch on every
         axis", which this configuration contradicts.
         """
-        maya_env.scene.add_mesh(
-            "GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9)
-        )
-        maya_env.scene.add_mesh(
-            "GEO_b", bbox_min=(-9.5, -9, -9.5), bbox_max=(-8.5, -8, -8.5)
-        )
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9))
+        maya_env.scene.add_mesh("GEO_b", bbox_min=(-9.5, -9, -9.5), bbox_max=(-8.5, -8, -8.5))
         m = maya_env.module.measure("GEO_a", "GEO_b", "clearance")
 
         gaps = m["details"]["clearances_xyz"]
@@ -72,13 +68,9 @@ class TestWorldBbox:
     def test_measure_clearance_negative_is_shallowest_penetration(self, maya_env):
         """All three axes penetrate -> distance is the shallowest one, i.e.
         the minimum translation that separates the boxes."""
-        maya_env.scene.add_mesh(
-            "GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9)
-        )
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9))
         # X and Y shift by 0.5 (gap -0.5 each); Z is coincident (gap -1.0).
-        maya_env.scene.add_mesh(
-            "GEO_b", bbox_min=(-9.5, -9.5, -10.0), bbox_max=(-8.5, -8.5, -9.0)
-        )
+        maya_env.scene.add_mesh("GEO_b", bbox_min=(-9.5, -9.5, -10.0), bbox_max=(-8.5, -8.5, -9.0))
         m = maya_env.module.measure("GEO_a", "GEO_b", "clearance")
         assert m["details"]["clearances_xyz"] == pytest.approx([-0.5, -0.5, -1.0], abs=1e-6)
         assert m["distance"] == pytest.approx(-0.5, abs=1e-6), (
@@ -89,12 +81,8 @@ class TestWorldBbox:
     def test_measure_clearance_positive_ignores_penetrating_axes(self, maya_env):
         """A separated axis dominates: Y is clear by 2.5 while X and Z
         penetrate, so the distance is 3.0 and the penetration is invisible."""
-        maya_env.scene.add_mesh(
-            "GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9)
-        )
-        maya_env.scene.add_mesh(
-            "GEO_b", bbox_min=(-9.5, -6.5, -9.5), bbox_max=(-8.5, -5.5, -8.5)
-        )
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9))
+        maya_env.scene.add_mesh("GEO_b", bbox_min=(-9.5, -6.5, -9.5), bbox_max=(-8.5, -5.5, -8.5))
         m = maya_env.module.measure("GEO_a", "GEO_b", "clearance")
         # Y separation = B.y_min - A.y_max = -6.5 - (-9) = 2.5
         assert m["distance"] == pytest.approx(2.5, abs=1e-6), (
@@ -128,9 +116,7 @@ class TestWorldBbox:
         a, b = f"GEO_a{tag}", f"GEO_b{tag}"
         maya_env.scene.add_mesh(a, bbox_min=(0, 0, 0), bbox_max=(size, size, size))
         off = tuple(g + size for g in gaps)
-        maya_env.scene.add_mesh(
-            b, bbox_min=off, bbox_max=tuple(v + size for v in off)
-        )
+        maya_env.scene.add_mesh(b, bbox_min=off, bbox_max=tuple(v + size for v in off))
         return maya_env.module.measure(a, b, "clearance")
 
     def test_clearance_rules_hold_across_the_whole_domain(self, maya_env):

@@ -567,7 +567,7 @@ def test_live_coverage_floor_holds():
     annotated = mod.annotated_tools(mod.REPO)
     covered = set(data["tools"]) | set(data.get("coverage_exemptions", {}))
     assert annotated - covered == set(), (
-        "tools with neither elements nor an exemption: " f"{sorted(annotated - covered)}"
+        f"tools with neither elements nor an exemption: {sorted(annotated - covered)}"
     )
     errs, _warns = mod.check_coverage_and_derivation(mod.REPO, data)
     assert errs == []
@@ -608,8 +608,11 @@ def test_coverage_fires_when_a_tool_is_neither_covered_nor_exempt():
 def test_coverage_fires_on_a_stale_entry():
     mod = _load()
     data = _live_data(mod)
-    data["tools"]["scene_nonexistent"] = {"file": "src/maya_mcp_server/scene_tools.py",
-                                           "tier": "P1", "required_elements": []}
+    data["tools"]["scene_nonexistent"] = {
+        "file": "src/maya_mcp_server/scene_tools.py",
+        "tier": "P1",
+        "required_elements": [],
+    }
     assert _covers_err(mod, data, "stale entry"), "an entry for a non-existent tool must fire"
 
 
@@ -643,7 +646,8 @@ def test_derivation_fires_on_a_new_violation():
     ids = [e["id"] for e in data["tools"]["scene_measure"]["required_elements"]]
     assert "session_prerequisite" in ids
     data["tools"]["scene_measure"]["required_elements"] = [
-        e for e in data["tools"]["scene_measure"]["required_elements"]
+        e
+        for e in data["tools"]["scene_measure"]["required_elements"]
         if e["id"] != "session_prerequisite"
     ]
     hits = _covers_err(mod, data, "missing 'session_prerequisite'")
@@ -727,7 +731,6 @@ def _guarded(mod):
     ]
 
 
-
 # ---------------------------------------------------------------------------
 # F2 rot guard. A hand-pinned corpus count in a comment goes stale silently,
 # and this file already carried one that the probe contradicted. The numbers
@@ -765,7 +768,9 @@ def test_probe_is_the_single_source_for_corpus_counts():
     at run time, i.e. the claim above stays true."""
     out = subprocess.run(
         [sys.executable, str(SCRIPTS_DIR / "polarity_corpus_probe.py")],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert out.returncode == 0, out.stderr[-2000:]
     assert "PRIMARY:" in out.stdout and "STRESS:" in out.stdout, out.stdout[-2000:]
@@ -884,9 +889,7 @@ def test_every_guarded_element_has_a_firing_negation_fixture():
             if neg and not pos:
                 fired = True
                 break
-        assert fired, (
-            f"{tool}/{elem['id']} has no fixture that makes it report negated_only"
-        )
+        assert fired, f"{tool}/{elem['id']} has no fixture that makes it report negated_only"
 
 
 def test_negation_fixtures_are_a_subset_of_guarded_elements():
@@ -896,10 +899,6 @@ def test_negation_fixtures_are_a_subset_of_guarded_elements():
     guarded = {f"{t}/{e['id']}" for t, e in _guarded(mod)}
     targets = {f"{t}/{e}" for t, e, _text in NEGATION_FIXTURES}
     assert targets, "the fixture list must not be emptied"
-    assert targets <= guarded, (
-        f"fixtures target non-guarded elements: {sorted(targets - guarded)}"
-    )
+    assert targets <= guarded, f"fixtures target non-guarded elements: {sorted(targets - guarded)}"
     # every guarded element is covered by the fixtures, not just the reverse
-    assert guarded <= targets, (
-        f"guarded elements without a fixture: {sorted(guarded - targets)}"
-    )
+    assert guarded <= targets, f"guarded elements without a fixture: {sorted(guarded - targets)}"
