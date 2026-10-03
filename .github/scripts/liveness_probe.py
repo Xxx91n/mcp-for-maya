@@ -36,7 +36,14 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[2]
-PROTOCOL = "2024-11-05"
+# D-214: PROTOCOL is a GOVERNANCE constant (which MCP revision counts as the
+# supported floor), so its single source is the per-domain spec file -- derived
+# here at runtime, never restated inline. POLICY_ENV_FLAGS below is the
+# opposite case: object-derivable from pipeline.py, so it stays derived from
+# the code and is deliberately NOT mirrored into the spec.
+PROTOCOL = json.loads((REPO / ".github" / "liveness-probe-spec.yaml").read_text(encoding="utf-8"))[
+    "PROTOCOL"
+]
 
 # The expectation is read from the code, not restated here: a second copy of
 # the flag table is how a probe ends up asserting the wrong thing and still

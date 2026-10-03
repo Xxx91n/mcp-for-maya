@@ -31,13 +31,20 @@ about rendered PyPI pages.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 
-GUARDED = [".github/assets/"]
+REPO = Path(__file__).resolve().parents[2]
+# D-214: GUARDED is a GOVERNANCE constant (D-082 6-5, append-only), so its
+# single source is the per-domain spec file -- derived here at runtime, never
+# restated inline.
+GUARDED = json.loads(
+    (REPO / ".github" / "assets-append-only-spec.yaml").read_text(encoding="utf-8")
+)["GUARDED"]
 
 
 def _git(*args: str, cwd: Path) -> str:

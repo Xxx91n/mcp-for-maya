@@ -248,32 +248,27 @@ LABELLED_CORPUS = [
     },
 ]
 
-# Below this many ADJUDICABLE samples the corpus is a smoke test, not evidence.
-# The ruling keeps such a run at "not yet adjudicable" rather than promoting a
-# verdict off a handful of samples.
+# ---------------------------------------------------------------------------
+# D-214: both floors are GOVERNANCE constants (they move when a ruling moves,
+# not when this code moves), so their single source is the per-domain spec
+# file -- read here, never restated inline. Restating a ruling's number in
+# code is how MIN_ADJUDICABLE=12 lost its basis in the first place (D-205).
 #
-# D-203 changed the counting basis. The floor counts ONLY the two labels whose
-# samples actually carry a verdict about the guard:
-#
-#     true_negative     the guard must answer negated_only for this sentence
-#     forgiven          the guard must answer positive, via the exemption list
-#
-# known_limitation is EXCLUDED. Those samples record a clause-scope trade the
-# design made on purpose (D-190 1); they can never move a verdict, so counting
-# them let the corpus reach a floor by adding sentences that adjudicate nothing.
-# The old basis counted every row, which made the floor reachable with samples
-# that could not support the conclusion it was supposed to gate.
-#
-# 12 is not re-derived here: it is the value D-203 legislated for the TN+F
-# caliber, carried over from the pre-D-203 number rather than recomputed from
-# this corpus (recomputing the floor from the sample it gates is circular).
-MIN_ADJUDICABLE = 12
-
-# D-203: a floor that the corpus as a whole clears is not enough. One element
-# carrying every sample would satisfy it while that element is the only one the
-# guard ever runs on. Each guarded element must independently carry enough true
-# negatives to have been adjudicated on its own.
-MIN_TN_PER_ELEMENT = 3
+# The spec file carries the full basis, caliber and precondition caveat:
+#   .github/polarity-corpus-spec.yaml
+#     MIN_ADJUDICABLE           12, ratified by D-203 2 (coverage argument,
+#                              explicitly not a statistical one)
+#     MIN_ADJUDICABLE_caliber   true_negative + forgiven only;
+#                              known_limitation excluded (D-203 1)
+#     ..._counting_unit         one count per SAMPLE, not per guarded element
+#     ..._precondition_caveat   the floor is ONE of two preconditions for
+#                              warn->hard promotion (D-198 5)
+#     MIN_TN_PER_ELEMENT        3, the per-element anti-dilution floor (D-203 3)
+# ---------------------------------------------------------------------------
+SPEC = REPO / ".github" / "polarity-corpus-spec.yaml"
+_MIN_SPEC = json.loads(SPEC.read_text(encoding="utf-8"))
+MIN_ADJUDICABLE = _MIN_SPEC["MIN_ADJUDICABLE"]
+MIN_TN_PER_ELEMENT = _MIN_SPEC["MIN_TN_PER_ELEMENT"]
 
 # The labels that carry a verdict; known_limitation is deliberately absent.
 ADJUDICABLE_LABELS = (TRUE_NEGATIVE, FORGIVEN)
@@ -287,6 +282,14 @@ def adjudicate(checker, guarded):
     this instrument is read by humans, so stdout is a report, not an interface.
     """
     counts = {TRUE_NEGATIVE: 0, FORGIVEN: 0, KNOWN_LIMITATION: 0}
+    # D-221 2 (S4). The label tally is per SAMPLE. It used to sit inside the
+    # guarded-element loop below, so every element re-counted the whole corpus
+    # and the floor numerator came out inflated by len(guarded) -- the floor
+    # could then be cleared with a fraction of the samples it claims to
+    # require. D-203's caliber is one count per labelled sample, so the tally
+    # is hoisted out here and the per-element counters stay per element.
+    for sample in LABELLED_CORPUS:
+        counts[sample["label"]] += 1
     per_element_tn: dict[tuple[str, str], int] = {}
     unexpected: list[tuple[str, str, str, str, str]] = []
     for tool, elem in guarded:
@@ -307,7 +310,6 @@ def adjudicate(checker, guarded):
                 verdict = FORGIVEN if sample["label"] == FORGIVEN else "saw-positive"
             else:
                 verdict = "no-match"
-            counts[sample["label"]] += 1
             if sample["label"] in ADJUDICABLE_LABELS:
                 if verdict == TRUE_NEGATIVE:
                     per_element_tn[key] = per_element_tn.get(key, 0) + 1
@@ -377,6 +379,18 @@ def labelled_track(checker, tools):
             f"MIN_ADJUDICABLE={MIN_ADJUDICABLE} and every guarded element "
             f"carries >= {MIN_TN_PER_ELEMENT} true negatives (D-203)"
         )
+    # D-198 5, restored by D-221 2 (S3). Hard admission is a TWO-precondition
+    # gate, not one: (a) the PRIMARY track reports zero false rejections AND
+    # (b) this track-2 floor is met. Printing only the floor verdict let a
+    # reader take "floor met" as the whole promotion decision, which is the
+    # single-condition reading D-198 5 legislated against. Restated here (not
+    # only in the spec file) because this line IS the promotion report.
+    print(
+        "  NOTE (D-198 5): this floor is ONE of two preconditions for warn->hard "
+        "promotion of the TDQS gate. The other is the PRIMARY track's "
+        "zero-false-rejection verdict above. Floor met + a PRIMARY false "
+        "rejection is NOT a promotion; both must hold."
+    )
     if unexpected:
         print("  REGRESSION: a labelled expectation did not hold")
 

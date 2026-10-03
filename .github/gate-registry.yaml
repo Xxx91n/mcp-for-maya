@@ -1,0 +1,232 @@
+{
+  "schema": "gate-registry/1",
+  "note": "JSON-syntax YAML (YAML 1.2 is a strict superset of JSON): stdlib-only consumption via json.loads, no PyYAML. THE PIN REGISTRY of ADR-0029 section 5 / D-215. It is an INDEX VIEW, never a second source of expected values: expected_sources only POINTS at where an expectation is derived (path or path::symbol) and deliberately copies no value out of it. HAND-AUTHORED per D-215 -- no script may generate or rewrite this file; .github/scripts/check_gate_registry.py only reads it and reports the set difference against the machine enumeration of .github/scripts/*.py. The rulings this file implements (five-tier bound classes, the warning-to-blocking flip condition, the residual-blind-spot disclosure, the exemption discipline) live in ADR-0029 section 5 and are cited from there rather than restated here, so the machine-read surface stays small enough to review by eye.",
+  "bound_classes": {
+    "gate": "CI-blocking decision gate. Full D-212 tier-1 obligation: external derivation plus at least one resolving pin, and it must actually be wired into a workflow or the checker reports verdict drift.",
+    "manual_preflight": "A human-run preflight row. Exempt from machine pins but carries the D-082 7 evidence-pointer obligation (environment + exit code + artifact path triple).",
+    "instrument": "A measurement instrument with NO veto power. Its pin obligation is downgraded to the sensitivity track: inject a known fault and require a non-zero verdict. Zero pin_node_ids is legal here, but the entry must then say so in its note so an empty list reads as a decision rather than an oversight."
+  },
+  "entries": [
+    {
+      "gate_id": "check_assets_append_only",
+      "bound_class": "gate",
+      "expected_sources": [
+        ".github/assets-append-only-spec.yaml::GUARDED"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_assets_append_only.py::test_pure_addition_passes",
+        "tests/test_check_assets_append_only.py::test_delete_fails",
+        "tests/test_check_assets_append_only.py::test_modify_fails",
+        "tests/test_check_assets_append_only.py::test_rename_fails_via_expanded_delete"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "check_count_claims",
+      "bound_class": "gate",
+      "expected_sources": [
+        "src/maya_mcp_server/maya_scene_module.py::scene_review",
+        "src/maya_mcp_server/maya_scene_module.py::SHOT_TYPES"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_count_claims.py::test_stale_claim_fails_the_gate",
+        "tests/test_check_count_claims.py::test_denylisted_drifted_string_fails_the_gate",
+        "tests/test_check_count_claims.py::test_repo_surface_currently_consistent"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "check_error_codes",
+      "bound_class": "gate",
+      "expected_sources": [
+        "src/maya_mcp_server/security.py::PipelineError"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_d207_gates.py::TestErrorCodesChecker::test_a_deleted_body_row_fails_the_gate",
+        "tests/test_check_d207_gates.py::TestErrorCodesChecker::test_a_deleted_anchor_row_fails_the_gate"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "check_evidence_anchors",
+      "bound_class": "gate",
+      "expected_sources": [
+        ".github/evidence-anchor-forms.yaml::anchor_forms"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_evidence_anchors.py::test_bare_path_line_warns_not_fails",
+        "tests/test_check_evidence_anchors.py::test_pytest_node_id_resolves_test_function"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "check_gate_registry",
+      "bound_class": "gate",
+      "expected_sources": [
+        ".github/gate-registry.yaml::schema"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_gate_registry.py::test_the_real_registry_is_clean",
+        "tests/test_check_gate_registry.py::test_unregistered_bound_object_is_red"
+      ],
+      "exemption": null,
+      "note": "The registry gate registers itself, because D-215 1 has no carve-out for the checker and a self-exempt gate is how a gate stops being applied. Its own termination is admitted rather than stacked: a corrupt or empty registry is red and stops there, with no fourth layer on top (D-213 4)."
+    },
+    {
+      "gate_id": "check_llms_txt",
+      "bound_class": "gate",
+      "expected_sources": [
+        ".github/llms-txt-spec.yaml::LINE_CAP",
+        "src/maya_mcp_server/pipeline.py::TOOL_ANNOTATIONS"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_drift_fails",
+        "tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_write_is_idempotent"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "check_monolith_budget",
+      "bound_class": "gate",
+      "expected_sources": [
+        ".github/monolith-budget.json::src/maya_mcp_server/maya_scene_module.py"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_monolith_budget.py::test_over_budget_fails_with_error_annotation",
+        "tests/test_check_monolith_budget.py::test_repo_monolith_within_budget"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "check_pypi_index",
+      "bound_class": "gate",
+      "expected_sources": [
+        "pyproject.toml::project"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_pypi_index.py::test_simple_unusable_is_red",
+        "tests/test_check_pypi_index.py::test_json_non_200_is_red"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "check_readme_skeleton",
+      "bound_class": "gate",
+      "expected_sources": [
+        "README.md"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_readme_skeleton.py::test_the_real_repo_mirror_is_green",
+        "tests/test_check_readme_skeleton.py::test_dropped_heading_in_the_mirror_is_red",
+        "tests/test_check_readme_skeleton.py::test_reordered_headings_are_red_even_at_the_same_levels",
+        "tests/test_check_readme_skeleton.py::test_missing_synced_with_anchor_is_red"
+      ],
+      "exemption": null,
+      "note": "Arrived at the L1 landing with ZERO pins and was the one bound_class=gate entry the registry's own zero-pin guard flagged on first run. Backfilled by the L4 pin lane (T-R46-06): 11 counterfactual pins, each paired with the live-green mirror check. Backfilling required giving the script a check(repo) seam -- it used to resolve the repo inline inside main(), which is why a real CI gate had been unpinnable since D-072."
+    },
+    {
+      "gate_id": "check_release_appendix",
+      "bound_class": "manual_preflight",
+      "expected_sources": [
+        ".github/release-appendix-spec.yaml::ISSUE"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_release_appendix.py::test_pass_when_appendix_present_and_issue_open",
+        "tests/test_check_release_appendix.py::test_missing_appendix_section_fails"
+      ],
+      "exemption": null,
+      "note": "D-142b / D-164b: deliberately NOT a push-CI gate. Its truth surface is a release-time fact, so a push-CI assertion would spin on a state that does not exist yet. Run by hand as release-preflight item 6."
+    },
+    {
+      "gate_id": "check_ruff_budget",
+      "bound_class": "gate",
+      "expected_sources": [
+        ".github/ruff-baseline.json::src"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_ruff_budget.py::test_new_rule_in_new_segment_fails",
+        "tests/test_check_ruff_budget.py::test_rule_cannot_subsidise_another_rule"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "check_tdqs_disclosure",
+      "bound_class": "gate",
+      "expected_sources": [
+        "docs/adr/0028-elements.yaml::tools"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_tdqs_disclosure.py::test_missing_element_fails",
+        "tests/test_check_tdqs_disclosure.py::test_live_coverage_floor_holds"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "check_tool_count_claims",
+      "bound_class": "gate",
+      "expected_sources": [
+        "src/maya_mcp_server/pipeline.py::TOOL_ANNOTATIONS"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_tool_count_claims.py::test_stale_claim_fails_everywhere_it_lives",
+        "tests/test_check_tool_count_claims.py::test_repo_surface_currently_consistent"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "check_version_consistency",
+      "bound_class": "gate",
+      "expected_sources": [
+        "pyproject.toml::project"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_d207_gates.py::TestVersionConsistency::test_all_four_surfaces_agree_today",
+        "tests/test_check_d207_gates.py::TestVersionConsistency::test_unreleased_tolerance_requires_actual_content"
+      ],
+      "exemption": null
+    },
+    {
+      "gate_id": "liveness_probe",
+      "bound_class": "instrument",
+      "expected_sources": [
+        ".github/liveness-probe-spec.yaml::PROTOCOL"
+      ],
+      "pin_node_ids": [
+        "tests/test_liveness_probe_sensitivity.py::test_a_dead_server_is_not_reported_as_a_pass",
+        "tests/test_liveness_probe_sensitivity.py::test_a_policy_flag_that_leaks_a_forbidden_tool_is_red",
+        "tests/test_liveness_probe_sensitivity.py::test_healthy_probe_run_is_green",
+        "tests/test_liveness_probe_sensitivity.py::test_the_umbrella_flag_expectation_matches_the_code_not_a_restated_copy"
+      ],
+      "exemption": null,
+      "note": "Genuinely zero-pin at the L1 landing: no tests/test_liveness_probe.py existed. D-212 tier 2 downgrades an instrument to the sensitivity track rather than a per-PR pin, because nothing it produces can turn a PR red; what IS owed is proof it still reacts, and that is what these are -- fault injection, not counterfactuals. SCOPE LIMIT, stated so nobody reads more into it: they exercise the verdict wiring with an injected collaborator, NOT a real Maya session. Pointing the real probe at a real session stays a manual step and is recorded as unverified rather than claimed."
+    },
+    {
+      "gate_id": "notify_drift_canary",
+      "bound_class": "instrument",
+      "expected_sources": [],
+      "pin_node_ids": [
+        "tests/test_notify_drift_canary.py::test_red_creates_issue_when_none_open",
+        "tests/test_notify_drift_canary.py::test_second_red_comments_not_creates",
+        "tests/test_notify_drift_canary.py::test_dedup_scoped_to_lane",
+        "tests/test_notify_drift_canary.py::test_green_closes_open_issue",
+        "tests/test_notify_drift_canary.py::test_missing_repo_errors",
+        "tests/test_notify_drift_canary.py::test_dry_run_mutates_nothing"
+      ],
+      "exemption": null,
+      "note": "NOT zero-pin. The R46 task book listed this among the SUSPECTED zero-pin gates and required a per-gate re-check before backfilling; the re-check found 12 existing tests here, so the suspicion was wrong and no backfill was needed. Seven sensitivity tests written on the strength of the suspicion were deleted rather than committed next to the real ones. expected_sources is empty BY DESIGN and legally so: this script has no pass/fail expectation to derive, it is a reporter that turns canary results into a deduplicated issue."
+    },
+    {
+      "gate_id": "polarity_corpus_probe",
+      "bound_class": "instrument",
+      "expected_sources": [
+        ".github/polarity-corpus-spec.yaml::MIN_ADJUDICABLE"
+      ],
+      "pin_node_ids": [
+        "tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_per_element_counting_unit_is_the_sample_not_the_element_pair",
+        "tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_s3_two_precondition_caveat_is_printed"
+      ],
+      "exemption": null,
+      "note": "Manual measurement instrument, never a CI gate: its own docstring says the exit code is always 0. Its pins are the arithmetic tests, which is the D-198 5 shape -- a report nobody can fail is a claim, not evidence."
+    }
+  ]
+}

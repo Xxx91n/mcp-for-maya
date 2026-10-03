@@ -1,0 +1,6 @@
+{
+  "schema": "release-appendix-spec/1",
+  "note": "JSON-syntax YAML (YAML 1.2 is a strict superset of JSON): stdlib-only consumption via json.loads, no PyYAML. SINGLE SOURCE for the release-appendix follow-up tracker default, extracted out of .github/scripts/check_release_appendix.py by D-214. Governance spec, not a baseline -- never regenerated; hand-edit in the PR that carries the ruling.",
+  "ISSUE": 7,
+  "ISSUE_basis": "D-142b: the gate-tracker issue that owns the disclosure-appendix follow-up work. It is a default only -- a single run overrides it with the ISSUE environment variable, which is why it lives here as a governance spec rather than being threaded through every call site. Governance constant by the D-214 litmus: re-pointing the follow-up at a new tracker issue is a ruling change, audited in PR review."
+}

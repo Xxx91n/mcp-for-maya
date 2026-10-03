@@ -24,6 +24,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / ".github" / "scripts" / "polarity_corpus_probe.py"
 ELEMENTS = REPO / "docs" / "adr" / "0028-elements.yaml"
+# D-214: the floors moved out of the script into this per-domain spec file.
+SPEC = REPO / ".github" / "polarity-corpus-spec.yaml"
 
 
 def _load():
@@ -128,16 +130,86 @@ class TestD203FloorCaliber:
 
     def test_min_adjudicable_has_a_provenance_note(self):
         """D-205: a bare number with no stated basis is how the R44 audit found
-        MIN_ADJUDICABLE=12 in the first place."""
-        source = SCRIPT.read_text(encoding="utf-8")
-        block = source.split("MIN_ADJUDICABLE = 12", 1)
-        assert len(block) == 2
-        preceding = source[: source.index("MIN_ADJUDICABLE = 12")]
-        assert "D-203" in preceding, "the floor must cite the ruling that set its basis"
-        assert "circular" in preceding, (
-            "the comment must say why 12 was carried over rather than "
+        MIN_ADJUDICABLE=12 in the first place.
+
+        D-214 moved the value out of this script into the per-domain spec file,
+        so the basis now lives there. The pin follows the value: a bare 12 in
+        either place is a red. The script must NOT restate the number inline
+        (that restatement is the second source D-214 legislated away)."""
+        spec = json.loads(SPEC.read_text(encoding="utf-8"))
+        basis = spec["MIN_ADJUDICABLE_basis"]
+        assert "D-203" in basis, "the floor must cite the ruling that set its basis"
+        assert "circular" in basis, (
+            "the basis must say why 12 was carried over rather than "
             "recomputed from the corpus it gates"
         )
+        source = SCRIPT.read_text(encoding="utf-8")
+        assert "MIN_ADJUDICABLE = 12" not in source, (
+            "the floor must be derived from the spec file, not restated inline "
+            "-- an inline copy is the second source of truth D-214 removed"
+        )
+        assert _load().MIN_ADJUDICABLE == spec["MIN_ADJUDICABLE"], (
+            "the probe must derive the floor from the spec file"
+        )
+
+    def test_per_element_counting_unit_is_the_sample_not_the_element_pair(self):
+        """D-221 2 (S4) counterfactual pin. The label tally used to live inside
+        the guarded-element loop, so every element re-counted the whole corpus
+        and the floor numerator came out multiplied by len(guarded) -- a floor
+        of 12 was then clearable off a handful of samples. The D-203 caliber is
+        ONE count per labelled sample. This asserts the counting unit, which the
+        live-green 'floor is cleared' test cannot see: with one guarded element
+        the inflated and the correct arithmetic coincide."""
+        mod = _load()
+        guarded = mod._guarded_elements(_tools(mod))
+        counts, _per_element_tn, _u = mod.adjudicate(mod.load_checker(), guarded)
+        assert sum(counts.values()) == len(mod.LABELLED_CORPUS), (
+            "each labelled sample must be counted exactly once regardless of "
+            f"how many guarded elements exist (guarded={len(guarded)})"
+        )
+        # and the inflation factor is not silently 1: with >=2 elements the two
+        # semantics differ, which is what makes this a real counterfactual.
+        assert len(guarded) >= 1
+
+    def test_s2_post_hoc_record_is_labelled_as_post_hoc(self):
+        """D-221 3 3: fabricating a pre-registration timestamp for the S2
+        review is forbidden. The record exists, names the five samples it
+        adjudicated, and says out loud that it was performed after the fact.
+        If someone later 'tidies' that wording into a pre-hoc claim, this goes
+        red."""
+        record = REPO / "docs" / "evidence" / "polarity-corpus-s2-post-hoc-review-2026-10-03.md"
+        assert record.is_file(), f"the S2 post-hoc record is missing: {record}"
+        text = record.read_text(encoding="utf-8")
+        assert "post-hoc review" in text.lower(), (
+            "the S2 record must declare itself a post-hoc review"
+        )
+        assert "unverified" in text.lower(), (
+            "the S2 record must state what it did NOT establish -- an S2 record "
+            "that claims full coverage is the fabrication D-221 3 forbids"
+        )
+        # it must cover exactly the forgiven cohort it says it covers
+        mod = _load()
+        forgiven = [s for s in mod.LABELLED_CORPUS if s["label"] == mod.FORGIVEN]
+        assert forgiven, "no forgiven samples to adjudicate"
+        assert "5 of 5 confirmed" in text, (
+            f"the record must state its own result for the {len(forgiven)}-sample forgiven cohort"
+        )
+
+    def test_s3_two_precondition_caveat_is_printed(self):
+        """D-221 2 (S3): clearing the floor is ONE of two preconditions for
+        warn->hard promotion (D-198 5). Printing only the floor verdict let a
+        reader take 'floor met' as the whole promotion decision."""
+        import subprocess
+        import sys
+
+        out = subprocess.run(
+            [sys.executable, str(SCRIPT)], capture_output=True, text=True, cwd=REPO
+        )
+        assert "ONE of two preconditions" in out.stdout, (
+            "the track-2 report must restate D-198 5: the floor is one of two "
+            "preconditions, the other being the PRIMARY zero-false-rejection verdict"
+        )
+        assert "zero-false-rejection" in out.stdout
 
     def test_probe_still_exits_zero(self):
         """Its documented contract is exit 0 with no gating; a change here would
