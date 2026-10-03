@@ -530,3 +530,55 @@ class TestAuditDualWrite:
         lines = [line for line in log_path.read_text().splitlines() if line.strip()]
         assert len(lines) == 2
         assert any('"e4"' in line for line in lines)
+
+
+# ---------------------------------------------------------------------------
+# D-019 error contract, pinned generically. D-207 4 requires every documented
+# code to carry a pytest node ID, and the base class plus server_not_started
+# have no per-code raise test of their own - so pin the contract once for the
+# whole set instead of writing a test per code that only restates the class.
+# ---------------------------------------------------------------------------
+
+
+def _pipeline_error_subclasses():
+    import maya_mcp_server.security as sec
+
+    return [
+        obj
+        for obj in vars(sec).values()
+        if isinstance(obj, type)
+        and issubclass(obj, sec.PipelineError)
+        and obj is not sec.PipelineError
+    ]
+
+
+class TestErrorCodeContract:
+    def test_every_error_class_renders_its_own_code_prefix(self):
+        """The agent classifies a host failure from the isError text alone, so
+        the [code] prefix is the contract - not the message text."""
+        for cls in _pipeline_error_subclasses():
+            err = cls("boom")
+            assert str(err).startswith(f"[{cls.code}] "), cls.__name__
+
+    def test_base_pipeline_error_carries_pipeline_error(self):
+        from maya_mcp_server.security import PipelineError
+
+        err = PipelineError("boom", suggestion="retry")
+        assert str(err) == "[pipeline_error] boom (suggestion: retry)"
+
+    def test_every_error_class_declares_a_snake_case_code(self):
+        import re
+
+        for cls in _pipeline_error_subclasses():
+            assert re.fullmatch(r"[a-z][a-z0-9_]*", cls.code), cls.__name__
+
+    def test_server_not_ready_before_lifespan_init(self):
+        """The one place ServerNotReadyError is raised: a tool asking for the
+        global session manager before startup finished."""
+        from maya_mcp_server import server
+        from maya_mcp_server.security import ServerNotReadyError
+
+        assert server._session_manager is None, "test assumes a fresh process"
+        with pytest.raises(ServerNotReadyError) as ei:
+            server.get_session_manager()
+        assert ei.value.code == "server_not_started"

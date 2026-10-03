@@ -338,6 +338,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 - **本地单用户**：命令端口仅绑定 localhost；接入的 MCP client 是受信方。
 - **安全网**：统一管线（`pipeline.py` + `security.py`）对全部 25 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 独立 JSONL 审计日志（覆盖全部 25 个工具）。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
 - **事务安全**：`scene_checkpoint`/`scene_rollback` 提供内存态快照与显式回滚（快照不含 undo 历史，references 默认展平）。
+- **严格策略模式（可选）**：设置 `MAYA_MCP_DISABLE_EXECUTE=1`、`MAYA_MCP_DISABLE_WRITE_MODULE=1` 或 `MAYA_MCP_DISABLE_ARBITRARY=1`（三者全禁），即可把逃生舱工具从 `tools/list` 中移除，并以 `[policy_disabled]` 拒绝调用；只读工具不受影响。它们是**误用护栏，不是恶意 agent 边界**——仍持有 `execute_code` 的 agent 本就在信任边界之内；它们买来的是 demo、误操作或 CI 沙箱场景下更小的爆炸半径。理由见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)，逐码对照见 [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md)。
 - 漏洞报告渠道见 [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md)。
 
 ## 版本策略

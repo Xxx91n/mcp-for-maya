@@ -53,6 +53,12 @@ jobs:
 
       - name: evidence anchors check (D-183)
         run: python .github/scripts/check_evidence_anchors.py
+      - name: error-code doc gate (D-207 4)
+        run: python .github/scripts/check_error_codes.py
+      - name: llms.txt gate (D-207 2)
+        run: python .github/scripts/check_llms_txt.py
+      - name: version consistency gate (D-207 9)
+        run: python .github/scripts/check_version_consistency.py
       - name: pre-commit fallback (all files)
         run: |
           pip install pre-commit

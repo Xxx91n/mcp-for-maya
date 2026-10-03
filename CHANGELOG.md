@@ -9,6 +9,139 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Strict policy mode (D-207 ①⑦)** — three operator flags
+  (`MAYA_MCP_DISABLE_EXECUTE`, `MAYA_MCP_DISABLE_WRITE_MODULE`,
+  `MAYA_MCP_DISABLE_ARBITRARY`) remove escape-hatch tools from `tools/list` and
+  deny the call with `[policy_disabled]`, audited as `rejected`. One choke
+  point in the pipeline, none in the tool bodies; read-only tools unaffected.
+  Evidence: `tests/test_pipeline.py::TestStrictPolicyMode` (19 collected: 5 functions,
+  parametrised), plus `.github/scripts/liveness_probe.py` — a committed probe that
+  spawns the real server over stdio and observes 25 tools by default and 22 under
+  `MAYA_MCP_DISABLE_ARBITRARY=1`, with 0 escapes leaked and the read-class surface
+  retained. It reads its expectation from `POLICY_ENV_FLAGS`, so it cannot assert
+  a stale set.
+  `src/maya_mcp_server/pipeline.py::policy_disabled_tools`,
+  `src/maya_mcp_server/security.py::PolicyDisabledError`.
+
+- **`llms.txt` discovery file + generator gate (D-207 ②)** — 75 lines, under
+  the 100-line cap, DERIVED from `pipeline.TOOL_ANNOTATIONS` and each tool’s own
+  docstring. Hand-editing it fails the lint job.
+  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker` (12 collected),
+  `python .github/scripts/check_llms_txt.py` → `llms.txt OK: 75 lines, 25 tools`.
+
+- **Error-code reference page + code-set gate (D-207 ④)** —
+  `docs/guide/error-codes.md` is derived from `security.py`; the gate fails on
+  drift in EITHER direction (a code with no row, a row with no code). The
+  precondition was verified first: the D-019 `[code]` prefix contract already
+  existed, so the page is not a standalone promise.
+  Evidence: `tests/test_check_d207_gates.py::TestErrorCodesChecker` (8 collected),
+  `python .github/scripts/check_error_codes.py` → `10 codes, doc set == code set`.
+
+- **Session-lifecycle matrix (D-207 ③)** — `docs/guide/session-lifecycle.md`,
+  one page, four columns (exit path × teardown trigger × residual state ×
+  worst-case residual window), marked as a summary view subordinate to the ADR.
+  Evidence: its 9 `path::symbol` anchors each verified to resolve in the named file;
+  `tests/test_session_manager.py::TestCodedSessionErrors::test_no_sessions_raises_coded`,
+  `tests/test_module_teardown.py::TestCreateModuleTeardown::test_teardown_called_and_resources_closed`.
+
+- **Version-consistency gate (D-207 ⑨)** —
+  `check_version_consistency.py` asserts pyproject == `__init__.__version__` ==
+  CHANGELOG newest released section == the `llms.txt` version field, and
+  deliberately TOLERATES pyproject running ahead of the CHANGELOG while real
+  work sits under `[Unreleased]` — a gate that is always red during development
+  gets deleted, and a deleted gate is worse than none.
+  Evidence: `tests/test_check_d207_gates.py::TestVersionConsistency` (6 tests).
+
+### Fixed
+
+- **An overdue TDQS exemption could not fail CI (D-204)** — the `due` field was
+  compared with `current >= due` and always warned, so a waiver left past its
+  deadline for a release stayed open-ended for free: the check could not fail,
+  which is the blind spot D-195 4 exists to close. Now `== due` warns (the
+  release landing ON the deadline stays green) and `> due` errors, naming the
+  five D-168 renewal elements. Broken from D-195 4 through 0.5.0; fixed in the
+  next release. All 12 live exemptions are due 0.7.0 against version 0.5.0, so
+  the 0.6.0 release stays green.
+  Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`,
+  `tests/test_check_tdqs_disclosure.py::test_due_warns_but_does_not_bite_on_the_deadline_itself`,
+  `python .github/scripts/check_tdqs_disclosure.py` → exit 0.
+
+- **`check_error_codes.py` crashed on a doc path outside the repo** — the gate
+  called `Path.relative_to(REPO)` unguarded, so a test pointing it at a tmp
+  path raised `ValueError` instead of reporting drift. Caught by
+  `tests/test_check_d207_gates.py::TestErrorCodesChecker::test_undocumented_code_is_reported`
+  and fixed
+  in the checker rather than by widening the test.
+  `.github/scripts/check_error_codes.py::_rel`.
+
+
+- **`llms.txt` linked to a repository this project has never occupied** — the
+  generator hardcoded an owner name, and because the gate compared the generated
+  file against its own constants the wrong links reported green indefinitely. That
+  was a fabricated identifier, not a typo. Every URL now derives from
+  `[project.urls] Repository` in `pyproject.toml`, so a fork or a rename moves
+  the links with the project.
+  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_doc_urls_are_derived_from_pyproject_not_hardcoded`,
+  `.github/scripts/check_llms_txt.py::repo_url`.
+
+- **A tool with no section heading vanished from `llms.txt` silently** — the
+  coverage check lived inside the byte-equality branch, so in the one case that
+  matters (a tool added to the registry and to no heading, where the renderer
+  drops it and therefore produces no diff) it could not fire. Coverage is now
+  asserted independently of the comparison, and an incomplete section map is
+  itself an error.
+  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_a_tool_absent_from_the_page_is_reported`.
+
+- **The per-element sample floor could report a false green** — the thin-element
+  list iterated the true-negative dict instead of the guarded elements, so an
+  element with zero true negatives had no key, was skipped, and fell through to
+  the branch announcing that every element cleared the floor. The floor verdict is
+  now reported independently of the label-agreement verdict, so a disagreement
+  can no longer swallow a floor violation.
+  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_element_with_zero_true_negatives_is_reported_not_passed`.
+
+- **The overdue-exemption message misdescribed the D-168 ④ renewal requirements** —
+  it listed five items of our own invention. The real five (D-168 ④ as revised by
+  D-176) are a `gate_authority` countersignature distinct from the `debt_owner`, an
+  event-anchored rather than calendar expiry, the per-row renewal cap of 2, a
+  re-validated reason, and the waiver lane closing after gate review.
+  Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`.
+### Changed
+
+- **Sample-size floor counts verdict-bearing labels only (D-203)** —
+  `MIN_ADJUDICABLE` in the polarity corpus probe measured `len(LABELLED_CORPUS)`,
+  so `known_limitation` samples — which record a clause-scope trade the design
+  made on purpose and can never move a verdict — counted toward the floor that
+  gates a verdict. The floor now counts `true_negative + forgiven` only, and each
+  guarded element independently needs ≥ 3 true negatives, so one element
+  carrying the whole corpus cannot pass. The corpus gained 5 track-3 promotions
+  (3 TN, 2 F) covering the `cannot`/`without` cue prefixes and the mirror-image
+  clause position. Measured: 14 samples, adjudicable 12 == the floor,
+  per-element TN 7 ≥ 3, 0 disagreements with the hand labels.
+  Evidence: `tests/test_polarity_corpus_probe.py` (11 collected),
+  `python .github/scripts/polarity_corpus_probe.py` → `TRACK2 (labelled)`.
+
+- **Line endings land in pre-commit, not CI (D-205 ③)** — `mixed-line-ending
+  --fix=lf` added to `.pre-commit-config.yaml`. The justification is measured,
+  not asserted: before this hook landed, on this Windows host, 29 tracked files
+  carried CRLF in the worktree while 0 of those carried CRLF in their HEAD blob.
+  So `.gitattributes` already normalises at commit, and a CI line-ending scan
+  would be a permanently green dead check. The pre-commit layer is where worktree
+  bytes actually get fixed — and having now fixed them, the same scan returns 0
+  for this worktree. Evidence: the "Assertion & Evidence Discipline" section in
+  AGENTS.md carries the mechanism pointer; the hook is the `mixed-line-ending`
+  entry in `.pre-commit-config.yaml`.
+
+- **`AGENTS.md` gains an Assertion & Evidence Discipline section (D-205 ①②)** —
+  three imperative rules in 9 lines, citing D-205 at the head: enumeration/count
+  assertions declare their domain or state the rule instead; versioned-doc
+  enumeration/count/retirement assertions default to a machine-checked carrier
+  while calibration claims stay prose under D-149; anything not reproducible is
+  recorded as “unverified” rather than assigned a guessed cause.
+  Evidence: the "Assertion & Evidence Discipline" section in AGENTS.md; the rule it
+  states is machine-enforced by
+  `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_the_old_basis_would_have_been_met_earlier`.
+
 - **TDQS disclosure ratchet CI gate (D-175)** — static AST and JSON
   validation script `.github/scripts/check_tdqs_disclosure.py:1` hard-gated in
   CI lint workflow (`.github/workflows/ci.yml:51`), enforcing 30 required

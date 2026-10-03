@@ -72,6 +72,8 @@ tests/
 ├── test_check_release_appendix.py # release-body appendix weak assertions (D-142β)
 ├── test_check_pypi_index.py   # PyPI simple+JSON dual-source probe lanes (D-142γ)
 ├── test_check_tdqs_disclosure.py # TDQS structured disclosure ratchet test suite (D-175)
+├── test_check_d207_gates.py     # D-207 gate family: error-codes doc / llms.txt / version consistency
+├── test_polarity_corpus_probe.py # D-203 sample-floor caliber (TN+F only) + per-element TN floor
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
@@ -96,6 +98,10 @@ docs/
 ├── scripts/check_release_appendix.py # release-body disclosure-appendix weak assertions — release-preflight item 6, manual not push CI (D-142β)
 ├── scripts/check_pypi_index.py   # PyPI simple-index (PEP 691+HTML)/project-JSON probe lane in the weekly drift job (D-142γ)
 ├── scripts/check_tdqs_disclosure.py # TDQS disclosure elements static ratchet script (D-175)
+├── scripts/check_error_codes.py  # docs/guide/error-codes.md code set == security.py code set (D-207 4)
+├── scripts/check_llms_txt.py     # llms.txt derived from TOOL_ANNOTATIONS + 100-line cap (D-207 2)
+├── scripts/check_version_consistency.py # pyproject == __init__ == CHANGELOG head == llms.txt (D-207 9)
+├── scripts/liveness_probe.py # spawns the real server over stdio: liveness + tools/list + policy end-to-end (manual, preflight)
 ├── assets-src/            # reproducible capture scripts for README imagery (t20/ scene generators; T-19c scene_build.py + capture.py kept for reference)
 └── assets/                # published README imagery (populated only after sign-off)
 ```
@@ -234,6 +240,8 @@ Failure to update dependent files will cause integration failures.
 | `cos_formatter.py` | `scene_tools.py` (COS format output) | Formatter changes affect all tool COS outputs |
 | `maya_scene_module.py` (scene_review check names/semantics) | `skills/scene-review-playbook/SKILL.md` | Card documents the 11 checks + findings→actions; check renames/semantics changes must sync it |
 | `maya_scene_module.py` (line-count growth) | `.github/monolith-budget.json`, `.github/scripts/check_monolith_budget.py`, `tests/test_check_monolith_budget.py` | D-125 ratchet: growth past the frozen cap fails the lint job; legitimate additions need a human-approved budget edit in the same PR with the reason stated; new Maya-side capability routes to a same-unit separate file (ADR-0027 criterion 4), never appended to the monolith |
+| `pipeline.py` strict policy flags (`MAYA_MCP_DISABLE_*`, D-207 1/7) | `docs/threat-model.md` §2/§3, `docs/guide/error-codes.md` (`policy_disabled` row), `llms.txt` escape-hatch section, `tests/test_pipeline.py::TestStrictPolicyMode` | One choke point: `on_call_tool` denies and `on_list_tools` hides. Adding a destructive tool without adding it to `MAYA_MCP_DISABLE_ARBITRARY` fails `test_the_three_dangerous_tools_are_exactly_the_covered_set`; adding an exception class without a doc row fails `check_error_codes.py` |
+| `llms.txt` / `docs/guide/**` (派生页) | `.github/scripts/check_llms_txt.py`, `.github/scripts/check_version_consistency.py`, `.github/scripts/check_error_codes.py`, `tests/test_check_d207_gates.py`, `.github/workflows/ci.yml` | Two of the three are DERIVED and gated, never hand-maintained: `llms.txt` from `TOOL_ANNOTATIONS`, `error-codes.md` from `security.py`, plus the version triple across pyproject/`__init__`/CHANGELOG — hand-editing any of those fails its own gate in CI (D-183 third-source rule). `docs/guide/session-lifecycle.md` is the exception and is **prose with AST-verified `path::symbol` anchors, not a derived page and not gated**; gating it would be a new ruling (D-207 3 legislated a page, not a checker). Do not describe it as derived |
 | `docs/adr/0028-elements.yaml` / tool descriptions | `.github/scripts/check_tdqs_disclosure.py`, `tests/test_check_tdqs_disclosure.py`, `docs/adr/0028-tdqs-description-quality.md`, `src/maya_mcp_server/pipeline.py` | D-175 disclosure ratchet: tool description elements and boundary targets must strictly satisfy 0028-elements.yaml; changes require PR explicit review |
 | `CHANGELOG.md` / `docs/decision-ledger.md` / `docs/adr/**` / `docs/evidence/**` (证据指针) | `.github/evidence-anchor-forms.yaml`, `.github/scripts/check_evidence_anchors.py`, `tests/test_check_evidence_anchors.py`, `.github/workflows/ci.yml` | D-183 锚点形态白名单单源——脚本与模板双消费防双真源；裸 path:line=warn 升级提示，sha 钉死除漂移 |
 
@@ -298,6 +306,17 @@ reachability + structural existence only; content truth, fix direction,
 and reproducibility remain human-review responsibilities. The `[0.2.1]`
 section is the first compliant section.
 
+### Assertion & Evidence Discipline (D-205)
+
+1. Enumeration/count assertions MUST declare their domain, or write the rule instead.
+   Report a number only with its basis; recompute before restating someone else's count.
+2. In versioned docs, enumeration/count/retirement assertions default to a
+   machine-checked carrier (checker assertion, docstring pinning test, elements.yaml).
+   Calibration claims stay prose under D-149 and do NOT become checker assertions.
+3. Anything not reproducible is recorded as "unverified" — never guess a cause.
+   An invalid experiment is not evidence (D-109). Mechanism pointer: pre-commit
+   `mixed-line-ending` is the landing layer for line endings; before reporting "N files
+   are bad", prove whether the blob or the working tree is at fault.
 ### Asset Directory Discipline (D-082⑥⑤)
 
 `.github/assets/` is **append-only**: README imagery is referenced by

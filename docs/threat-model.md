@@ -34,6 +34,15 @@ The following are **not** security boundaries:
 - Anything Maya-side (`maya_mcp_helper.py`, `_mcp_scene`).
   Code reaching Maya runs with Maya's full privileges — __builtins__ is
   fully present in the exec namespace by design.
+- The strict policy flags (`MAYA_MCP_DISABLE_EXECUTE`,
+  `MAYA_MCP_DISABLE_WRITE_MODULE`, `MAYA_MCP_DISABLE_ARBITRARY`,
+  D-207 1). These are **misuse guardrails, not a hostile-agent
+  boundary**, and the distinction is load-bearing: an agent that can
+  still reach `execute_code` is inside the trust boundary already and
+  no flag moves that. What they buy is the *other* direction — an
+  operator, a demo, or a CI sandbox can shrink the blast radius of a
+  mistake without trusting every caller to pass sensible arguments.
+  They are config, not a jail, and must never be described as one.
 
 We deliberately avoid the words "sandbox" and "secure" for these
 mechanisms. A future opt-in AST allowlist (`safe_mode`, roadmap
@@ -53,6 +62,7 @@ problem.
 | Checkpoint/rollback | exportAll memory snapshots, auto safety snapshot before rollback, S2 rebind | maya_scene_module.py |
 | userSetup.py merge | marker-block upsert, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
 | Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 25 tools | pipeline.py |
+| Strict policy mode | `MAYA_MCP_DISABLE_*{EXECUTE,WRITE_MODULE,ARBITRARY}` remove the named tools from `tools/list` and deny the call with `[policy_disabled]`, audited as `rejected`; one choke point in the pipeline, none in the tool bodies | pipeline.py (POLICY_ENV_FLAGS, on_list_tools, on_call_tool) |
 | Asset egress whitelist | asset_search/asset_import reach https only on api.polyhaven.com + dl.polyhaven.org/.com, mandatory User-Agent, size+timeout caps, per-file md5 verify, platformdirs cache | polyhaven.py |
 
 All 25 tools pass through one FastMCP middleware pipeline:

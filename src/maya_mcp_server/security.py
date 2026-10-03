@@ -111,6 +111,18 @@ class GuiSessionRequiredError(PipelineError):
     code = "gui_session_required"
 
 
+class PolicyDisabledError(PipelineError):
+    """Raised when an operator policy flag disables a tool (D-207 1).
+
+    Misuse guardrail, NOT a hostile-agent boundary: an agent that can run
+    execute_code bypasses every flag here. The threat model restates that
+    (docs/threat-model.md); this class only makes the operator's intent
+    mechanical and auditable.
+    """
+
+    code = "policy_disabled"
+
+
 class CaptureEmptyError(PipelineError):
     """Raised when a visual capture produces a zero-byte artifact.
 
