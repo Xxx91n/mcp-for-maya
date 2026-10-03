@@ -36,6 +36,172 @@ class TestWorldBbox:
         assert gaps[2] == pytest.approx(0.8 - math.sqrt(2) / 2, abs=1e-2)
         assert m["bbox_overlap"] is False
 
+    def test_measure_clearance_zero_does_not_mean_merely_touching(self, maya_env):
+        """A 0 clearance is NOT proof the boxes only touch.
+
+        Per-axis gap is +separated / 0=touching / -penetrating. Here X and Z
+        penetrate by 0.5 while Y is exactly touching, so the implementation
+        takes the "at least one axis >= 0" branch and computes the euclidean
+        distance over the POSITIVE parts only -- which is zero. Reading 0 as
+        "the boxes just touch" would miss a real 0.5cm interpenetration.
+
+        This is the counterexample that pinned the scene_measure docstring
+        rewrite: the old wording claimed "0 means the boxes touch on every
+        axis", which this configuration contradicts.
+        """
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9))
+        maya_env.scene.add_mesh("GEO_b", bbox_min=(-9.5, -9, -9.5), bbox_max=(-8.5, -8, -8.5))
+        m = maya_env.module.measure("GEO_a", "GEO_b", "clearance")
+
+        gaps = m["details"]["clearances_xyz"]
+        assert gaps[0] == pytest.approx(-0.5, abs=1e-6), "X must read as penetrating"
+        assert gaps[1] == pytest.approx(0.0, abs=1e-6), "Y must read as exactly touching"
+        assert gaps[2] == pytest.approx(-0.5, abs=1e-6), "Z must read as penetrating"
+
+        assert m["distance"] == pytest.approx(0.0, abs=1e-6), (
+            "distance collapses to 0 even though two axes interpenetrate"
+        )
+        assert m["bbox_overlap"] is False, (
+            "bbox_overlap is all-three-penetrating only, so 2-of-3 reads false"
+        )
+
+    def test_measure_clearance_negative_is_shallowest_penetration(self, maya_env):
+        """All three axes penetrate -> distance is the shallowest one, i.e.
+        the minimum translation that separates the boxes."""
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9))
+        # X and Y shift by 0.5 (gap -0.5 each); Z is coincident (gap -1.0).
+        maya_env.scene.add_mesh("GEO_b", bbox_min=(-9.5, -9.5, -10.0), bbox_max=(-8.5, -8.5, -9.0))
+        m = maya_env.module.measure("GEO_a", "GEO_b", "clearance")
+        assert m["details"]["clearances_xyz"] == pytest.approx([-0.5, -0.5, -1.0], abs=1e-6)
+        assert m["distance"] == pytest.approx(-0.5, abs=1e-6), (
+            "the SHALLOWEST penetration (-0.5) is reported, not the deepest (-1.0)"
+        )
+        assert m["bbox_overlap"] is True
+
+    def test_measure_clearance_positive_ignores_penetrating_axes(self, maya_env):
+        """A separated axis dominates: Y is clear by 2.5 while X and Z
+        penetrate, so the distance is 3.0 and the penetration is invisible."""
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(-10, -10, -10), bbox_max=(-9, -9, -9))
+        maya_env.scene.add_mesh("GEO_b", bbox_min=(-9.5, -6.5, -9.5), bbox_max=(-8.5, -5.5, -8.5))
+        m = maya_env.module.measure("GEO_a", "GEO_b", "clearance")
+        # Y separation = B.y_min - A.y_max = -6.5 - (-9) = 2.5
+        assert m["distance"] == pytest.approx(2.5, abs=1e-6), (
+            "only the separated axis contributes; X and Z penetration is invisible"
+        )
+        assert m["details"]["clearances_xyz"][0] == pytest.approx(-0.5, abs=1e-6)
+
+    # ------------------------------------------------------------------
+    # The scene_measure docstring states four rules about clearance. Those
+    # rules used to be prose nobody checked, which is how a false one shipped
+    # (F1: "0 means the boxes touch on every axis"). They are now asserted
+    # against the real implementation across the whole enumerated domain, so a
+    # future edit to either side fails loudly instead of drifting.
+    #
+    # Domain is stated explicitly and is deliberately NOT a claim about the
+    # implementation: it is the enumeration set. Any count quoted without the
+    # domain is meaningless, which is exactly how the original error read.
+    # ------------------------------------------------------------------
+
+    CLEARANCE_DOMAIN = (-2, -1, 0, 1, 1.5)  # penetrating / touching / separated
+
+    @staticmethod
+    def _clearance_for(maya_env, gaps, size=4.0, tag=""):
+        """Drive measure() to a chosen per-axis gap triple.
+
+        Two axis-aligned cubes of side `size`; shifting B by t on an axis
+        yields gap = |t| - size, so t = gap + size realises any gap >= -size.
+        Node names must be unique per call -- the stub keys transforms by name,
+        so reusing them inside one scene silently keeps the first geometry.
+        """
+        a, b = f"GEO_a{tag}", f"GEO_b{tag}"
+        maya_env.scene.add_mesh(a, bbox_min=(0, 0, 0), bbox_max=(size, size, size))
+        off = tuple(g + size for g in gaps)
+        maya_env.scene.add_mesh(b, bbox_min=off, bbox_max=tuple(v + size for v in off))
+        return maya_env.module.measure(a, b, "clearance")
+
+    def test_clearance_rules_hold_across_the_whole_domain(self, maya_env):
+        """The docstring's three distance branches, asserted exhaustively."""
+        import itertools
+
+        dom = self.CLEARANCE_DOMAIN
+        seen_zero = seen_pos = seen_neg = 0
+        for n, gaps in enumerate(itertools.product(dom, repeat=3)):
+            m = self._clearance_for(maya_env, gaps, tag=str(n))
+            d = m["distance"]
+            ov = m["bbox_overlap"]
+            read = m["details"]["clearances_xyz"]
+
+            # the per-axis read-back must equal what we asked for
+            for want, got in zip(gaps, read):
+                assert got == pytest.approx(want, abs=1e-6), (gaps, read)
+
+            any_sep = any(g > 0 for g in gaps)
+            any_touch = any(g == 0 for g in gaps)
+            all_pen = all(g < 0 for g in gaps)
+
+            # branch 1: >0 exactly when some axis is strictly separated
+            if any_sep:
+                seen_pos += 1
+                assert d > 0, f"{gaps}: separated axis must give a positive distance"
+                # only the separating axes contribute. measure() rounds the
+                # result with _round3, so the tolerance must admit that
+                # rounding rather than pretend the value is unrounded.
+                want = math.sqrt(sum(g * g for g in gaps if g > 0))
+                assert d == pytest.approx(want, abs=1e-3), gaps
+            else:
+                # branch 2: 0 exactly when touching and not separated
+                if any_touch:
+                    seen_zero += 1
+                    assert d == pytest.approx(0.0, abs=1e-6), (
+                        f"{gaps}: touching-but-not-separated must read 0, got {d}"
+                    )
+                else:
+                    # branch 3: negative exactly when all three penetrate
+                    seen_neg += 1
+                    assert d < 0, f"{gaps}: all-penetrating must give a negative distance"
+                    assert d == pytest.approx(max(gaps), abs=1e-3), (
+                        f"{gaps}: must report the SHALLOWEST penetration"
+                    )
+
+            # bbox_overlap rule: true iff all three strictly penetrate
+            assert ov is all_pen, f"{gaps}: bbox_overlap must be {all_pen}, got {ov}"
+
+        # the enumeration must actually reach every branch, or it proves little
+        assert seen_pos and seen_zero and seen_neg, (seen_pos, seen_zero, seen_neg)
+
+    def test_bbox_overlap_is_false_for_a_single_penetrating_axis(self, maya_env):
+        """The specific trap the old docstring understated: ONE penetrating
+        axis already reads bbox_overlap False."""
+        m = self._clearance_for(maya_env, (-1, 0, 2))
+        assert m["bbox_overlap"] is False
+        assert m["details"]["clearances_xyz"][0] == pytest.approx(-1, abs=1e-6)
+
+    def test_clearance_docstring_does_not_assert_the_retired_false_claim(self):
+        """Targeted guard against the exact hallucination that shipped (F1)."""
+        import ast
+        import inspect
+        import textwrap
+
+        from maya_mcp_server import scene_tools
+
+        doc = ast.get_docstring(
+            next(
+                node
+                for node in ast.walk(ast.parse(inspect.getsource(scene_tools)))
+                if isinstance(node, ast.AsyncFunctionDef) and node.name == "scene_measure"
+            )
+        )
+        assert doc is not None
+        flat = " ".join(doc.split())
+        assert "touch on every axis" not in flat, (
+            "the retired false claim is back: distance 0 does not mean every "
+            "axis is exactly touching"
+        )
+        # the corrected rule must be stated, in both branches
+        assert "if and only if all three axes" in flat
+        assert "does NOT mean the boxes just touch" in flat
+        assert textwrap  # keep the import honest
+
     def test_measure_center_mode(self, maya_env):
         maya_env.scene.add_mesh("GEO_a", t=(10, 0, 0))
         maya_env.scene.add_mesh("GEO_b", t=(0, 0, 30))
