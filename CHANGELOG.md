@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path raised `ValueError` instead of reporting drift. Caught by
   `tests/test_check_d207_gates.py::TestErrorCodesChecker::test_undocumented_code_is_reported`
   and fixed
-  in the checker rather than by widening the test.
+  in the checker rather than by widening the test. Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   `.github/scripts/check_error_codes.py::_rel`.
 
 
@@ -82,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file against its own constants the wrong links reported green indefinitely. That
   was a fabricated identifier, not a typo. Every URL now derives from
   `[project.urls] Repository` in `pyproject.toml`, so a fork or a rename moves
-  the links with the project.
+  the links with the project. Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_doc_urls_are_derived_from_pyproject_not_hardcoded`,
   `.github/scripts/check_llms_txt.py::repo_url`.
 
@@ -91,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   matters (a tool added to the registry and to no heading, where the renderer
   drops it and therefore produces no diff) it could not fire. Coverage is now
   asserted independently of the comparison, and an incomplete section map is
-  itself an error.
+  itself an error. Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_a_tool_absent_from_the_page_is_reported`.
 
 - **The per-element sample floor could report a false green** — the thin-element
@@ -99,14 +99,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   element with zero true negatives had no key, was skipped, and fell through to
   the branch announcing that every element cleared the floor. The floor verdict is
   now reported independently of the label-agreement verdict, so a disagreement
-  can no longer swallow a floor violation.
+  can no longer swallow a floor violation. Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_element_with_zero_true_negatives_is_reported_not_passed`.
 
 - **The overdue-exemption message misdescribed the D-168 ④ renewal requirements** —
   it listed five items of our own invention. The real five (D-168 ④ as revised by
   D-176) are a `gate_authority` countersignature distinct from the `debt_owner`, an
   event-anchored rather than calendar expiry, the per-row renewal cap of 2, a
-  re-validated reason, and the waiver lane closing after gate review.
+  re-validated reason, and the waiver lane closing after gate review. Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`.
 ### Changed
 
