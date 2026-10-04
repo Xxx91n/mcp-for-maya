@@ -99,6 +99,35 @@ dimensions=5, shot types=8`.
 
 ### Fixed
 
+- **Counterfactual pins did not follow the pin-form canon they were written
+  under (ADR-0029 ③, D-213 ②)** — the five S1/S2 counterfactual pins landed in
+  the R46 lane under descriptive names (`test_a_helper_function_is_not_accepted_as_a_pin`
+  and siblings) with no `counterfactual` docstring marker, so the clause that
+  says a pin must be named `test_*_fails_the_gate` and declare itself a
+  counterfactual was satisfied by prose in the module header rather than by the
+  pins themselves. Same failure class as the phantom-pointer and false-count
+  findings of this round: the rule existed, nothing checked the new code against
+  it. Renamed to the canon form and gave each an explicit counterfactual
+  docstring; the live-green control keeps its descriptive name because it is a
+  positive control, not a counterfactual.
+  Broken: through 0.5.0 (unreleased lane) · Fixed: 0.5.0 → [Unreleased].
+  Evidence: `tests/test_check_gate_registry.py::test_a_helper_function_named_as_a_pin_fails_the_gate`,
+  `tests/test_check_gate_registry.py::test_a_module_constant_named_as_a_pin_fails_the_gate`,
+  `tests/test_check_gate_registry.py::test_a_non_test_class_method_named_as_a_pin_fails_the_gate`,
+  `tests/test_check_gate_registry.py::test_a_class_not_named_test_prefix_fails_the_gate`,
+  `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_an_unreviewed_track_3_promotion_fails_the_gate`;
+  `python .github/scripts/check_gate_registry.py` → registry OK (the renames
+  touch no registered pin node id).
+
+- **The S2 review record pointed at a bare `path:line` for its central claim** —
+  the correction notice cites where the promotion record lives using
+  `polarity_corpus_probe.py:206-215`, a form D-183 holds drifts on every edit and
+  flags at warn level. It also cited a line range that the same record's own
+  derivation pin makes redundant. Now `path::symbol`.
+  Broken: through 0.5.0 (unreleased lane) · Fixed: 0.5.0 → [Unreleased].
+  Evidence: `python .github/scripts/check_evidence_anchors.py` → this file
+  contributes 0 warnings (total 41 → 40).
+
 - **The polarity sample floor was counting each sample once per guarded element
   (D-221 ② / S4)** — the label tally sat inside the per-element loop, so the
   floor numerator came out multiplied by the number of guarded elements. With

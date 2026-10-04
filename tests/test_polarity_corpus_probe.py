@@ -172,15 +172,15 @@ class TestD203FloorCaliber:
         # semantics differ, which is what makes this a real counterfactual.
         assert len(guarded) >= 1
 
-    def test_s2_review_covers_the_actual_track_3_cohort(self):
-        """R46 audit finding, and the sharpest of the four.
+    def test_an_unreviewed_track_3_promotion_fails_the_gate(self):
+        """Counterfactual (D-213 2). R46 audit finding, and the sharpest of the four.
 
         The first version of the S2 record reviewed the wrong five samples: it
         took the FORGIVEN cohort instead of the samples the probe file actually
         marks as track-3 promotions, so three genuine promotions went
         unadjudicated and three non-promotions got reviewed. It also claimed no
-        promotion record existed, which the marker comment at
-        polarity_corpus_probe.py:206-215 refutes.
+        promotion record existed, which the marker comment in
+        polarity_corpus_probe.py refutes.
 
         A label is not a cohort. This pin derives the cohort from the marker
         comment the way a reviewer must, then asserts the record names every

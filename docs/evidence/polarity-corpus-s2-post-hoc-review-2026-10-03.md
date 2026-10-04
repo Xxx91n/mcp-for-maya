@@ -16,10 +16,11 @@
 >
 > - **What it claimed:** that "no promotion record exists anywhere in the repo",
 >   and that the five samples needing adjudication were the `forgiven` cohort.
-> - **What is true:** a promotion record **does** exist, at
->   `.github/scripts/polarity_corpus_probe.py:206-215` — an explicit
->   `# --- track-3 promotions (D-203) ---` block stating why each of the five was
->   promoted. The first version reviewed `LABELLED_CORPUS[4,5,6,12,13]`
+> - **What is true:** a promotion record **does** exist, in
+>   `.github/scripts/polarity_corpus_probe.py::adjudicate` — in the
+>   `LABELLED_CORPUS` literal it consumes, immediately after an explicit
+>   `# --- track-3 promotions (D-203) ---` marker comment stating why each of
+>   the five was promoted. The first version reviewed `LABELLED_CORPUS[4,5,6,12,13]`
 >   (all `forgiven`); the real cohort is `[9,10,11,12,13]`. **Overlap: two.**
 >   Three genuine promotions — the three `true_negative` samples at `[9]`,
 >   `[10]`, `[11]` — were never adjudicated at all, and three samples the first
@@ -109,4 +110,4 @@ experiment is not evidence.
 | ----------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | the five-sample cohort + arithmetic | `uv run python .github/scripts/polarity_corpus_probe.py`         | `samples=14`, `true_negative=7`, `forgiven=5`, `known_limitation=2`, `adjudicable (true_negative + forgiven) = 12` |
 | guard agrees with every hand label  | same command, TRACK2 block                                       | `disagreements with the hand labels = 0`                                                                           |
-| this record stays labelled post-hoc | `uv run python -m pytest tests/test_polarity_corpus_probe.py -q` | includes `test_s2_post_hoc_record_is_labelled_as_post_hoc` and `test_s2_review_covers_the_actual_track_3_cohort`   |
+| this record stays labelled post-hoc | `uv run python -m pytest tests/test_polarity_corpus_probe.py -q` | includes `test_s2_post_hoc_record_is_labelled_as_post_hoc` and `test_an_unreviewed_track_3_promotion_fails_the_gate`   |

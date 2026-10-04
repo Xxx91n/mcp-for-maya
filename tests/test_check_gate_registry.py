@@ -205,11 +205,12 @@ def test_a_method_missing_from_an_existing_class_is_still_red(tmp_path):
     assert any("test_never_written" in f for f in mod.check(root, reg))
 
 
-def test_a_helper_function_is_not_accepted_as_a_pin(tmp_path):
-    """R46 audit finding. The first resolver returned every top-level name, so a
-    private helper registered as a "pin" resolved fine. A helper asserts nothing
-    about the gate, so accepting one makes the registry look covered while
-    pinning nothing -- the exact hollow-pin shape D-213 2 legislates against."""
+def test_a_helper_function_named_as_a_pin_fails_the_gate(tmp_path):
+    """Counterfactual (D-213 2). R46 audit finding. The first resolver returned
+    every top-level name, so a private helper registered as a "pin" resolved
+    fine. A helper asserts nothing about the gate, so accepting one makes the
+    registry look covered while pinning nothing -- the exact hollow-pin shape
+    D-213 2 legislates against. Non-empty red asserted below."""
     mod = _load()
     root = _tree(tmp_path, scripts=["check_demo"], wired=["check_demo"])
     (root / "tests" / "test_helper.py").write_text(
@@ -222,7 +223,10 @@ def test_a_helper_function_is_not_accepted_as_a_pin(tmp_path):
     assert any("_build_tree" in f and "collectible test" in f for f in findings), findings
 
 
-def test_a_module_constant_is_not_accepted_as_a_pin(tmp_path):
+def test_a_module_constant_named_as_a_pin_fails_the_gate(tmp_path):
+    """Counterfactual (D-213 2). A module-level constant resolved as a pin for
+    the same reason a helper did -- nothing about it asserts anything. Non-empty
+    red asserted below."""
     mod = _load()
     root = _tree(tmp_path, scripts=["check_demo"], wired=["check_demo"])
     (root / "tests" / "test_const.py").write_text(
@@ -233,7 +237,10 @@ def test_a_module_constant_is_not_accepted_as_a_pin(tmp_path):
     assert any("TOOLS" in f and "collectible test" in f for f in findings), findings
 
 
-def test_a_non_test_class_method_is_not_accepted_as_a_pin(tmp_path):
+def test_a_non_test_class_method_named_as_a_pin_fails_the_gate(tmp_path):
+    """Counterfactual (D-213 2). A ``Test*`` class still collects only its
+    ``test*`` methods; ``_setup`` is not one, so it is not a pin. Non-empty red
+    asserted below."""
     mod = _load()
     root = _tree(tmp_path, scripts=["check_demo"], wired=["check_demo"])
     (root / "tests" / "test_cls2.py").write_text(
@@ -246,9 +253,10 @@ def test_a_non_test_class_method_is_not_accepted_as_a_pin(tmp_path):
     assert any("_setup" in f for f in mod.check(root, reg))
 
 
-def test_a_class_not_named_test_prefix_is_not_collectible(tmp_path):
-    """pytest's default ``python_classes = Test*`` is the rule; a helper class
-    that happens to live in a test file is still not collectible."""
+def test_a_class_not_named_test_prefix_fails_the_gate(tmp_path):
+    """Counterfactual (D-213 2). pytest's default ``python_classes = Test*`` is
+    the rule; a helper class that happens to live in a test file is still not
+    collectible, so it cannot be a pin. Non-empty red asserted below."""
     mod = _load()
     root = _tree(tmp_path, scripts=["check_demo"], wired=["check_demo"])
     (root / "tests" / "test_cls3.py").write_text(
