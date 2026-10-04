@@ -1,0 +1,6 @@
+{
+  "schema": "llms-txt-spec/1",
+  "note": "JSON-syntax YAML (YAML 1.2 is a strict superset of JSON): stdlib-only consumption via json.loads, no PyYAML. SINGLE SOURCE for the llms.txt governance constants, extracted out of .github/scripts/check_llms_txt.py by D-214. Governance spec, not a baseline -- never regenerated from the generated file; hand-edit in the PR that carries the ruling.",
+  "LINE_CAP": 100,
+  "LINE_CAP_basis": "D-207 2: llms.txt follows the llmstxt.org convention and is capped at this many lines. A discovery file that must be paged through has stopped being a discovery file. Governance constant by the D-214 litmus: it changes when the governance decision changes (raising it is a ruling change, audited in PR review and rolled back by audit), not when the code changes. The tool COUNT next to it is the opposite case -- object-derivable, so it stays derived at runtime from pipeline.TOOL_ANNOTATIONS and is deliberately absent here."
+}

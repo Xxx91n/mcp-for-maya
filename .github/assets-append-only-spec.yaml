@@ -1,0 +1,6 @@
+{
+  "schema": "assets-append-only-spec/1",
+  "note": "JSON-syntax YAML (YAML 1.2 is a strict superset of JSON): stdlib-only consumption via json.loads, no PyYAML. SINGLE SOURCE for the append-only guard's protected prefixes, extracted out of .github/scripts/check_assets_append_only.py by D-214. Governance spec, not a baseline -- never regenerated; hand-edit in the PR that carries the ruling.",
+  "GUARDED": [".github/assets/"],
+  "GUARDED_basis": "D-082 6-5: .github/assets/ is append-only. README imagery is referenced by absolute main-branch URLs and every already-published PyPI page renders main forever, so deleting or renaming an already-published asset permanently breaks every historical release page. New captures get NEW filenames; retirement happens in README prose, never by file deletion. Governance constant by the D-214 litmus: widening or narrowing what is protected is a ruling change, not a code tweak."
+}

@@ -1,0 +1,6 @@
+{
+  "schema": "liveness-probe-spec/1",
+  "note": "JSON-syntax YAML (YAML 1.2 is a strict superset of JSON): stdlib-only consumption via json.loads, no PyYAML. SINGLE SOURCE for the liveness probe's governance constants, extracted out of .github/scripts/liveness_probe.py by D-214. Governance spec, not a baseline -- never regenerated; hand-edit in the PR that carries the ruling.",
+  "PROTOCOL": "2024-11-05",
+  "PROTOCOL_basis": "The MCP protocol revision the probe declares in its initialize request and then asserts the server honoured. Governance constant by the D-214 litmus: which revision counts as the supported floor is a support decision that moves when the support policy moves, not when this script changes. Note the asymmetry with the flag table right below it in the script: POLICY_ENV_FLAGS is object-derivable from pipeline.py, so it stays derived at runtime and is deliberately absent here."
+}

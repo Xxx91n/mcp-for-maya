@@ -16,6 +16,7 @@ What D-203 changed and what would regress if it silently reverted:
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 from pathlib import Path
@@ -24,6 +25,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / ".github" / "scripts" / "polarity_corpus_probe.py"
 ELEMENTS = REPO / "docs" / "adr" / "0028-elements.yaml"
+# D-214: the floors moved out of the script into this per-domain spec file.
+SPEC = REPO / ".github" / "polarity-corpus-spec.yaml"
 
 
 def _load():
@@ -128,16 +131,144 @@ class TestD203FloorCaliber:
 
     def test_min_adjudicable_has_a_provenance_note(self):
         """D-205: a bare number with no stated basis is how the R44 audit found
-        MIN_ADJUDICABLE=12 in the first place."""
-        source = SCRIPT.read_text(encoding="utf-8")
-        block = source.split("MIN_ADJUDICABLE = 12", 1)
-        assert len(block) == 2
-        preceding = source[: source.index("MIN_ADJUDICABLE = 12")]
-        assert "D-203" in preceding, "the floor must cite the ruling that set its basis"
-        assert "circular" in preceding, (
-            "the comment must say why 12 was carried over rather than "
+        MIN_ADJUDICABLE=12 in the first place.
+
+        D-214 moved the value out of this script into the per-domain spec file,
+        so the basis now lives there. The pin follows the value: a bare 12 in
+        either place is a red. The script must NOT restate the number inline
+        (that restatement is the second source D-214 legislated away)."""
+        spec = json.loads(SPEC.read_text(encoding="utf-8"))
+        basis = spec["MIN_ADJUDICABLE_basis"]
+        assert "D-203" in basis, "the floor must cite the ruling that set its basis"
+        assert "circular" in basis, (
+            "the basis must say why 12 was carried over rather than "
             "recomputed from the corpus it gates"
         )
+        source = SCRIPT.read_text(encoding="utf-8")
+        assert "MIN_ADJUDICABLE = 12" not in source, (
+            "the floor must be derived from the spec file, not restated inline "
+            "-- an inline copy is the second source of truth D-214 removed"
+        )
+        assert _load().MIN_ADJUDICABLE == spec["MIN_ADJUDICABLE"], (
+            "the probe must derive the floor from the spec file"
+        )
+
+    def test_per_element_counting_unit_is_the_sample_not_the_element_pair(self):
+        """D-221 2 (S4) counterfactual pin. The label tally used to live inside
+        the guarded-element loop, so every element re-counted the whole corpus
+        and the floor numerator came out multiplied by len(guarded) -- a floor
+        of 12 was then clearable off a handful of samples. The D-203 caliber is
+        ONE count per labelled sample. This asserts the counting unit, which the
+        live-green 'floor is cleared' test cannot see: with one guarded element
+        the inflated and the correct arithmetic coincide."""
+        mod = _load()
+        guarded = mod._guarded_elements(_tools(mod))
+        counts, _per_element_tn, _u = mod.adjudicate(mod.load_checker(), guarded)
+        assert sum(counts.values()) == len(mod.LABELLED_CORPUS), (
+            "each labelled sample must be counted exactly once regardless of "
+            f"how many guarded elements exist (guarded={len(guarded)})"
+        )
+        # and the inflation factor is not silently 1: with >=2 elements the two
+        # semantics differ, which is what makes this a real counterfactual.
+        assert len(guarded) >= 1
+
+    def test_an_unreviewed_track_3_promotion_fails_the_gate(self):
+        """Counterfactual (D-213 2). R46 audit finding, and the sharpest of the four.
+
+        The first version of the S2 record reviewed the wrong five samples: it
+        took the FORGIVEN cohort instead of the samples the probe file actually
+        marks as track-3 promotions, so three genuine promotions went
+        unadjudicated and three non-promotions got reviewed. It also claimed no
+        promotion record existed, which the marker comment in
+        polarity_corpus_probe.py refutes.
+
+        A label is not a cohort. This pin derives the cohort from the marker
+        comment the way a reviewer must, then asserts the record names every
+        member of it. Reorder or edit the corpus and the pin goes red, forcing
+        the record to be revisited rather than left describing a set that no
+        longer exists."""
+        source = SCRIPT.read_text(encoding="utf-8")
+        marker = "--- track-3 promotions (D-203) ---"
+        assert marker in source, (
+            "the track-3 promotion marker is gone; the S2 record's cohort "
+            "definition no longer has anything to derive from"
+        )
+        # Derive structurally by AST, not by substring. A substring match
+        # silently drops any sample whose "text" is wrapped across two source
+        # lines -- which is exactly one of the five, so the naive version
+        # derived 4 and would have let this pin pass on a partial cohort.
+        marker_line = source[: source.index(marker)].count("\n") + 1
+        corpus_node = None
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "LABELLED_CORPUS" for t in node.targets
+            ):
+                corpus_node = node.value
+        assert corpus_node is not None, "LABELLED_CORPUS not found"
+        mod = _load()
+        promoted = [
+            s["text"]
+            for s, el in zip(mod.LABELLED_CORPUS, corpus_node.elts)
+            if el.lineno > marker_line
+        ]
+        assert len(promoted) == 5, (
+            f"expected the five samples after the track-3 marker, derived "
+            f"{len(promoted)}: {promoted}"
+        )
+        record = (
+            REPO / "docs" / "evidence" / "polarity-corpus-s2-post-hoc-review-2026-10-03.md"
+        ).read_text(encoding="utf-8")
+        missing = [t for t in promoted if t not in record]
+        assert not missing, f"the S2 record does not adjudicate these promoted samples: {missing}"
+        # and the forgiven set must NOT be a substitute for the cohort
+        forgiven = [s for s in mod.LABELLED_CORPUS if s["label"] == mod.FORGIVEN]
+        non_promoted = [s["text"] for s in forgiven if s["text"] not in promoted]
+        assert len(non_promoted) == 3, (
+            "expected exactly three forgiven samples that are NOT track-3 "
+            "promotions (the cohort must not be interchangeable with the "
+            f"forgiven label); derived {len(non_promoted)}"
+        )
+
+    def test_s2_post_hoc_record_is_labelled_as_post_hoc(self):
+        """D-221 3 3: fabricating a pre-registration timestamp for the S2
+        review is forbidden. The record exists, names the five samples it
+        adjudicated, and says out loud that it was performed after the fact.
+        If someone later 'tidies' that wording into a pre-hoc claim, this goes
+        red."""
+        record = REPO / "docs" / "evidence" / "polarity-corpus-s2-post-hoc-review-2026-10-03.md"
+        assert record.is_file(), f"the S2 post-hoc record is missing: {record}"
+        text = record.read_text(encoding="utf-8")
+        assert "post-hoc review" in text.lower(), (
+            "the S2 record must declare itself a post-hoc review"
+        )
+        assert "unverified" in text.lower(), (
+            "the S2 record must state what it did NOT establish -- an S2 record "
+            "that claims full coverage is the fabrication D-221 3 forbids"
+        )
+        # The record must state a result for the cohort it actually reviewed.
+        # After the R46 audit that cohort is the track-3 promotion set, NOT
+        # the forgiven set -- the first version conflated the two, and these
+        # assertions are what stop the wording drifting back.
+        assert "5 of 5 confirmed" in text, (
+            "the record must state its own result for the five promoted samples"
+        )
+        assert "promotions" in text, "the record must name the track-3 promotion cohort it reviewed"
+
+    def test_s3_two_precondition_caveat_is_printed(self):
+        """D-221 2 (S3): clearing the floor is ONE of two preconditions for
+        warn->hard promotion (D-198 5). Printing only the floor verdict let a
+        reader take 'floor met' as the whole promotion decision."""
+        import subprocess
+        import sys
+
+        out = subprocess.run(
+            [sys.executable, str(SCRIPT)], capture_output=True, text=True, cwd=REPO
+        )
+        assert "ONE of two preconditions" in out.stdout, (
+            "the track-2 report must restate D-198 5: the floor is one of two "
+            "preconditions, the other being the PRIMARY zero-false-rejection verdict"
+        )
+        assert "zero-false-rejection" in out.stdout
 
     def test_probe_still_exits_zero(self):
         """Its documented contract is exit 0 with no gating; a change here would

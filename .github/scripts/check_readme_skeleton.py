@@ -18,6 +18,9 @@ import sys
 from pathlib import Path
 
 
+REPO = Path(__file__).resolve().parent.parent.parent
+
+
 def skeleton(path: Path) -> list[int]:
     """Ordered list of heading levels (1-6) - language-agnostic shape.
 
@@ -28,40 +31,47 @@ def skeleton(path: Path) -> list[int]:
     return [len(m.group(1)) for m in re.finditer(r"^(#{1,6})\s", text, re.M)]
 
 
-def main() -> int:
-    repo = Path(__file__).resolve().parent.parent.parent
+def check(repo: Path) -> list[str]:
+    """Findings for one repo root. Empty list == mirror is in sync.
+
+    Takes the root as an argument, and prints nothing, so a pin can hand it a
+    corrupted tmp_path copy and assert a NON-EMPTY red (D-213 1/2). The other
+    checkers in this family already have this shape; this one used to resolve
+    the repo inline inside main(), which left a real gate unpinnable.
+    """
+    findings: list[str] = []
     en = repo / "README.md"
     zh = repo / "README.zh-CN.md"
     if not en.exists() or not zh.exists():
-        print("::error::README.md or README.zh-CN.md missing")
-        return 1
+        return ["README.md or README.zh-CN.md missing"]
 
     en_text = en.read_text(encoding="utf-8")
     zh_text = zh.read_text(encoding="utf-8")
 
-    failed = False
     if "**English** | [简体中文](README.zh-CN.md)" not in en_text:
-        print("::error::README.md missing top language selector")
-        failed = True
+        findings.append("README.md missing top language selector")
     if "[English](README.md) | **简体中文**" not in zh_text:
-        print("::error::README.zh-CN.md missing top language selector")
-        failed = True
+        findings.append("README.zh-CN.md missing top language selector")
     if not re.search(r"synced-with:\s*README\.md\s*@\s*[0-9a-f]{7,40}", zh_text):
-        print("::error::README.zh-CN.md missing synced-with anchor comment")
-        failed = True
+        findings.append("README.zh-CN.md missing synced-with anchor comment")
 
     en_sk, zh_sk = skeleton(en), skeleton(zh)
     if en_sk != zh_sk:
-        failed = True
-        print("::error::README heading skeleton divergence")
-        print(f"  EN ({len(en_sk)} headings): {en_sk}")
-        print(f"  zh ({len(zh_sk)} headings): {zh_sk}")
-    else:
-        print(
-            f"README skeleton OK: {len(en_sk)} headings match 1:1 "
-            "(levels identical, order identical)"
-        )
-    return 1 if failed else 0
+        findings.append(f"README heading skeleton divergence: EN {en_sk} vs zh {zh_sk}")
+    return findings
+
+
+def main() -> int:
+    findings = check(REPO)
+    for finding in findings:
+        print(f"::error::{finding}")
+    if findings:
+        return 1
+    print(
+        f"README skeleton OK: {len(skeleton(REPO / 'README.md'))} headings match 1:1 "
+        "(levels identical, order identical)"
+    )
+    return 0
 
 
 if __name__ == "__main__":

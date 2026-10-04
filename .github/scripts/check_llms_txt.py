@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import json
 import re
 import sys
 from pathlib import Path
@@ -37,7 +38,14 @@ SCRIPTS = REPO / ".github" / "scripts"
 LLMS = REPO / "llms.txt"
 PIPELINE = Path("src/maya_mcp_server/pipeline.py")
 
-LINE_CAP = 100
+# D-214: LINE_CAP is a GOVERNANCE constant (D-207 2), so its single source is
+# the per-domain spec file -- derived here at runtime, never restated inline.
+# The tool COUNT beside it is object-derivable, so it stays derived from
+# pipeline.TOOL_ANNOTATIONS and is deliberately NOT mirrored into the spec
+# (spec files must not mirror object state into a second source of truth).
+LINE_CAP = json.loads((REPO / ".github" / "llms-txt-spec.yaml").read_text(encoding="utf-8"))[
+    "LINE_CAP"
+]
 _SEC_SOURCE = __file__.rsplit("/", 1)[-1]
 _LLMS_NAME = "llms.txt"
 

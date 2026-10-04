@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0  # merge-base resolution for the assets guard (D-113)
+          fetch-depth: 0 # merge-base resolution for the assets guard (D-113)
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: true
@@ -59,6 +59,14 @@ jobs:
         run: python .github/scripts/check_llms_txt.py
       - name: version consistency gate (D-207 9)
         run: python .github/scripts/check_version_consistency.py
+      - name: count claims gate (D-216)
+        run: python .github/scripts/check_count_claims.py
+      - name: gate-registry consistency (D-215; warning period, not yet blocking)
+        # Ships as ::warning:: for one observation period per D-215 4. It exits
+        # 0 while warning; flip to hard red once the registry has landed and the
+        # first normal PR cycle on top of it has completed, in a commit that
+        # also carries the coverage self-check. Do not leave it warning.
+        run: python .github/scripts/check_gate_registry.py
       - name: pre-commit fallback (all files)
         run: |
           pip install pre-commit
@@ -122,7 +130,7 @@ jobs:
         with:
           python-version: "3.x"
       - name: fresh floating resolution
-        run: uv lock --upgrade   # ignores the committed lock; newest-in-range wins
+        run: uv lock --upgrade # ignores the committed lock; newest-in-range wins
       - name: install + test on floating resolution
         run: |
           uv sync

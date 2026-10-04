@@ -4327,7 +4327,7 @@ def _parse_objective(objective):
         steps.append(
             {
                 "action": "full_review",
-                "description": "Run comprehensive scene review (11 dimensions)",
+                "description": "Run comprehensive scene review (11 checks)",
                 "priority": "medium",
             }
         )

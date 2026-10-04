@@ -34,15 +34,23 @@ Env:
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
 import sys
 from collections.abc import Callable
+from pathlib import Path
 
 
+REPO = Path(__file__).resolve().parents[2]
 Runner = Callable[[list[str]], str]
-ISSUE = 7
+# D-214: ISSUE is a GOVERNANCE constant (D-142b), so its single source is the
+# per-domain spec file -- derived here at runtime, never restated inline. The
+# ISSUE env var still overrides it per run; this is only the default.
+ISSUE = json.loads((REPO / ".github" / "release-appendix-spec.yaml").read_text(encoding="utf-8"))[
+    "ISSUE"
+]
 
 _APPENDIX_HEADING = re.compile(
     r"^#{1,6}[ \t]+.*?(disclosure[ \t]+appendix|known[- \t]unverified)",

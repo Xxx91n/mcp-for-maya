@@ -73,18 +73,22 @@ tests/
 ├── test_check_pypi_index.py   # PyPI simple+JSON dual-source probe lanes (D-142γ)
 ├── test_check_tdqs_disclosure.py # TDQS structured disclosure ratchet test suite (D-175)
 ├── test_check_d207_gates.py     # D-207 gate family: error-codes doc / llms.txt / version consistency
-├── test_polarity_corpus_probe.py # D-203 sample-floor caliber (TN+F only) + per-element TN floor
+├── test_polarity_corpus_probe.py # D-203 sample-floor caliber (TN+F only) + per-element TN floor + D-214 spec + D-221② S3/S4
+├── test_check_gate_registry.py   # pin-registry consistency: unregistered/stale/unresolvable/zero-pin/expired-exemption (D-215)
+├── test_check_count_claims.py    # bare count claims vs AST-derived families + denylist (D-216)
+├── test_check_readme_skeleton.py # README/zh-CN skeleton parity, red+green pairs (D-072, backfilled D-212)
+├── test_liveness_probe_sensitivity.py # D-212 tier-2 sensitivity track: fault injection must produce a non-zero verdict
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
-├── adr/                   # ADR-0001..0028 architecture decision records (incl. 0028-elements.yaml)
+├── adr/                   # ADR-0001..0029 architecture decision records (incl. 0028-elements.yaml)
 ├── decision-ledger.md     # grill decision ledger — canonical path since T-11a (D-041)
 ├── handoffs/              # round handoffs — canonical (next-round.md standing task book)
 ├── testing.md             # real-Maya manual tier checklist
 └── threat-model.md        # threat model + security boundaries
 
 .github/
-├── workflows/ci.yml       # lint (ruff budget + monolith line + tool-count claims + assets append-only + README skeleton gates) + test matrix ubuntu/windows x 3.10/3.x + weekly drift canary (+ PyPI index probe lane, D-142γ) -> issue notify (D-112/D-123)
+├── workflows/ci.yml       # lint (ruff budget + monolith line + tool-count claims + count claims + assets append-only + README skeleton gates, plus the gate-registry consistency gate in its ::warning:: observation period) + test matrix ubuntu/windows x 3.10/3.x + weekly drift canary (+ PyPI index probe lane, D-142γ) -> issue notify (D-112/D-123)
 ├── workflows/release.yml  # tag v* -> test -> build -> publish (trusted publisher; env: pypi)
 ├── dependabot.yml         # weekly github-actions bumps, minor+patch grouped
 ├── ruff-baseline.json     # frozen lint budget {"src":{"RULE":N},"tests":{...}} — per-rule ratchet down only (T-10b/D-044)
@@ -102,6 +106,14 @@ docs/
 ├── scripts/check_llms_txt.py     # llms.txt derived from TOOL_ANNOTATIONS + 100-line cap (D-207 2)
 ├── scripts/check_version_consistency.py # pyproject == __init__ == CHANGELOG head == llms.txt (D-207 9)
 ├── scripts/liveness_probe.py # spawns the real server over stdio: liveness + tools/list + policy end-to-end (manual, preflight)
+├── scripts/check_count_claims.py # bare enumeration/count claims in live docs vs AST-derived families + denylist (D-216)
+├── scripts/check_gate_registry.py # pin-registry consistency, ships ::warning:: for one observation period (D-215)
+├── gate-registry.yaml   # HUMAN-AUTHORED pin registry — bound_class / expected_sources / pin_node_ids / exemption (D-215; never script-generated)
+├── polarity-corpus-spec.yaml # MIN_ADJUDICABLE + MIN_TN_PER_ELEMENT and their D-203 basis (D-214)
+├── llms-txt-spec.yaml  # llms.txt LINE_CAP (D-214)
+├── assets-append-only-spec.yaml # append-only GUARDED prefixes (D-214)
+├── release-appendix-spec.yaml # gate-tracker ISSUE default (D-214)
+├── liveness-probe-spec.yaml # MCP PROTOCOL revision (D-214)
 ├── assets-src/            # reproducible capture scripts for README imagery (t20/ scene generators; T-19c scene_build.py + capture.py kept for reference)
 └── assets/                # published README imagery (populated only after sign-off)
 ```
@@ -113,6 +125,8 @@ docs/
 3. **Large module handling** — GUI/Qt sessions inject modules of any size directly via the framed channel (16 MiB cap, D-013); temp-file injection is retained only for headless/native commandPort sessions
 4. **Response alignment** — `execute_code` handles both `str` and `dict` results to prevent `json.loads` errors
 5. **CoS notation** — Chain-of-Symbol format compacts scene tokens (the CoS paper reports ~65% savings vs JSON on its demo scenes, arXiv 2305.10276 — a paper figure, not a local benchmark)
+
+**Gate verification integrity**: all blocking CI gates must derive expected values externally, carry a counterfactual pin (test_*_fails_the_gate), and be registered in .github/gate-registry.yaml; bare enumeration claims in docs default to machine-checked carriers — see ADR-0029 (D-212..D-216)
 
 ## ICEV Workflow
 
@@ -243,6 +257,7 @@ Failure to update dependent files will cause integration failures.
 | `pipeline.py` strict policy flags (`MAYA_MCP_DISABLE_*`, D-207 1/7) | `docs/threat-model.md` §2/§3, `docs/guide/error-codes.md` (`policy_disabled` row), `llms.txt` escape-hatch section, `tests/test_pipeline.py::TestStrictPolicyMode` | One choke point: `on_call_tool` denies and `on_list_tools` hides. Adding a destructive tool without adding it to `MAYA_MCP_DISABLE_ARBITRARY` fails `test_the_three_dangerous_tools_are_exactly_the_covered_set`; adding an exception class without a doc row fails `check_error_codes.py` |
 | `llms.txt` / `docs/guide/**` (派生页) | `.github/scripts/check_llms_txt.py`, `.github/scripts/check_version_consistency.py`, `.github/scripts/check_error_codes.py`, `tests/test_check_d207_gates.py`, `.github/workflows/ci.yml` | Two of the three are DERIVED and gated, never hand-maintained: `llms.txt` from `TOOL_ANNOTATIONS`, `error-codes.md` from `security.py`, plus the version triple across pyproject/`__init__`/CHANGELOG — hand-editing any of those fails its own gate in CI (D-183 third-source rule). `docs/guide/session-lifecycle.md` is the exception and is **prose with AST-verified `path::symbol` anchors, not a derived page and not gated**; gating it would be a new ruling (D-207 3 legislated a page, not a checker). Do not describe it as derived |
 | `docs/adr/0028-elements.yaml` / tool descriptions | `.github/scripts/check_tdqs_disclosure.py`, `tests/test_check_tdqs_disclosure.py`, `docs/adr/0028-tdqs-description-quality.md`, `src/maya_mcp_server/pipeline.py` | D-175 disclosure ratchet: tool description elements and boundary targets must strictly satisfy 0028-elements.yaml; changes require PR explicit review |
+| `.github/gate-registry.yaml` / `check_gate_registry.py` / `check_count_claims.py` / `.github/*-spec.yaml` (治理载体面) | `.github/scripts/check_gate_registry.py`, `tests/test_check_gate_registry.py`, `tests/test_check_count_claims.py`, `.github/workflows/ci.yml`, `AGENTS.md`, `CHANGELOG.md` | ADR-0029 通则的落地面。改闸 → 必须同步登记条目（bound_class/expected_sources/pin_node_ids/exemption），登记**禁脚本生成**（D-215）；豁免条目必带 expires\|issue（D-215）。改治理常量 → 迁到对应 per-domain spec 文件，禁留在代码里（D-214）；spec 禁镜像对象实况（那是第二真源）。**baseline 语义条款（D-214⑤，落地）**：baseline 文件=「上一帧真源的存档」，每次**重新生成**，禁手写维护数字——适用 `.github/ruff-baseline.json`、`.github/monolith-budget.json`、`mypy-baseline.txt`、TDQS derivable-minimum-set。降低棘轮须在同 PR 说明理由；CI 永不写 baseline。与 spec 文件正交：spec 是人手编的治理常量，baseline 是生成物。新增 check_*.py → 登记表缺条目即红（D-215①），`.github/workflows/ci.yml` 未接线而自称 bound_class=gate 即否决权漂移红（D-212②）。`check_gate_registry` 处于 D-215④ 观察期（::warning:: 不阻塞），翻转条件=登记表落盘后首个正常 PR 周期走完 + 覆盖自查同 commit |
 | `CHANGELOG.md` / `docs/decision-ledger.md` / `docs/adr/**` / `docs/evidence/**` (证据指针) | `.github/evidence-anchor-forms.yaml`, `.github/scripts/check_evidence_anchors.py`, `tests/test_check_evidence_anchors.py`, `.github/workflows/ci.yml` | D-183 锚点形态白名单单源——脚本与模板双消费防双真源；裸 path:line=warn 升级提示，sha 钉死除漂移 |
 
 ### Injected-module admission criteria (注入模块准入判据, ADR-0027 + D-095)
