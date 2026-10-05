@@ -81,7 +81,7 @@ tests/
 └── test_presence_baseline.py    # presence-baseline auto-diff vs real Maya (D-049b/D-056①)
 
 docs/
-├── adr/                   # ADR-0001..0029 architecture decision records (incl. 0028-elements.yaml)
+├── adr/                   # ADR-0001..0030 architecture decision records (incl. 0028-elements.yaml)
 ├── decision-ledger.md     # grill decision ledger — canonical path since T-11a (D-041)
 ├── handoffs/              # round handoffs — canonical (next-round.md standing task book)
 ├── testing.md             # real-Maya manual tier checklist
@@ -126,7 +126,9 @@ docs/
 4. **Response alignment** — `execute_code` handles both `str` and `dict` results to prevent `json.loads` errors
 5. **CoS notation** — Chain-of-Symbol format compacts scene tokens (the CoS paper reports ~65% savings vs JSON on its demo scenes, arXiv 2305.10276 — a paper figure, not a local benchmark)
 
-**Gate verification integrity**: all blocking CI gates must derive expected values externally, carry a counterfactual pin (test_*_fails_the_gate), and be registered in .github/gate-registry.yaml; bare enumeration claims in docs default to machine-checked carriers — see ADR-0029 (D-212..D-216)
+**Gate verification integrity**: all blocking CI gates must derive expected values externally, carry a counterfactual pin (three-class taxonomy — `test_*_fails_the_gate` canon applies to counterfactual pins only; live controls keep descriptive names and MUST NOT use the suffix — see ADR-0030), and be registered in .github/gate-registry.yaml; bare enumeration claims in docs default to machine-checked carriers — see ADR-0029 (D-212..D-216, D-225)
+
+**Handoff carrier**: all handoff documents (grill/audit/exec/handoff) must land in `.scratch/{slug}/handoffs/` — `%TEMP%` and any off-repo path are banned as handoff carriers; a skill's `%TEMP%` default is explicitly void for this repo. Cross-round decision content folds into ADR/ledger (fold-then-delete), so handoff files themselves may stay unversioned — see ADR-0030 §6 (D-226①)
 
 ## ICEV Workflow
 

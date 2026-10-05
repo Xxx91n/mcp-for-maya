@@ -395,7 +395,7 @@ ADR 内常设的 known-gap 注册表宿主章节（D-200——ADR-0028 缺口披
 判定面期望值与测量值同源流动的失效形态（D-212——arXiv 2608.17214「specification-anchored vs state-anchored」分类学）——期望值若从被测系统自身传递性流动，故障同时移动两侧使比较精确抵消、闸结构性不可能红；立法对治=期望值必须由被闸对象之外的真源锚定。_Avoid_: 闸内嵌治理常量自证、spec 文件镜像对象实况造第二真源、把「期望值有出处」当充分条件（出处须独立于对象）
 
 **反事实钉 (counterfactual pin)**:
-判定闸的腐坏实验件（D-213——ESLint RuleTester 断言力条款/OPA --fail-on-empty 同构）——注入变异使被闸对象故意变坏、断言闸返回红（main()==1），与 live-green 阳性对照成对；唯一默认形态=进程内 pytest 钉（monkeypatch 常量→tmp_path 腐坏副本），命名 test_*_fails_the_gate+counterfactual docstring，钉必须携带非空红断言且被 CI 实际执行。_Avoid_: 只跑不断言的空壳钉、钉存在但 CI 不跑（回永绿）、fixture 文件库默认化（无执行不证伪）、拿闸代码变异当钉（错层）
+判定闸的腐坏实验件（D-213——ESLint RuleTester 断言力条款/OPA --fail-on-empty 同构）——注入变异使被闸对象故意变坏、断言闸返回红（main()==1），与 live-green 阳性对照成对；唯一默认形态=进程内 pytest 钉（monkeypatch 常量→tmp_path 腐坏副本），命名 test_*_fails_the_gate+counterfactual docstring 与非空红断言义务（此三要件经 ADR-0030 明确为**反事实钉专属**类别义务；D-225）。_Avoid_: 只跑不断言的空壳钉、钉存在但 CI 不跑（回永绿）、fixture 文件库默认化（无执行不证伪）、拿闸代码变异当钉（错层）
 
 **治理常量 vs 机制常量 (governance vs mechanism constant)**:
 外部派生义务的判别二分（D-214——12-Factor config litmus 变体+reversal test）——会因治理决策变化而变化的值=治理常量须迁出脚本入外部真源、其修改须 PR 审计回滚；只影响闸如何检测/不影响判定什么是对的=机制常量豁免迁出、随 code review 直接改。_Avoid_: 拿「常量都该外置」一刀切（机制参数外置=维护噪音）、治理常量藏脚本内自证、baseline 文件手写维护数字（其=上一帧真源存档每次重生成）
@@ -408,6 +408,18 @@ ADR 内常设的 known-gap 注册表宿主章节（D-200——ADR-0028 缺口披
 
 **终止层 (termination layer)**:
 「谁钉钉者」递归的承认性收束（D-213——Matryoshka 论证）——登记表一致性闸自身的钉=喂腐坏登记表→红，其内容正确性由普通 code review 守护、终止于人类层，不再加第四层机器闸；承认终止层比假装无限机检更诚实。_Avoid_: 给登记表闸再配机器闸（伪递归）、把终止层当缺陷隐藏而非立法披露
+
+**live 对照钉 (live-green control)**:
+反事实钉的阳性配对（ADR-0030——ESLint RuleTester valid 轨禁带 errors 属性同构）——在真仓库上跑闸断言当前绿；保留描述名（建议 *_is_green|_passes|_holds|_consistent 收敛面）且**禁 fails_the_gate 后缀**（套错后缀=形式撒谎，R46 审计 M1 实证）；可入 pin_node_ids 但不满足「≥1 反事实钉」义务。_Avoid_: 把对照钉注册成反事实钉（假覆盖）、给对照钉补 counterfactual docstring（文档撒谎）
+
+**性质断言 (property assertion)**:
+规格陈述型回归测试的迁出类（ADR-0030）——验证的是脚本行为的文档化性质（幂等性/打印格式/边界容差），非「注入故障→闸红」也非「真仓库→绿」；迁出 pin_node_ids 使登记语义纯化为「pin=能判红者」，测试本身保留为普通测试。_Avoid_: 性质断言占 pin_node_ids 充钉数（登记表看起来有钉实则无可判红者）、因迁出而删测试（迁出≠退役）
+
+**交接载体 (handoff carrier)**:
+交接文档的法定落点条款（D-226①——AWS OPS07-BP03 runbook 版本控制+mattpocock/skills #596+#272 同形事故先例）——一切交接文档（grill/audit/exec/handoff）必须落 .scratch/{slug}/handoffs/，%TEMP% 及仓外路径禁作交接载体；skill 默认对本仓显式无效（工具默认与仓内惯例冲突时仓内惯例优先）；跨轮决策内容按 fold-then-delete 折叠进 ADR/ledger 后交接文件允许不版本化（.scratch 不版本化=跨机器存活换 commit 降噪的明示取舍）。_Avoid_: 交接落 %TEMP%（跨会话失效已致一次真实丢失）、为交接文件开 .scratch 版本化（commit 噪音）、把交接当第二真源不复读（承载内容须折叠进 ADR/ledger）
+
+**孤儿钉 (orphan counterfactual pin)**:
+R8 覆盖边界的披露类残余盲（D-227④）——fails_the_gate 钉落在无 bound 对象对应的测试文件内即机器不可见（R8 只扫 bound 对象测试文件，不扫全 tests/ 为刻意克制防误伤普通业务测试）；补闸扫描=过度机检，如实披露不假装覆盖。_Avoid_: 把孤儿钉当机检能抓的缺陷报告（边界外）、为堵此洞放开 R8 全扫（误伤面大于捕获面）
 
 **否决权判据 (veto-power criterion)**:
 通则义务级的分级标尺（D-212）——一个对象是否受全额约束取决于它是否握有红/绿否决权：有否决权的守卫必须证明自己会红；无否决权的探针/仪器降级为敏感度实验（注入已知故障→产出非零 verdict），其 verdict 若被下游当硬门消费=裁决权漂移→升格全责或显式标 non-gating。_Avoid_: 给无否决权对象立红/绿义务（形态错配）、探针 verdict 隐性变门禁（漂移不立界）

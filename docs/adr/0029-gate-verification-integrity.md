@@ -28,7 +28,9 @@
 | 人工清单行 | 证据指针义务 | 豁免（定义上不可自动化） | 四眼原则为唯一现实缓解 |
 | pytest 套件 | 豁免 | 豁免——测试本身就是①②③的钉 | 可选范围化变异测试作健康指标 |
 
-### 3. 钉形态法典化（D-213）
+### 3. 钉形态法典化（D-213，类别语义经 ADR-0030 修订）
+
+> **supersession note（2026-10-05, D-225）**：本节「钉=单一形态 test_*_fails_the_gate」被 ADR-0030 三类法典取代（反事实钉/live 对照钉/性质断言——单类法典对混装登记面结构性不可执行，R46 审计 M1 实证）。本节进程内 pytest 形态、断言力条款、fixture 例外、递归终止三件套、mutmut 定位仍有效，类别义务以 ADR-0030 为准。
 
 - 唯一默认形态=**进程内 pytest 钉**：monkeypatch 闸模块目标常量→tmp_path 腐坏副本→断言 main()==1；与 live-green 阳性对照（真闸 subprocess rc==0）成对；
 - **钉断言力条款**：钉必须携带非空红断言（ESLint RuleTester「invalid cases must have at least one error」同构），命名 test_*_fails_the_gate+counterfactual docstring；
