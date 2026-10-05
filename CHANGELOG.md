@@ -9,43 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Strict policy mode (D-207 ①⑦)** — three operator flags
-  (`MAYA_MCP_DISABLE_EXECUTE`, `MAYA_MCP_DISABLE_WRITE_MODULE`,
-  `MAYA_MCP_DISABLE_ARBITRARY`) remove escape-hatch tools from `tools/list` and
-  deny the call with `[policy_disabled]`, audited as `rejected`. One choke
-  point in the pipeline, none in the tool bodies; read-only tools unaffected.
-  Evidence: `tests/test_pipeline.py::TestStrictPolicyMode` (19 collected: 5 functions,
-  parametrised), plus `.github/scripts/liveness_probe.py` — a committed probe that
-  spawns the real server over stdio and observes 25 tools by default and 22 under
-  `MAYA_MCP_DISABLE_ARBITRARY=1`, with 0 escapes leaked and the read-class surface
-  retained. It reads its expectation from `POLICY_ENV_FLAGS`, so it cannot assert
-  a stale set.
-  `src/maya_mcp_server/pipeline.py::policy_disabled_tools`,
-  `src/maya_mcp_server/security.py::PolicyDisabledError`.
-
-- **`llms.txt` discovery file + generator gate (D-207 ②)** — 75 lines, under
-  the 100-line cap, DERIVED from `pipeline.TOOL_ANNOTATIONS` and each tool’s own
-  docstring. Hand-editing it fails the lint job.
-  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker` (12 collected),
-  `python .github/scripts/check_llms_txt.py` → `llms.txt OK: 75 lines, 25 tools`.
-
-- **Error-code reference page + code-set gate (D-207 ④)** —
-  `docs/guide/error-codes.md` is derived from `security.py`; the gate fails on
-  drift in EITHER direction (a code with no row, a row with no code). The
-  precondition was verified first: the D-019 `[code]` prefix contract already
-  existed, so the page is not a standalone promise.
-  Evidence: `tests/test_check_d207_gates.py::TestErrorCodesChecker` (8 collected),
-  `python .github/scripts/check_error_codes.py` → `10 codes, doc set == code set`.
-
-- **Session-lifecycle matrix (D-207 ③)** — `docs/guide/session-lifecycle.md`,
-  one page, four columns (exit path × teardown trigger × residual state ×
-  worst-case residual window), marked as a summary view subordinate to the ADR.
-  Evidence: its nine anchor references — eight `path::symbol` plus one ADR file
-  path — each verified to resolve, with the composition itself machine-checked by
-  `tests/test_check_d207_gates.py::TestErrorCodesChecker::test_session_lifecycle_anchor_composition_is_what_the_changelog_claims`;
-  `tests/test_session_manager.py::TestCodedSessionErrors::test_no_sessions_raises_coded`,
-  `tests/test_module_teardown.py::TestCreateModuleTeardown::test_teardown_called_and_resources_closed`.
-
 - **Version-consistency gate (D-207 ⑨)** —
   `check_version_consistency.py` asserts pyproject == `__init__.__version__` ==
   CHANGELOG newest released section == the `llms.txt` version field, and
@@ -96,6 +59,68 @@ dimensions=5, shot types=8`.
   second source of truth.
   Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_min_adjudicable_has_a_provenance_note`,
   `tests/test_liveness_probe_sensitivity.py::test_the_protocol_revision_comes_from_the_spec_file`.
+
+### Changed
+
+- **Sample-size floor counts verdict-bearing labels only (D-203)** —
+  `MIN_ADJUDICABLE` in the polarity corpus probe measured `len(LABELLED_CORPUS)`,
+  so `known_limitation` samples — which record a clause-scope trade the design
+  made on purpose and can never move a verdict — counted toward the floor that
+  gates a verdict. The floor now counts `true_negative + forgiven` only, and each
+  guarded element independently needs ≥ 3 true negatives, so one element
+  carrying the whole corpus cannot pass. The corpus gained 5 track-3 promotions
+  (3 TN, 2 F) covering the `cannot`/`without` cue prefixes and the mirror-image
+  clause position. Measured: 14 samples, adjudicable 12 == the floor,
+  per-element TN 7 ≥ 3, 0 disagreements with the hand labels.
+  Evidence: `tests/test_polarity_corpus_probe.py` (11 collected),
+  `python .github/scripts/polarity_corpus_probe.py` → `TRACK2 (labelled)`.
+
+- **Line endings land in pre-commit, not CI (D-205 ③)** — `mixed-line-ending
+--fix=lf` added to `.pre-commit-config.yaml`. The justification is measured,
+  not asserted: before this hook landed, on this Windows host, 29 tracked files
+  carried CRLF in the worktree while 0 of those carried CRLF in their HEAD blob.
+  So `.gitattributes` already normalises at commit, and a CI line-ending scan
+  would be a permanently green dead check. The pre-commit layer is where worktree
+  bytes actually get fixed — and having now fixed them, the same scan returns 0
+  for this worktree. Evidence: the "Assertion & Evidence Discipline" section in
+  AGENTS.md carries the mechanism pointer; the hook is the `mixed-line-ending`
+  entry in `.pre-commit-config.yaml`.
+
+- **`AGENTS.md` gains an Assertion & Evidence Discipline section (D-205 ①②)** —
+  three imperative rules in 9 lines, citing D-205 at the head: enumeration/count
+  assertions declare their domain or state the rule instead; versioned-doc
+  enumeration/count/retirement assertions default to a machine-checked carrier
+  while calibration claims stay prose under D-149; anything not reproducible is
+  recorded as “unverified” rather than assigned a guessed cause.
+  Evidence: the "Assertion & Evidence Discipline" section in AGENTS.md; the rule it
+  states is machine-enforced by
+  `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_the_old_basis_would_have_been_met_earlier`.
+
+- **TDQS disclosure ratchet CI gate (D-175)** — static AST and JSON
+  validation script `.github/scripts/check_tdqs_disclosure.py:1` hard-gated in
+  CI lint workflow (`.github/workflows/ci.yml:51`), enforcing 30 required
+  disclosure elements across 11 tools against single-source specification
+  `docs/adr/0028-elements.yaml:1`, backed by unit test suite
+  `tests/test_check_tdqs_disclosure.py:1` (5 passed).
+
+- **TDQS polarity mechanism hardened to clause scope (D-190)** — the
+  mutation-class existence guard in
+  `.github/scripts/check_tdqs_disclosure.py::_negated` scopes the negation
+  window to the enclosing clause instead of a fixed 80-char window, and
+  `docs/adr/0028-elements.yaml` gains the element-level `positive_exemptions`
+  field plus the polarity direction limit (the guard applies only to purely
+  positive pattern sets; negation-form elements stay unguarded). Negated-only
+  matches stay warn-level. The two-track corpus measurement D-191①c requires is
+  now a committed instrument instead of a per-round scratch probe:
+  `.github/scripts/polarity_corpus_probe.py` (manual, not wired into CI).
+  Evidence — environment: Python 3.11.9 on Windows;
+  `python -m pytest tests/test_check_tdqs_disclosure.py -q` -> exit 0,
+  17 passed, artifact in-repo
+  (`tests/test_check_tdqs_disclosure.py::test_polarity_cross_clause_cue_does_not_negate`,
+  `tests/test_check_tdqs_disclosure.py::test_polarity_same_clause_exemption_forgives_cue`,
+  `tests/test_check_tdqs_disclosure.py::test_live_corpus_has_no_polarity_warnings`);
+  `python .github/scripts/check_tdqs_disclosure.py` -> exit 0, 36 elements
+  across 12 tools, artifact `.github/scripts/check_tdqs_disclosure.py`.
 
 ### Fixed
 
@@ -179,6 +204,96 @@ dimensions=5, shot types=8`.
   `tests/test_check_tdqs_disclosure.py::test_due_warns_but_does_not_bite_on_the_deadline_itself`,
   `python .github/scripts/check_tdqs_disclosure.py` → exit 0.
 
+- **The per-element sample floor could report a false green** — the thin-element
+  list iterated the true-negative dict instead of the guarded elements, so an
+  element with zero true negatives had no key, was skipped, and fell through to
+  the branch announcing that every element cleared the floor. The floor verdict is
+  now reported independently of the label-agreement verdict, so a disagreement
+  can no longer swallow a floor violation.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_element_with_zero_true_negatives_is_reported_not_passed`.
+
+- **The overdue-exemption message misdescribed the D-168 ④ renewal requirements** —
+  it listed five items of our own invention. The real five (D-168 ④ as revised by
+  D-176) are a `gate_authority` countersignature distinct from the `debt_owner`, an
+  event-anchored rather than calendar expiry, the per-row renewal cap of 2, a
+  re-validated reason, and the waiver lane closing after gate review.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`.
+
+## [0.6.0] - 2026-10-05
+
+Release-bearing floor update. Tag 语义基点历史锚：`f97857f`（exec-A: R44 description floor, #67）。本版本依据 D-224 改锚至 HEAD bump commit 发布，包含描述地板重写、严格策略模式及用户面发现治理；R46 纯 CI 治理件保留在 [Unreleased]。
+
+### Added
+
+- **Strict policy mode (D-207 ①⑦)** — three operator flags
+  (`MAYA_MCP_DISABLE_EXECUTE`, `MAYA_MCP_DISABLE_WRITE_MODULE`,
+  `MAYA_MCP_DISABLE_ARBITRARY`) remove escape-hatch tools from `tools/list` and
+  deny the call with `[policy_disabled]`, audited as `rejected`. One choke
+  point in the pipeline, none in the tool bodies; read-only tools unaffected.
+  Evidence: `tests/test_pipeline.py::TestStrictPolicyMode` (19 collected: 5 functions,
+  parametrised), plus `.github/scripts/liveness_probe.py` — a committed probe that
+  spawns the real server over stdio and observes 25 tools by default and 22 under
+  `MAYA_MCP_DISABLE_ARBITRARY=1`, with 0 escapes leaked and the read-class surface
+  retained. It reads its expectation from `POLICY_ENV_FLAGS`, so it cannot assert
+  a stale set.
+  `src/maya_mcp_server/pipeline.py::policy_disabled_tools`,
+  `src/maya_mcp_server/security.py::PolicyDisabledError`.
+
+- **`llms.txt` discovery file + generator gate (D-207 ②)** — 75 lines, under
+  the 100-line cap, DERIVED from `pipeline.TOOL_ANNOTATIONS` and each tool’s own
+  docstring. Hand-editing it fails the lint job.
+  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker` (12 collected),
+  `python .github/scripts/check_llms_txt.py` → `llms.txt OK: 75 lines, 25 tools`.
+
+- **Error-code reference page + code-set gate (D-207 ④)** —
+  `docs/guide/error-codes.md` is derived from `security.py`; the gate fails on
+  drift in EITHER direction (a code with no row, a row with no code). The
+  precondition was verified first: the D-019 `[code]` prefix contract already
+  existed, so the page is not a standalone promise.
+  Evidence: `tests/test_check_d207_gates.py::TestErrorCodesChecker` (8 collected),
+  `python .github/scripts/check_error_codes.py` → `10 codes, doc set == code set`.
+
+- **Session-lifecycle matrix (D-207 ③)** — `docs/guide/session-lifecycle.md`,
+  one page, four columns (exit path × teardown trigger × residual state ×
+  worst-case residual window), marked as a summary view subordinate to the ADR.
+  Evidence: its nine anchor references — eight `path::symbol` plus one ADR file
+  path — each verified to resolve, with the composition itself machine-checked by
+  `tests/test_check_d207_gates.py::TestErrorCodesChecker::test_session_lifecycle_anchor_composition_is_what_the_changelog_claims`;
+  `tests/test_session_manager.py::TestCodedSessionErrors::test_no_sessions_raises_coded`,
+  `tests/test_module_teardown.py::TestCreateModuleTeardown::test_teardown_called_and_resources_closed`.
+
+### Changed
+
+- **TDQS description quality architecture decision record (D-174)** —
+  `docs/adr/0028-tdqs-description-quality.md:1` and machine-readable specification
+  `docs/adr/0028-elements.yaml:1` establishing P0 required disclosure elements
+  and single-direction `Boundary:` conventions.
+
+- **P0 core tool descriptions rewritten (D-172, ADR-0028 §2)** —
+  `execute_code` (`src/maya_mcp_server/server.py:345`) rewritten to disclose
+  arbitrary code scope, full session privileges, irreversible execution,
+  `result_type` envelope, and session prerequisites; `write_module`
+  (`src/maya_mcp_server/server.py:292`) rewritten to disclose session
+  prerequisites, in-memory overwrite semantics, and `execute_code` boundary;
+  `scene_validate` (`src/maya_mcp_server/scene_tools.py:473`) rewritten to
+  disclose read-only spatial constraints without `auto_fix` mutations, session
+  prerequisites, and disambiguation boundaries.
+
+- **P1 scene analysis tool disambiguation boundaries (D-173, ADR-0028 §3)** —
+  added single-direction `Boundary:` lines across 9 scene tools in
+  `src/maya_mcp_server/scene_tools.py:147` and
+  `src/maya_mcp_server/introspect_tools.py:35` to eliminate conceptual
+  overlap across spatial inspection and auditing tools.
+
+- **Tool instructions and threat model alignment (D-173④)** — synchronized
+  FastMCP server instructions (`src/maya_mcp_server/server.py:67`) and
+  security threat model (`docs/threat-model.md:162`) to reflect `execute_code`
+  arbitrary execution privilege and `scene_validate` read-only constraint semantics.
+
+### Fixed
+
 - **`check_error_codes.py` crashed on a doc path outside the repo** — the gate
   called `Path.relative_to(REPO)` unguarded, so a test pointing it at a tmp
   path raised `ValueError` instead of reporting drift. Caught by
@@ -206,115 +321,6 @@ dimensions=5, shot types=8`.
   itself an error.
   Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
   Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_a_tool_absent_from_the_page_is_reported`.
-
-- **The per-element sample floor could report a false green** — the thin-element
-  list iterated the true-negative dict instead of the guarded elements, so an
-  element with zero true negatives had no key, was skipped, and fell through to
-  the branch announcing that every element cleared the floor. The floor verdict is
-  now reported independently of the label-agreement verdict, so a disagreement
-  can no longer swallow a floor violation.
-  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
-  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_element_with_zero_true_negatives_is_reported_not_passed`.
-
-- **The overdue-exemption message misdescribed the D-168 ④ renewal requirements** —
-  it listed five items of our own invention. The real five (D-168 ④ as revised by
-  D-176) are a `gate_authority` countersignature distinct from the `debt_owner`, an
-  event-anchored rather than calendar expiry, the per-row renewal cap of 2, a
-  re-validated reason, and the waiver lane closing after gate review.
-  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
-  Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`.
-
-### Changed
-
-- **Sample-size floor counts verdict-bearing labels only (D-203)** —
-  `MIN_ADJUDICABLE` in the polarity corpus probe measured `len(LABELLED_CORPUS)`,
-  so `known_limitation` samples — which record a clause-scope trade the design
-  made on purpose and can never move a verdict — counted toward the floor that
-  gates a verdict. The floor now counts `true_negative + forgiven` only, and each
-  guarded element independently needs ≥ 3 true negatives, so one element
-  carrying the whole corpus cannot pass. The corpus gained 5 track-3 promotions
-  (3 TN, 2 F) covering the `cannot`/`without` cue prefixes and the mirror-image
-  clause position. Measured: 14 samples, adjudicable 12 == the floor,
-  per-element TN 7 ≥ 3, 0 disagreements with the hand labels.
-  Evidence: `tests/test_polarity_corpus_probe.py` (11 collected),
-  `python .github/scripts/polarity_corpus_probe.py` → `TRACK2 (labelled)`.
-
-- **Line endings land in pre-commit, not CI (D-205 ③)** — `mixed-line-ending
---fix=lf` added to `.pre-commit-config.yaml`. The justification is measured,
-  not asserted: before this hook landed, on this Windows host, 29 tracked files
-  carried CRLF in the worktree while 0 of those carried CRLF in their HEAD blob.
-  So `.gitattributes` already normalises at commit, and a CI line-ending scan
-  would be a permanently green dead check. The pre-commit layer is where worktree
-  bytes actually get fixed — and having now fixed them, the same scan returns 0
-  for this worktree. Evidence: the "Assertion & Evidence Discipline" section in
-  AGENTS.md carries the mechanism pointer; the hook is the `mixed-line-ending`
-  entry in `.pre-commit-config.yaml`.
-
-- **`AGENTS.md` gains an Assertion & Evidence Discipline section (D-205 ①②)** —
-  three imperative rules in 9 lines, citing D-205 at the head: enumeration/count
-  assertions declare their domain or state the rule instead; versioned-doc
-  enumeration/count/retirement assertions default to a machine-checked carrier
-  while calibration claims stay prose under D-149; anything not reproducible is
-  recorded as “unverified” rather than assigned a guessed cause.
-  Evidence: the "Assertion & Evidence Discipline" section in AGENTS.md; the rule it
-  states is machine-enforced by
-  `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_the_old_basis_would_have_been_met_earlier`.
-
-- **TDQS disclosure ratchet CI gate (D-175)** — static AST and JSON
-  validation script `.github/scripts/check_tdqs_disclosure.py:1` hard-gated in
-  CI lint workflow (`.github/workflows/ci.yml:51`), enforcing 30 required
-  disclosure elements across 11 tools against single-source specification
-  `docs/adr/0028-elements.yaml:1`, backed by unit test suite
-  `tests/test_check_tdqs_disclosure.py:1` (5 passed).
-
-- **TDQS description quality architecture decision record (D-174)** —
-  `docs/adr/0028-tdqs-description-quality.md:1` and machine-readable specification
-  `docs/adr/0028-elements.yaml:1` establishing P0 required disclosure elements
-  and single-direction `Boundary:` conventions.
-
-### Changed
-
-- **P0 core tool descriptions rewritten (D-172, ADR-0028 §2)** —
-  `execute_code` (`src/maya_mcp_server/server.py:345`) rewritten to disclose
-  arbitrary code scope, full session privileges, irreversible execution,
-  `result_type` envelope, and session prerequisites; `write_module`
-  (`src/maya_mcp_server/server.py:292`) rewritten to disclose session
-  prerequisites, in-memory overwrite semantics, and `execute_code` boundary;
-  `scene_validate` (`src/maya_mcp_server/scene_tools.py:473`) rewritten to
-  disclose read-only spatial constraints without `auto_fix` mutations, session
-  prerequisites, and disambiguation boundaries.
-
-- **P1 scene analysis tool disambiguation boundaries (D-173, ADR-0028 §3)** —
-  added single-direction `Boundary:` lines across 9 scene tools in
-  `src/maya_mcp_server/scene_tools.py:147` and
-  `src/maya_mcp_server/introspect_tools.py:35` to eliminate conceptual
-  overlap across spatial inspection and auditing tools.
-
-- **Tool instructions and threat model alignment (D-173④)** — synchronized
-  FastMCP server instructions (`src/maya_mcp_server/server.py:67`) and
-  security threat model (`docs/threat-model.md:162`) to reflect `execute_code`
-  arbitrary execution privilege and `scene_validate` read-only constraint semantics.
-
-- **TDQS polarity mechanism hardened to clause scope (D-190)** — the
-  mutation-class existence guard in
-  `.github/scripts/check_tdqs_disclosure.py::_negated` scopes the negation
-  window to the enclosing clause instead of a fixed 80-char window, and
-  `docs/adr/0028-elements.yaml` gains the element-level `positive_exemptions`
-  field plus the polarity direction limit (the guard applies only to purely
-  positive pattern sets; negation-form elements stay unguarded). Negated-only
-  matches stay warn-level. The two-track corpus measurement D-191①c requires is
-  now a committed instrument instead of a per-round scratch probe:
-  `.github/scripts/polarity_corpus_probe.py` (manual, not wired into CI).
-  Evidence — environment: Python 3.11.9 on Windows;
-  `python -m pytest tests/test_check_tdqs_disclosure.py -q` -> exit 0,
-  17 passed, artifact in-repo
-  (`tests/test_check_tdqs_disclosure.py::test_polarity_cross_clause_cue_does_not_negate`,
-  `tests/test_check_tdqs_disclosure.py::test_polarity_same_clause_exemption_forgives_cue`,
-  `tests/test_check_tdqs_disclosure.py::test_live_corpus_has_no_polarity_warnings`);
-  `python .github/scripts/check_tdqs_disclosure.py` -> exit 0, 36 elements
-  across 12 tools, artifact `.github/scripts/check_tdqs_disclosure.py`.
-
-### Fixed
 
 - **MCP ImageContent snake_case attribute alignment** — align `mt.ImageContent`
   instantiation to use standard snake_case `mime_type` instead of deprecated
