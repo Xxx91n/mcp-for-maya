@@ -135,7 +135,7 @@ dimensions=5, shot types=8`.
   it. Renamed to the canon form and gave each an explicit counterfactual
   docstring; the live-green control keeps its descriptive name because it is a
   positive control, not a counterfactual.
-  Broken: through 0.5.0 (unreleased lane) · Fixed: 0.5.0 → [Unreleased].
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
   Evidence: `tests/test_check_gate_registry.py::test_a_helper_function_named_as_a_pin_fails_the_gate`,
   `tests/test_check_gate_registry.py::test_a_module_constant_named_as_a_pin_fails_the_gate`,
   `tests/test_check_gate_registry.py::test_a_non_test_class_method_named_as_a_pin_fails_the_gate`,
@@ -149,7 +149,7 @@ dimensions=5, shot types=8`.
   `polarity_corpus_probe.py:206-215`, a form D-183 holds drifts on every edit and
   flags at warn level. It also cited a line range that the same record's own
   derivation pin makes redundant. Now `path::symbol`.
-  Broken: through 0.5.0 (unreleased lane) · Fixed: 0.5.0 → [Unreleased].
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
   Evidence: `python .github/scripts/check_evidence_anchors.py` → this file
   contributes 0 warnings (total 41 → 40).
 
@@ -158,7 +158,7 @@ dimensions=5, shot types=8`.
   floor numerator came out multiplied by the number of guarded elements. With
   one guarded element the arithmetic coincides with the correct reading, which
   is exactly why the live-green test could not see it.
-  Broken: through 0.5.0 (unreleased lane) · Fixed: 0.5.0 → [Unreleased].
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
   Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_per_element_counting_unit_is_the_sample_not_the_element_pair`;
   `python .github/scripts/polarity_corpus_probe.py` → `samples=14`,
   `adjudicable (true_negative + forgiven) = 12`, per D-203's arithmetic.
@@ -170,7 +170,7 @@ dimensions=5, shot types=8`.
   have looked for an 11-dimension breakdown that does not exist. Both strings
   were agent-facing, and the count-claims gate reads docs rather than source,
   so nothing else would have caught it.
-  Broken: through 0.5.0 · Fixed: 0.5.0 → [Unreleased].
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
   Evidence: `tests/test_check_count_claims.py::test_derivers_read_live_source_literals`;
   `python .github/scripts/check_count_claims.py` → `aesthetic dimensions=5`.
 
@@ -178,7 +178,7 @@ dimensions=5, shot types=8`.
   (D-221 ② / S3)** — hard admission to the TDQS gate needs the floor AND the
   primary track's zero-false-rejection verdict, but printing only the floor
   verdict let "floor met" read as the whole promotion decision.
-  Broken: through 0.5.0 · Fixed: 0.5.0 → [Unreleased].
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
   Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_s3_two_precondition_caveat_is_printed`.
 
 - **`check_readme_skeleton` had been a CI gate with no pins since D-072** —
@@ -187,7 +187,7 @@ dimensions=5, shot types=8`.
   nothing able to fail it. It now takes a `check(repo)` seam and carries 11 tests: 8 counterfactual
   reds plus 3 green controls, of which 4 are registered as pins. It was the one entry the new registry's zero-pin guard
   flagged on arrival.
-  Broken: through 0.5.0 · Fixed: 0.5.0 → [Unreleased].
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
   Evidence: `tests/test_check_readme_skeleton.py` (11 tests, incl.
   `test_dropped_heading_in_the_mirror_is_red` and
   `test_the_real_repo_mirror_is_green`).
@@ -197,9 +197,9 @@ dimensions=5, shot types=8`.
   deadline for a release stayed open-ended for free: the check could not fail,
   which is the blind spot D-195 4 exists to close. Now `== due` warns (the
   release landing ON the deadline stays green) and `> due` errors, naming the
-  five D-168 renewal elements. Broken from D-195 4 through 0.5.0; fixed in the
-  next release. All 12 live exemptions are due 0.7.0 against version 0.5.0, so
-  the 0.6.0 release stays green.
+  five D-168 renewal elements. All 12 live exemptions are due 0.7.0 against
+  version 0.5.0, so the 0.6.0 release stays green.
+  Broken version: from D-195 4 through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
   Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`,
   `tests/test_check_tdqs_disclosure.py::test_due_warns_but_does_not_bite_on_the_deadline_itself`,
   `python .github/scripts/check_tdqs_disclosure.py` → exit 0.
@@ -292,6 +292,14 @@ Release-bearing floor update. Tag 语义基点历史锚：`f97857f`（exec-A: R4
   security threat model (`docs/threat-model.md:162`) to reflect `execute_code`
   arbitrary execution privilege and `scene_validate` read-only constraint semantics.
 
+- **Description floor rewrite — `scene_measure` measurement contract (R44, D-195/D-196)** —
+  the scene-measurement descriptions were rewritten to the disclosure floor
+  (explicit units, frame/session prerequisites, read-only boundary), landing as
+  the release-bearing `exec-A` batch `f97857f` recorded as the tag semantic
+  basepoint above.
+  Evidence: `f97857f:src/maya_mcp_server/scene_tools.py:376`,
+  `tests/test_scene_tools.py::TestCosFormatterIntegration::test_format_measure_cos_roundtrip`.
+
 ### Fixed
 
 - **`check_error_codes.py` crashed on a doc path outside the repo** — the gate
@@ -328,6 +336,7 @@ Release-bearing floor update. Tag 语义基点历史锚：`f97857f`（exec-A: R4
   `call-arg` violation and `FastMCPDeprecationWarning` during viewport
   snapshot processing with MCP SDK v2 (`tests/test_visual_tools.py:245`,
   `tests/test_visual_tools.py:259`).
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
 
 - **FastMCP 4.x / 2.14.x test harness compatibility** — adapt test suite for
   library upgrades: import `ToolResult` with fallback order from
@@ -337,6 +346,7 @@ Release-bearing floor update. Tag 语义基点历史锚：`f97857f`（exec-A: R4
   tool tests (`tests/test_qt_channel.py:636`,
   `tests/test_scene_tools_json.py:255`), and filter warnings ahead of imports
   in conftest (`tests/conftest.py:33`).
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
 
 ## [0.5.0] - 2026-09-30
 
