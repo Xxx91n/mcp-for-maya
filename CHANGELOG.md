@@ -9,43 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Strict policy mode (D-207 ①⑦)** — three operator flags
-  (`MAYA_MCP_DISABLE_EXECUTE`, `MAYA_MCP_DISABLE_WRITE_MODULE`,
-  `MAYA_MCP_DISABLE_ARBITRARY`) remove escape-hatch tools from `tools/list` and
-  deny the call with `[policy_disabled]`, audited as `rejected`. One choke
-  point in the pipeline, none in the tool bodies; read-only tools unaffected.
-  Evidence: `tests/test_pipeline.py::TestStrictPolicyMode` (19 collected: 5 functions,
-  parametrised), plus `.github/scripts/liveness_probe.py` — a committed probe that
-  spawns the real server over stdio and observes 25 tools by default and 22 under
-  `MAYA_MCP_DISABLE_ARBITRARY=1`, with 0 escapes leaked and the read-class surface
-  retained. It reads its expectation from `POLICY_ENV_FLAGS`, so it cannot assert
-  a stale set.
-  `src/maya_mcp_server/pipeline.py::policy_disabled_tools`,
-  `src/maya_mcp_server/security.py::PolicyDisabledError`.
-
-- **`llms.txt` discovery file + generator gate (D-207 ②)** — 75 lines, under
-  the 100-line cap, DERIVED from `pipeline.TOOL_ANNOTATIONS` and each tool’s own
-  docstring. Hand-editing it fails the lint job.
-  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker` (12 collected),
-  `python .github/scripts/check_llms_txt.py` → `llms.txt OK: 75 lines, 25 tools`.
-
-- **Error-code reference page + code-set gate (D-207 ④)** —
-  `docs/guide/error-codes.md` is derived from `security.py`; the gate fails on
-  drift in EITHER direction (a code with no row, a row with no code). The
-  precondition was verified first: the D-019 `[code]` prefix contract already
-  existed, so the page is not a standalone promise.
-  Evidence: `tests/test_check_d207_gates.py::TestErrorCodesChecker` (8 collected),
-  `python .github/scripts/check_error_codes.py` → `10 codes, doc set == code set`.
-
-- **Session-lifecycle matrix (D-207 ③)** — `docs/guide/session-lifecycle.md`,
-  one page, four columns (exit path × teardown trigger × residual state ×
-  worst-case residual window), marked as a summary view subordinate to the ADR.
-  Evidence: its nine anchor references — eight `path::symbol` plus one ADR file
-  path — each verified to resolve, with the composition itself machine-checked by
-  `tests/test_check_d207_gates.py::TestErrorCodesChecker::test_session_lifecycle_anchor_composition_is_what_the_changelog_claims`;
-  `tests/test_session_manager.py::TestCodedSessionErrors::test_no_sessions_raises_coded`,
-  `tests/test_module_teardown.py::TestCreateModuleTeardown::test_teardown_called_and_resources_closed`.
-
 - **Version-consistency gate (D-207 ⑨)** —
   `check_version_consistency.py` asserts pyproject == `__init__.__version__` ==
   CHANGELOG newest released section == the `llms.txt` version field, and
@@ -97,133 +60,6 @@ dimensions=5, shot types=8`.
   Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_min_adjudicable_has_a_provenance_note`,
   `tests/test_liveness_probe_sensitivity.py::test_the_protocol_revision_comes_from_the_spec_file`.
 
-### Fixed
-
-- **Counterfactual pins did not follow the pin-form canon they were written
-  under (ADR-0029 ③, D-213 ②)** — the five S1/S2 counterfactual pins landed in
-  the R46 lane under descriptive names (`test_a_helper_function_is_not_accepted_as_a_pin`
-  and siblings) with no `counterfactual` docstring marker, so the clause that
-  says a pin must be named `test_*_fails_the_gate` and declare itself a
-  counterfactual was satisfied by prose in the module header rather than by the
-  pins themselves. Same failure class as the phantom-pointer and false-count
-  findings of this round: the rule existed, nothing checked the new code against
-  it. Renamed to the canon form and gave each an explicit counterfactual
-  docstring; the live-green control keeps its descriptive name because it is a
-  positive control, not a counterfactual.
-  Broken: through 0.5.0 (unreleased lane) · Fixed: 0.5.0 → [Unreleased].
-  Evidence: `tests/test_check_gate_registry.py::test_a_helper_function_named_as_a_pin_fails_the_gate`,
-  `tests/test_check_gate_registry.py::test_a_module_constant_named_as_a_pin_fails_the_gate`,
-  `tests/test_check_gate_registry.py::test_a_non_test_class_method_named_as_a_pin_fails_the_gate`,
-  `tests/test_check_gate_registry.py::test_a_class_not_named_test_prefix_fails_the_gate`,
-  `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_an_unreviewed_track_3_promotion_fails_the_gate`;
-  `python .github/scripts/check_gate_registry.py` → registry OK (the renames
-  touch no registered pin node id).
-
-- **The S2 review record pointed at a bare `path:line` for its central claim** —
-  the correction notice cites where the promotion record lives using
-  `polarity_corpus_probe.py:206-215`, a form D-183 holds drifts on every edit and
-  flags at warn level. It also cited a line range that the same record's own
-  derivation pin makes redundant. Now `path::symbol`.
-  Broken: through 0.5.0 (unreleased lane) · Fixed: 0.5.0 → [Unreleased].
-  Evidence: `python .github/scripts/check_evidence_anchors.py` → this file
-  contributes 0 warnings (total 41 → 40).
-
-- **The polarity sample floor was counting each sample once per guarded element
-  (D-221 ② / S4)** — the label tally sat inside the per-element loop, so the
-  floor numerator came out multiplied by the number of guarded elements. With
-  one guarded element the arithmetic coincides with the correct reading, which
-  is exactly why the live-green test could not see it.
-  Broken: through 0.5.0 (unreleased lane) · Fixed: 0.5.0 → [Unreleased].
-  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_per_element_counting_unit_is_the_sample_not_the_element_pair`;
-  `python .github/scripts/polarity_corpus_probe.py` → `samples=14`,
-  `adjudicable (true_negative + forgiven) = 12`, per D-203's arithmetic.
-
-- **`scene_review` was described as having 11 "dimensions" in two places** —
-  the 11 are checks; the aesthetic dimensions are 5
-  (`color_theory`, `spatial_composition`, `proportion_scale`,
-  `lighting_quality`, `visual_flow`). A reader following the old wording would
-  have looked for an 11-dimension breakdown that does not exist. Both strings
-  were agent-facing, and the count-claims gate reads docs rather than source,
-  so nothing else would have caught it.
-  Broken: through 0.5.0 · Fixed: 0.5.0 → [Unreleased].
-  Evidence: `tests/test_check_count_claims.py::test_derivers_read_live_source_literals`;
-  `python .github/scripts/check_count_claims.py` → `aesthetic dimensions=5`.
-
-- **The track-2 floor report omitted D-198 ⑤'s second precondition
-  (D-221 ② / S3)** — hard admission to the TDQS gate needs the floor AND the
-  primary track's zero-false-rejection verdict, but printing only the floor
-  verdict let "floor met" read as the whole promotion decision.
-  Broken: through 0.5.0 · Fixed: 0.5.0 → [Unreleased].
-  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_s3_two_precondition_caveat_is_printed`.
-
-- **`check_readme_skeleton` had been a CI gate with no pins since D-072** —
-  it resolved the repo root inline inside `main()`, so no pin could hand it a
-  corrupted copy, which is why a real gate sat in the lint job for months with
-  nothing able to fail it. It now takes a `check(repo)` seam and carries 11 tests: 8 counterfactual
-  reds plus 3 green controls, of which 4 are registered as pins. It was the one entry the new registry's zero-pin guard
-  flagged on arrival.
-  Broken: through 0.5.0 · Fixed: 0.5.0 → [Unreleased].
-  Evidence: `tests/test_check_readme_skeleton.py` (11 tests, incl.
-  `test_dropped_heading_in_the_mirror_is_red` and
-  `test_the_real_repo_mirror_is_green`).
-
-- **An overdue TDQS exemption could not fail CI (D-204)** — the `due` field was
-  compared with `current >= due` and always warned, so a waiver left past its
-  deadline for a release stayed open-ended for free: the check could not fail,
-  which is the blind spot D-195 4 exists to close. Now `== due` warns (the
-  release landing ON the deadline stays green) and `> due` errors, naming the
-  five D-168 renewal elements. Broken from D-195 4 through 0.5.0; fixed in the
-  next release. All 12 live exemptions are due 0.7.0 against version 0.5.0, so
-  the 0.6.0 release stays green.
-  Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`,
-  `tests/test_check_tdqs_disclosure.py::test_due_warns_but_does_not_bite_on_the_deadline_itself`,
-  `python .github/scripts/check_tdqs_disclosure.py` → exit 0.
-
-- **`check_error_codes.py` crashed on a doc path outside the repo** — the gate
-  called `Path.relative_to(REPO)` unguarded, so a test pointing it at a tmp
-  path raised `ValueError` instead of reporting drift. Caught by
-  `tests/test_check_d207_gates.py::TestErrorCodesChecker::test_undocumented_code_is_reported`
-  and fixed
-  in the checker rather than by widening the test.
-  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
-  `.github/scripts/check_error_codes.py::_rel`.
-
-- **`llms.txt` linked to a repository this project has never occupied** — the
-  generator hardcoded an owner name, and because the gate compared the generated
-  file against its own constants the wrong links reported green indefinitely. That
-  was a fabricated identifier, not a typo. Every URL now derives from
-  `[project.urls] Repository` in `pyproject.toml`, so a fork or a rename moves
-  the links with the project.
-  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
-  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_doc_urls_are_derived_from_pyproject_not_hardcoded`,
-  `.github/scripts/check_llms_txt.py::repo_url`.
-
-- **A tool with no section heading vanished from `llms.txt` silently** — the
-  coverage check lived inside the byte-equality branch, so in the one case that
-  matters (a tool added to the registry and to no heading, where the renderer
-  drops it and therefore produces no diff) it could not fire. Coverage is now
-  asserted independently of the comparison, and an incomplete section map is
-  itself an error.
-  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
-  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_a_tool_absent_from_the_page_is_reported`.
-
-- **The per-element sample floor could report a false green** — the thin-element
-  list iterated the true-negative dict instead of the guarded elements, so an
-  element with zero true negatives had no key, was skipped, and fell through to
-  the branch announcing that every element cleared the floor. The floor verdict is
-  now reported independently of the label-agreement verdict, so a disagreement
-  can no longer swallow a floor violation.
-  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
-  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_element_with_zero_true_negatives_is_reported_not_passed`.
-
-- **The overdue-exemption message misdescribed the D-168 ④ renewal requirements** —
-  it listed five items of our own invention. The real five (D-168 ④ as revised by
-  D-176) are a `gate_authority` countersignature distinct from the `debt_owner`, an
-  event-anchored rather than calendar expiry, the per-row renewal cap of 2, a
-  re-validated reason, and the waiver lane closing after gate review.
-  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
-  Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`.
-
 ### Changed
 
 - **Sample-size floor counts verdict-bearing labels only (D-203)** —
@@ -267,12 +103,173 @@ dimensions=5, shot types=8`.
   `docs/adr/0028-elements.yaml:1`, backed by unit test suite
   `tests/test_check_tdqs_disclosure.py:1` (5 passed).
 
+- **TDQS polarity mechanism hardened to clause scope (D-190)** — the
+  mutation-class existence guard in
+  `.github/scripts/check_tdqs_disclosure.py::_negated` scopes the negation
+  window to the enclosing clause instead of a fixed 80-char window, and
+  `docs/adr/0028-elements.yaml` gains the element-level `positive_exemptions`
+  field plus the polarity direction limit (the guard applies only to purely
+  positive pattern sets; negation-form elements stay unguarded). Negated-only
+  matches stay warn-level. The two-track corpus measurement D-191①c requires is
+  now a committed instrument instead of a per-round scratch probe:
+  `.github/scripts/polarity_corpus_probe.py` (manual, not wired into CI).
+  Evidence — environment: Python 3.11.9 on Windows;
+  `python -m pytest tests/test_check_tdqs_disclosure.py -q` -> exit 0,
+  17 passed, artifact in-repo
+  (`tests/test_check_tdqs_disclosure.py::test_polarity_cross_clause_cue_does_not_negate`,
+  `tests/test_check_tdqs_disclosure.py::test_polarity_same_clause_exemption_forgives_cue`,
+  `tests/test_check_tdqs_disclosure.py::test_live_corpus_has_no_polarity_warnings`);
+  `python .github/scripts/check_tdqs_disclosure.py` -> exit 0, 36 elements
+  across 12 tools, artifact `.github/scripts/check_tdqs_disclosure.py`.
+
+### Fixed
+
+- **Counterfactual pins did not follow the pin-form canon they were written
+  under (ADR-0029 ③, D-213 ②)** — the five S1/S2 counterfactual pins landed in
+  the R46 lane under descriptive names (`test_a_helper_function_is_not_accepted_as_a_pin`
+  and siblings) with no `counterfactual` docstring marker, so the clause that
+  says a pin must be named `test_*_fails_the_gate` and declare itself a
+  counterfactual was satisfied by prose in the module header rather than by the
+  pins themselves. Same failure class as the phantom-pointer and false-count
+  findings of this round: the rule existed, nothing checked the new code against
+  it. Renamed to the canon form and gave each an explicit counterfactual
+  docstring; the live-green control keeps its descriptive name because it is a
+  positive control, not a counterfactual.
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
+  Evidence: `tests/test_check_gate_registry.py::test_a_helper_function_named_as_a_pin_fails_the_gate`,
+  `tests/test_check_gate_registry.py::test_a_module_constant_named_as_a_pin_fails_the_gate`,
+  `tests/test_check_gate_registry.py::test_a_non_test_class_method_named_as_a_pin_fails_the_gate`,
+  `tests/test_check_gate_registry.py::test_a_class_not_named_test_prefix_fails_the_gate`,
+  `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_an_unreviewed_track_3_promotion_fails_the_gate`;
+  `python .github/scripts/check_gate_registry.py` → registry OK (the renames
+  touch no registered pin node id).
+
+- **The S2 review record pointed at a bare `path:line` for its central claim** —
+  the correction notice cites where the promotion record lives using
+  `polarity_corpus_probe.py:206-215`, a form D-183 holds drifts on every edit and
+  flags at warn level. It also cited a line range that the same record's own
+  derivation pin makes redundant. Now `path::symbol`.
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
+  Evidence: `python .github/scripts/check_evidence_anchors.py` → this file
+  contributes 0 warnings (total 41 → 40).
+
+- **The polarity sample floor was counting each sample once per guarded element
+  (D-221 ② / S4)** — the label tally sat inside the per-element loop, so the
+  floor numerator came out multiplied by the number of guarded elements. With
+  one guarded element the arithmetic coincides with the correct reading, which
+  is exactly why the live-green test could not see it.
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
+  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_per_element_counting_unit_is_the_sample_not_the_element_pair`;
+  `python .github/scripts/polarity_corpus_probe.py` → `samples=14`,
+  `adjudicable (true_negative + forgiven) = 12`, per D-203's arithmetic.
+
+- **`scene_review` was described as having 11 "dimensions" in two places** —
+  the 11 are checks; the aesthetic dimensions are 5
+  (`color_theory`, `spatial_composition`, `proportion_scale`,
+  `lighting_quality`, `visual_flow`). A reader following the old wording would
+  have looked for an 11-dimension breakdown that does not exist. Both strings
+  were agent-facing, and the count-claims gate reads docs rather than source,
+  so nothing else would have caught it.
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
+  Evidence: `tests/test_check_count_claims.py::test_derivers_read_live_source_literals`;
+  `python .github/scripts/check_count_claims.py` → `aesthetic dimensions=5`.
+
+- **The track-2 floor report omitted D-198 ⑤'s second precondition
+  (D-221 ② / S3)** — hard admission to the TDQS gate needs the floor AND the
+  primary track's zero-false-rejection verdict, but printing only the floor
+  verdict let "floor met" read as the whole promotion decision.
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
+  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_s3_two_precondition_caveat_is_printed`.
+
+- **`check_readme_skeleton` had been a CI gate with no pins since D-072** —
+  it resolved the repo root inline inside `main()`, so no pin could hand it a
+  corrupted copy, which is why a real gate sat in the lint job for months with
+  nothing able to fail it. It now takes a `check(repo)` seam and carries 11 tests: 8 counterfactual
+  reds plus 3 green controls, of which 4 are registered as pins. It was the one entry the new registry's zero-pin guard
+  flagged on arrival.
+  Broken version: through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
+  Evidence: `tests/test_check_readme_skeleton.py` (11 tests, incl.
+  `test_dropped_heading_in_the_mirror_is_red` and
+  `test_the_real_repo_mirror_is_green`).
+
+- **An overdue TDQS exemption could not fail CI (D-204)** — the `due` field was
+  compared with `current >= due` and always warned, so a waiver left past its
+  deadline for a release stayed open-ended for free: the check could not fail,
+  which is the blind spot D-195 4 exists to close. Now `== due` warns (the
+  release landing ON the deadline stays green) and `> due` errors, naming the
+  five D-168 renewal elements. All 12 live exemptions are due 0.7.0 against
+  version 0.5.0, so the 0.6.0 release stays green.
+  Broken version: from D-195 4 through 0.5.0 (unreleased lane, never shipped); fixed version: [Unreleased] (next release).
+  Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`,
+  `tests/test_check_tdqs_disclosure.py::test_due_warns_but_does_not_bite_on_the_deadline_itself`,
+  `python .github/scripts/check_tdqs_disclosure.py` → exit 0.
+
+- **The per-element sample floor could report a false green** — the thin-element
+  list iterated the true-negative dict instead of the guarded elements, so an
+  element with zero true negatives had no key, was skipped, and fell through to
+  the branch announcing that every element cleared the floor. The floor verdict is
+  now reported independently of the label-agreement verdict, so a disagreement
+  can no longer swallow a floor violation.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_element_with_zero_true_negatives_is_reported_not_passed`.
+
+- **The overdue-exemption message misdescribed the D-168 ④ renewal requirements** —
+  it listed five items of our own invention. The real five (D-168 ④ as revised by
+  D-176) are a `gate_authority` countersignature distinct from the `debt_owner`, an
+  event-anchored rather than calendar expiry, the per-row renewal cap of 2, a
+  re-validated reason, and the waiver lane closing after gate review.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`.
+
+## [0.6.0] - 2026-10-05
+
+Release-bearing floor update. Tag 语义基点历史锚：`f97857f`（exec-A: R44 description floor, #67）。本版本依据 D-224 改锚至 HEAD bump commit 发布，包含描述地板重写、严格策略模式及用户面发现治理；R46 纯 CI 治理件保留在 [Unreleased]。
+
+### Added
+
+- **Strict policy mode (D-207 ①⑦)** — three operator flags
+  (`MAYA_MCP_DISABLE_EXECUTE`, `MAYA_MCP_DISABLE_WRITE_MODULE`,
+  `MAYA_MCP_DISABLE_ARBITRARY`) remove escape-hatch tools from `tools/list` and
+  deny the call with `[policy_disabled]`, audited as `rejected`. One choke
+  point in the pipeline, none in the tool bodies; read-only tools unaffected.
+  Evidence: `tests/test_pipeline.py::TestStrictPolicyMode` (19 collected: 5 functions,
+  parametrised), plus `.github/scripts/liveness_probe.py` — a committed probe that
+  spawns the real server over stdio and observes 25 tools by default and 22 under
+  `MAYA_MCP_DISABLE_ARBITRARY=1`, with 0 escapes leaked and the read-class surface
+  retained. It reads its expectation from `POLICY_ENV_FLAGS`, so it cannot assert
+  a stale set.
+  `src/maya_mcp_server/pipeline.py::policy_disabled_tools`,
+  `src/maya_mcp_server/security.py::PolicyDisabledError`.
+
+- **`llms.txt` discovery file + generator gate (D-207 ②)** — 75 lines, under
+  the 100-line cap, DERIVED from `pipeline.TOOL_ANNOTATIONS` and each tool’s own
+  docstring. Hand-editing it fails the lint job.
+  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker` (12 collected),
+  `python .github/scripts/check_llms_txt.py` → `llms.txt OK: 75 lines, 25 tools`.
+
+- **Error-code reference page + code-set gate (D-207 ④)** —
+  `docs/guide/error-codes.md` is derived from `security.py`; the gate fails on
+  drift in EITHER direction (a code with no row, a row with no code). The
+  precondition was verified first: the D-019 `[code]` prefix contract already
+  existed, so the page is not a standalone promise.
+  Evidence: `tests/test_check_d207_gates.py::TestErrorCodesChecker` (8 collected),
+  `python .github/scripts/check_error_codes.py` → `10 codes, doc set == code set`.
+
+- **Session-lifecycle matrix (D-207 ③)** — `docs/guide/session-lifecycle.md`,
+  one page, four columns (exit path × teardown trigger × residual state ×
+  worst-case residual window), marked as a summary view subordinate to the ADR.
+  Evidence: its nine anchor references — eight `path::symbol` plus one ADR file
+  path — each verified to resolve, with the composition itself machine-checked by
+  `tests/test_check_d207_gates.py::TestErrorCodesChecker::test_session_lifecycle_anchor_composition_is_what_the_changelog_claims`;
+  `tests/test_session_manager.py::TestCodedSessionErrors::test_no_sessions_raises_coded`,
+  `tests/test_module_teardown.py::TestCreateModuleTeardown::test_teardown_called_and_resources_closed`.
+
+### Changed
+
 - **TDQS description quality architecture decision record (D-174)** —
   `docs/adr/0028-tdqs-description-quality.md:1` and machine-readable specification
   `docs/adr/0028-elements.yaml:1` establishing P0 required disclosure elements
   and single-direction `Boundary:` conventions.
-
-### Changed
 
 - **P0 core tool descriptions rewritten (D-172, ADR-0028 §2)** —
   `execute_code` (`src/maya_mcp_server/server.py:345`) rewritten to disclose
@@ -295,26 +292,43 @@ dimensions=5, shot types=8`.
   security threat model (`docs/threat-model.md:162`) to reflect `execute_code`
   arbitrary execution privilege and `scene_validate` read-only constraint semantics.
 
-- **TDQS polarity mechanism hardened to clause scope (D-190)** — the
-  mutation-class existence guard in
-  `.github/scripts/check_tdqs_disclosure.py::_negated` scopes the negation
-  window to the enclosing clause instead of a fixed 80-char window, and
-  `docs/adr/0028-elements.yaml` gains the element-level `positive_exemptions`
-  field plus the polarity direction limit (the guard applies only to purely
-  positive pattern sets; negation-form elements stay unguarded). Negated-only
-  matches stay warn-level. The two-track corpus measurement D-191①c requires is
-  now a committed instrument instead of a per-round scratch probe:
-  `.github/scripts/polarity_corpus_probe.py` (manual, not wired into CI).
-  Evidence — environment: Python 3.11.9 on Windows;
-  `python -m pytest tests/test_check_tdqs_disclosure.py -q` -> exit 0,
-  17 passed, artifact in-repo
-  (`tests/test_check_tdqs_disclosure.py::test_polarity_cross_clause_cue_does_not_negate`,
-  `tests/test_check_tdqs_disclosure.py::test_polarity_same_clause_exemption_forgives_cue`,
-  `tests/test_check_tdqs_disclosure.py::test_live_corpus_has_no_polarity_warnings`);
-  `python .github/scripts/check_tdqs_disclosure.py` -> exit 0, 36 elements
-  across 12 tools, artifact `.github/scripts/check_tdqs_disclosure.py`.
+- **Description floor rewrite — `scene_measure` measurement contract (R44, D-195/D-196)** —
+  the scene-measurement descriptions were rewritten to the disclosure floor
+  (explicit units, frame/session prerequisites, read-only boundary), landing as
+  the release-bearing `exec-A` batch `f97857f` recorded as the tag semantic
+  basepoint above.
+  Evidence: `f97857f:src/maya_mcp_server/scene_tools.py:376`,
+  `tests/test_scene_tools.py::TestCosFormatterIntegration::test_format_measure_cos_roundtrip`.
 
 ### Fixed
+
+- **`check_error_codes.py` crashed on a doc path outside the repo** — the gate
+  called `Path.relative_to(REPO)` unguarded, so a test pointing it at a tmp
+  path raised `ValueError` instead of reporting drift. Caught by
+  `tests/test_check_d207_gates.py::TestErrorCodesChecker::test_undocumented_code_is_reported`
+  and fixed
+  in the checker rather than by widening the test.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  `.github/scripts/check_error_codes.py::_rel`.
+
+- **`llms.txt` linked to a repository this project has never occupied** — the
+  generator hardcoded an owner name, and because the gate compared the generated
+  file against its own constants the wrong links reported green indefinitely. That
+  was a fabricated identifier, not a typo. Every URL now derives from
+  `[project.urls] Repository` in `pyproject.toml`, so a fork or a rename moves
+  the links with the project.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_doc_urls_are_derived_from_pyproject_not_hardcoded`,
+  `.github/scripts/check_llms_txt.py::repo_url`.
+
+- **A tool with no section heading vanished from `llms.txt` silently** — the
+  coverage check lived inside the byte-equality branch, so in the one case that
+  matters (a tool added to the registry and to no heading, where the renderer
+  drops it and therefore produces no diff) it could not fire. Coverage is now
+  asserted independently of the comparison, and an incomplete section map is
+  itself an error.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  Evidence: `tests/test_check_d207_gates.py::TestLlmsTxtChecker::test_a_tool_absent_from_the_page_is_reported`.
 
 - **MCP ImageContent snake_case attribute alignment** — align `mt.ImageContent`
   instantiation to use standard snake_case `mime_type` instead of deprecated
@@ -322,6 +336,7 @@ dimensions=5, shot types=8`.
   `call-arg` violation and `FastMCPDeprecationWarning` during viewport
   snapshot processing with MCP SDK v2 (`tests/test_visual_tools.py:245`,
   `tests/test_visual_tools.py:259`).
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
 
 - **FastMCP 4.x / 2.14.x test harness compatibility** — adapt test suite for
   library upgrades: import `ToolResult` with fallback order from
@@ -331,6 +346,7 @@ dimensions=5, shot types=8`.
   tool tests (`tests/test_qt_channel.py:636`,
   `tests/test_scene_tools_json.py:255`), and filter warnings ahead of imports
   in conftest (`tests/conftest.py:33`).
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
 
 ## [0.5.0] - 2026-09-30
 
