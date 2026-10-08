@@ -204,23 +204,6 @@ dimensions=5, shot types=8`.
   `tests/test_check_tdqs_disclosure.py::test_due_warns_but_does_not_bite_on_the_deadline_itself`,
   `python .github/scripts/check_tdqs_disclosure.py` → exit 0.
 
-- **The per-element sample floor could report a false green** — the thin-element
-  list iterated the true-negative dict instead of the guarded elements, so an
-  element with zero true negatives had no key, was skipped, and fell through to
-  the branch announcing that every element cleared the floor. The floor verdict is
-  now reported independently of the label-agreement verdict, so a disagreement
-  can no longer swallow a floor violation.
-  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
-  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_element_with_zero_true_negatives_is_reported_not_passed`.
-
-- **The overdue-exemption message misdescribed the D-168 ④ renewal requirements** —
-  it listed five items of our own invention. The real five (D-168 ④ as revised by
-  D-176) are a `gate_authority` countersignature distinct from the `debt_owner`, an
-  event-anchored rather than calendar expiry, the per-row renewal cap of 2, a
-  re-validated reason, and the waiver lane closing after gate review.
-  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
-  Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`.
-
 ## [0.6.0] - 2026-10-05
 
 Release-bearing floor update. Tag 语义基点历史锚：`f97857f`（exec-A: R44 description floor, #67）。本版本依据 D-224 改锚至 HEAD bump commit 发布，包含描述地板重写、严格策略模式及用户面发现治理；R46 纯 CI 治理件保留在 [Unreleased]。
@@ -347,6 +330,23 @@ Release-bearing floor update. Tag 语义基点历史锚：`f97857f`（exec-A: R4
   `tests/test_scene_tools_json.py:255`), and filter warnings ahead of imports
   in conftest (`tests/conftest.py:33`).
   Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+
+- **The per-element sample floor could report a false green** — the thin-element
+  list iterated the true-negative dict instead of the guarded elements, so an
+  element with zero true negatives had no key, was skipped, and fell through to
+  the branch announcing that every element cleared the floor. The floor verdict is
+  now reported independently of the label-agreement verdict, so a disagreement
+  can no longer swallow a floor violation.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  Evidence: `tests/test_polarity_corpus_probe.py::TestD203FloorCaliber::test_element_with_zero_true_negatives_is_reported_not_passed`.
+
+- **The overdue-exemption message misdescribed the D-168 ④ renewal requirements** —
+  it listed five items of our own invention. The real five (D-168 ④ as revised by
+  D-176) are a `gate_authority` countersignature distinct from the `debt_owner`, an
+  event-anchored rather than calendar expiry, the per-row renewal cap of 2, a
+  re-validated reason, and the waiver lane closing after gate review.
+  Broken version: unreleased (introduced and fixed within the 0.6.0 development cycle, never shipped); fixed version: 0.6.0.
+  Evidence: `tests/test_check_tdqs_disclosure.py::test_past_the_deadline_is_an_error_not_a_warning`.
 
 ## [0.5.0] - 2026-09-30
 

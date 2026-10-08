@@ -363,3 +363,133 @@ class TestVersionConsistency:
     def test_section_regex_only_matches_dotted_versions(self):
         mod = _load("check_version_consistency")
         assert mod._SECTION.search("## [Unreleased]") is None
+
+    # --- D-229 2: server.json triple (counterfactual reds + live green) ----
+
+    def test_server_json_version_parser_reads_the_top_level_field(self, tmp_path):
+        mod = _load("check_version_consistency")
+        p = tmp_path / "server.json"
+        p.write_text('{"version": "0.6.0", "packages": [{"version": "0.5.0"}]}', encoding="utf-8")
+        assert mod.server_json_version(p) == (0, 6, 0)
+
+    def test_server_json_version_rejects_non_dotted_and_missing(self, tmp_path):
+        mod = _load("check_version_consistency")
+        bad = tmp_path / "bad.json"
+        bad.write_text('{"version": "next"}', encoding="utf-8")
+        assert mod.server_json_version(bad) is None
+        absent = tmp_path / "nope.json"
+        assert mod.server_json_version(absent) is None
+
+    def test_live_gate_names_server_json_in_the_triple(self):
+        out = _run("check_version_consistency.py")
+        assert out.returncode == 0, out.stdout + out.stderr
+        # the triple now names server.json explicitly (D-229 2)
+        assert "server.json" in out.stdout, out.stdout
+
+    def test_a_drifted_server_json_fails_the_gate(self, monkeypatch):
+        """Counterfactual red: a manifest whose version lags pyproject must go red."""
+        mod = _load("check_version_consistency")
+        import json as _json
+
+        drifted = REPO / "server.json.drift-fixture"
+        doc = _json.loads((REPO / "server.json").read_text(encoding="utf-8"))
+        doc["version"] = "0.5.0"
+        drifted.write_text(_json.dumps(doc), encoding="utf-8")
+        try:
+            monkeypatch.setattr(mod, "SERVER_JSON", drifted)
+            rc = mod.main()
+        finally:
+            drifted.unlink(missing_ok=True)
+        assert rc == 1, "a drifted registry manifest must fail the gate (D-229 2)"
+
+    def test_a_missing_server_json_fails_the_gate(self, monkeypatch):
+        """Counterfactual red: the manifest must be version-controlled at the root."""
+        mod = _load("check_version_consistency")
+        monkeypatch.setattr(mod, "SERVER_JSON", REPO / "definitely-not-here.json")
+        assert mod.main() == 1, "a missing server.json must fail the gate (D-229 1)"
+
+
+# ---------------------------------------------------------------------------
+# D-230: CHANGELOG Fixed-entry field gate
+# ---------------------------------------------------------------------------
+
+
+class TestChangelogFixedFields:
+    def test_live_gate_is_green(self):
+        out = _run("check_changelog_fixed.py")
+        assert out.returncode == 0, out.stdout + out.stderr
+        # the disclosure line names both the in-scope and grandfathered counts
+        assert "in-scope entries" in out.stdout, out.stdout
+        assert "grandfathered" in out.stdout, out.stdout
+
+    def test_field_value_reads_the_tail_line_not_just_the_last_line(self, tmp_path):
+        """The fields sit on their own line before a trailing Evidence: line, so
+        a last-line-only scan would miss them - the whole block is searched."""
+        mod = _load("check_changelog_fixed")
+        entry = (
+            "- **A thing was fixed** — description.\n"
+            "  Broken version: unreleased; fixed version: 0.6.0.\n"
+            "  Evidence: `tests/test_x.py::test_y`.\n"
+        )
+        assert mod._field_value(entry, "Broken version:") == "unreleased; fixed version: 0.6.0."
+        assert mod._field_value(entry, "fixed version:") == "0.6.0."
+        assert mod._field_value(entry, "Missing version:") is None
+
+    def test_a_corrupted_entry_missing_a_field_fails_the_gate(self, tmp_path, monkeypatch):
+        """Counterfactual red: an in-scope entry that loses its broken-version
+        field must turn the gate red."""
+        mod = _load("check_changelog_fixed")
+        bad = tmp_path / "CHANGELOG.md"
+        bad.write_text(
+            "## [Unreleased]\n\n### Fixed\n\n"
+            "- **A fix** — text.\n"
+            "  fixed version: 0.6.0.\n"  # Broken version: deliberately absent\n"
+            "\n## [0.5.0] - 2026-09-30\n\n### Fixed\n\n"
+            "- **Old fix** — predates the rule, no fields, grandfathered.\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(mod, "CHANGELOG", bad)
+        rc = mod.main()
+        assert rc == 1, "an in-scope entry missing Broken version: must fail (D-230)"
+
+    def test_an_empty_field_value_fails_the_gate(self, tmp_path, monkeypatch):
+        """Counterfactual red: a present-but-empty value is not compliance."""
+        mod = _load("check_changelog_fixed")
+        bad = tmp_path / "CHANGELOG.md"
+        bad.write_text(
+            "## [0.6.0] - 2026-10-05\n\n### Fixed\n\n"
+            "- **A fix** — text.\n"
+            "  Broken version: unreleased;\n"
+            "  fixed version: \n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(mod, "CHANGELOG", bad)
+        assert mod.main() == 1, "an empty fixed version: value must fail (D-230)"
+
+    def test_pre_boundary_sections_are_grandfathered_not_asserted(self, tmp_path, monkeypatch):
+        """The frozen boundary exempts released sections below ENFORCED_FROM even
+        though they lack the fields - backfilling them would invent facts (D-205)."""
+        mod = _load("check_changelog_fixed")
+        doc = tmp_path / "CHANGELOG.md"
+        doc.write_text(
+            "## [Unreleased]\n\n### Fixed\n\n"
+            "- **New fix** — text.\n"
+            "  Broken version: unreleased; fixed version: [Unreleased].\n"
+            "\n## [0.5.0] - 2026-09-30\n\n### Fixed\n\n"
+            "- **Old fix** — no fields at all, but below the boundary.\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(mod, "CHANGELOG", doc)
+        assert mod.main() == 0, "pre-boundary sections are exempt, not errors (D-230)"
+
+    def test_unreleased_is_enforced_regardless_of_boundary(self, tmp_path, monkeypatch):
+        """[Unreleased] is always in scope even though it is not a dotted version."""
+        mod = _load("check_changelog_fixed")
+        bad = tmp_path / "CHANGELOG.md"
+        bad.write_text(
+            "## [Unreleased]\n\n### Fixed\n\n"
+            "- **New fix** — text with neither field.\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(mod, "CHANGELOG", bad)
+        assert mod.main() == 1, "[Unreleased] is enforced even though non-dotted (D-230)"

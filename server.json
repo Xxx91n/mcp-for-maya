@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Xxx91n/mcp-for-maya",
+  "title": "mcp-for-maya",
+  "description": "AI agents' spatial awareness inside Autodesk Maya: audit, rollback safety, visual loop (Beta)",
+  "version": "0.6.0",
+  "repository": {
+    "url": "https://github.com/Xxx91n/mcp-for-maya",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "mcp-for-maya",
+      "version": "0.6.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeHint": "uvx"
+    }
+  ]
+}
