@@ -39,6 +39,7 @@ Exit codes: 0 = every in-scope Fixed entry carries both non-empty fields;
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -47,10 +48,12 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 CHANGELOG = REPO / "CHANGELOG.md"
 
-# Frozen enforcement boundary (D-230): the version-field rule landed at 0.6.0.
-# Released sections strictly below this are grandfathered (they predate the
-# rule); [Unreleased] is always enforced regardless of this value.
-ENFORCED_FROM = (0, 6, 0)
+# D-214: ENFORCED_FROM is a GOVERNANCE constant (the grandfather boundary), so its
+# single source is the per-domain spec file -- derived here at runtime, never
+# restated inline. Released sections strictly below this predate the field rule;
+# [Unreleased] is always enforced regardless of this value.
+_SPEC = json.loads((REPO / ".github" / "changelog-fixed-spec.yaml").read_text(encoding="utf-8"))
+ENFORCED_FROM = tuple(int(p) for p in _SPEC["ENFORCED_FROM"])
 
 _VERSION = re.compile(r"(?m)^## \[(\d+(?:\.\d+)*)\]")
 
@@ -103,11 +106,19 @@ def _field_value(block: str, field: str) -> str | None:
     before the trailing `Evidence:` line, not necessarily the final line. Each
     in-scope entry carries each field exactly once, so searching the whole block
     is unambiguous.
+
+    The value runs to the FIRST ';' or end-of-line. That boundary is what makes
+    an empty value detectable: when both fields share one line (`Broken version:
+    X; fixed version: Y.`), slicing to end-of-line would swallow the next field
+    into this one's value and report a present-but-empty field as non-empty -
+    the exact escape the R48 audit caught. Splitting on ';' (and the fields never
+    contain a semicolon themselves) keeps each value bounded.
     """
     for line in block.splitlines():
         idx = line.find(field)
         if idx >= 0:
-            return line[idx + len(field):].strip()
+            rest = line[idx + len(field):]
+            return rest.split(";", 1)[0].strip()
     return None
 
 

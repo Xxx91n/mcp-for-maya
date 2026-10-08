@@ -386,21 +386,21 @@ class TestVersionConsistency:
         # the triple now names server.json explicitly (D-229 2)
         assert "server.json" in out.stdout, out.stdout
 
-    def test_a_drifted_server_json_fails_the_gate(self, monkeypatch):
-        """Counterfactual red: a manifest whose version lags pyproject must go red."""
+    def test_a_drifted_server_json_fails_the_gate(self, tmp_path, monkeypatch):
+        """Counterfactual red: a manifest whose version lags pyproject must go red.
+
+        The corrupted copy lives in pytest's tmp_path (ADR-0029 section 3), never
+        in the repo root - a fixture written into the worktree would leave a dirty
+        file behind if the test aborted before cleanup."""
         mod = _load("check_version_consistency")
         import json as _json
 
-        drifted = REPO / "server.json.drift-fixture"
         doc = _json.loads((REPO / "server.json").read_text(encoding="utf-8"))
         doc["version"] = "0.5.0"
+        drifted = tmp_path / "server.json"
         drifted.write_text(_json.dumps(doc), encoding="utf-8")
-        try:
-            monkeypatch.setattr(mod, "SERVER_JSON", drifted)
-            rc = mod.main()
-        finally:
-            drifted.unlink(missing_ok=True)
-        assert rc == 1, "a drifted registry manifest must fail the gate (D-229 2)"
+        monkeypatch.setattr(mod, "SERVER_JSON", drifted)
+        assert mod.main() == 1, "a drifted registry manifest must fail the gate (D-229 2)"
 
     def test_a_missing_server_json_fails_the_gate(self, monkeypatch):
         """Counterfactual red: the manifest must be version-controlled at the root."""
@@ -431,9 +431,27 @@ class TestChangelogFixedFields:
             "  Broken version: unreleased; fixed version: 0.6.0.\n"
             "  Evidence: `tests/test_x.py::test_y`.\n"
         )
-        assert mod._field_value(entry, "Broken version:") == "unreleased; fixed version: 0.6.0."
+        # each value runs to the first ';' or end-of-line, so a same-line pair
+        # does not leak one field into the other's value (R48 audit fix)
+        assert mod._field_value(entry, "Broken version:") == "unreleased"
         assert mod._field_value(entry, "fixed version:") == "0.6.0."
         assert mod._field_value(entry, "Missing version:") is None
+
+    def test_a_same_line_empty_broken_version_fails_the_gate(self, tmp_path, monkeypatch):
+        """Counterfactual red for the R48 audit's exact escape: both fields share
+        one line and the broken-version value is empty. The old end-of-line slice
+        swallowed '; fixed version: 0.6.0.' as the broken value and reported it
+        non-empty (a false green); splitting on ';' must turn this red."""
+        mod = _load("check_changelog_fixed")
+        bad = tmp_path / "CHANGELOG.md"
+        bad.write_text(
+            "## [0.6.0] - 2026-10-05\n\n### Fixed\n\n"
+            "- **A fix** — text.\n"
+            "  Broken version: ; fixed version: 0.6.0.\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(mod, "CHANGELOG", bad)
+        assert mod.main() == 1, "an empty same-line Broken version: must fail (D-230)"
 
     def test_a_corrupted_entry_missing_a_field_fails_the_gate(self, tmp_path, monkeypatch):
         """Counterfactual red: an in-scope entry that loses its broken-version
@@ -482,7 +500,7 @@ class TestChangelogFixedFields:
         monkeypatch.setattr(mod, "CHANGELOG", doc)
         assert mod.main() == 0, "pre-boundary sections are exempt, not errors (D-230)"
 
-    def test_unreleased_is_enforced_regardless_of_boundary(self, tmp_path, monkeypatch):
+    def test_unreleased_corrupted_without_fields_fails_the_gate(self, tmp_path, monkeypatch):
         """[Unreleased] is always in scope even though it is not a dotted version."""
         mod = _load("check_changelog_fixed")
         bad = tmp_path / "CHANGELOG.md"
