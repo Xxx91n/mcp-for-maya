@@ -36,6 +36,23 @@
       "exemption": null
     },
     {
+      "gate_id": "check_changelog_fixed",
+      "bound_class": "gate",
+      "expected_sources": [
+        "CHANGELOG.md",
+        ".github/changelog-fixed-spec.yaml::ENFORCED_FROM"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_d207_gates.py::TestChangelogFixedFields::test_a_corrupted_entry_missing_a_field_fails_the_gate",
+        "tests/test_check_d207_gates.py::TestChangelogFixedFields::test_an_empty_field_value_fails_the_gate",
+        "tests/test_check_d207_gates.py::TestChangelogFixedFields::test_a_same_line_empty_broken_version_fails_the_gate",
+        "tests/test_check_d207_gates.py::TestChangelogFixedFields::test_unreleased_corrupted_without_fields_fails_the_gate",
+        "tests/test_check_d207_gates.py::TestChangelogFixedFields::test_live_gate_is_green"
+      ],
+      "exemption": null,
+      "note": "R48 (D-230): existence-only assertion that every in-scope ### Fixed entry carries non-empty Broken version: + fixed version: fields. SCOPE DEVIATION DECLARED (first case of the ADR-0029 section 5 observation-window criterion): enforcement covers [Unreleased] + released sections >= ENFORCED_FROM (the frozen boundary, single-sourced in .github/changelog-fixed-spec.yaml per D-214); pre-0.6.0 sections are grandfathered because they predate the field rule and backfilling them would invent broken-version facts (D-205 no-guessing). Existing in-scope violations = 0, so this gate skips the D-215 4 observation window and is blocking from day one rather than warning. The red pins are counterfactuals (a missing field, a present-but-empty value on its own line, an empty same-line value - the R48 audit escape, and an Unreleased entry with neither field); test_live_gate_is_green is the live green control."
+    },
+    {
       "gate_id": "check_error_codes",
       "bound_class": "gate",
       "expected_sources": [
@@ -177,13 +194,18 @@
       "gate_id": "check_version_consistency",
       "bound_class": "gate",
       "expected_sources": [
-        "pyproject.toml::project"
+        "pyproject.toml::project",
+        "server.json::version"
       ],
       "pin_node_ids": [
         "tests/test_check_d207_gates.py::TestVersionConsistency::test_all_four_surfaces_agree_today",
-        "tests/test_check_d207_gates.py::TestVersionConsistency::test_unreleased_tolerance_requires_actual_content"
+        "tests/test_check_d207_gates.py::TestVersionConsistency::test_unreleased_tolerance_requires_actual_content",
+        "tests/test_check_d207_gates.py::TestVersionConsistency::test_a_drifted_server_json_fails_the_gate",
+        "tests/test_check_d207_gates.py::TestVersionConsistency::test_a_missing_server_json_fails_the_gate",
+        "tests/test_check_d207_gates.py::TestVersionConsistency::test_live_gate_names_server_json_in_the_triple"
       ],
-      "exemption": null
+      "exemption": null,
+      "note": "R48 (D-229 2): assertion surface widened from pyproject==__init__ to the server.json triple -- the repo-root mcp-publisher manifest's top-level version must equal pyproject EXACTLY. Manifest equality only: it never asserts registry-active state or that PyPI has the version (D-164 beta empty-spin prohibition). The two new pins are counterfactual reds (a drifted manifest, a missing manifest); test_live_gate_names_server_json_in_the_triple is the live green control."
     },
     {
       "gate_id": "liveness_probe",
