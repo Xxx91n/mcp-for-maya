@@ -50,7 +50,7 @@ become permanent. There is deliberately no non-blocking mode.
 
 Scope honesty: what is checked here is REGISTRATION DISCIPLINE, not
 pin effectiveness. A hollow pin passes every rule below and is still not a pin.
-That residual is disclosed in the registry file and mitigated elsewhere.
+That residual is disclosed here, not in the registry, and mitigated elsewhere.
 
 Usage:
     python .github/scripts/check_gate_registry.py

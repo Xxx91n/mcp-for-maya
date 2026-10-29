@@ -55,14 +55,14 @@
 - server.json 每次 publish 生成新版本记录；**发新版须重 publish，且 version 字段与 PyPI 精确一致**（T-30h 动作序：version 改届时 PyPI 精确版本→mcp-publisher validate 离线→人工门 login github+publish→登录态 Registry API GET /v0.1/servers/{serverName}/versions/{version} 查 status/isLatest（serverName 需 URL-encode；端点公开可读，登录态用于排除匿名歧义））。
 - 下架/更名走 publish 侧 status 变更（active/deprecated/deleted，Registry API 原生字段），非删记录——原生可控退路。
 - **publish 完成即刻于本表落 publish 日期=D-146 30 天核销窗起算点（非发版日）**。
-- **核销触发链（D-229）**：本小节义务的校验载体=本小节自身的逐版发布记录（下方「实况」按发版逐条落日期/版本/复证结果；最新一条=2026-10-28 的 0.7.0，含离线 `validate` 与公开端点复证），30 天核销窗按该记录起算（见上）。v0.6.0 当窗漏执的根因（义务无消费者）由这条记录链承接。原指认的「release-preflight 第 10 行『收录面义务行』」随 ADR 层退役已不在本仓，编号仅存于归档决策记录（D-229，见 git 历史）——此处只陈述去向，不重建清单。
+- **核销触发链（D-229）**：本小节义务的校验载体=本小节自身的逐版发布记录（下方「实况」逐版落日期/版本/复证结果，含当前版本的 publish 与复证；30 天核销窗按该记录起算，见上）。v0.6.0 当窗漏执的根因（义务无消费者）由这条记录链承接。原指认的「release-preflight 第 10 行『收录面义务行』」随 ADR 层退役已不在本仓，编号仅存于归档决策记录（D-229，见 git 历史）——此处只陈述去向，不重建清单。
 - **实况（2026-10-08 挂账 → 2026-10-25 结清；裁决 #86，执行 #88）**：v0.6.0 发布后重 publish 曾**未执行**（R48 挂账 T-R48-00）。2026-10-25 先以 mcp-publisher 1.8.4 离线 `validate`（exit 0），维护者执行 `mcp-publisher login github` 与 `mcp-publisher publish`（exit 0，published 0.6.0）；1.8.4 的 `status` 子命令只写不读，故以登录态 Registry API 复证：`GET /v0.1/servers/io.github.Xxx91n%2Fmcp-for-maya/versions/0.6.0` → HTTP 200，`version=0.6.0`、`status=active`、`isLatest=true`、`publishedAt=2026-10-25T17:29:14Z`，与 PyPI 0.6.0 精确一致。30 天核销窗起算=2026-10-25。匿名 404 仍不作为缺席证据。
 - **实况（2026-10-28 发版窗；执行 #95）**：0.7.0 发布后重 publish 已执行——离线 `mcp-publisher validate`（exit 0）在先，维护者 `mcp-publisher login github` + `mcp-publisher publish`（exit 0）。复证用公开端点（无鉴权）`GET /v0.1/servers/io.github.Xxx91n%2Fmcp-for-maya/versions/0.7.0` → HTTP 200，`version=0.7.0`、`status=active`、`isLatest=true`、`publishedAt=2026-10-28T09:57:46Z`，与 PyPI 0.7.0 精确一致（工件上传 08:55:37Z wheel / 08:55:39Z sdist）。本次为最新一次 publish，30 天核销窗起算=2026-10-28（取代 2026-10-25 起算窗）。公开 200 即在场证据；匿名 404 仍不作为缺席证据。
 - 核销产出=每渠道「Registry 同步已发生/未发生」事实，**按本表三态重新判置并落账**（遗漏面 #1：判置变化→先落账本再改表；未收录且无信号→维持被动观察或注销债；已收录→观察态转静默，无需动作）。
 
 ## 关联
 
-- 核销义务行：本表「Registry publish 小节」的逐版实况记录（D-229——本表可行动区的人工核销触发器；原 release-preflight 行已退役，去向见该小节）
+- 核销义务行（D-229）：本表「Registry publish 小节」的逐版实况记录（本表可行动区的人工核销触发器）
 - 原账本 D 行（已退役，git 历史可查）：D-132（校准宣称句式）/D-141（渠道分层）/D-143（平台扩张执行）/D-144（三态立法）/D-145（执行契约）/D-146/D-147（触发债）/D-082⑦（宣称对账反向面）
 - 发布后段核销行（D-145β：Registry publish 后 30 天一次性核销）· 注入模块准入判据（独立注入时机 / 独立 API 面 / 独立失败域）
 - GLOSSARY.md：「收录/叙事双轨」「收录面三态判置」词条（本表=其查询面落地）
