@@ -706,7 +706,11 @@ class MayaClient(BaseMayaClient):
         port_type = await self._detect_port_type()
 
         if port_type != PortType.PYTHON:
-            # TODO: support bootstrapping from a MEL command port
+            # Known limitation: bootstrap only speaks Python. Every payload it
+            # sends is bare Python source, and the commands around them are
+            # Python expressions; a non-Python port would need the equivalent MEL
+            # form, with the source wrapped in a python() call, and this path
+            # does not build that wrapper - it refuses the port instead.
             raise MayaConnectionError(
                 f"Cannot bootstrap non-Python port (detected: {port_type.value})"
             )
