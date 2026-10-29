@@ -6,6 +6,8 @@
 > **权威决策依据**：退役决策账本 D-148（R32 主题面裁决）、D-149（真机验证窗执行契约）、D-150（发版序与前向立法）、D-109（凭证入仓纪律）、D-131（用户末行裁决权）、D-049（环境披露档）、D-145β / D-146（发布收录与核销）、GLOSSARY.md（脏场景守卫）；账本原文恢复：`git show '1c5befe^:docs/decision-ledger.md'`
 > **性质声明**：本件原为操作类非耐久运行手册（原留存 `.scratch/`），现作为历史归档收入 `docs/reference/`；窗收尾时的 AC 卡骨架与逐框结果表作为正式裁决产物随成果合入 `docs/evidence/`。
 
+> **证据工件路径声明（2026-10-29 补注）**：下文各 AC 卡 `Artifact Destination` 字段与第七节逐框结果汇总表记录的是窗口当时规划的工件命名与落点，不保证已产出并提交。经对仓库全部历史核查（`git log --all --full-history -- <path>`），除 `probe-box05-client-multiblock.json`、`probe-box07-cmds-audit.json`、`probe-box08-signature-diff.json` 三份确已入库外，其余逐框工件路径在任何提交中都从未出现过对应文件。本窗真正在仓的证据以 `docs/evidence/real-maya-window-2026-09-30.md` 的逐框结果表为准，配套探针工件见 `docs/evidence/probes/` 下实际存在的文件（例如 `probe-box07-box10.json`、`probe-qt-rst-fin.json`、`probe-box06-linux-wsl.json`）。正文不因本注记改动：各 AC 卡、预期读回、版本矩阵披露与逃生通道保持原样，本件只作注记，不改写历史正文。
+
 ---
 
 ## 一、Readiness 节（前置就绪与客户端预检）
