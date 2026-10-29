@@ -11,8 +11,9 @@ uv run pre-commit run --all-files    # hook sweep — CI's lint fallback. doc-cl
                                      # doc-claims --all-files` exits 1 with `SRE module mismatch` at
                                      # python 3.11.9 against the uv 3.13 venv; `uv run` of it exits 0
 python -m pytest tests/ -q         # stub-layer suite (contract tests vs the maya.cmds stub)
-ruff check .                        # lint — frozen budget gate (.github/ruff-baseline.json), ratchet only goes down
-python -m mypy src | mypy-baseline filter   # typecheck gate — fails only on NEW errors vs mypy-baseline.txt
+uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json          # lint pass 1: report only, red findings must not fail the shell
+python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint pass 2: frozen per-rule budget, ratchet only goes down
+rc=0; uv run python -m mypy src/ > mypy-report.txt || rc=$?; if [ "$rc" -gt 1 ]; then cat mypy-report.txt; false; else uv run mypy-baseline filter < mypy-report.txt; fi   # type-check gate: the raw exit is non-zero on the baselined errors; `false` keeps a pasted line from closing the shell
 python -m maya_mcp_server -vv      # run with DEBUG logs (-v=INFO, -vv=DEBUG)
 ```
 
@@ -20,7 +21,7 @@ House rules:
 
 - Every fix ships with a regression test on the maya stub layer.
 - Real-Maya tests are a separate local manual tier (`pytest -m mayapy`, see docs/testing.md) — never mixed with the stub tier.
-- If your change makes a doc line stale, fix that line in the same commit (「文档传播矩阵」词条 in GLOSSARY.md).
+- If your change makes a doc line stale, fix that line in the same commit — the [cross-module dependency rules](#cross-module-dependency-rules-联动规范) table below is the propagation matrix: it names, per module, the files that must move with it.
 - When folding `[Unreleased]` into a release section, rewrite each Fixed entry's
   `fixed version: [Unreleased]` literal to that release's version number by hand
   (D-230 fold-time rule; human step).
@@ -47,7 +48,7 @@ stale companions cause integration failures and gate reds.
 | `pipeline.py` strict policy flags (`MAYA_MCP_DISABLE_*`) | `docs/threat-model.md` §2/§3, `llms.txt`, `tests/test_pipeline.py::TestStrictPolicyMode` | One choke point; uncovered dangerous tools fail their gates |
 | `connection_guide.py` | `server.py` (maya_setup_guide params), `tests/test_connection_guide.py` | Marker-block semantics + flags |
 | `cos_formatter.py` | `scene_tools.py` | Formatter changes affect all tool COS outputs |
-| Derived surfaces | — | `llms.txt` (from TOOL_ANNOTATIONS) and the version list (pyproject/`__init__`/server.json/CHANGELOG/llms.txt) are derived and gated — never hand-edit; `docs/guide/session-lifecycle.md` is prose with AST-verified anchors, NOT derived |
+| Derived surfaces | — | `llms.txt` (from TOOL_ANNOTATIONS) and the version list (pyproject/`__init__`/server.json/CHANGELOG/llms.txt) are derived and gated — never hand-edit; `docs/guide/session-lifecycle.md` is prose, NOT derived; its eight `path::symbol` anchors are hand-maintained, no gate resolves them, and all eight currently resolve |
 | `.github/gate-registry.yaml` / `check_gate_registry.py` / `*-spec.yaml` | `tests/`, `ci.yml`, `AGENTS.md`, `CHANGELOG.md` | Gates register pins (human-authored, never generated); exemptions carry `expires\|issue`; governance constants live in per-domain spec files, not code; spec files must not mirror object state (second source of truth) |
 
 ### Injected-module admission criteria
