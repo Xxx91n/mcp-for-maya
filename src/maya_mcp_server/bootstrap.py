@@ -50,8 +50,11 @@ def get_bootstrap_code() -> str:
     Returns:
         Python source code as a string
     """
-    # FIXME: instead of storing create_module in a seprate file we should be able to extract
-    #  just the necessary lines of code using inspect
+    # Known limitation: create_module ships in maya_bootstrap.py rather than
+    # being extracted from this module with inspect. What reaches Maya is source
+    # text it execs standalone - Maya imports nothing from this package - so the
+    # injection unit has to be a self-contained file, not a fragment lifted out
+    # of a module that only exists on this side of the connection.
     return _get_code("maya_bootstrap")
 
 
