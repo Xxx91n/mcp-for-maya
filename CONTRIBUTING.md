@@ -13,7 +13,7 @@ uv run pre-commit run --all-files    # hook sweep — CI's lint fallback. doc-cl
 python -m pytest tests/ -q         # stub-layer suite (contract tests vs the maya.cmds stub)
 uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json          # lint pass 1: report only, red findings must not fail the shell
 python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint pass 2: frozen per-rule budget, ratchet only goes down
-rc=0; uv run python -m mypy src/ > mypy-report.txt || rc=$?; if [ "$rc" -gt 1 ]; then cat mypy-report.txt; false; else uv run mypy-baseline filter < mypy-report.txt; fi   # type-check gate: the raw exit is non-zero on the baselined errors; `false` keeps a pasted line from closing the shell
+rc=0; uv run python -m mypy src/ > mypy-report.txt || rc=$?; if [ "$rc" -gt 1 ]; then cat mypy-report.txt; false; else uv run mypy-baseline filter < mypy-report.txt; fi   # type-check gate: the raw exit is non-zero on the baselined errors; `false` rather than `exit` keeps a pasted line from closing the shell
 python -m maya_mcp_server -vv      # run with DEBUG logs (-v=INFO, -vv=DEBUG)
 ```
 
@@ -103,8 +103,9 @@ captures get NEW filenames.
   budgeted down in the same PR commit with the reason stated. `mypy` is baseline-gated in CI
   (`mypy-baseline.txt`; 184 errors in 2 files as of the D-124 dormant-module deletion —
   baseline counts are stub-env sensitive; drift trail 221→223→212→223→184 across formatter,
-  stub-environment changes and dormant-code removal): `python -m mypy src | mypy-baseline filter`
-  fails only on NEW errors.
+  stub-environment changes and dormant-code removal): the type-check row in
+  Development setup above is that gate — the filter fails only on NEW errors,
+  and the wrapper keeps a mypy crash (raw exit above 1) red.
   After resolving errors, run `python -m mypy src | mypy-baseline sync` and commit
   the refreshed baseline in the same PR. The ruff budget is per-rule
   (`{segment:{rule:count}}`) since T-10b — rules cannot subsidise each other.
