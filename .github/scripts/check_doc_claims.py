@@ -27,7 +27,7 @@ SCOPE LIMITS, stated so nobody reads more into this than it does:
   Added/Fixed/Changed only.
 * D1b proves a pointer LANDS, not that what it lands on proves the claim. A
   pointer to a real test that asserts nothing relevant passes every rule here.
-  That residual is the same one the pin registry discloses, and it is
+  That residual is the same one the pin-registry checker discloses, and it is
   disclosed rather than papered over.
 * ``sha:path:line`` is accepted as a form and NOT resolved: it names an
   immutable blob, so the checker would have to read git objects to confirm it,
