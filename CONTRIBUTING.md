@@ -13,7 +13,7 @@ uv run pre-commit run --all-files    # hook sweep — CI's lint fallback. doc-cl
 python -m pytest tests/ -q         # stub-layer suite (contract tests vs the maya.cmds stub)
 uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json          # lint pass 1: report only, red findings must not fail the shell
 python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint pass 2: frozen per-rule budget, ratchet only goes down
-rc=0; uv run python -m mypy src/ > mypy-report.txt || rc=$?; if [ "$rc" -gt 1 ]; then cat mypy-report.txt; false; else uv run mypy-baseline filter < mypy-report.txt; fi   # type-check gate: the raw exit is non-zero on the baselined errors; `false` rather than `exit` keeps a pasted line from closing the shell
+rc=0; uv run python -m mypy src/ > mypy-report.txt || rc=$?; if [ "$rc" -gt 1 ]; then cat mypy-report.txt; false; else uv run mypy-baseline filter < mypy-report.txt; fi   # type-check gate: the raw exit is non-zero on the baselined errors; `false` rather than `exit` keeps a pasted line from closing the shell, so a crash lands at exit 1 here and CI's 2
 python -m maya_mcp_server -vv      # run with DEBUG logs (-v=INFO, -vv=DEBUG)
 ```
 
@@ -48,7 +48,7 @@ stale companions cause integration failures and gate reds.
 | `pipeline.py` strict policy flags (`MAYA_MCP_DISABLE_*`) | `docs/threat-model.md` §2/§3, `llms.txt`, `tests/test_pipeline.py::TestStrictPolicyMode` | One choke point; uncovered dangerous tools fail their gates |
 | `connection_guide.py` | `server.py` (maya_setup_guide params), `tests/test_connection_guide.py` | Marker-block semantics + flags |
 | `cos_formatter.py` | `scene_tools.py` | Formatter changes affect all tool COS outputs |
-| Derived surfaces | — | `llms.txt` (from TOOL_ANNOTATIONS) and the version list (pyproject/`__init__`/server.json/CHANGELOG/llms.txt) are derived and gated — never hand-edit; `docs/guide/session-lifecycle.md` is prose, NOT derived; its eight `path::symbol` anchors are hand-maintained, no gate resolves them, and all eight currently resolve |
+| Derived surfaces | — | `llms.txt` (from TOOL_ANNOTATIONS) and the version list (pyproject/`__init__`/server.json/CHANGELOG/llms.txt) are derived and gated — never hand-edit; `docs/guide/session-lifecycle.md` is prose, NOT derived; the eight `path::symbol` bullets under its Anchors heading are hand-maintained, no gate resolves them, and all eight currently resolve |
 | `.github/gate-registry.yaml` / `check_gate_registry.py` / `*-spec.yaml` | `tests/`, `ci.yml`, `AGENTS.md`, `CHANGELOG.md` | Gates register pins (human-authored, never generated); exemptions carry `expires\|issue`; governance constants live in per-domain spec files, not code; spec files must not mirror object state (second source of truth) |
 
 ### Injected-module admission criteria
@@ -106,8 +106,10 @@ captures get NEW filenames.
   stub-environment changes and dormant-code removal): the type-check row in
   Development setup above is that gate — the filter fails only on NEW errors,
   and the wrapper keeps a mypy crash (raw exit above 1) red.
-  After resolving errors, run `python -m mypy src | mypy-baseline sync` and commit
-  the refreshed baseline in the same PR. The ruff budget is per-rule
+  After resolving errors, regenerate the baseline from the same guarded report —
+  `uv run mypy-baseline sync < mypy-report.txt`, once the wrapper above has
+  stopped reporting errors — and commit the refreshed baseline in the same PR.
+  The ruff budget is per-rule
   (`{segment:{rule:count}}`) since T-10b — rules cannot subsidise each other.
   Budget gates are judged on the checked commit's tip (the PR's end state); a
   mid-PR commit that transiently exceeds a budget does not constitute a gate
