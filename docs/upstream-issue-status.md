@@ -7,7 +7,7 @@ dist name `mcp-for-maya`). It exists so that issue comments can point at a
 stable, honest anchor instead of re-stating per-release details inline.
 
 Source of truth: `CHANGELOG.md`（原账本 D-057..D-065 行已随账本退役删除，见 git 历史）
-— this table is regenerated from the same facts, never ahead of them.
+— this table is hand-maintained from the same facts, never ahead of them.
 
 Version pointers are **durable claims**: `>= X.Y.Z` names the first release
 that contains the change, which stays true even if later releases supersede it
