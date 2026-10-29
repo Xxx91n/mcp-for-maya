@@ -50,11 +50,11 @@ def get_bootstrap_code() -> str:
     Returns:
         Python source code as a string
     """
-    # Known limitation: create_module lives in maya_bootstrap.py and ships by
-    # reading that file, not by extracting its lines from this module at runtime.
-    # What the port receives is source text exec'd on its own, so the file is
-    # written to be self-contained; keeping it whole means the text sent is the
-    # file on disk, not a function sliced out of a module by inspect.
+    # Known limitation: create_module lives in maya_bootstrap.py and ships as that
+    # whole file, read verbatim - not sliced out of a module at runtime with
+    # inspect. What the port receives is source text exec'd on its own, so the
+    # file is written to be self-contained; shipping it whole is what keeps the
+    # text sent identical to the file on disk.
     return _get_code("maya_bootstrap")
 
 
