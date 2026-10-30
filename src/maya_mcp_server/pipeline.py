@@ -3,7 +3,7 @@ rate-limit, pattern scan, safe_mode gate, dispatch and audit.
 
 One FastMCP middleware funnels every tool call through:
     input validation -> rate limit -> pattern scan -> safe_mode gate ->
-    dispatch -> audit.
+    dispatch -> disclosure -> audit.
 
 TOOL_ANNOTATIONS is the single source for each tool's four MCP hints;
 the same map drives the read/write rate-limit bucket classification.
@@ -11,6 +11,7 @@ the same map drives the read/write rate-limit bucket classification.
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import os
@@ -24,12 +25,15 @@ from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 
 
 try:
-    from fastmcp.tools.base import Tool  # fastmcp 4.x
+    from fastmcp.tools.base import Tool, ToolResult  # fastmcp 4.x
 except ImportError:  # pragma: no cover - exercised by the other resolution arm
-    from fastmcp.tools import Tool  # fastmcp 2.x
+    from fastmcp.tools import Tool, ToolResult  # fastmcp 2.x
 
 from maya_mcp_server.security import (
+    SAFE_MODE_BOUNDARY_LINE,
     SAFE_MODE_ENV_FLAG,
+    SAFE_MODE_RESULT_FIELD,
+    SAFE_MODE_RESULT_VALUE,
     SAFE_MODE_TOOLS,
     AuditLogger,
     PatternBlockedError,
@@ -223,15 +227,26 @@ class SecurityPipeline(Middleware):
         context: MiddlewareContext[mt.ListToolsRequest],
         call_next: CallNext[mt.ListToolsRequest, Sequence[Tool]],
     ) -> Sequence[Tool]:
-        """Hide policy-disabled tools from tools/list.
+        """Hide policy-disabled tools and disclose safe_mode on tools/list.
 
         A tool the agent cannot see is one it will not plan around; on_call_tool
         still denies it, because hiding is an affordance and not a boundary.
+        Under safe_mode the two gated tools stay listed; their descriptions
+        gain a Boundary line (ADR-0028 convention) instead.
         """
         disabled = policy_disabled_tools()
-        if not disabled:
+        disclose = safe_mode_enabled()
+        if not disabled and not disclose:
             return await call_next(context)
-        return [tool for tool in await call_next(context) if tool.name not in disabled]
+        listed = await call_next(context)
+        out: list[Tool] = []
+        for tool in listed:
+            if tool.name in disabled:
+                continue
+            if disclose and tool.name in SAFE_MODE_TOOLS:
+                tool = _with_boundary_line(tool)
+            out.append(tool)
+        return out
 
     async def on_call_tool(
         self,
@@ -327,6 +342,12 @@ class SecurityPipeline(Middleware):
                 raise
             if _result_is_error(result):
                 outcome = "error"
+                return result
+            # 6. disclosure — a successful gated call under safe_mode carries
+            # mode: "safe" on its structured payload; error results (domain
+            # failures) and rejections (the raised PipelineError) never do.
+            if safe_mode_enabled() and tool_name in SAFE_MODE_TOOLS:
+                result = _with_safe_mode_field(result)
             return result
         except PipelineError:
             if outcome != "error":
@@ -348,6 +369,79 @@ class SecurityPipeline(Middleware):
                         warnings=warnings,
                     )
                 )
+
+
+def _with_safe_mode_field(result: Any) -> Any:
+    """Add mode: "safe" to a successful gated tool result (T3 disclosure).
+
+    A dict structured payload gains the field as a sibling; a result without
+    one gets the field alone (its content blocks carry the payload verbatim).
+    Rejections never reach this helper — they leave the pipeline as raised
+    PipelineErrors — and an error result keeps its payload untouched.
+    """
+    if type(result) is not ToolResult or result.is_error:
+        # subclasses (e.g. InputRequiredToolResult) carry control flow, not
+        # tool-output data; an error result is not a success response
+        return result
+    structured = result.structured_content
+    if isinstance(structured, dict):
+        merged = {**structured, SAFE_MODE_RESULT_FIELD: SAFE_MODE_RESULT_VALUE}
+        # Regenerate only a content block that was the JSON mirror of the
+        # pre-merge payload; a plain-text confirmation (write_module's
+        # wrapped string) stays verbatim next to the merged structured field.
+        content = (
+            None
+            if _mirrors_payload(result.content, structured)
+            else (list(result.content) if result.content else None)
+        )
+    else:
+        # scalar/empty results carry no structured payload to merge into —
+        # the content blocks stay verbatim and only the mode field is added
+        merged = {SAFE_MODE_RESULT_FIELD: SAFE_MODE_RESULT_VALUE}
+        content = list(result.content) if result.content else None
+    return ToolResult(
+        content=content,
+        structured_content=merged,
+        meta=result.meta,
+        is_error=result.is_error,
+    )
+
+
+def _mirrors_payload(content: Sequence[Any], payload: dict[str, Any]) -> bool:
+    """Whether one text block is the JSON projection of the structured payload.
+
+    fastmcp sets text = json(structured) for unwrapped dict results, but keeps
+    a wrapped scalar's plain-text confirmation. Only the mirror form can be
+    regenerated after the merge without altering the tool's own wording.
+    """
+    if len(content) != 1:
+        return False
+    text = getattr(content[0], "text", None)
+    if not isinstance(text, str):
+        return False
+    try:
+        return bool(json.loads(text) == payload)
+    except (ValueError, TypeError):
+        return False
+
+
+def _with_boundary_line(tool: Tool) -> Tool:
+    """Return a copy of tool with the safe_mode Boundary line appended.
+
+    tools/list re-serves the registry's Tool instances, so the line is added
+    to a clone — mutating the original would leak the disclosure into the
+    flag-off listing. Called once per listing, so an existing line is never
+    duplicated.
+    """
+    description = getattr(tool, "description", None)
+    if not isinstance(description, str) or SAFE_MODE_BOUNDARY_LINE in description:
+        return tool
+    try:
+        cloned = tool.model_copy()  # pydantic Tool (fastmcp)
+    except AttributeError:
+        cloned = copy.copy(tool)
+    cloned.description = f"{description.rstrip()}\n\n{SAFE_MODE_BOUNDARY_LINE}"
+    return cloned
 
 
 def _resolve_session_id(context: MiddlewareContext[Any], args: dict[str, Any]) -> str:
