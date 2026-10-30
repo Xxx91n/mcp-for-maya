@@ -754,9 +754,7 @@ class TestSafeModeDisclosure:
                 structured_content={"nodes": ["a"]},
             )
 
-        result = await pipe.on_call_tool(
-            _ctx("execute_code", {"code": "x = 1"}), _dict_next
-        )
+        result = await pipe.on_call_tool(_ctx("execute_code", {"code": "x = 1"}), _dict_next)
         assert result.structured_content == {"nodes": ["a"], "mode": "safe"}
         # the content blocks stay the JSON mirror of the structured payload
         # (fastmcp's invariant) — mode is visible to text consumers too
@@ -769,11 +767,7 @@ class TestSafeModeDisclosure:
         monkeypatch.delenv(SAFE_MODE_ENV_FLAG, raising=False)
         pipe, _audit, _log = _pipeline(tmp_path)
         for tool in SAFE_MODE_TOOLS:
-            args = (
-                {"name": "m", "code": "x = 1"}
-                if tool == "write_module"
-                else {"code": "x = 1"}
-            )
+            args = {"name": "m", "code": "x = 1"} if tool == "write_module" else {"code": "x = 1"}
             result = await pipe.on_call_tool(_ctx(tool, args), _ok_next)
             assert result.structured_content is None, (
                 f"{tool}: no mode field may be added when the flag is off"
@@ -871,9 +865,7 @@ class TestSafeModeDisclosure:
         assert "execute_code" not in by_name
         assert SAFE_MODE_BOUNDARY_LINE in by_name["write_module"].description
 
-    async def test_real_tool_descriptions_gain_the_line(
-        self, tmp_path, monkeypatch
-    ):
+    async def test_real_tool_descriptions_gain_the_line(self, tmp_path, monkeypatch):
         """Seam B end-to-end shape: the registered execute_code/write_module
         descriptions must take the line without losing their fields."""
         monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
@@ -891,12 +883,7 @@ class TestSafeModeDisclosure:
         listed = await pipe.on_list_tools(_list_ctx(), _next)
         for listed_tool, original in zip(listed, real_tools, strict=True):
             assert SAFE_MODE_BOUNDARY_LINE in listed_tool.description
-            assert listed_tool.description.startswith(
-                original.description.rstrip()[:40]
-            )
+            assert listed_tool.description.startswith(original.description.rstrip()[:40])
             assert listed_tool.name == original.name
             assert listed_tool.parameters == original.parameters
-        assert all(
-            SAFE_MODE_BOUNDARY_LINE not in (t.description or "")
-            for t in real_tools
-        )
+        assert all(SAFE_MODE_BOUNDARY_LINE not in (t.description or "") for t in real_tools)
