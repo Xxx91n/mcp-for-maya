@@ -15,9 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `rejected` with the triggering rule id, and the suggestion points at typed
   tools or unsetting the flag. Default off, and the flag is standalone (not a
   `MAYA_MCP_DISABLE_*` member), so DISABLE still removes tools from `tools/list`
-  before safe_mode narrows what remains. The full rule matrix and the response
-  disclosure land in follow-up tickets. Evidence:
+  before safe_mode narrows what remains. The response disclosure lands in a
+  follow-up ticket. Evidence:
   `tests/test_pipeline.py::TestSafeModeGate::test_unsafe_import_rejected_before_dispatch`.
+- **Full deny-by-default `safe_mode` rule matrix** — the AST gate now also
+  rejects syntax constructs outside the v1 node allowlist (`with`, `raise`,
+  `assert`, `del`, `global`/`nonlocal`, `yield`, `await`, `async`, `match`),
+  references to the denied builtin names (`open`, `eval`, `exec`, `compile`,
+  `__import__`, `globals`, `locals`, `vars`, `getattr`, `setattr`, `delattr`,
+  `input`, `breakpoint`, `help`, `id`, `super`), `__builtins__` references, and
+  any `__x__` attribute access (the `().__class__.__base__.__subclasses__()`
+  family, including the `from x import __path__` spelling), each under its own
+  `safe-mode-*` rule id. `def`/`class`/`lambda` bodies are walked under the
+  same rules recursively. Safety net, not a boundary. Evidence:
+  `tests/test_security.py::TestScanSafeModeCode`,
+  `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`.
 
 ### Removed
 
