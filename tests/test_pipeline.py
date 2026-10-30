@@ -887,3 +887,40 @@ class TestSafeModeDisclosure:
             assert listed_tool.name == original.name
             assert listed_tool.parameters == original.parameters
         assert all(SAFE_MODE_BOUNDARY_LINE not in (t.description or "") for t in real_tools)
+
+    async def test_error_result_keeps_payload_without_mode(self, tmp_path, monkeypatch):
+        """A result flagged is_error is not a success response, so it must not
+        gain the mode field. (The bare is_error flag is not visible to
+        _result_is_error, which reads the protocol camelCase / payload form.)"""
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+
+        async def _error_next(context):
+            return ToolResult(content="backend said no", is_error=True)
+
+        pipe, _audit, _log = _pipeline(tmp_path)
+        result = await pipe.on_call_tool(_ctx("execute_code", {"code": "x = 1"}), _error_next)
+        assert result.structured_content is None
+        assert result.content[0].text == "backend said no"
+
+    async def test_wrapped_confirmation_keeps_plain_text(self, tmp_path, monkeypatch):
+        """write_module's wrapped string keeps its plain-text confirmation:
+        the disclosure adds the structured field, it does not reword the tool."""
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        from maya_mcp_server.server import mcp
+
+        write_tool = await mcp.get_tool("write_module")
+        original = write_tool.convert_result("Module 'm' registered")
+
+        async def _next(context):
+            return original
+
+        pipe, _audit, _log = _pipeline(tmp_path)
+        result = await pipe.on_call_tool(
+            _ctx("write_module", {"name": "m", "code": "x = 1"}), _next
+        )
+        assert result.content[0].text == "Module 'm' registered"
+        assert result.structured_content == {
+            "result": "Module 'm' registered",
+            "mode": "safe",
+        }
+        assert result.meta == original.meta

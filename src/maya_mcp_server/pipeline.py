@@ -377,19 +377,23 @@ def _with_safe_mode_field(result: Any) -> Any:
     A dict structured payload gains the field as a sibling; a result without
     one gets the field alone (its content blocks carry the payload verbatim).
     Rejections never reach this helper — they leave the pipeline as raised
-    PipelineErrors.
+    PipelineErrors — and an error result keeps its payload untouched.
     """
-    if type(result) is not ToolResult:
+    if type(result) is not ToolResult or result.is_error:
         # subclasses (e.g. InputRequiredToolResult) carry control flow, not
-        # tool-output data — they must pass through unmodified
+        # tool-output data; an error result is not a success response
         return result
     structured = result.structured_content
     if isinstance(structured, dict):
         merged = {**structured, SAFE_MODE_RESULT_FIELD: SAFE_MODE_RESULT_VALUE}
-        # keep fastmcp's invariant: for dict payloads the content blocks are
-        # the JSON mirror of structured_content — regenerate, don't preserve
-        # the pre-merge text or content and structured payload would diverge
-        content = None
+        # Regenerate only a content block that was the JSON mirror of the
+        # pre-merge payload; a plain-text confirmation (write_module's
+        # wrapped string) stays verbatim next to the merged structured field.
+        content = (
+            None
+            if _mirrors_payload(result.content, structured)
+            else (list(result.content) if result.content else None)
+        )
     else:
         # scalar/empty results carry no structured payload to merge into —
         # the content blocks stay verbatim and only the mode field is added
@@ -401,6 +405,24 @@ def _with_safe_mode_field(result: Any) -> Any:
         meta=result.meta,
         is_error=result.is_error,
     )
+
+
+def _mirrors_payload(content: Sequence[Any], payload: dict[str, Any]) -> bool:
+    """Whether one text block is the JSON projection of the structured payload.
+
+    fastmcp sets text = json(structured) for unwrapped dict results, but keeps
+    a wrapped scalar's plain-text confirmation. Only the mirror form can be
+    regenerated after the merge without altering the tool's own wording.
+    """
+    if len(content) != 1:
+        return False
+    text = getattr(content[0], "text", None)
+    if not isinstance(text, str):
+        return False
+    try:
+        return bool(json.loads(text) == payload)
+    except (ValueError, TypeError):
+        return False
 
 
 def _with_boundary_line(tool: Tool) -> Tool:
