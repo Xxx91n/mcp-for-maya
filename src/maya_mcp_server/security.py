@@ -509,6 +509,14 @@ SAFE_MODE_ENV_FLAG = "MAYA_MCP_SAFE_MODE"
 # affected by safe_mode.
 SAFE_MODE_TOOLS: frozenset[str] = frozenset({"execute_code", "write_module"})
 
+# T3 disclosure surfaces, both conditional on the flag: successful gated-tool
+# results carry `mode: "safe"` on their structured payload, and the tools/list
+# descriptions gain one Boundary line (ADR-0028 convention). Neither appears
+# when the flag is off; rejections never carry the mode field.
+SAFE_MODE_RESULT_FIELD = "mode"
+SAFE_MODE_RESULT_VALUE = "safe"
+SAFE_MODE_BOUNDARY_LINE = "Boundary: safe_mode on — code allowlist enforced"
+
 # v1 import allowlist, matched on the dotted root. `maya.OpenMaya*` rides the
 # `maya` root; pymel is deliberately absent (rejected in v1).
 SAFE_IMPORT_ROOTS: frozenset[str] = frozenset(

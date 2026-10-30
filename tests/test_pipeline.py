@@ -32,6 +32,8 @@ from maya_mcp_server.pipeline import (
     tool_annotations,
 )
 from maya_mcp_server.security import (
+    SAFE_MODE_BOUNDARY_LINE,
+    SAFE_MODE_TOOLS,
     AuditLogger,
     InputValidationError,
     PatternBlockedError,
@@ -503,8 +505,9 @@ async def test_in_tool_pipeline_error_counts_as_error(tmp_path):
 
 
 class _FakeTool:
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, description: str | None = None) -> None:
         self.name = name
+        self.description = description
 
 
 def _list_ctx() -> MiddlewareContext:
@@ -796,3 +799,203 @@ class TestSafeModeGate:
             _next,
         )
         assert len(calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# T3: safe_mode disclosure surfaces. Successful gated calls carry
+# mode: "safe" on their structured payload; tools/list descriptions gain a
+# Boundary line while the flag is on. Both are absent when the flag is off
+# and neither touches rejections, errors, or other tools.
+# ---------------------------------------------------------------------------
+
+
+class TestSafeModeDisclosure:
+    @pytest.mark.parametrize("tool", ["execute_code", "write_module"])
+    async def test_success_result_carries_mode_field(self, tmp_path, monkeypatch, tool):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        args = {"name": "m", "code": "x = 1"} if tool == "write_module" else {"code": "x = 1"}
+        result = await pipe.on_call_tool(_ctx(tool, args), _ok_next)
+        assert result.structured_content["mode"] == "safe"
+        assert result.content[0].text == "ok"
+
+    async def test_mode_field_merges_into_dict_payload(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+
+        async def _dict_next(context):
+            return ToolResult(
+                content='{"nodes": ["a"]}',
+                structured_content={"nodes": ["a"]},
+            )
+
+        result = await pipe.on_call_tool(_ctx("execute_code", {"code": "x = 1"}), _dict_next)
+        assert result.structured_content == {"nodes": ["a"], "mode": "safe"}
+        # the content blocks stay the JSON mirror of the structured payload
+        # (fastmcp's invariant) — mode is visible to text consumers too
+        assert json.loads(result.content[0].text) == {
+            "nodes": ["a"],
+            "mode": "safe",
+        }
+
+    async def test_flag_off_adds_no_mode_field(self, tmp_path, monkeypatch):
+        monkeypatch.delenv(SAFE_MODE_ENV_FLAG, raising=False)
+        pipe, _audit, _log = _pipeline(tmp_path)
+        for tool in SAFE_MODE_TOOLS:
+            args = {"name": "m", "code": "x = 1"} if tool == "write_module" else {"code": "x = 1"}
+            result = await pipe.on_call_tool(_ctx(tool, args), _ok_next)
+            assert result.structured_content is None, (
+                f"{tool}: no mode field may be added when the flag is off"
+            )
+        result = await pipe.on_call_tool(
+            _ctx("execute_code", {"code": "x = 1"}),
+            _domain_error_next(),
+        )
+        assert "mode" not in (result.structured_content or {})
+
+    async def test_rejection_never_carries_mode(self, tmp_path, monkeypatch):
+        """A rejection leaves the pipeline as a raised PipelineError — there
+        is no ToolResult for a mode field to ride on."""
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        with pytest.raises(SafeModeRejectedError):
+            await pipe.on_call_tool(_ctx("execute_code", {"code": "import os"}), _ok_next)
+
+    async def test_domain_error_result_gets_no_mode(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        result = await pipe.on_call_tool(
+            _ctx("execute_code", {"code": "x = 1"}), _domain_error_next()
+        )
+        assert result.structured_content == {"error": {"code": "x", "message": "boom"}}
+
+    async def test_mode_field_only_on_gated_tools(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        result = await pipe.on_call_tool(_ctx("scene_snapshot", {}), _ok_next)
+        assert result.structured_content is None
+
+    async def test_boundary_line_appended_only_when_flag_on(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+
+        async def _next(context):
+            return [
+                _FakeTool("execute_code", "Execute Python code."),
+                _FakeTool("write_module", "Register a module."),
+                _FakeTool("scene_snapshot", "Snapshot the scene."),
+            ]
+
+        listed = await pipe.on_list_tools(_list_ctx(), _next)
+        by_name = {t.name: t for t in listed}
+        for gated in ("execute_code", "write_module"):
+            assert SAFE_MODE_BOUNDARY_LINE in by_name[gated].description
+            assert by_name[gated].description.count(SAFE_MODE_BOUNDARY_LINE) == 1
+        assert SAFE_MODE_BOUNDARY_LINE not in by_name["scene_snapshot"].description
+
+    async def test_flag_off_leaves_descriptions_unchanged(self, tmp_path, monkeypatch):
+        monkeypatch.delenv(SAFE_MODE_ENV_FLAG, raising=False)
+        pipe, _audit, _log = _pipeline(tmp_path)
+
+        async def _next(context):
+            return [
+                _FakeTool("execute_code", "Execute Python code."),
+                _FakeTool("write_module", "Register a module."),
+            ]
+
+        listed = await pipe.on_list_tools(_list_ctx(), _next)
+        for tool in listed:
+            assert SAFE_MODE_BOUNDARY_LINE not in tool.description
+
+    async def test_original_tool_instances_are_not_mutated(self, tmp_path, monkeypatch):
+        """The Boundary line rides a clone — the registry's Tool objects must
+        stay flag-off clean or the disclosure would leak into the next listing."""
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        original = _FakeTool("execute_code", "Execute Python code.")
+
+        async def _next(context):
+            return [original]
+
+        listed = await pipe.on_list_tools(_list_ctx(), _next)
+        assert original.description == "Execute Python code."
+        assert listed[0] is not original
+        assert SAFE_MODE_BOUNDARY_LINE in listed[0].description
+
+    async def test_disabled_tool_does_not_gain_the_line(self, tmp_path, monkeypatch):
+        """Composition: DISABLE removes the tool entirely, so there is no
+        description left for the Boundary line to land on."""
+        monkeypatch.setenv("MAYA_MCP_DISABLE_EXECUTE", "1")
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+
+        async def _next(context):
+            return [
+                _FakeTool("execute_code", "Execute Python code."),
+                _FakeTool("write_module", "Register a module."),
+            ]
+
+        listed = await pipe.on_list_tools(_list_ctx(), _next)
+        by_name = {t.name: t for t in listed}
+        assert "execute_code" not in by_name
+        assert SAFE_MODE_BOUNDARY_LINE in by_name["write_module"].description
+
+    async def test_real_tool_descriptions_gain_the_line(self, tmp_path, monkeypatch):
+        """Seam B end-to-end shape: the registered execute_code/write_module
+        descriptions must take the line without losing their fields."""
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        from maya_mcp_server.server import mcp
+
+        real_tools = [
+            await mcp.get_tool("execute_code"),
+            await mcp.get_tool("write_module"),
+        ]
+        pipe, _audit, _log = _pipeline(tmp_path)
+
+        async def _next(context):
+            return real_tools
+
+        listed = await pipe.on_list_tools(_list_ctx(), _next)
+        for listed_tool, original in zip(listed, real_tools, strict=True):
+            assert SAFE_MODE_BOUNDARY_LINE in listed_tool.description
+            assert listed_tool.description.startswith(original.description.rstrip()[:40])
+            assert listed_tool.name == original.name
+            assert listed_tool.parameters == original.parameters
+        assert all(SAFE_MODE_BOUNDARY_LINE not in (t.description or "") for t in real_tools)
+
+    async def test_error_result_keeps_payload_without_mode(self, tmp_path, monkeypatch):
+        """A result flagged is_error is not a success response, so it must not
+        gain the mode field. (The bare is_error flag is not visible to
+        _result_is_error, which reads the protocol camelCase / payload form.)"""
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+
+        async def _error_next(context):
+            return ToolResult(content="backend said no", is_error=True)
+
+        pipe, _audit, _log = _pipeline(tmp_path)
+        result = await pipe.on_call_tool(_ctx("execute_code", {"code": "x = 1"}), _error_next)
+        assert result.structured_content is None
+        assert result.content[0].text == "backend said no"
+
+    async def test_wrapped_confirmation_keeps_plain_text(self, tmp_path, monkeypatch):
+        """write_module's wrapped string keeps its plain-text confirmation:
+        the disclosure adds the structured field, it does not reword the tool."""
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        from maya_mcp_server.server import mcp
+
+        write_tool = await mcp.get_tool("write_module")
+        original = write_tool.convert_result("Module 'm' registered")
+
+        async def _next(context):
+            return original
+
+        pipe, _audit, _log = _pipeline(tmp_path)
+        result = await pipe.on_call_tool(
+            _ctx("write_module", {"name": "m", "code": "x = 1"}), _next
+        )
+        assert result.content[0].text == "Module 'm' registered"
+        assert result.structured_content == {
+            "result": "Module 'm' registered",
+            "mode": "safe",
+        }
+        assert result.meta == original.meta
