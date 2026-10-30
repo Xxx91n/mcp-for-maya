@@ -64,7 +64,7 @@ Domain vocabulary. Each entry is a term and a definition of at most two sentence
 
 **端口豁免集**: 已判定非 Python 的端口入会话级永久豁免，端口从 LISTEN 消失才解禁，避免周期重探。
 
-**safe_mode**: opt-in 收紧模式（`MAYA_MCP_SAFE_MODE`）：对 execute_code/write_module 的代码载荷做允许清单式 AST 判定后放行；安全网非安全边界，Maya 内语言级沙盒仍是 won't-fix。
+**safe_mode**: opt-in 收紧模式（`MAYA_MCP_SAFE_MODE`，默认关）：对 execute_code/write_module 的代码载荷做允许清单式 AST 判定后放行；拒绝报 `safe_mode_rejected` 并带 rule id，成功响应带 `mode:"safe"`；安全网非安全边界，Maya 内语言级沙盒仍是 won't-fix。
 
 ## 工程词汇
 

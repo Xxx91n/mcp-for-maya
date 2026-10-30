@@ -45,6 +45,7 @@ stale companions cause integration failures and gate reds.
 | `scene_tools.py` (new tool) | `server.py` instructions, READMEs, `AGENTS.md` | Tool surface changes require documentation sync |
 | `scene_cache.py` | `scene_tools.py`, `session_manager.py` | Cache invalidation consistency |
 | `security.py` | `pipeline.py`, `tests/test_security.py`, `tests/test_pipeline.py` | Rules enforced by the middleware pipeline |
+| `security.py` (`safe_mode` rule table: `SAFE_IMPORT_ROOTS`/`SAFE_NODE_TYPES`/denied builtins) | `docs/threat-model.md` §2/§3, `GLOSSARY.md`, `README.md` + `README.zh-CN.md`, `server.py` docstrings, `tests/test_security.py::TestScanSafeModeCode`, `tests/test_pipeline.py::TestSafeModeGate`, the error-code registry under `docs/guide/` | The v1 deny-by-default matrix is the single source — docs, tool docstrings, and pin tests restate it; every rule change propagates |
 | `pipeline.py` strict policy flags (`MAYA_MCP_DISABLE_*`) | `docs/threat-model.md` §2/§3, `llms.txt`, `tests/test_pipeline.py::TestStrictPolicyMode` | One choke point; uncovered dangerous tools fail their gates |
 | `connection_guide.py` | `server.py` (maya_setup_guide params), `tests/test_connection_guide.py` | Marker-block semantics + flags |
 | `cos_formatter.py` | `scene_tools.py` | Formatter changes affect all tool COS outputs |
