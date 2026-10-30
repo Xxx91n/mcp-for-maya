@@ -43,10 +43,18 @@ The following are **not** security boundaries:
   operator, a demo, or a CI sandbox can shrink the blast radius of a
   mistake without trusting every caller to pass sensible arguments.
   They are config, not a jail, and must never be described as one.
+- `safe_mode` (`MAYA_MCP_SAFE_MODE=1`, implemented, opt-in, default
+  off). Same misuse-guardrail class as the DISABLE flags: while the
+  two code-bearing tools stay listed, the AST gate narrows their
+  `code` payloads to a v1 allowlist and rejections return
+  `safe_mode_rejected` with the triggering rule id. It slows
+  confused-deputy payloads; it does not contain a hostile caller —
+  the client stays trusted, and successful calls disclose
+  `mode: "safe"` rather than claim a boundary. Config, not a jail.
 
 We deliberately avoid the words "sandbox" and "secure" for these
-mechanisms. A future opt-in AST allowlist (`safe_mode`, roadmap
-P2) would still be a hallucination-slowing net, not a jail —
+mechanisms. `safe_mode` (the implemented opt-in AST allowlist,
+roadmap P2) is a hallucination-slowing net, not a jail —
 language-level confinement of Python inside Maya is a known-won't-fix
 problem.
 
@@ -63,10 +71,12 @@ problem.
 | userSetup.py merge | marker-block upsert, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
 | Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 25 tools | pipeline.py |
 | Strict policy mode | `MAYA_MCP_DISABLE_*{EXECUTE,WRITE_MODULE,ARBITRARY}` remove the named tools from `tools/list` and deny the call with `[policy_disabled]`, audited as `rejected`; one choke point in the pipeline, none in the tool bodies | pipeline.py (POLICY_ENV_FLAGS, on_list_tools, on_call_tool) |
+| `safe_mode` AST gate | opt-in (`MAYA_MCP_SAFE_MODE=1`, default off); deny-by-default allowlist over `execute_code`/`write_module` `code` payloads — v1 import roots (maya/math/json/re/collections/itertools/functools/dataclasses/typing) + node allowlist, denied builtin names rejected on any reference (not just calls)/`__builtins__`/dunder access rejected, unparseable input rejects ("cannot decide ⇒ deny"); `[safe_mode_rejected]` + rule id, audited `rejected`; success responses carry `mode:"safe"`, tools/list gains a Boundary line | security.py (SAFE_* tables, scan_safe_mode_code), pipeline.py (on_call_tool stage 4, _with_safe_mode_field, _with_boundary_line) |
 | Asset egress whitelist | asset_search/asset_import reach https only on api.polyhaven.com + dl.polyhaven.org/.com, mandatory User-Agent, size+timeout caps, per-file md5 verify, platformdirs cache | polyhaven.py |
 
 All 25 tools pass through one FastMCP middleware pipeline:
-validate → rate-limit → pattern-scan → dispatch → audit.
+validate → rate-limit → pattern-scan → safe_mode gate (opt-in, the
+two code-bearing tools only) → dispatch → audit.
 
 ## 4. Port and network exposure
 
@@ -157,7 +167,9 @@ authoritative and this table must match it row for row:
   modal dialog can hang the channel. Residuals registered honestly: no
   realpath/symlink resolution (a symlinked parent is followed silently)
   and no per-directory allowlist (any path the Maya process can write
-  is writable).
+  is writable). `safe_mode` narrows nothing here — it gates `code`
+  payloads only, and `path` stays an informed-acceptance string; both
+  residuals are acknowledged, not fixed.
 - `scene_viewport_snapshot` / `scene_render_preview` are readOnly
   under the net-zero side-effect discipline (camera/current-time
   restored on every path, D-026) - the visible transient is documented
@@ -220,6 +232,9 @@ See [SECURITY.md](../SECURITY.md).
 
 - Multi-user or remote access → the model breaks; don't do it without a
   redesign.
-- `safe_mode` AST allowlist (roadmap P2, opt-in, default off,
-  responses carry a `mode` field, docs say "safety net, not a
-  boundary").
+- `safe_mode` AST allowlist — implemented (roadmap P2): opt-in,
+  default off, successful responses carry a `mode` field, and every
+  surface keeps the "safety net, not a boundary" wording (§2/§3
+  above). The model itself is unchanged: trusted parties stay
+  trusted, and the "not a boundary" list gains a member, nothing
+  moves sides.

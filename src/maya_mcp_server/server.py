@@ -311,9 +311,16 @@ async def write_module(
     and existing modules are protected unless overwrite=True is explicitly set.
     Requires an active Maya session.
 
-    Under safe_mode (MAYA_MCP_SAFE_MODE), gated execute_code payloads can only
-    import the v1 allowlisted roots; a module defined here whose root is not one
-    of those roots is therefore not importable by name from gated code.
+    Under safe_mode (MAYA_MCP_SAFE_MODE, opt-in, default off) this code
+    payload passes the same deny-by-default AST allowlist as execute_code:
+    non-allowlisted imports, denied builtin names (any reference, not
+    just calls), __builtins__ references,
+    dunder attribute access, and unparseable input are rejected with
+    safe_mode_rejected naming the triggering rule id. Successful
+    responses carry mode: "safe" on their structured payload. Gated
+    execute_code payloads can only import the v1 allowlisted roots, so a
+    module defined here whose root is not one of those roots is not
+    importable by name from gated code.
 
     Boundary: Use write_module to define reusable libraries and helper functions;
     use execute_code for one-shot imperative execution or expression evaluation.
@@ -367,6 +374,18 @@ async def execute_code(
     do not register an automatic undo chunk). The return value shape is
     governed by the result_type envelope parameter.
     Requires an established Maya session (discoverable via list_sessions).
+
+    Under safe_mode (MAYA_MCP_SAFE_MODE, opt-in, default off) the code
+    payload passes a deny-by-default AST allowlist before dispatch:
+    imports outside the v1 roots (maya/math/json/re/collections/
+    itertools/functools/dataclasses/typing), denied builtins
+    (eval/exec/open/__import__/getattr/setattr/...), __builtins__
+    references (any use of a denied name rejects, not just calls),
+    dunder attribute access, and unparseable input are
+    rejected with safe_mode_rejected naming the triggering rule id.
+    Successful responses carry mode: "safe" on their structured payload.
+    The gate is a misuse guardrail, not a sandbox — code that passes
+    still runs with full session privileges.
 
     Args:
         code: Python code to execute in Maya.
