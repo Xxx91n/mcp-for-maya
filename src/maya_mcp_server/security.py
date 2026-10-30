@@ -1,13 +1,14 @@
 """Security pipeline primitives for maya-mcp-server.
 
-All 22 MCP tools funnel through the SecurityPipeline middleware
+All 25 MCP tools funnel through the SecurityPipeline middleware
 (pipeline.py): input validation -> rate limit -> pattern scan ->
-dispatch -> audit. This module is a safety net for confused-deputy
-scenarios, NOT a security boundary (see SECURITY.md).
+safe_mode AST gate (opt-in) -> dispatch -> audit. This module is a safety
+net for confused-deputy scenarios, NOT a security boundary (see SECURITY.md).
 """
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import logging
@@ -121,6 +122,17 @@ class PolicyDisabledError(PipelineError):
     """
 
     code = "policy_disabled"
+
+
+class SafeModeRejectedError(PipelineError):
+    """Raised when an opt-in safe_mode AST gate rejects a code payload.
+
+    Same misuse-guardrail framing as PolicyDisabledError: safe_mode is a
+    safety net that narrows what execute_code/write_module accept, not a
+    sandbox and not a boundary against a hostile client.
+    """
+
+    code = "safe_mode_rejected"
 
 
 class CaptureEmptyError(PipelineError):
@@ -481,6 +493,131 @@ def scan_for_dangerous_patterns(code: str) -> list[str]:
     """
     warnings, _blocked = scan_tool_params("_adhoc", {"code": code})
     return [w["message"] for w in warnings]
+
+
+# ---------------------------------------------------------------------------
+# safe_mode: opt-in AST gate for the two code-bearing tools.
+#
+# A safety net, NOT a sandbox or a hostile-agent boundary: it narrows what a
+# confused or hallucinating agent can send through execute_code/write_module
+# while those tools stay listed, exactly like the strict-policy flags.
+# ---------------------------------------------------------------------------
+
+SAFE_MODE_ENV_FLAG = "MAYA_MCP_SAFE_MODE"
+
+# Only these tools carry executable Python in a parameter; no other tool is
+# affected by safe_mode.
+SAFE_MODE_TOOLS: frozenset[str] = frozenset({"execute_code", "write_module"})
+
+# v1 import allowlist, matched on the dotted root. `maya.OpenMaya*` rides the
+# `maya` root; pymel is deliberately absent (rejected in v1).
+SAFE_IMPORT_ROOTS: frozenset[str] = frozenset(
+    {
+        "maya",
+        "math",
+        "json",
+        "re",
+        "collections",
+        "itertools",
+        "functools",
+        "dataclasses",
+        "typing",
+    }
+)
+
+SAFE_RULE_IMPORT = "safe-mode-import"
+SAFE_RULE_UNPARSEABLE = "safe-mode-unparseable"
+
+
+@dataclass(frozen=True)
+class SafeModeViolation:
+    """One safe_mode gate hit: the rule that fired plus its message."""
+
+    rule_id: str
+    message: str
+
+
+@dataclass(frozen=True)
+class SafeCodeRule:
+    """One safe_mode denial rule, mirroring PatternRule's declarative shape."""
+
+    rule_id: str
+    message: str
+
+
+# T1 lands the import and unparseable classes; the node/builtin/dunder matrix
+# is T2's addition to this table.
+SAFE_CODE_RULES: dict[str, SafeCodeRule] = {
+    SAFE_RULE_IMPORT: SafeCodeRule(
+        SAFE_RULE_IMPORT, "import target is outside the safe_mode allowlist"
+    ),
+    SAFE_RULE_UNPARSEABLE: SafeCodeRule(
+        SAFE_RULE_UNPARSEABLE,
+        "payload cannot be parsed as Python (cannot decide => deny)",
+    ),
+}
+
+
+def _safe_mode_violation(rule_id: str, detail: str = "") -> SafeModeViolation:
+    message = SAFE_CODE_RULES[rule_id].message
+    if detail:
+        message = f"{message}: {detail}"
+    return SafeModeViolation(rule_id=rule_id, message=message)
+
+
+class _SafeModeImportVisitor(ast.NodeVisitor):
+    """Record the first import that leaves the allowlist."""
+
+    def __init__(self) -> None:
+        self.violation: SafeModeViolation | None = None
+
+    def visit_Import(self, node: ast.Import) -> None:
+        for alias in node.names:
+            self._check_import(alias.name, level=0)
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        self._check_import(node.module or "", level=node.level)
+        self.generic_visit(node)
+
+    def _check_import(self, module: str, *, level: int) -> None:
+        if self.violation is not None:
+            return
+        if level != 0:
+            self.violation = _safe_mode_violation(
+                SAFE_RULE_IMPORT, f"relative import from level {level}"
+            )
+            return
+        root = module.split(".", 1)[0]
+        if root not in SAFE_IMPORT_ROOTS:
+            self.violation = _safe_mode_violation(
+                SAFE_RULE_IMPORT,
+                f"import '{module}' (allowed roots: {', '.join(sorted(SAFE_IMPORT_ROOTS))})",
+            )
+
+
+def scan_safe_mode_code(code: object) -> SafeModeViolation | None:
+    """Return the first safe_mode violation in code, or None when allowed.
+
+    Imports outside SAFE_IMPORT_ROOTS reject, as do payloads the parser cannot
+    decide (non-string input, syntax errors). Escape families beyond imports
+    are outside this layer's current rule set.
+    """
+    if not isinstance(code, str):
+        return _safe_mode_violation(SAFE_RULE_UNPARSEABLE, "code must be a source string")
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError, TypeError, RecursionError):
+        return _safe_mode_violation(SAFE_RULE_UNPARSEABLE)
+    visitor = _SafeModeImportVisitor()
+    try:
+        visitor.visit(tree)
+    except RecursionError:
+        # A parseable but pathologically deep tree can exhaust the recursive
+        # walk: the gate cannot classify it, so it rejects rather than escaping
+        # as an unclassified host error.
+        return _safe_mode_violation(SAFE_RULE_UNPARSEABLE)
+    return visitor.violation
 
 
 def compute_code_hash(code: str) -> str:

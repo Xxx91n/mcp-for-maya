@@ -64,6 +64,8 @@ Domain vocabulary. Each entry is a term and a definition of at most two sentence
 
 **端口豁免集**: 已判定非 Python 的端口入会话级永久豁免，端口从 LISTEN 消失才解禁，避免周期重探。
 
+**safe_mode**: opt-in 收紧模式（`MAYA_MCP_SAFE_MODE`）：对 execute_code/write_module 的代码载荷做允许清单式 AST 判定后放行；安全网非安全边界，Maya 内语言级沙盒仍是 won't-fix。
+
 ## 工程词汇
 
 **绞杀者 (strangler)**: 先建 stub 测试脚手架，修复带回归测试落地，拆分随修复触及区域增量进行。

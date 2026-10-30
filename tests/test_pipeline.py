@@ -24,9 +24,11 @@ from mcp.types import CallToolRequestParams
 
 from maya_mcp_server.pipeline import (
     POLICY_ENV_FLAGS,
+    SAFE_MODE_ENV_FLAG,
     TOOL_ANNOTATIONS,
     SecurityPipeline,
     policy_disabled_tools,
+    safe_mode_enabled,
     tool_annotations,
 )
 from maya_mcp_server.security import (
@@ -35,6 +37,7 @@ from maya_mcp_server.security import (
     PatternBlockedError,
     PolicyDisabledError,
     RateLimitExceededError,
+    SafeModeRejectedError,
     SecurityConfig,
     SessionLookupError,
 )
@@ -605,3 +608,116 @@ class TestStrictPolicyMode:
         fails rather than letting the umbrella quietly mean less than it says."""
         destructive = {n for n, a in TOOL_ANNOTATIONS.items() if a.destructive_hint}
         assert destructive == POLICY_ENV_FLAGS["MAYA_MCP_DISABLE_ARBITRARY"]
+
+
+# ---------------------------------------------------------------------------
+# T1: safe_mode plumbing - opt-in AST gate after the pattern scan, before
+# dispatch. A safety net, not a boundary.
+# ---------------------------------------------------------------------------
+
+
+class TestSafeModeGate:
+    @pytest.mark.parametrize("value", ["", "0", "false", "no", "off", "  "])
+    def test_falsy_values_do_not_enable(self, value):
+        assert safe_mode_enabled({SAFE_MODE_ENV_FLAG: value}) is False
+
+    @pytest.mark.parametrize("value", ["1", "TRUE", "yes", " On "])
+    def test_truthy_values_enable(self, value):
+        assert safe_mode_enabled({SAFE_MODE_ENV_FLAG: value}) is True
+
+    def test_flag_is_not_a_policy_flag(self):
+        assert SAFE_MODE_ENV_FLAG not in POLICY_ENV_FLAGS
+
+    async def test_flag_off_leaves_the_stage_inert(self, tmp_path, monkeypatch):
+        monkeypatch.delenv(SAFE_MODE_ENV_FLAG, raising=False)
+        pipe, _audit, log = _pipeline(tmp_path)
+        calls = []
+
+        async def _next(context):
+            calls.append(context)
+            return ToolResult(content="ok")
+
+        await pipe.on_call_tool(_ctx("execute_code", {"code": "import os"}), _next)
+        assert len(calls) == 1
+        assert _read_events(log)[-1]["outcome"] == "success"
+
+    async def test_allowlisted_code_reaches_backend(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        calls = []
+
+        async def _next(context):
+            calls.append(context)
+            return ToolResult(content="ok")
+
+        await pipe.on_call_tool(
+            _ctx("execute_code", {"code": "import maya.cmds as cmds; cmds.ls()"}),
+            _next,
+        )
+        assert len(calls) == 1
+
+    async def test_unsafe_import_rejected_before_dispatch(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, log = _pipeline(tmp_path)
+        calls = []
+
+        async def _next(context):
+            calls.append(context)
+            return ToolResult(content="ok")
+
+        with pytest.raises(SafeModeRejectedError) as ei:
+            await pipe.on_call_tool(_ctx("execute_code", {"code": "import os"}), _next)
+        assert ei.value.code == "safe_mode_rejected"
+        assert "safe-mode-import" in str(ei.value)
+        assert "MAYA_MCP_SAFE_MODE" in str(ei.value)
+        assert calls == [], "the backend must never see a rejected payload"
+        ev = _read_events(log)[-1]
+        assert ev["outcome"] == "rejected"
+        assert any(w["rule_id"] == "safe-mode-import" for w in ev["warnings"])
+
+    async def test_write_module_code_is_gated_identically(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, log = _pipeline(tmp_path)
+        with pytest.raises(SafeModeRejectedError):
+            await pipe.on_call_tool(
+                _ctx("write_module", {"name": "m", "code": "import os"}),
+                _ok_next,
+            )
+        assert _read_events(log)[-1]["outcome"] == "rejected"
+
+    async def test_non_code_tools_are_unaffected(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        calls = []
+
+        async def _next(context):
+            calls.append(context)
+            return ToolResult(content="ok")
+
+        await pipe.on_call_tool(_ctx("scene_inspect", {"target": "import os"}), _next)
+        assert len(calls) == 1
+
+    async def test_disable_flag_wins_before_safe_mode(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("MAYA_MCP_DISABLE_EXECUTE", "1")
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        with pytest.raises(PolicyDisabledError):
+            await pipe.on_call_tool(_ctx("execute_code", {"code": "import os"}), _ok_next)
+
+    async def test_tools_list_still_lists_gated_tools(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        listed = await pipe.on_list_tools(_list_ctx(), _listing(*ALL_TOOLS))
+        names = {t.name for t in listed}
+        assert {"execute_code", "write_module"} <= names
+
+    async def test_disable_removes_tool_before_safe_mode_on_listing(self, tmp_path, monkeypatch):
+        # AC composition order: DISABLE removes from tools/list; safe_mode only
+        # narrows the payloads of the tools that remain visible.
+        monkeypatch.setenv("MAYA_MCP_DISABLE_EXECUTE", "1")
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        listed = await pipe.on_list_tools(_list_ctx(), _listing(*ALL_TOOLS))
+        names = {t.name for t in listed}
+        assert "execute_code" not in names
+        assert "write_module" in names
