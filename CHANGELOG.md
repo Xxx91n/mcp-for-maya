@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   family, including the `from x import __path__` spelling), each under its own
   `safe-mode-*` rule id. `def`/`class`/`lambda` bodies are walked under the
   same rules recursively. Safety net, not a boundary. Evidence:
-  `tests/test_security.py::TestScanSafeModeCode`,
+  `tests/test_security.py::TestScanSafeModeCode::test_allowlisted_constructs_pass`,
   `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`.
 
 ### Removed

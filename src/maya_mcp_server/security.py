@@ -547,7 +547,7 @@ SAFE_NODE_TYPES: frozenset[type[ast.AST]] = frozenset(
         ast.For,
         ast.While,
         ast.Try,
-        getattr(ast, "TryStar"),
+        getattr(ast, "TryStar", None),
         ast.Return,
         ast.Pass,
         ast.Break,

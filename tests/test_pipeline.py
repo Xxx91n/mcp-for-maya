@@ -728,7 +728,7 @@ class TestSafeModeGate:
         "code",
         [
             "import os",
-            "eval('1+1')",
+            "open('x')",
             "__builtins__['eval']('1+1')",
             "().__class__.__base__.__subclasses__()",
             "with m:\n    pass",
@@ -757,8 +757,8 @@ class TestSafeModeGate:
         "code",
         [
             "def f():\n    import os\nf()",
-            "def f():\n    eval('x')",
-            "class C:\n    import subprocess",
+            "def f():\n    open('x')",
+            "class C:\n    import os",
             "f = lambda: getattr(x, 'y')",
         ],
         ids=["nested-def-import", "nested-def-builtin", "nested-class-import", "lambda-builtin"],
