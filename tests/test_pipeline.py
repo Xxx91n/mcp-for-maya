@@ -763,9 +763,7 @@ class TestSafeModeGate:
         ],
         ids=["nested-def-import", "nested-def-builtin", "nested-class-import", "lambda-builtin"],
     )
-    async def test_recursion_inside_nested_scopes_is_gated(
-        self, tmp_path, monkeypatch, code
-    ):
+    async def test_recursion_inside_nested_scopes_is_gated(self, tmp_path, monkeypatch, code):
         # AC: def/class/lambda bodies are checked under the same rules — an
         # escape hiding inside a nested scope cannot pass the gate.
         monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
@@ -781,9 +779,7 @@ class TestSafeModeGate:
         assert calls == []
         assert _read_events(log)[-1]["outcome"] == "rejected"
 
-    async def test_nested_scope_allowlisted_code_reaches_backend(
-        self, tmp_path, monkeypatch
-    ):
+    async def test_nested_scope_allowlisted_code_reaches_backend(self, tmp_path, monkeypatch):
         monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
         pipe, _audit, _log = _pipeline(tmp_path)
         calls = []

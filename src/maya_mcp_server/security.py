@@ -684,15 +684,9 @@ SAFE_CODE_RULES: dict[str, SafeCodeRule] = {
     SAFE_RULE_IMPORT: SafeCodeRule(
         SAFE_RULE_IMPORT, "import target is outside the safe_mode allowlist"
     ),
-    SAFE_RULE_BUILTIN: SafeCodeRule(
-        SAFE_RULE_BUILTIN, "reference to a denied builtin name"
-    ),
-    SAFE_RULE_BUILTINS: SafeCodeRule(
-        SAFE_RULE_BUILTINS, "__builtins__ namespace reference"
-    ),
-    SAFE_RULE_DUNDER: SafeCodeRule(
-        SAFE_RULE_DUNDER, "dunder attribute access"
-    ),
+    SAFE_RULE_BUILTIN: SafeCodeRule(SAFE_RULE_BUILTIN, "reference to a denied builtin name"),
+    SAFE_RULE_BUILTINS: SafeCodeRule(SAFE_RULE_BUILTINS, "__builtins__ namespace reference"),
+    SAFE_RULE_DUNDER: SafeCodeRule(SAFE_RULE_DUNDER, "dunder attribute access"),
     SAFE_RULE_NODE: SafeCodeRule(
         SAFE_RULE_NODE, "syntax construct is outside the safe_mode allowlist"
     ),
@@ -727,9 +721,7 @@ class _SafeModeVisitor(ast.NodeVisitor):
         if self.violation is not None:
             return
         if type(node) not in SAFE_NODE_TYPES:
-            self.violation = _safe_mode_violation(
-                SAFE_RULE_NODE, f"node '{type(node).__name__}'"
-            )
+            self.violation = _safe_mode_violation(SAFE_RULE_NODE, f"node '{type(node).__name__}'")
             return
         super().visit(node)
 
@@ -760,9 +752,7 @@ class _SafeModeVisitor(ast.NodeVisitor):
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         if _DUNDER_ATTR_RE.match(node.attr):
-            self.violation = _safe_mode_violation(
-                SAFE_RULE_DUNDER, f"'.{node.attr}'"
-            )
+            self.violation = _safe_mode_violation(SAFE_RULE_DUNDER, f"'.{node.attr}'")
             return
         self.generic_visit(node)
 
