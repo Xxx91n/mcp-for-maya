@@ -533,7 +533,142 @@ SAFE_IMPORT_ROOTS: frozenset[str] = frozenset(
     }
 )
 
+# v1 statement/expression node allowlist. Deny-by-default means every node in
+# a parsed tree must be one of these types; anything else — `with`, `raise`,
+# `assert`, `del`, `global`/`nonlocal`, `yield`, `await`, `async`, `match` —
+# rejects under the "cannot decide => deny" posture. `def`/`class`/`lambda`
+# bodies are not exempted: they are walked under exactly these same rules.
+# `ast.TryStar` is resolved conditionally (3.11+): the node does not exist on
+# 3.10, so it cannot appear in a tree parsed there.
+SAFE_NODE_TYPES: frozenset[type[ast.AST]] = frozenset(
+    t
+    for t in (
+        # module + statements
+        ast.Module,
+        ast.Expr,
+        ast.Assign,
+        ast.AugAssign,
+        ast.AnnAssign,
+        ast.Import,
+        ast.ImportFrom,
+        ast.If,
+        ast.For,
+        ast.While,
+        ast.Try,
+        getattr(ast, "TryStar", None),
+        ast.Return,
+        ast.Pass,
+        ast.Break,
+        ast.Continue,
+        ast.FunctionDef,
+        ast.ClassDef,
+        # expressions
+        ast.Lambda,
+        ast.BoolOp,
+        ast.BinOp,
+        ast.UnaryOp,
+        ast.IfExp,
+        ast.Dict,
+        ast.Set,
+        ast.ListComp,
+        ast.SetComp,
+        ast.DictComp,
+        ast.GeneratorExp,
+        ast.Compare,
+        ast.Call,
+        ast.FormattedValue,
+        ast.JoinedStr,
+        ast.Constant,
+        ast.Attribute,
+        ast.Subscript,
+        ast.Starred,
+        ast.Name,
+        ast.List,
+        ast.Tuple,
+        ast.Slice,
+        ast.NamedExpr,
+        # operator/context/machinery nodes reached inside the above
+        ast.Load,
+        ast.Store,
+        ast.And,
+        ast.Or,
+        ast.Add,
+        ast.Sub,
+        ast.Mult,
+        ast.MatMult,
+        ast.Div,
+        ast.Mod,
+        ast.Pow,
+        ast.LShift,
+        ast.RShift,
+        ast.BitOr,
+        ast.BitXor,
+        ast.BitAnd,
+        ast.FloorDiv,
+        ast.Invert,
+        ast.Not,
+        ast.UAdd,
+        ast.USub,
+        ast.Eq,
+        ast.NotEq,
+        ast.Lt,
+        ast.LtE,
+        ast.Gt,
+        ast.GtE,
+        ast.Is,
+        ast.IsNot,
+        ast.In,
+        ast.NotIn,
+        ast.comprehension,
+        ast.ExceptHandler,
+        ast.arguments,
+        ast.arg,
+        ast.keyword,
+        ast.alias,
+    )
+    if t is not None
+)
+
+# Builtin names whose every reference rejects. References — not just call
+# sites — are gated so an alias like `f = getattr` cannot smuggle the same
+# escape past a call-shape check. `hasattr`/`getattr`-by-string is narrowed by
+# denying `getattr` itself rather than the attribute-name string.
+SAFE_DENIED_BUILTINS: frozenset[str] = frozenset(
+    {
+        "open",
+        "eval",
+        "exec",
+        "compile",
+        "__import__",
+        "globals",
+        "locals",
+        "vars",
+        "getattr",
+        "setattr",
+        "delattr",
+        "input",
+        "breakpoint",
+        "help",
+        "id",
+        "super",
+    }
+)
+
+# `__builtins__` is a Name reference too but carries its own rule_id: the
+# namespace-injection illusion (peer issue mcp-for-blender #207) is its own
+# documented escape family, distinct from the denied-builtin call names.
+SAFE_BUILTINS_NAME = "__builtins__"
+
+# Any __x__ attribute access rejects — the
+# `().__class__.__base__.__subclasses__()` family walks the class hierarchy to
+# reach `object.__subclasses__` and from there every loaded class.
+_DUNDER_ATTR_RE = re.compile(r"^__.*__$")
+
 SAFE_RULE_IMPORT = "safe-mode-import"
+SAFE_RULE_BUILTIN = "safe-mode-builtin"
+SAFE_RULE_BUILTINS = "safe-mode-builtins"
+SAFE_RULE_DUNDER = "safe-mode-dunder"
+SAFE_RULE_NODE = "safe-mode-node"
 SAFE_RULE_UNPARSEABLE = "safe-mode-unparseable"
 
 
@@ -553,11 +688,15 @@ class SafeCodeRule:
     message: str
 
 
-# T1 lands the import and unparseable classes; the node/builtin/dunder matrix
-# is T2's addition to this table.
 SAFE_CODE_RULES: dict[str, SafeCodeRule] = {
     SAFE_RULE_IMPORT: SafeCodeRule(
         SAFE_RULE_IMPORT, "import target is outside the safe_mode allowlist"
+    ),
+    SAFE_RULE_BUILTIN: SafeCodeRule(SAFE_RULE_BUILTIN, "reference to a denied builtin name"),
+    SAFE_RULE_BUILTINS: SafeCodeRule(SAFE_RULE_BUILTINS, "__builtins__ namespace reference"),
+    SAFE_RULE_DUNDER: SafeCodeRule(SAFE_RULE_DUNDER, "dunder attribute access"),
+    SAFE_RULE_NODE: SafeCodeRule(
+        SAFE_RULE_NODE, "syntax construct is outside the safe_mode allowlist"
     ),
     SAFE_RULE_UNPARSEABLE: SafeCodeRule(
         SAFE_RULE_UNPARSEABLE,
@@ -573,11 +712,26 @@ def _safe_mode_violation(rule_id: str, detail: str = "") -> SafeModeViolation:
     return SafeModeViolation(rule_id=rule_id, message=message)
 
 
-class _SafeModeImportVisitor(ast.NodeVisitor):
-    """Record the first import that leaves the allowlist."""
+class _SafeModeVisitor(ast.NodeVisitor):
+    """Walk a parsed tree and record the first deny-by-default violation.
+
+    Every node is first gated on the SAFE_NODE_TYPES allowlist in visit();
+    visit_* methods then apply the content rules (imports, denied builtin
+    names, __builtins__, dunder attribute access). Nested def/class/lambda
+    bodies are not exempted — generic_visit reaches them under the same
+    rules. The first violation wins in document order.
+    """
 
     def __init__(self) -> None:
         self.violation: SafeModeViolation | None = None
+
+    def visit(self, node: ast.AST) -> None:
+        if self.violation is not None:
+            return
+        if type(node) not in SAFE_NODE_TYPES:
+            self.violation = _safe_mode_violation(SAFE_RULE_NODE, f"node '{type(node).__name__}'")
+            return
+        super().visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
@@ -586,6 +740,28 @@ class _SafeModeImportVisitor(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         self._check_import(node.module or "", level=node.level)
+        for alias in node.names:
+            # `from maya.cmds import __path__` reaches a dunder attribute
+            # without an Attribute node, so the dunder class is spelled here.
+            if self.violation is None and _DUNDER_ATTR_RE.match(alias.name):
+                self.violation = _safe_mode_violation(
+                    SAFE_RULE_DUNDER, f"from-import of '{alias.name}'"
+                )
+        self.generic_visit(node)
+
+    def visit_Name(self, node: ast.Name) -> None:
+        if node.id in SAFE_DENIED_BUILTINS:
+            self.violation = _safe_mode_violation(SAFE_RULE_BUILTIN, f"'{node.id}'")
+            return
+        if node.id == SAFE_BUILTINS_NAME:
+            self.violation = _safe_mode_violation(SAFE_RULE_BUILTINS)
+            return
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        if _DUNDER_ATTR_RE.match(node.attr):
+            self.violation = _safe_mode_violation(SAFE_RULE_DUNDER, f"'.{node.attr}'")
+            return
         self.generic_visit(node)
 
     def _check_import(self, module: str, *, level: int) -> None:
@@ -607,9 +783,11 @@ class _SafeModeImportVisitor(ast.NodeVisitor):
 def scan_safe_mode_code(code: object) -> SafeModeViolation | None:
     """Return the first safe_mode violation in code, or None when allowed.
 
-    Imports outside SAFE_IMPORT_ROOTS reject, as do payloads the parser cannot
-    decide (non-string input, syntax errors). Escape families beyond imports
-    are outside this layer's current rule set.
+    The gate is deny-by-default: every parsed node must be a SAFE_NODE_TYPES
+    member, imports must stay inside SAFE_IMPORT_ROOTS, denied builtin names /
+    __builtins__ references / dunder attribute access reject, and payloads the
+    parser cannot decide (non-string input, syntax errors, pathologically deep
+    trees) reject as unparseable.
     """
     if not isinstance(code, str):
         return _safe_mode_violation(SAFE_RULE_UNPARSEABLE, "code must be a source string")
@@ -617,7 +795,7 @@ def scan_safe_mode_code(code: object) -> SafeModeViolation | None:
         tree = ast.parse(code)
     except (SyntaxError, ValueError, TypeError, RecursionError):
         return _safe_mode_violation(SAFE_RULE_UNPARSEABLE)
-    visitor = _SafeModeImportVisitor()
+    visitor = _SafeModeVisitor()
     try:
         visitor.visit(tree)
     except RecursionError:

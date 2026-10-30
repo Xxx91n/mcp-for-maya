@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import ast
 import logging
 
 import pytest
 
 from maya_mcp_server.security import (
+    SAFE_DENIED_BUILTINS,
     SAFE_MODE_TOOLS,
+    SAFE_RULE_BUILTIN,
+    SAFE_RULE_BUILTINS,
+    SAFE_RULE_DUNDER,
     SAFE_RULE_IMPORT,
+    SAFE_RULE_NODE,
     SAFE_RULE_UNPARSEABLE,
     AuditLogger,
     InputValidationError,
@@ -140,7 +146,14 @@ class TestScanForDangerousPatterns:
 
 
 class TestScanSafeModeCode:
-    """Seam A: the pure deny-by-default rule layer (T1 minimal matrix)."""
+    """Seam A: the pure deny-by-default rule layer.
+
+    Corpus sources, per the safe_mode spec: rule-table-derived accept/reject
+    pairs, payloads that already live in the repo (the execute_code docstring
+    examples, the pipeline-test cmds shapes), and researched escape shapes
+    (mcp-for-blender #207 builtins illusion, dunder subclass chain,
+    __import__). No invented samples.
+    """
 
     def test_maya_import_is_allowed(self) -> None:
         assert scan_safe_mode_code("import maya.cmds as cmds; cmds.ls()") is None
@@ -189,6 +202,226 @@ class TestScanSafeModeCode:
 
     def test_safe_mode_tools_are_the_code_bearing_pair(self) -> None:
         assert SAFE_MODE_TOOLS == frozenset({"execute_code", "write_module"})
+
+    # --- node allowlist (rule-table-derived pairs) ---
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            # the execute_code docstring payloads
+            "cmds.ls(type='mesh')",
+            "import maya.cmds as cmds; cmds.polyCube(name='GEO_cube')",
+            # expression / assignment families from the pipeline-test corpus
+            "x = 1\ny = 2\nx + y",
+            "x = 1\nx += 1\nx",
+            "x, y = 1, 2",
+            "x: int = 1",
+            "print('hello')",
+            "[1, 2, 3]",
+            "{'a': 1, 'b': 2}",
+            "(x := 5)",
+            "1 if True else 2",
+            "lambda x: x + 1",
+            "some_function(\n    arg1,\n    arg2,\n    arg3\n)",
+            # control flow inside the allowlist
+            "for i in range(10):\n    if i:\n        continue\n    else:\n        break",
+            "while True:\n    break",
+            "try:\n    cmds.polyCube()\nexcept Exception:\n    pass\nfinally:\n    pass",
+            # comprehensions and f-strings
+            "[x * 2 for x in range(10)]",
+            "(x * 2 for x in range(10))",
+            "{x: 1 for x in range(3)}",
+            "{x for x in range(3)}",
+            "f'cube_{name}'",
+            # def / class bodies checked under the same rules
+            "def foo():\n    return 1\nfoo()",
+            "class Foo:\n    x = 1\nFoo.x",
+            # dunder method NAMES are names, not attribute access
+            "class Foo:\n    def __init__(self):\n        pass",
+            # slicing / subscript / unpacking expression machinery
+            "x[1:3]",
+            "x[1, ...]",
+            "a, *b = [1, 2, 3]",
+            # allowlisted helper imports already covered; root 'maya' covers OpenMaya
+            "import maya.OpenMaya as om",
+            "from maya.OpenMaya import MPoint",
+            "import collections, itertools, dataclasses",
+        ],
+    )
+    def test_allowlisted_constructs_pass(self, code: str) -> None:
+        assert scan_safe_mode_code(code) is None
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "with open('f') as f:\n    pass",
+            "with m:\n    pass",
+            "raise ValueError('x')",
+            "assert True",
+            "del x",
+            "def f():\n    global x\n    x = 1",
+            "def f():\n    def g():\n        nonlocal x\n        x = 1",
+            "def gen():\n    yield 42",
+            "def gen():\n    yield from xs",
+            "async def f():\n    return 1",
+            "async def f():\n    await g()",
+            "async def f():\n    async for x in y:\n        pass",
+            "async def f():\n    async with m:\n        pass",
+            "match x:\n    case 1:\n        pass",
+            "async def f():\n    return await g()",
+        ],
+    )
+    def test_non_allowlisted_nodes_reject_as_safe_mode_node(self, code: str) -> None:
+        # deny-by-default: with/raise/assert/del/global/nonlocal/yield/async/
+        # match are not in the v1 allowlist, so their presence denies.
+        violation = scan_safe_mode_code(code)
+        assert violation is not None, code
+        assert violation.rule_id == SAFE_RULE_NODE
+
+    def test_try_star_is_allowlisted_alongside_try(self) -> None:
+        code = "try:\n    pass\nexcept* ValueError:\n    pass"
+        try:
+            ast.parse(code)
+        except SyntaxError:
+            pytest.skip("except* needs Python 3.11+")
+        assert scan_safe_mode_code(code) is None
+
+    # --- import allowlist ---
+
+    def test_pymel_is_rejected_in_v1(self) -> None:
+        violation = scan_safe_mode_code("import pymel.core as pm")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_IMPORT
+
+    @pytest.mark.parametrize(
+        "module",
+        ["sys", "os", "subprocess", "socket", "ctypes", "shutil", "pathlib", "importlib"],
+    )
+    def test_escape_ladder_roots_reject(self, module: str) -> None:
+        violation = scan_safe_mode_code(f"import {module}")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_IMPORT
+
+    # --- denied builtin names (rule-table-derived) ---
+
+    @pytest.mark.parametrize("name", sorted(SAFE_DENIED_BUILTINS))
+    def test_denied_builtin_calls_reject(self, name: str) -> None:
+        violation = scan_safe_mode_code(f"{name}('x')")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_BUILTIN
+        assert name in violation.message
+
+    @pytest.mark.parametrize("name", ["getattr", "eval", "super"])
+    def test_denied_builtin_references_reject_not_just_calls(self, name: str) -> None:
+        # Reference (alias) form is denied too, or `f = eval` would smuggle
+        # the same escape past a call-shape check.
+        violation = scan_safe_mode_code(f"f = {name}")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_BUILTIN
+
+    def test_denied_builtin_shadowed_by_store_still_rejects(self) -> None:
+        violation = scan_safe_mode_code("eval = lambda x: x")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_BUILTIN
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "dir(x)",
+            "hasattr(obj, 'name')",
+            "len(cmds.ls())",
+            "isinstance(x, int)",
+            "print('hello')",
+            "range(10)",
+            "sorted(xs)",
+            "type(x)",
+        ],
+    )
+    def test_ordinary_builtins_pass(self, code: str) -> None:
+        assert scan_safe_mode_code(code) is None
+
+    # --- dunder attribute access ---
+
+    def test_ordinary_attribute_access_passes(self) -> None:
+        assert scan_safe_mode_code("cmds.polyCube(name='GEO_cube')") is None
+        # `__x` without a trailing `__` is not a dunder under the __x__ shape.
+        assert scan_safe_mode_code("obj.__mangled") is None
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "x.__class__",
+            "().__class__.__base__.__subclasses__()",
+            "foo.__globals__['x']",
+            "x.__dict__",
+        ],
+    )
+    def test_dunder_attribute_access_rejects(self, code: str) -> None:
+        violation = scan_safe_mode_code(code)
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_DUNDER
+
+    def test_from_import_of_dunder_name_rejects(self) -> None:
+        violation = scan_safe_mode_code("from maya.cmds import __path__")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_DUNDER
+
+    # --- __builtins__ ---
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "__builtins__",
+            "__builtins__['eval']('1+1')",
+            "__builtins__.eval('1+1')",
+            "x = __builtins__",
+        ],
+    )
+    def test_builtins_reference_rejects(self, code: str) -> None:
+        violation = scan_safe_mode_code(code)
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_BUILTINS
+
+    # --- researched escape shapes (mcp-for-blender #207 + families) ---
+
+    def test_import_os_via_dunder_import_rejects(self) -> None:
+        violation = scan_safe_mode_code("__import__('os')")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_BUILTIN
+
+    def test_dunder_subclass_chain_rejects(self) -> None:
+        code = "().__class__.__base__.__subclasses__()[1]('id')"
+        violation = scan_safe_mode_code(code)
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_DUNDER
+
+    # --- recursion inside nested scopes (same rules, no exemption) ---
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "def f():\n    import os",
+            "def f():\n    eval('x')",
+            "class C:\n    import os",
+            "class C:\n    x = __builtins__",
+            "f = lambda: getattr(x, 'y')",
+            "def f():\n    x.__class__",
+            "def outer():\n    def inner():\n        import subprocess\n    return inner",
+        ],
+    )
+    def test_nested_scope_escapes_reject(self, code: str) -> None:
+        assert scan_safe_mode_code(code) is not None
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "def f():\n    import maya.cmds as cmds\n    return cmds.ls()",
+            "class C:\n    def m(self):\n        return 1",
+            "f = lambda x: x * 2",
+        ],
+    )
+    def test_nested_scope_allowlisted_passes(self, code: str) -> None:
+        assert scan_safe_mode_code(code) is None
 
 
 class TestComputeCodeHash:

@@ -725,6 +725,81 @@ class TestSafeModeGate:
         assert "execute_code" not in names
         assert "write_module" in names
 
+    # --- T2: the full deny-by-default matrix rides the same stage ---
+
+    @pytest.mark.parametrize(
+        "code, rule_id",
+        [
+            ("import os", "safe-mode-import"),
+            ("open('x')", "safe-mode-builtin"),
+            ("__builtins__['eval']('1+1')", "safe-mode-builtins"),
+            ("().__class__.__base__.__subclasses__()", "safe-mode-dunder"),
+            ("with m:\n    pass", "safe-mode-node"),
+        ],
+        ids=["import", "builtin", "builtins", "dunder", "node"],
+    )
+    async def test_rule_matrix_rejects_before_dispatch(self, tmp_path, monkeypatch, code, rule_id):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, log = _pipeline(tmp_path)
+        calls = []
+
+        async def _next(context):
+            calls.append(context)
+            return ToolResult(content="ok")
+
+        with pytest.raises(SafeModeRejectedError):
+            await pipe.on_call_tool(_ctx("execute_code", {"code": code}), _next)
+        assert calls == [], "the backend must never see a rejected payload"
+        ev = _read_events(log)[-1]
+        assert ev["outcome"] == "rejected"
+        # AC: every rule-table entry's exact rule_id reaches the audit row, not
+        # just the import class the T1 test already pins.
+        assert any(w["rule_id"] == rule_id for w in ev["warnings"])
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "def f():\n    import os\nf()",
+            "def f():\n    open('x')",
+            "class C:\n    import os",
+            "f = lambda: getattr(x, 'y')",
+        ],
+        ids=["nested-def-import", "nested-def-builtin", "nested-class-import", "lambda-builtin"],
+    )
+    async def test_recursion_inside_nested_scopes_is_gated(self, tmp_path, monkeypatch, code):
+        # AC: def/class/lambda bodies are checked under the same rules — an
+        # escape hiding inside a nested scope cannot pass the gate.
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, log = _pipeline(tmp_path)
+        calls = []
+
+        async def _next(context):
+            calls.append(context)
+            return ToolResult(content="ok")
+
+        with pytest.raises(SafeModeRejectedError):
+            await pipe.on_call_tool(_ctx("execute_code", {"code": code}), _next)
+        assert calls == []
+        assert _read_events(log)[-1]["outcome"] == "rejected"
+
+    async def test_nested_scope_allowlisted_code_reaches_backend(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
+        pipe, _audit, _log = _pipeline(tmp_path)
+        calls = []
+
+        async def _next(context):
+            calls.append(context)
+            return ToolResult(content="ok")
+
+        await pipe.on_call_tool(
+            _ctx(
+                "execute_code",
+                {"code": "def f():\n    import maya.cmds as cmds\n    return cmds.ls()\nf()"},
+            ),
+            _next,
+        )
+        assert len(calls) == 1
+
 
 # ---------------------------------------------------------------------------
 # T3: safe_mode disclosure surfaces. Successful gated calls carry
