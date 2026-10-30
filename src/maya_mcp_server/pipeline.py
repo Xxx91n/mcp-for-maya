@@ -1,8 +1,9 @@
 """Unified security pipeline: every tool call goes through validate,
-rate-limit, pattern scan, dispatch and audit.
+rate-limit, pattern scan, safe_mode gate, dispatch and audit.
 
 One FastMCP middleware funnels every tool call through:
-    input validation -> rate limit -> pattern scan -> dispatch -> audit.
+    input validation -> rate limit -> pattern scan -> safe_mode gate ->
+    dispatch -> audit.
 
 TOOL_ANNOTATIONS is the single source for each tool's four MCP hints;
 the same map drives the read/write rate-limit bucket classification.
@@ -28,14 +29,18 @@ except ImportError:  # pragma: no cover - exercised by the other resolution arm
     from fastmcp.tools import Tool  # fastmcp 2.x
 
 from maya_mcp_server.security import (
+    SAFE_MODE_ENV_FLAG,
+    SAFE_MODE_TOOLS,
     AuditLogger,
     PatternBlockedError,
     PipelineError,
     PolicyDisabledError,
     RateLimiter,
     RateLimitExceededError,
+    SafeModeRejectedError,
     SecurityConfig,
     build_audit_event,
+    scan_safe_mode_code,
     scan_tool_params,
     validate_code_size,
     validate_session_key,
@@ -167,6 +172,17 @@ def policy_disabled_tools(env: dict[str, str] | None = None) -> frozenset[str]:
     return frozenset(disabled)
 
 
+def safe_mode_enabled(env: dict[str, str] | None = None) -> bool:
+    """Whether the opt-in safe_mode AST gate is active.
+
+    Deliberately not a POLICY_ENV_FLAGS member: those flags remove a tool from
+    tools/list, while safe_mode narrows the payloads of tools that remain.
+    Read per call for the same reason as policy_disabled_tools.
+    """
+    source = os.environ if env is None else env
+    return source.get(SAFE_MODE_ENV_FLAG, "").strip().lower() in POLICY_TRUTHY
+
+
 # ---------------------------------------------------------------------------
 # Pipeline middleware
 # ---------------------------------------------------------------------------
@@ -175,8 +191,8 @@ def policy_disabled_tools(env: dict[str, str] | None = None) -> frozenset[str]:
 class SecurityPipeline(Middleware):
     """The single choke point every MCP tool call passes through.
 
-    Rejections (validation/rate-limit/pattern block) raise PipelineError
-    -> MCP isError with a [code] prefix (host layer). Every call \u2014
+    Rejections (validation/rate-limit/pattern block/safe_mode) raise
+    PipelineError -> MCP isError with a [code] prefix (host layer). Every call \u2014
     success, error, or rejected \u2014 is recorded to the audit JSONL.
     """
 
@@ -280,7 +296,29 @@ class SecurityPipeline(Middleware):
                         ),
                     )
 
-            # 4. dispatch — errors raised inside the tool count as "error",
+            # 4. safe_mode — opt-in AST gate for the two code-bearing tools.
+            # DISABLE ran at stage 0 (a removed tool never reaches this stage);
+            # the always-on pattern scan stays the broad first layer, and this
+            # is the stricter second layer over what remains.
+            if safe_mode_enabled() and tool_name in SAFE_MODE_TOOLS:
+                violation = scan_safe_mode_code(args.get("code"))
+                if violation is not None:
+                    warnings.append(
+                        {
+                            "rule_id": violation.rule_id,
+                            "param": "code",
+                            "message": violation.message,
+                        }
+                    )
+                    raise SafeModeRejectedError(
+                        f"{tool_name}.code rejected by {violation.rule_id}: {violation.message}",
+                        suggestion=(
+                            "use a typed tool instead, or ask the operator to "
+                            "unset MAYA_MCP_SAFE_MODE"
+                        ),
+                    )
+
+            # 5. dispatch — errors raised inside the tool count as "error",
             # not "rejected" (rejected = the pipeline itself denied the call)
             try:
                 result = await call_next(context)

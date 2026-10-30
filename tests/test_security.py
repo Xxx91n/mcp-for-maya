@@ -7,6 +7,9 @@ import logging
 import pytest
 
 from maya_mcp_server.security import (
+    SAFE_MODE_TOOLS,
+    SAFE_RULE_IMPORT,
+    SAFE_RULE_UNPARSEABLE,
     AuditLogger,
     InputValidationError,
     RateLimiter,
@@ -14,6 +17,7 @@ from maya_mcp_server.security import (
     compute_code_hash,
     sanitize_error_message,
     scan_for_dangerous_patterns,
+    scan_safe_mode_code,
     scan_tool_params,
     validate_code_size,
     validate_module_name,
@@ -133,6 +137,58 @@ class TestScanForDangerousPatterns:
         """Test detection of eval."""
         warnings = scan_for_dangerous_patterns("eval('1+1')")
         assert any("eval" in w for w in warnings)
+
+
+class TestScanSafeModeCode:
+    """Seam A: the pure deny-by-default rule layer (T1 minimal matrix)."""
+
+    def test_maya_import_is_allowed(self) -> None:
+        assert scan_safe_mode_code("import maya.cmds as cmds; cmds.ls()") is None
+
+    def test_from_maya_import_is_allowed(self) -> None:
+        assert scan_safe_mode_code("from maya import cmds\ncmds.ls()") is None
+
+    def test_allowlisted_helper_imports_are_allowed(self) -> None:
+        code = "import json, math\nfrom typing import Any\nfrom functools import wraps"
+        assert scan_safe_mode_code(code) is None
+
+    def test_os_import_is_rejected(self) -> None:
+        violation = scan_safe_mode_code("import os")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_IMPORT
+        assert "os" in violation.message
+
+    def test_from_os_import_is_rejected(self) -> None:
+        violation = scan_safe_mode_code("from os import system")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_IMPORT
+
+    def test_relative_import_is_rejected(self) -> None:
+        violation = scan_safe_mode_code("from . import helpers")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_IMPORT
+
+    def test_syntax_error_is_rejected_as_unparseable(self) -> None:
+        violation = scan_safe_mode_code("def broken(")
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_UNPARSEABLE
+
+    def test_deep_traversal_is_rejected_as_unparseable(self) -> None:
+        # Deep enough to exhaust NodeVisitor's recursive walk (Python's default
+        # limit) but shallow enough to parse on supported versions, so this
+        # exercises the traversal guard rather than the parse guard.
+        code = "1" + " + 1" * 1500
+        violation = scan_safe_mode_code(code)
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_UNPARSEABLE
+
+    def test_non_string_payload_is_rejected(self) -> None:
+        violation = scan_safe_mode_code(None)
+        assert violation is not None
+        assert violation.rule_id == SAFE_RULE_UNPARSEABLE
+
+    def test_safe_mode_tools_are_the_code_bearing_pair(self) -> None:
+        assert SAFE_MODE_TOOLS == frozenset({"execute_code", "write_module"})
 
 
 class TestComputeCodeHash:

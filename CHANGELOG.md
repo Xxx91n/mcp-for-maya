@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Opt-in `safe_mode` gate for the code-bearing tools** — `MAYA_MCP_SAFE_MODE=1`
+  makes `execute_code` and `write_module` reject imports outside the v1 allowlist
+  with `[safe_mode_rejected]` before dispatch; the rejection is audited as
+  `rejected` with the triggering rule id, and the suggestion points at typed
+  tools or unsetting the flag. Default off, and the flag is standalone (not a
+  `MAYA_MCP_DISABLE_*` member), so DISABLE still removes tools from `tools/list`
+  before safe_mode narrows what remains. The full rule matrix and the response
+  disclosure land in follow-up tickets. Evidence:
+  `tests/test_pipeline.py::TestSafeModeGate::test_unsafe_import_rejected_before_dispatch`.
+
 ### Removed
 
 - **Migration-shape gate** — the prose-integrity gate script and its 32-test

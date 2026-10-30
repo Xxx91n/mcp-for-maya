@@ -140,7 +140,7 @@ mcp = FastMCP(
         "- write_module: Define in-memory virtual Python modules in an active session\n"
         "  with overwrite semantics; disambiguated from execute_code (use execute_code\n"
         "  for one-off snippets, queries, or expression evaluation)\n"
-        "- execute_code: Execute arbitrary Python or MEL code with full session\n"
+        "- execute_code: Execute arbitrary Python code with full session\n"
         "  privileges in an active session; irreversible (cannot be undone);\n"
         "  returns structured response envelopes via result_type; disambiguated from\n"
         "  write_module (module definition) and domain-specific scene tools\n\n"
@@ -172,7 +172,7 @@ register_export_tools(mcp)
 register_introspect_tools(mcp)
 
 # Unified security pipeline: every tool call passes through validation,
-# rate limiting, pattern scanning, and audit logging.
+# rate limiting, pattern scanning, the safe_mode gate, and audit logging.
 mcp.add_middleware(SecurityPipeline(config=_security_config, audit=_audit_logger))
 
 # Global session manager - initialized when server starts
@@ -311,6 +311,10 @@ async def write_module(
     and existing modules are protected unless overwrite=True is explicitly set.
     Requires an active Maya session.
 
+    Under safe_mode (MAYA_MCP_SAFE_MODE), gated execute_code payloads can only
+    import the v1 allowlisted roots; a module defined here whose root is not one
+    of those roots is therefore not importable by name from gated code.
+
     Boundary: Use write_module to define reusable libraries and helper functions;
     use execute_code for one-shot imperative execution or expression evaluation.
 
@@ -356,7 +360,7 @@ async def execute_code(
     result_type: str = "NONE",
     session_key: str | None = None,
 ) -> Any:
-    """Execute arbitrary Python or MEL code in an active Maya session.
+    """Execute arbitrary Python code in an active Maya session.
 
     Runs arbitrary code with full session privileges of the connected Maya
     process. Execution is irreversible and cannot be undone (modifications
@@ -365,7 +369,7 @@ async def execute_code(
     Requires an established Maya session (discoverable via list_sessions).
 
     Args:
-        code: Python or MEL code to execute in Maya.
+        code: Python code to execute in Maya.
         result_type: Return envelope handling for the execution result:
             - "NONE": Execute statements, don't capture result (returns None)
             - "JSON": Evaluate expression, JSON-encode result
