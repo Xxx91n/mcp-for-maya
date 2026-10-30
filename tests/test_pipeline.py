@@ -725,17 +725,17 @@ class TestSafeModeGate:
     # --- T2: the full deny-by-default matrix rides the same stage ---
 
     @pytest.mark.parametrize(
-        "code",
+        "code, rule_id",
         [
-            "import os",
-            "open('x')",
-            "__builtins__['eval']('1+1')",
-            "().__class__.__base__.__subclasses__()",
-            "with m:\n    pass",
+            ("import os", "safe-mode-import"),
+            ("open('x')", "safe-mode-builtin"),
+            ("__builtins__['eval']('1+1')", "safe-mode-builtins"),
+            ("().__class__.__base__.__subclasses__()", "safe-mode-dunder"),
+            ("with m:\n    pass", "safe-mode-node"),
         ],
         ids=["import", "builtin", "builtins", "dunder", "node"],
     )
-    async def test_rule_matrix_rejects_before_dispatch(self, tmp_path, monkeypatch, code):
+    async def test_rule_matrix_rejects_before_dispatch(self, tmp_path, monkeypatch, code, rule_id):
         monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
         pipe, _audit, log = _pipeline(tmp_path)
         calls = []
@@ -749,9 +749,9 @@ class TestSafeModeGate:
         assert calls == [], "the backend must never see a rejected payload"
         ev = _read_events(log)[-1]
         assert ev["outcome"] == "rejected"
-        # AC: every rule-table entry's rule_id reaches the audit row, not just
-        # the import class the T1 test already pins.
-        assert any(w["rule_id"].startswith("safe-mode-") for w in ev["warnings"])
+        # AC: every rule-table entry's exact rule_id reaches the audit row, not
+        # just the import class the T1 test already pins.
+        assert any(w["rule_id"] == rule_id for w in ev["warnings"])
 
     @pytest.mark.parametrize(
         "code",
