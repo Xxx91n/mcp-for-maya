@@ -46,8 +46,9 @@ The following are **not** security boundaries:
 - `safe_mode` (`MAYA_MCP_SAFE_MODE=1`, implemented, opt-in, default
   off). Same misuse-guardrail class as the DISABLE flags: while the
   two code-bearing tools stay listed, the AST gate narrows their
-  `code` payloads to a v1 allowlist and rejections return
-  `safe_mode_rejected` with the triggering rule id. It slows
+  `code` payloads to a v1 allowlist and rejections raise
+  `safe_mode_rejected` (a host `isError` failure) with the triggering
+  rule id. It slows
   confused-deputy payloads; it does not contain a hostile caller —
   the client stays trusted, and successful calls disclose
   `mode: "safe"` rather than claim a boundary. Config, not a jail.
@@ -71,12 +72,15 @@ problem.
 | userSetup.py merge | marker-block upsert, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
 | Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 25 tools | pipeline.py |
 | Strict policy mode | `MAYA_MCP_DISABLE_*{EXECUTE,WRITE_MODULE,ARBITRARY}` remove the named tools from `tools/list` and deny the call with `[policy_disabled]`, audited as `rejected`; one choke point in the pipeline, none in the tool bodies | pipeline.py (POLICY_ENV_FLAGS, on_list_tools, on_call_tool) |
-| `safe_mode` AST gate | opt-in (`MAYA_MCP_SAFE_MODE=1`, default off); deny-by-default allowlist over `execute_code`/`write_module` `code` payloads — v1 import roots (maya/math/json/re/collections/itertools/functools/dataclasses/typing) + node allowlist, denied builtin names rejected on any reference (not just calls)/`__builtins__`/dunder access rejected, unparseable input rejects ("cannot decide ⇒ deny"); `[safe_mode_rejected]` + rule id, audited `rejected`; success responses carry `mode:"safe"`, tools/list gains a Boundary line | security.py (SAFE_* tables, scan_safe_mode_code), pipeline.py (on_call_tool stage 4, _with_safe_mode_field, _with_boundary_line) |
+| `safe_mode` AST gate | opt-in (`MAYA_MCP_SAFE_MODE=1`, default off); deny-by-default allowlist over `execute_code`/`write_module` `code` payloads — v1 import roots (maya/math/json/re/collections/itertools/functools/dataclasses/typing) + node allowlist, denied builtin names rejected on any reference (not just calls)/`__builtins__`/dunder access rejected, unparseable input rejects ("cannot decide ⇒ deny"); raises `[safe_mode_rejected]` + rule id, audited `rejected`; success responses carry `mode:"safe"`, tools/list gains a Boundary line | security.py (SAFE_* tables, scan_safe_mode_code), pipeline.py (on_call_tool stage 4, _with_safe_mode_field, _with_boundary_line) |
 | Asset egress whitelist | asset_search/asset_import reach https only on api.polyhaven.com + dl.polyhaven.org/.com, mandatory User-Agent, size+timeout caps, per-file md5 verify, platformdirs cache | polyhaven.py |
 
 All 25 tools pass through one FastMCP middleware pipeline:
-validate → rate-limit → pattern-scan → safe_mode gate (opt-in, the
-two code-bearing tools only) → dispatch → audit.
+policy-disabled check (MAYA_MCP_DISABLE_* removes the tool from
+tools/list and denies calls) → validate → rate-limit → pattern-scan →
+safe_mode gate (opt-in; `execute_code`/`write_module` only) →
+dispatch → disclosure (a successful gated call gains `mode:"safe"`)
+→ audit.
 
 ## 4. Port and network exposure
 
