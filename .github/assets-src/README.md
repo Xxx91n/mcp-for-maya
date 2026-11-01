@@ -22,7 +22,7 @@ readback freezes while the window is minimized.
 | `auditbench.py` | `t20_audit` | `GRP_t20_audit` | `CAM_t20au_hero` | metrology bench |
 
 Run inside a Maya 2024 GUI session: inject each file via `write_module`
-(under the `t20_*` name), then call `execute_code`:
+using the exact name in the `Injected as` column, then call `execute_code`:
 
 ```python
 import t20kit, t20_movement  # modules injected by write_module

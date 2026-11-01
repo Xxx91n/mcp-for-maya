@@ -15,8 +15,13 @@ Admission rules:
   ledger adjudication; the old file is annotated `superseded`, not
   rewritten.
 - **Provenance required.** `meta` carries env / date / versions / PID —
-  admission requirements, not redaction targets.
+  admission requirements, not redaction targets. Artifacts frozen before
+  this rule (e.g. `probes/probe-signature-baseline-maya2024.json`, which
+  has no `versions`/`PID` fields) are grandfathered and stay as-is —
+  append-only applies to them too.
 - **claim_boundary required.** Every artifact states the strongest claim
   it supports (example: connected != renders).
 - **Forward rule:** a live-verified-grade claim must cite an in-repo
-  artifact here or name a mayapy/human_verify tier record.
+  artifact here or name a mayapy/human_verify tier record **with a
+  recorded outcome** — the `human_verify` marker only prints manual steps
+  and always skips, so naming the marker alone does not satisfy this rule.
