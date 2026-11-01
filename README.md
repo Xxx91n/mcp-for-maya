@@ -12,16 +12,14 @@
 
 [![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/Xxx91n/mcp-for-maya/blob/main/LICENSE) [![Python](https://img.shields.io/pypi/pyversions/mcp-for-maya)](https://pypi.org/project/mcp-for-maya/)
 
-## What Is This
+## What this is
 
-`mcp-for-maya` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets LLM agents (Codex, Claude, etc.) directly drive Autodesk Maya for 3D modeling, scene planning, and engineering-grade delivery.
+`mcp-for-maya` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets LLM agents (Codex, Claude, etc.) drive Autodesk Maya for 3D modeling, scene planning, and engineering-grade delivery.
 
-Forked from [chadrik/maya-mcp-server](https://github.com/chadrik/maya-mcp-server), it adds a scene-intelligence layer on top of the upstream connection stack: spatial awareness, deterministic auditing, transactional safety, and a visual loop.
-
-**Key capability:** the agent stops "writing blind" — it can perceive spatial state, materials, and object relationships, then verify changes against engineering rules.
+Forked from [chadrik/maya-mcp-server](https://github.com/chadrik/maya-mcp-server). The fork keeps the upstream connection stack and adds a scene-intelligence layer: spatial awareness, deterministic auditing, transactional safety, and a visual loop. The agent stops writing blind — it reads spatial state, materials, and object relationships, then verifies changes against engineering rules.
 
 > [!WARNING]
-> This server executes arbitrary Python inside Maya — that is a designed capability, not a bug. The built-in validation / rate-limit / audit pipeline is a **safety net for accidents and injected instructions, not a boundary against a malicious client**; the connected agent is trusted. See [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
+> This server executes arbitrary Python inside Maya — a designed capability, not a bug. The validation / rate-limit / audit pipeline is a **safety net for accidents and injected instructions, not a boundary against a malicious client**; the connected agent is trusted. See [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-live-demo.svg" width="100%" alt="Live Demo — captured by the product itself"/>
 
@@ -42,7 +40,7 @@ Reproduce every frame with the scripts in [`.github/assets-src/`](https://github
 
 ## vs blender-mcp
 
-An honest three-tier comparison with [ahujasid/mcp-for-blender](https://github.com/ahujasid/mcp-for-blender) (measured 2026-09):
+Three-tier comparison with [ahujasid/mcp-for-blender](https://github.com/ahujasid/mcp-for-blender) (measured 2026-09):
 
 | Tier | Contents |
 |------|----------|
@@ -50,9 +48,9 @@ An honest three-tier comparison with [ahujasid/mcp-for-blender](https://github.c
 | **Unique to blender-mcp** | Asset ecosystem breadth (Sketchfab/Hyper3D/Hunyuan3D), first-class object CRUD tools, AI-generated-model integrations, community scale |
 | **Shared** | MCP tool surface, Poly Haven asset source, viewport screenshot feedback, arbitrary Python execution, local socket connection |
 
-Poly Haven model search + import shipped in 0.2.0 (issue #2 thin slice: FBX + texture wiring; HDRIs and texture packs remain roadmap). AI generation and first-class object CRUD are explicitly out of scope — the latter is already covered by `execute_code`.
+Poly Haven model search + import shipped in 0.2.0 (issue #2 thin slice: FBX + texture wiring; HDRIs and texture packs remain roadmap). AI generation and first-class object CRUD are out of scope — the latter is already covered by `execute_code`.
 
-On the shared asset-download path, this project's controls are enforced in code rather than conventional: downloads happen host-side only — https + host allowlist, per-file md5, size caps, filenames sanitized from the URL's last segment (`polyhaven.py`) — and Maya itself never touches the network. Enforcement detail: [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
+On the shared asset-download path, this project's controls are enforced in code: downloads happen host-side only — https + host allowlist, per-file md5, size caps, filenames sanitized from the URL's last segment (`polyhaven.py`) — and Maya itself never touches the network. Enforcement detail: [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
 
@@ -195,7 +193,7 @@ Every scene modification follows the **ICEV** loop (also shipped as an agent pro
 3. **EXECUTE**: `execute_code()` applies Maya Python
 4. **VERIFY**: `scene_assert()` + `scene_review()` confirm the result; on GUI sessions the visual tools give pixel-level confirmation
 
-## Tools Reference
+## Tools reference
 
 ### Spatial
 
@@ -269,7 +267,7 @@ scene_render_preview(camera="CAM_hero", width=640, height=360)  # clean single-f
 # prefer format="png" for wireframe/line-art review; trust returned metadata for actual size
 ```
 
-## CoS Notation
+## CoS notation
 
 Default output uses **Chain-of-Symbol** notation to compress scene data. The format's paper reports ~65% token savings vs JSON on its demo scenes (arXiv:2305.10276, −65.8%) — this project implements the notation; that figure is the paper's measurement, not a benchmark of this project.
 
@@ -279,7 +277,7 @@ shell (23obj) @(-11.8,178.8,145.7)
   GRP_floor[mesh]@(0,0,0) 1121.5x20x1530.5
 ```
 
-## Agent Skills
+## Agent skills
 
 Two **Experimental** process cards ship in `skills/`:
 
@@ -308,7 +306,7 @@ Two **Experimental** process cards ship in `skills/`:
 | organization | 10 | overall hierarchy health |
 | constraints | 5 | custom rule violations |
 
-## Trust & Privacy
+## Trust & privacy
 
 - **Zero telemetry**: no phone-home — the project ships no telemetry or unsolicited outbound traffic; verify in source. The ONLY outbound calls are the two asset tools: HTTPS to `api.polyhaven.com` / `dl.polyhaven.org|.com` (host allowlist + md5 + size caps in `polyhaven.py`), and only when you call them.
 - **Local, single-user**: the command port binds localhost only; the connected MCP client is trusted.
@@ -323,12 +321,12 @@ Two **Experimental** process cards ship in `skills/`:
 This project follows [Semantic Versioning](https://semver.org/):
 
 - **0.x (through 0.3.x, Alpha)**: the tool surface could still change; minor bumps carried features, no compatibility freeze.
-- **Beta (0.4.0)**: feature-complete tier — external testing begins here (classifier `4 - Beta`).
-- **1.0.0**: public API freeze — tool surface and output schemas stable per semver; breaking changes require 2.0.0. Promoted together with the `5 - Production/Stable` classifier in one commit; gated by the [#7 real-machine checklist](https://github.com/Xxx91n/mcp-for-maya/issues/7) (Pass-set green + explicit waived items with owner/expiry — three-state gate, D-163).
+- **Beta (0.4.0 onward; current release 0.7.0)**: feature-complete tier — external testing begins here (classifier `4 - Beta`).
+- **1.0.0**: public API freeze — tool surface and output schemas stable per semver; breaking changes require 2.0.0. Promoted together with the `5 - Production/Stable` classifier in one commit; gated by the [#7 real-machine checklist](https://github.com/Xxx91n/mcp-for-maya/issues/7).
 
-The **public API** is the MCP tool surface: tool names, their input/output shapes, the two-layer error contract (host `isError` failures vs `{error:{code,message,suggestion}}` domain results), and tool-annotation semantics ([docs/threat-model.md §5](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)). Additive changes (new tools, new optional response fields) ship as minor releases; breaking changes ship as a major bump. 1.0.0 is a freeze commitment on this surface — not a quality certification: the remaining real-machine verification surface is tracked explicitly in #7 rather than implied away.
+The **public API** is the MCP tool surface: tool names, their input/output shapes, the two-layer error contract (host `isError` failures vs `{error:{code,message,suggestion}}` domain results), and tool-annotation semantics ([docs/threat-model.md §5](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)). Additive changes (new tools, new optional response fields) ship as minor releases; breaking changes ship as a major bump. 1.0.0 freezes this surface — it is not a quality certification; the remaining real-machine verification surface is tracked explicitly in #7.
 
-Releases are milestone-driven — no fixed cadence promised. Roadmap lives in GitHub issues: #2 Poly Haven integration (model slice shipped in 0.2.0; scene_plan recommendation residual split to #31), #3 Skills program (v1.x), #4 security & permission model (v1.x), #5 scene export + introspection (scene_export shipped in 0.3.0: FBX/OBJ/USD; scene_describe/scene_nodes introspection shipped in the same 0.3.0), #6 more asset sources (exploratory), #7 real-machine checklist + v1.0 feedback (pinned).
+Releases are milestone-driven — no fixed cadence. Roadmap lives in GitHub issues: #2 Poly Haven integration (model slice shipped in 0.2.0; scene_plan recommendation residual split to #31), #3 Skills program (v1.x), #4 security & permission model (v1.x), #5 scene export + introspection (both shipped in 0.3.0), #6 more asset sources (exploratory), #7 real-machine checklist + v1.0 feedback (pinned).
 
 ## Requirements
 
