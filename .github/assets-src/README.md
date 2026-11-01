@@ -30,6 +30,9 @@ import t20kit, t20_movement  # modules injected by write_module
 t20_movement.build()  # -> scene_render_preview("CAM_t20mv_hero")
 ```
 
+Reruns in the same session need `write_module(..., overwrite=True)` —
+`overwrite` defaults to `False` and an existing module is rejected.
+
 Notes: `workbench.py` requires the Poly Haven cache populated by
 `asset_import("vintage_pocket_watch")` + `asset_import("metal_tool_chest")`
 first. `cmds.scale`/`cmds.rotate` are absolute-set in Maya — the scripts
