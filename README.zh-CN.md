@@ -1,5 +1,4 @@
 <!-- mcp-name: io.github.Xxx91n/mcp-for-maya -->
-<!-- synced-with: README.md @ 8402e3b — 本文件为英文权威版的中文镜像：可滞后、不许分叉；英文版 commit 变更后需同步本文件 -->
 
 [English](README.md) | **简体中文**
 
@@ -347,12 +346,12 @@ entrance (6obj) @(157.3,162.6,-111.6)
 遵循 [Semantic Versioning](https://semver.org/)：
 
 - **0.x（至 0.3.x，Alpha）**：工具面仍可能调整；minor bump 承载新功能，不承诺兼容冻结。
-- **Beta（0.4.0）**：feature-complete 层级——自此开始外部测试（classifier `4 - Beta`）。
-- **1.0.0**：公共 API 冻结——工具面与输出 schema 按 semver 保持稳定；breaking 变更须升 2.0.0。与 `5 - Production/Stable` classifier 同一提交晋升；由 [#7 真机验证清单](https://github.com/Xxx91n/mcp-for-maya/issues/7)把守（全绿方可 tag）。
+- **Beta（0.4.0 起；当前发布 0.7.0）**：feature-complete 层级——自此开始外部测试（classifier `4 - Beta`）。
+- **1.0.0**：公共 API 冻结——工具面与输出 schema 按 semver 保持稳定；breaking 变更须升 2.0.0。与 `5 - Production/Stable` classifier 同一提交晋升；由 [#7 真机验证清单](https://github.com/Xxx91n/mcp-for-maya/issues/7)把守。
 
 **公共 API** 即 MCP 工具面：工具名、输入/输出形状、双层错误契约（宿主侧 `isError` 故障 vs `{error:{code,message,suggestion}}` 域结果）与工具 annotations 语义（见 [docs/threat-model.md §5](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)）。additive 变更（新工具、新可选响应字段）随 minor 发布；破坏该面的变更须 major 升档。1.0.0 是对该面的冻结承诺而非质量认证——剩余真机验证面在 #7 显式跟踪，不默示抹去。
 
-发布节奏为里程碑驱动，不承诺固定周期。路线图见 GitHub issues：#2 Poly Haven 集成（模型切片已随 0.2.0 交付并收口；scene_plan 推荐集成残余拆分为 #31）、#3 Skills 正式立项（v1.x）、#4 安全与权限模型（v1.x）、#5 场景导出与内省（scene_export 已随 0.3.0 交付：FBX/OBJ/USD；scene_describe/scene_nodes 内省同随 0.3.0 交付）、#6 更多资产源（exploratory）、#7 真机验证清单与 v1.0 反馈（pinned）。
+发布节奏为里程碑驱动，不承诺固定周期。路线图见 GitHub issues：#2 Poly Haven 集成（模型切片已随 0.2.0 交付并收口；scene_plan 推荐集成残余拆分为 #31）、#3 Skills 正式立项（v1.x）、#4 安全与权限模型（v1.x）、#5 场景导出与内省（两者均随 0.3.0 交付）、#6 更多资产源（exploratory）、#7 真机验证清单与 v1.0 反馈（pinned）。
 
 ## 环境要求
 

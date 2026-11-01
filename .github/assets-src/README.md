@@ -1,27 +1,31 @@
-# T-19 + T-20 demo assets — reproduction
+# Showcase asset reproduction
 
-Frozen-session captures for README/social assets. Every image was
-produced by the product MCP tools (no mocks, no post-editing).
+Frozen-session captures behind the README and social assets. Every image was
+produced by the product's own MCP tools — no mocks, no post-editing.
+
+Requires a Maya 2024 GUI session: `scene_viewport_snapshot` is not supported
+in headless/mayapy sessions, and the Maya window must stay visible — the
+readback freezes while the window is minimized.
 
 ## T-20 showcase set (current README)
 
 `t20/` holds the six scene generators plus the shared kit:
 
-| Script | Scene root | Hero camera | Subject |
-|--------|-----------|-------------|---------|
-| `t20kit.py` | — | — | shared helpers (mats, prism, ring, tube, cam, kill) |
-| `movement.py` | `GRP_t20_movement` | `CAM_t20mv_hero` | involute watch movement |
-| `bonsai.py` | `GRP_t20_bonsai` | `CAM_t20bn_hero` | L-system bonsai |
-| `workbench.py` | `GRP_t20_workbench` | `CAM_t20wb_hero` | Poly Haven import + assembly |
-| `streetblock.py` | `GRP_t20_street` | `CAM_t20st_hero` | low-poly corner block |
-| `teapot.py` | `GRP_t20_teapot` | `CAM_t20tp_hero` | Utah teapot recreation |
-| `auditbench.py` | `GRP_t20_audit` | `CAM_t20au_hero` | metrology bench |
+| Script | Injected as | Scene root | Hero camera | Subject |
+|--------|-------------|-----------|-------------|---------|
+| `t20kit.py` | `t20kit` | — | — | shared helpers (mats, prism, ring, tube, cam, kill) |
+| `movement.py` | `t20_movement` | `GRP_t20_movement` | `CAM_t20mv_hero` | involute watch movement |
+| `bonsai.py` | `t20_bonsai` | `GRP_t20_bonsai` | `CAM_t20bn_hero` | L-system bonsai |
+| `workbench.py` | `t20_workbench` | `GRP_t20_workbench` | `CAM_t20wb_hero` | Poly Haven import + assembly |
+| `streetblock.py` | `t20_street` | `GRP_t20_street` | `CAM_t20st_hero` | low-poly corner block |
+| `teapot.py` | `t20_teapot` | `GRP_t20_teapot` | `CAM_t20tp_hero` | Utah teapot recreation |
+| `auditbench.py` | `t20_audit` | `GRP_t20_audit` | `CAM_t20au_hero` | metrology bench |
 
-Run order inside a Maya 2024 GUI session (via `write_module` then
-`execute_code`):
+Run inside a Maya 2024 GUI session: inject each file via `write_module`
+(under the `t20_*` name), then call `execute_code`:
 
 ```python
-import t20kit, t20_movement  # modules are injected by write_module
+import t20kit, t20_movement  # modules injected by write_module
 
 t20_movement.build()  # -> scene_render_preview("CAM_t20mv_hero")
 ```
@@ -32,16 +36,16 @@ first. `cmds.scale`/`cmds.rotate` are absolute-set in Maya — the scripts
 compute absolute targets, and second rotations use `relative=True`.
 `playblast` frame grabs must `lookThru` the intended camera.
 
-## T-19 set (superseded showcase, kept for reference)
+## T-19 capture pipeline (superseded, kept for reference)
 
-## Environment
+### Environment
 
 - Maya 2024 GUI session, en_US UI (`MAYA_UI_LANGUAGE=en_US` env,
   not Maya.env), clean untitled scene
 - Repo HEAD `python -m maya_mcp_server` over stdio; Qt framed channel
 - Capture host: this repo, Windows
 
-## Build
+### Build
 
 1. Start Maya (GUI, en_US), commandPort :7001 via userSetup.py managed
    block (see maya_setup_guide).
@@ -64,7 +68,7 @@ compute absolute targets, and second rotations use `relative=True`.
 7. `camera_orbit(center=[0,115,-10], radius=660, frames=48, name=CAM_orbit)`;
    parent `LGT_rim_back` transform under CAM_orbit for stable orbit rim.
 
-## Capture
+### Capture
 
 ```bash
 python .github/assets-src/capture.py
