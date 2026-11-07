@@ -1,7 +1,7 @@
 """T-24b host-tool tests: scene_describe / scene_nodes (D-094/D-095).
 
 ExecClient runs generated code against the stub-bound _mcp_scene
-assembly (monolith + introspect_module fragment) via the REAL
+assembly (monolith + fragments) via the REAL
 result-capture transform - same chain as test_scene_tools_json.py and
 test_export_tools.py. Covers injection lifecycle, dual channels,
 domain-error passthrough, input validation, and annotations.

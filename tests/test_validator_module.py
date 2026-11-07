@@ -1,6 +1,6 @@
 """Issue #79 Maya-side contract tests: custom scene_review validators.
 
-Most run against the stub-bound _mcp_scene injection unit (monolith + both
+Most run against the stub-bound _mcp_scene injection unit (monolith + all
 fragments assembled - maya_env.module), the same seam
 tests/test_introspect_module.py uses. Those are CONTRACT tests: the
 registration surface, the score separation and the check_error isolation must

@@ -20,6 +20,7 @@ from maya_mcp_server.maya_mcp_helper import prepare_code_for_result_capture
 from maya_mcp_server.scene_tools import (
     _caches,
     _injected_sessions,
+    get_zone_geometry,
     register_scene_tools,
 )
 from maya_mcp_server.types import CommandResponse, OutputBuffer, ResultType
@@ -367,3 +368,51 @@ class TestChecksArgumentShape:
 
         assert "checks" in seen, "the Maya-side entry point was never called - re-aim this pin"
         assert seen["checks"] == ["overlaps", "conflicts"]
+
+
+# ------------------------------------------------------------
+# Issue #176: internal zone-geometry host helper, no new MCP tool
+# ------------------------------------------------------------
+
+
+class TestZoneGeometryHostHelper:
+    async def test_helper_reads_fresh_geometry_through_the_scene_module(self, tools):
+        tools.env.scene.add_mesh("GEO_shelf_a", bbox_min=(0, 0, 0), bbox_max=(4, 2, 1), t=(0, 0, 0))
+
+        first = await get_zone_geometry(tools.client)
+        tools.env.cmds.move(10, 0, 0, "GEO_shelf_a")
+        second = await get_zone_geometry(tools.client)
+
+        assert first["zones"][0]["bbox_min"] == [0, 0, 0]
+        assert second["zones"][0]["bbox_min"] == [10, 0, 0]
+        assert second["zones"][0]["size"] == [4, 2, 1]
+        assert "get_zone_geometry" in tools.client.calls[-1]
+        assert not _caches, "geometry must not be cached by this helper"
+
+    async def test_helper_passes_domain_errors_through(self, tools, monkeypatch):
+        error = {"error": {"code": "query_failed", "message": "bbox unreadable"}}
+        monkeypatch.setattr(tools.env.module, "get_zone_geometry", lambda: error)
+
+        assert await get_zone_geometry(tools.client) == error
+
+    async def test_helper_raises_on_maya_execution_error(self, tools):
+        from maya_mcp_server.client import MayaExecutionError
+
+        with pytest.raises(MayaExecutionError, match="kaboom"):
+            await get_zone_geometry(ErrorClient(tools.env.module))
+
+    @pytest.mark.parametrize("format", ["json", "cos"])
+    async def test_default_scene_plan_bytes_do_not_use_the_helper(self, tools, monkeypatch, format):
+        tools.env.scene.add_mesh("GEO_shelf_a", t=(10, 0, 0))
+        tools.env.scene.add_mesh("GEO_door_a", t=(0, 0, 10))
+        expected = await tools.fns["scene_plan"](format=format)
+
+        def should_not_run():
+            raise AssertionError("scene_plan must not call the dormant geometry helper")
+
+        monkeypatch.setattr(tools.env.module, "get_zone_geometry", should_not_run)
+        actual = await tools.fns["scene_plan"](format=format)
+
+        assert actual.encode("utf-8") == expected.encode("utf-8")
+        assert "get_zone_geometry" not in tools.client.calls[-1]
+        assert "scene_plan" in tools.client.calls[-1]

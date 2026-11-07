@@ -108,6 +108,11 @@ markers = [
     "human_verify: manual checklist skeletons — prints steps, never asserts, always skips (D-049a)",
 ]
 
+[tool.coverage.run]
+# dormant: #177 wires this fragment into scene_plan recommendations. Its tests
+# are contract tests, not production coverage; remove this omit when wired.
+omit = ["src/maya_mcp_server/zone_geometry_module.py"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
