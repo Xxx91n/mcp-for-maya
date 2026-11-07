@@ -194,6 +194,76 @@ class TestSearch:
         polyhaven.search_assets()
         assert record and "mcp-for-maya" in (record[0]["ua"] or "")
 
+    def test_dimensions_and_polycount_projected(self, monkeypatch):
+        """#175: published size + count reach each result, order kept."""
+        assets = {
+            "Sofa_01": {
+                "name": "Sofa",
+                "categories": ["furniture"],
+                "tags": ["sofa"],
+                "dimensions": [2.1, 0.9, 0.8],
+                "polycount": 12345,
+            }
+        }
+        routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
+        monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes))
+        out = polyhaven.search_assets(query="sofa")
+        (row,) = out["results"]
+        assert row["dimensions"] == [2.1, 0.9, 0.8]
+        assert row["polycount"] == 12345
+        # existing fields keep their names and meanings
+        assert row["id"] == "Sofa_01"
+        assert row["name"] == "Sofa"
+        assert row["categories"] == ["furniture"]
+        assert row["tags"] == ["sofa"]
+
+    def test_missing_metadata_is_null_never_fabricated(self, monkeypatch):
+        assets = {"Rock_01": {"name": "Rock", "categories": [], "tags": []}}
+        routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
+        monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes))
+        (row,) = polyhaven.search_assets(query="rock")["results"]
+        assert row["dimensions"] is None
+        assert row["polycount"] is None
+
+    @pytest.mark.parametrize(
+        "dims",
+        [
+            "1.0x2.0x3.0",  # not a list
+            [1.0, 2.0],  # too short
+            [1.0, 2.0, 3.0, 4.0],  # too long
+            [1.0, "wide", 3.0],  # non-numeric
+            [1.0, True, 3.0],  # bool is not a size
+            [1.0, -2.0, 3.0],  # negative
+            [1.0, float("nan"), 3.0],  # non-finite
+            None,
+        ],
+    )
+    def test_malformed_dimensions_are_null(self, monkeypatch, dims):
+        assets = {"Bad_01": {"name": "Bad", "dimensions": dims}}
+        routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
+        monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes))
+        (row,) = polyhaven.search_assets(query="bad")["results"]
+        assert row["dimensions"] is None
+
+    @pytest.mark.parametrize("count", ["12k", -5, True, 1.5, None])
+    def test_malformed_polycount_is_null(self, monkeypatch, count):
+        assets = {"Bad_02": {"name": "Bad", "polycount": count}}
+        routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
+        monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes))
+        (row,) = polyhaven.search_assets(query="bad")["results"]
+        assert row["polycount"] is None
+
+    def test_search_makes_no_files_request(self, monkeypatch):
+        """#175: the only network call on the search path is /assets."""
+        record = []
+        assets = {
+            "Sofa_01": {"name": "Sofa", "dimensions": [2.0, 1.0, 1.0], "polycount": 9}
+        }
+        routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
+        monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes, record))
+        polyhaven.search_assets(query="sofa")
+        assert [r["url"] for r in record] == ["https://api.polyhaven.com/assets?t=models"]
+
 
 # ------------------------------------------------------------------
 # guardrails

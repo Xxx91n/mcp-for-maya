@@ -220,6 +220,8 @@ scene_rollback(filename="cp_before_renovation.ma")
 
 ```python
 asset_search(query="camera", asset_type="models", limit=20)  # Search Poly Haven index
+# Each result includes dimensions ([x, y, z] in metres, Poly Haven order) and polycount (int).
+# Either is null when Poly Haven publishes no valid value. Search makes no file downloads.
 asset_import(asset_id="Camera_01", resolution="1k")
 # Downloads via HTTPS to local cache (MD5 verified + SHA-256 audit),
 # then Maya imports the local FBX grouped under GRP_asset_<asset_id>
