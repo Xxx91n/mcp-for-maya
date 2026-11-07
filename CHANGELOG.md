@@ -31,6 +31,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_security.py::TestScanSafeModeCode::test_allowlisted_constructs_pass`,
   `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`.
 
+### Changed
+
+- **Defect record #115 no longer reads as open work** — the fix had landed as
+  `2f8d51e` (PR #138, merge `894f6ae`) while the ticket stayed open, because
+  the closing keyword lived in the child ticket's body and never reached a
+  pull-request description; #115 now carries an evidence comment naming that
+  merge commit and pull request, the recurrence cause, and the regression
+  nodes behind each of its six cases, and is closed as completed. The
+  original body stays byte-identical — the correction is the record, not the
+  prose. Evidence — the six nodes tabulated in that comment:
+  `tests/test_validator_module.py::TestRegistration::test_a_strip_that_raises_is_answered_not_escaped`,
+  `tests/test_validator_module.py::TestRegistration::test_a_family_strip_that_raises_is_answered_not_escaped`,
+  `tests/test_validator_module.py::TestRegistration::test_truthiness_of_a_stripped_name_is_answered_not_escaped`,
+  `tests/test_validator_module.py::TestRegistration::test_a_severity_whose_equality_raises_is_answered_not_escaped`,
+  `tests/test_validator_module.py::TestRegistration::test_a_weight_whose_float_raises_an_ordinary_exception_is_answered`,
+  and `tests/test_validator_module.py::TestRegistration::test_the_echoed_message_is_plain_str`.
+- **The stale-doc-line rule points at a table that exists** — the house rule
+  sent readers to a glossary entry (「文档传播矩阵」) that no commit of
+  `GLOSSARY.md` ever carried; it now points at the cross-module dependency
+  table in the same document — the real propagation matrix — instead of
+  growing the glossary to satisfy a workflow rule. Evidence:
+  `3a8bc13:CONTRIBUTING.md:24`.
+- **The session-lifecycle anchor claim now says what is true** — the rule
+  file called `docs/guide/session-lifecycle.md` machine-verified while the
+  page itself says no machine checks it and the checker that once did left
+  with the governance layer; the row now states that the page is prose, its
+  eight `path::symbol` anchors are hand-maintained, no gate resolves them,
+  and all eight currently resolve — a declaration, not a check. Evidence:
+  `3a8bc13:CONTRIBUTING.md:51`.
+- **The gate registry header no longer describes classes and fields the file
+  does not carry** — its note claimed five bound classes, a
+  warning-to-blocking flip condition and a residual-blind-spot disclosure the
+  registry does not record; it now describes the bound-classes map its
+  entries actually use, the veto standing and pin obligation each class
+  carries, and the places disclosures actually sit (the per-entry exemption
+  field and the notes some entries carry). The two checker docstrings that
+  attributed that disclosure to the registry now attribute it to the checkers
+  themselves. Evidence: `dfbc572:.github/gate-registry.yaml:3`,
+  `dfbc572:.github/scripts/check_gate_registry.py:53`,
+  `dfbc572:.github/scripts/check_doc_claims.py:30`.
+- **The real-Maya runbook says which artifact paths it actually holds** — the
+  per-frame `Artifact Destination` fields named probe files that git has
+  never held at any commit, so a maintainer running the manual frame by frame
+  went looking for blobs that do not exist; a front-matter banner now states
+  that those paths record the naming planned at the time, names the probe
+  files that did land, and points at the record that holds the window's real
+  evidence (`docs/evidence/real-maya-window-2026-09-30.md`). The body —
+  acceptance cards, expectations, escape hatches — stays untouched.
+  Evidence: `b5e35cf:docs/reference/real-maya-runbook.md:9`.
+- **The upstream-status page says it is hand-maintained** — the header
+  claimed the table was regenerated from the same facts, but no generator
+  exists: nothing under `.github/`, `src/` or `tests/` references the page,
+  so nothing keeps it current. The sentence now says hand-maintained;
+  ownership and the disclosed fork relationship are unchanged. Evidence:
+  `dfbc572:docs/upstream-issue-status.md:10`.
+- **The distribution ledger's validation path names a mechanism that exists** —
+  the Registry publish section's obligation pointed at row 10 of a
+  release-preflight checklist that left with the retired ADR layer and is not
+  in this repository; the obligation now points at the section's own dated
+  publish records — the real carrier, written at each publish — and the
+  retired row's provenance is stated once so a reader knows where it went.
+  Evidence: `dfbc572:docs/distribution-surfaces.md:58` and
+  `dfbc572:docs/distribution-surfaces.md:65`.
+- **The documented check commands now run the way CI runs them** — both rule
+  files handed contributors commands that come back red when copied:
+  `AGENTS.md`'s `&&` chain short-circuits before the type-check once the
+  tree's lint findings exit non-zero, and `CONTRIBUTING.md` paired a bare
+  lint invocation that exits red with a pipe that swallows the type-check's
+  raw non-zero exit. Both now describe the two passes CI actually performs:
+  a lint report written without failing the shell, compared against the
+  frozen per-rule budget, and a type-check whose raw exit is expected to be
+  non-zero, filtered against the baseline with a crash kept red. Evidence:
+  `32dad67:AGENTS.md:9` and `3a8bc13:CONTRIBUTING.md:14`.
+- **The three budget files are described per file, not as a family** —
+  `AGENTS.md` called the ruff, monolith and mypy baselines "regenerated
+  archives", which is true of only one of them and contradicted how
+  `CONTRIBUTING.md` describes their upkeep; the agent file now states what is
+  true: CI reads all three and never writes them, `mypy-baseline.txt` is
+  regenerated by its sync tool, and the lint budget and monolith line cap are
+  maintained by hand and may be tightened in the pull request that earns it.
+  Evidence: `32dad67:AGENTS.md:20`.
+- **The two developer FIXMEs read as known limitations** — each comment kept
+  the reason the current shape exists and stopped promising a refactor: the
+  bootstrap source ships as one whole self-contained file because the port
+  execs source text on its own, and bootstrap refuses a non-Python port
+  because every payload it sends is bare Python. No ticket, owner or schedule
+  was opened for either. Evidence:
+  `src/maya_mcp_server/bootstrap.py::get_bootstrap_code` and
+  `src/maya_mcp_server/client.py::MayaClient::_bootstrap`.
+
 ### Removed
 
 - **Migration-shape gate** — the prose-integrity gate script and its 32-test
