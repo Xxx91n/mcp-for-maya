@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import os
 import re
 import time
@@ -118,6 +119,42 @@ def validate_asset_id(asset_id: str) -> str:
             f"invalid asset id {asset_id!r}: expected a slug like 'Camera_01'",
         )
     return asset_id
+
+
+def _project_dimensions(raw: Any) -> list[float] | None:
+    """Poly Haven bounding size, converted from millimetres to metres.
+
+    Poly Haven publishes ``dimensions`` in millimetres (confirmed on live
+    model entries from /assets?t=models); the output contract is metres,
+    in the published axis order. Anything that
+    is not three finite, non-negative numbers becomes None. A bad value
+    is never guessed into a size.
+    """
+    if not isinstance(raw, (list, tuple)) or len(raw) != 3:
+        return None
+    out: list[float] = []
+    for v in raw:
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            return None
+        try:
+            f = float(v)  # huge ints raise OverflowError here
+        except OverflowError:
+            return None
+        if not math.isfinite(f) or f < 0:
+            return None
+        out.append(f / 1000.0)
+    return out
+
+
+def _project_polycount(raw: Any) -> int | None:
+    """Triangle/face count as a non-negative int, else None (never guessed)."""
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, float) and math.isfinite(raw) and raw.is_integer():
+        raw = int(raw)
+    if not isinstance(raw, int) or raw < 0:
+        return None
+    return raw
 
 
 def _as_int(value: Any, what: str) -> int:
@@ -238,6 +275,9 @@ def search_assets(
     payload, so `query`/`limit` vary freely within the TTL.
 
     Returns {"results": [...<=limit], "total_count": <all matches>}.
+    Each result also carries "dimensions" ([x, y, z] metres, Poly Haven
+    order) and "polycount" (int); either is None when /assets does not
+    publish a valid value. No /files request is made on this path.
     """
     limit = min(max(1, int(limit)), SEARCH_LIMIT_MAX)
     url = f"{API_BASE}/assets?t={urllib.parse.quote(str(asset_type))}"
@@ -278,6 +318,8 @@ def search_assets(
             "name": m.get("name", aid),
             "categories": m.get("categories", []),
             "tags": (m.get("tags") or [])[:10],
+            "dimensions": _project_dimensions(m.get("dimensions")),
+            "polycount": _project_polycount(m.get("polycount")),
         }
         for _s, aid, m in scored[:limit]
     ]

@@ -130,8 +130,11 @@ def register_asset_tools(mcp: Any, audit: AuditLogger | None = None) -> None:
                 reports the full match count.
 
         Returns:
-            JSON {results: [{id, name, categories, tags}], total_count,
-            query, asset_type}. On failure: {"error": {code, message}}
+            JSON {results: [{id, name, categories, tags, dimensions,
+            polycount}], total_count, query, asset_type}. dimensions is
+            [x, y, z] in metres (Poly Haven's published order); polycount
+            is an int. Either is null when Poly Haven publishes no valid
+            value. On failure: {"error": {code, message}}
             (e.g. network_unavailable when the host is offline).
         """
         if not isinstance(asset_type, str) or not _ASSET_TYPE_RE.match(asset_type):

@@ -221,6 +221,8 @@ scene_rollback(filename="cp_before_renovation.ma")
 
 ```python
 asset_search(query="camera", asset_type="models", limit=20)  # Poly Haven 索引检索
+# 每条结果都带 dimensions（[x, y, z]，单位米，Poly Haven 原始顺序）和 polycount（整数）。
+# 平台没有发布有效值时为 null。搜索不会下载任何文件。
 asset_import(asset_id="Camera_01", resolution="1k")
 # 经 HTTPS 下载到 platformdirs 缓存（逐文件 md5 校验 + sha256 审计），
 # 然后 Maya 导入本地 FBX 并挂到 GRP_asset_<asset_id>（重复调用自动去重；
