@@ -201,7 +201,7 @@ class TestSearch:
                 "name": "Sofa",
                 "categories": ["furniture"],
                 "tags": ["sofa"],
-                "dimensions": [2.1, 0.9, 0.8],
+                "dimensions": [2100, 900, 800],  # Poly Haven publishes millimetres
                 "polycount": 12345,
             }
         }
@@ -209,7 +209,8 @@ class TestSearch:
         monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes))
         out = polyhaven.search_assets(query="sofa")
         (row,) = out["results"]
-        assert row["dimensions"] == [2.1, 0.9, 0.8]
+        # converted to metres, published axis order kept
+        assert row["dimensions"] == pytest.approx([2.1, 0.9, 0.8])
         assert row["polycount"] == 12345
         # existing fields keep their names and meanings
         assert row["id"] == "Sofa_01"
@@ -236,6 +237,7 @@ class TestSearch:
             [1.0, -2.0, 3.0],  # negative
             [1.0, float("nan"), 3.0],  # non-finite
             None,
+            [10**309, 1000, 1000],  # int too large for float: OverflowError path
         ],
     )
     def test_malformed_dimensions_are_null(self, monkeypatch, dims):
@@ -256,9 +258,7 @@ class TestSearch:
     def test_search_makes_no_files_request(self, monkeypatch):
         """#175: the only network call on the search path is /assets."""
         record = []
-        assets = {
-            "Sofa_01": {"name": "Sofa", "dimensions": [2.0, 1.0, 1.0], "polycount": 9}
-        }
+        assets = {"Sofa_01": {"name": "Sofa", "dimensions": [2.0, 1.0, 1.0], "polycount": 9}}
         routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
         monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes, record))
         polyhaven.search_assets(query="sofa")

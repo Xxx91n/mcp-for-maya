@@ -122,10 +122,13 @@ def validate_asset_id(asset_id: str) -> str:
 
 
 def _project_dimensions(raw: Any) -> list[float] | None:
-    """Poly Haven bounding size in metres, kept in published order.
+    """Poly Haven bounding size, converted from millimetres to metres.
 
-    Anything that is not three finite, non-negative numbers becomes None.
-    A bad value is never guessed into a size.
+    Poly Haven publishes ``dimensions`` in millimetres (confirmed on live
+    model entries from /assets?t=models); the output contract is metres,
+    in the published axis order. Anything that
+    is not three finite, non-negative numbers becomes None. A bad value
+    is never guessed into a size.
     """
     if not isinstance(raw, (list, tuple)) or len(raw) != 3:
         return None
@@ -133,10 +136,13 @@ def _project_dimensions(raw: Any) -> list[float] | None:
     for v in raw:
         if isinstance(v, bool) or not isinstance(v, (int, float)):
             return None
-        f = float(v)
+        try:
+            f = float(v)  # huge ints raise OverflowError here
+        except OverflowError:
+            return None
         if not math.isfinite(f) or f < 0:
             return None
-        out.append(f)
+        out.append(f / 1000.0)
     return out
 
 
