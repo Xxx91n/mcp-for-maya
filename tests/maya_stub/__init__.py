@@ -108,23 +108,25 @@ def load_scene_module():
     """Load the _mcp_scene injection unit fresh, bound to the stub.
 
     Mirrors the production payload assembly (D-095): maya_scene_module.py
-    + introspect_module.py + validator_module.py concatenated into ONE
-    module namespace - the same bytes the host ships via
-    write_module/mkstemp. A __future__ import or syntax slip in a fragment
-    fails here exactly like it would inside Maya.
+    + introspect_module.py + validator_module.py + zone_geometry_module.py
+    concatenated into ONE module namespace - the same bytes the host ships
+    via write_module/mkstemp. A __future__ import or syntax slip in a fragment
+    fails here exactly like it would inside Maya. __mcp_payload__ is test-only
+    metadata so the assembly test can compare those bytes with the host write.
     """
     sys.modules.pop("maya_mcp_server.maya_scene_module", None)
-    for _frag in ("introspect_module", "validator_module"):
+    for _frag in ("introspect_module", "validator_module", "zone_geometry_module"):
         sys.modules.pop(f"maya_mcp_server.{_frag}", None)
     src_dir = Path(__file__).resolve().parents[2] / "src" / "maya_mcp_server"
     source = (src_dir / "maya_scene_module.py").read_text(encoding="utf-8")
     # No exists() guard: the host reads these unconditionally, so a missing or
     # renamed fragment must fail here, not silently shrink the payload.
-    for frag_name in ("introspect_module.py", "validator_module.py"):
+    for frag_name in ("introspect_module.py", "validator_module.py", "zone_geometry_module.py"):
         source += "\n\n" + (src_dir / frag_name).read_text(encoding="utf-8")
     mod = types.ModuleType("maya_mcp_server.maya_scene_module")
     mod.__file__ = str(src_dir / "maya_scene_module.py")
     mod.__package__ = "maya_mcp_server"
+    mod.__mcp_payload__ = source
     sys.modules["maya_mcp_server.maya_scene_module"] = mod
     exec(compile(source, mod.__file__, "exec"), mod.__dict__)
     return mod

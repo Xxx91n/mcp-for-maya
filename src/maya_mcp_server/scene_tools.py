@@ -26,15 +26,14 @@ from maya_mcp_server.security import InputValidationError
 
 logger = logging.getLogger(__name__)
 
-# Module source paths for _mcp_scene. The introspection fragment
-# (introspect_module.py) and the custom-validator fragment
-# (validator_module.py) are concatenated into the SAME injection unit:
-# one module name / trigger / failure domain, but independently
-# maintained host-side source files. File boundary = injection boundary =
-# failure-domain boundary.
+# Module source paths for _mcp_scene. The fragments are concatenated into
+# the SAME injection unit in this order: introspection, custom validators,
+# zone geometry. One module name / trigger / failure domain, but separately
+# maintained host-side source files.
 _MODULE_SOURCE = Path(__file__).parent / "maya_scene_module.py"
 _INTROSPECT_FRAGMENT = Path(__file__).parent / "introspect_module.py"
 _VALIDATOR_FRAGMENT = Path(__file__).parent / "validator_module.py"
+_ZONE_GEOMETRY_FRAGMENT = Path(__file__).parent / "zone_geometry_module.py"
 
 # Global cache per session (keyed by session_key)
 _caches: dict[str, SceneCache] = {}
@@ -75,7 +74,11 @@ async def _ensure_module_injected(client: Any, session_key: str | None) -> None:
         source_path=_MODULE_SOURCE,
         tmp_prefix="_mcp_scene_src_",
         injected_sessions=_injected_sessions,
-        extra_source_paths=[_INTROSPECT_FRAGMENT, _VALIDATOR_FRAGMENT],
+        extra_source_paths=[
+            _INTROSPECT_FRAGMENT,
+            _VALIDATOR_FRAGMENT,
+            _ZONE_GEOMETRY_FRAGMENT,
+        ],
     )
 
 
@@ -105,6 +108,26 @@ async def _execute_scene_code(
     if use_cache and cache_key:
         return await _get_cache(session_key).get_or_fetch(cache_key, fetch)
     return await fetch()
+
+
+# dormant: #177 is the first planned production caller. Keep this helper out
+# of scene_plan until the recommendation opt-in lands; default output is frozen.
+async def get_zone_geometry(  # pragma: no cover
+    client: Any, session_key: str | None = None
+) -> Any:
+    """Read fresh zone boxes and object sizes through the _mcp_scene unit.
+
+    Internal host-side seam, not an MCP tool. Geometry is never cached here:
+    a moved object must be measured again on the next call. #177 will compose
+    this with the scene plan and asset search.
+    """
+    await _ensure_module_injected(client, session_key)
+    return await _execute_scene_code(
+        client,
+        module_call("_mcp_scene", "get_zone_geometry"),
+        session_key,
+        use_cache=False,
+    )
 
 
 # --- Token Budget Management ---

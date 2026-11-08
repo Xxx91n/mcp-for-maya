@@ -174,9 +174,10 @@ def test_callform_about_batch_is_true(real_maya):
 
 def _injection_unit():
     """Exec the real _mcp_scene payload shape in mayapy: monolith source
-    + both fragments concatenated into one namespace - the same bytes the
-    host ships via write_module (D-095). A __future__ slip or py-unsafe
-    syntax in a fragment fails here exactly as in Maya."""
+    + all three fragments concatenated into one namespace - the same bytes
+    the host ships via write_module (D-095). A __future__ slip or py-unsafe
+    syntax in a fragment fails here exactly as in Maya. __mcp_payload__ is
+    test-only metadata for the byte-parity check."""
     import sys
     import types
     from pathlib import Path
@@ -186,10 +187,11 @@ def _injection_unit():
     # No exists() guard: the host reads the fragments unconditionally, so a
     # missing one has to fail here rather than silently shrink this payload
     # below the shipped one.
-    for frag_name in ("introspect_module.py", "validator_module.py"):
+    for frag_name in ("introspect_module.py", "validator_module.py", "zone_geometry_module.py"):
         source += "\n\n" + (src_dir / frag_name).read_text(encoding="utf-8")
     mod = types.ModuleType("_mcp_scene")
     mod.__file__ = str(src_dir / "maya_scene_module.py")
+    mod.__mcp_payload__ = source
     sys.modules.pop("_mcp_scene", None)
     sys.modules["_mcp_scene"] = mod
     exec(compile(source, mod.__file__, "exec"), mod.__dict__)
@@ -219,3 +221,15 @@ def test_list_nodes_in_real_maya(real_maya):
     assert res["next_cursor"] is None
     dg = m.list_nodes(dag_only=False)
     assert dg["total_count"] >= res["total_count"]
+
+
+def test_zone_geometry_in_real_maya(real_maya):
+    """Issue #176: the appended fragment runs inside the assembled unit."""
+    m = _injection_unit()
+    real_maya.polyCube(name="GEO_shelf_probe", width=2, height=1, depth=3)
+    res = m.get_zone_geometry()
+    assert "error" not in res, res
+    display = next(z for z in res["zones"] if z["name"] == "display")
+    assert display["size"] == pytest.approx([2, 1, 3])
+    assert display["objects"][0]["size"] == pytest.approx([2, 1, 3])
+    assert "def get_zone_geometry" in m.__mcp_payload__
