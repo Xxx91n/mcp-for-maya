@@ -657,9 +657,9 @@ result
         Before opening, the current scene is saved to a file first
         (auto_before_rollback); if that fails, the read-back aborts \u2014 pass
         discard_current_state=True to escape (the result reports
-        safety_snapshot="skipped_by_user"). A scene never saved to disk, and
-        a temporary checkpoint, have no original path, so the scene stays on
-        the checkpoint path (S1) and scene_rebound_to is null.
+        safety_snapshot="skipped_by_user"). The scene points back only when
+        it has a file path at read-back time; otherwise it stays on the
+        checkpoint path (S1) and scene_rebound_to is null.
 
         The checkpoint file carries no undo history \u2014 call scene_snapshot
         afterwards to rebuild context.

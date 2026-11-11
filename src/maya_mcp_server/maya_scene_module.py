@@ -1040,7 +1040,7 @@ def check_constraints(rules):
 # ============================================================
 # checkpoint = cmds.file(exportAll) writes the scene into checkpoints/ as .ma
 # rollback   = open that file + rename back to the original scene path (S2);
-#            a scene never saved to disk keeps the checkpoint path (S1)
+#            no file path at read-back time -> stays on the checkpoint path (S1)
 # invariant: before any overwrite-path op, the current scene is saved first
 #            (auto_before_rollback); failure aborts unless
 #            discard_current_state=True escapes it
@@ -1218,7 +1218,7 @@ def save_checkpoint(name: str | None = None, overwrite: bool = False) -> dict[st
             to disk needs an explicit name, and the file goes under the
             Maya workspace instead of next to the scene
             (original_file_status="no_original_file", scene_rebound_to=None
-            \u2014 reading it back leaves the scene on the checkpoint path, S1).
+            \u2014 read-back with no path yet leaves it on the checkpoint path, S1).
         overwrite: Replace a same-name checkpoint; the old file is
             renamed to prev_<ts>_<filename> before the new write.
 
@@ -1352,9 +1352,9 @@ def rollback_to_checkpoint(filename: str, discard_current_state: bool = False) -
 
     S2 semantics: the scene ends up named after the file it was read *for*,
     so a later save writes to the original scene file \u2014 not silently to
-    the checkpoint. A scene never saved to disk, and a temporary checkpoint,
-    have no original path, so the scene stays on the checkpoint path (S1)
-    and scene_rebound_to is None.
+    the checkpoint. The point-back happens only when the scene has a file
+    path at read-back time; otherwise the scene stays on the checkpoint
+    path (S1) and scene_rebound_to is None.
 
     Invariant: before the scene name is pointed back at the original path,
     the current scene has been saved to a file first (auto_before_rollback

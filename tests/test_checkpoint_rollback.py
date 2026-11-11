@@ -278,7 +278,7 @@ class TestRollback:
         untitled_scene.scene.add_mesh("GEO_after")
         rb = untitled_scene.module.rollback_to_checkpoint("cp_adhoc_rescue.ma")
         assert rb["success"] is True, rb
-        # S1: no original file to point back at -> stay on the checkpoint path
+        # S1: no file path at read-back time -> stay on the checkpoint path
         assert rb["scene_rebound_to"] is None
         assert rb["original_file_status"] == "no_original_file"
         assert rb["scene_name_after"].endswith("cp_adhoc_rescue.ma")
