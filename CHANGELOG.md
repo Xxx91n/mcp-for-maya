@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Plain-language glossary plus a local checker for the words it retires** —
+  `GLOSSARY.md` now gives every term one plain sentence and an `_Avoid_:` line
+  naming the words it replaced, and `tools/check_plain_language.py` reads those
+  lines and reports prose uses with file and line. The checker reads tracked
+  prose (Markdown outside code blocks and code spans, Python comments and
+  docstrings, `#` comment lines in TOML/YAML) and skips the records the
+  cleanup must not rewrite: the historical shelf under `docs/reference/`,
+  `docs/evidence/`, released `CHANGELOG` sections, the derived `llms.txt`,
+  `mypy-baseline.txt`, `GLOSSARY.md` itself, the security-audit artifacts, and
+  the showcase image generators under `.github/assets-src/`. It is not a CI
+  gate and has no gate-registry entry; only its tests run in the suite. Evidence:
+  `tests/test_check_plain_language.py::test_an_active_doc_with_an_old_word_fails`,
+  `tests/test_check_plain_language.py::test_a_historical_path_with_the_same_word_is_skipped`,
+  `tests/test_check_plain_language.py::test_a_clean_doc_passes`,
+  `tests/test_check_plain_language.py::test_the_real_repo_loads_the_glossary_and_skips_the_records`.
 - **Internal zone-geometry read for the later `scene_plan` recommendation pass** —
   the `_mcp_scene` injection unit now carries `get_zone_geometry()`, returning
   the existing zone boxes plus per-object world sizes. It is a same-unit
