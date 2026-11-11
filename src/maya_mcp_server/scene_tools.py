@@ -972,8 +972,8 @@ result
 
             lines = [f"REVIEW: score={score}/100 | errors={errors} | warnings={warnings}"]
             lines += rows(issues, "check")
-            # Studio validators keep their own score line: a compact view that
-            # dropped them would read as "the studio rules passed".
+            # Checks you registered keep their own score line: a compact view
+            # that dropped them would read as "your rules all passed".
             custom = result.get("custom")
             if custom:
                 failing = custom["issues"]

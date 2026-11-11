@@ -58,9 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Scene and workflow terms now say what they mean** — group 1 of the
   plain-language pass (#188): `ICEV`, `看图复查`, `scene_snapshot`, `CoS`,
   `Zone`, `命名规则`, `scene_review`, `自定义检查项`, `场景存档`, `读档` and
-  `临时存档` are now written plainly everywhere they appear: both READMEs, the
-  two skill cards, `docs/` prose, the `server.py` instructions, tool
-  descriptions and error strings. Two claims that contradicted the code are
+  `临时存档` are rewritten in plain words in both READMEs, the two skill
+  cards, `docs/` prose, the `server.py` instructions, tool descriptions and
+  error strings. Audit-log wording and the later groups' terms are untouched.
+  Two claims that contradicted the code are
   fixed: `scene_checkpoint` is described as writing a `.ma` file to disk under
   `checkpoints/` (it used to be described as living only in Maya's memory),
   and the zone text now names `get_zone_map()`'s 7 built-in zones instead of

@@ -260,7 +260,7 @@ scene_render_preview(camera="CAM_hero", width=640, height=360)
 # Use format="png" for wireframe or line-art review; always rely on returned metadata for actual dimensions
 ```
 
-## CoS notation
+## CoS output format
 
 Default output uses **CoS** (Chain-of-Symbol) notation: scene data written as very short lines of text, which saves the number of tokens sent to the AI. The original research paper reports roughly 65% token savings compared to JSON on demo scenes (arXiv:2305.10276, -65.8%).
 
