@@ -16,7 +16,7 @@
 
 `mcp-for-maya` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets AI agents (such as Codex and Claude) directly control Autodesk Maya for 3D modeling, scene planning, and production-ready work.
 
-**Core capability:** AI no longer writes code blindly. It inspects scene objects, materials, and spatial relationships at any time, auditing changes against real engineering rules.
+**Core capability:** AI no longer writes code blindly. It inspects scene objects, materials, and spatial relationships at any time, then checks its own changes against fixed rules.
 
 > [!WARNING]
 > This server runs Python code directly inside Maya by design, not by accident. For details, see [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
@@ -126,36 +126,36 @@ Chat naturally in your agent:
 
 > "Check out what's in my Maya scene, then put together a display shelf by the entrance"
 
-The AI automatically calls `scene_snapshot()` → inspects the scene → builds the model → audits the result with `scene_review()`.
+The AI automatically calls `scene_snapshot()` → inspects the scene → builds the model → checks the result with `scene_review()`.
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-icev-workflow.svg" width="100%" alt="ICEV Workflow"/>
 
-Every scene edit follows the **ICEV** workflow (also provided as an agent skill card in `skills/icev-workflow`):
+Every scene edit follows **ICEV**: look at the scene, work out the change, make the change, then check the result — in that order, every time. The same four steps are also an agent skill card in `skills/icev-workflow`:
 
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
 │ INSPECT  │ ──→ │ COMPUTE  │ ──→ │ EXECUTE  │ ──→ │ VERIFY   │
-│ snapshot │     │  plan    │     │  apply   │     │  audit   │
+│ look     │     │ work out │     │  apply   │     │  check   │
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
 ```
 
-1. **INSPECT**: Call `scene_snapshot()` to capture full spatial scene data
-2. **COMPUTE**: Calculate positions, sizes, and spacing from the spatial data
-3. **EXECUTE**: Run Maya Python code via `execute_code()`
-4. **VERIFY**: Check the outcome with `scene_assert()` + `scene_review()`; GUI sessions can use visual tools to verify visually
+1. **INSPECT** (look): Call `scene_snapshot()` to capture full spatial scene data
+2. **COMPUTE** (work out): Calculate positions, sizes, and spacing from the spatial data
+3. **EXECUTE** (apply): Run Maya Python code via `execute_code()`
+4. **VERIFY** (check): Check the outcome with `scene_assert()` + `scene_review()`; GUI sessions can also look at the result
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
 
 | Capability | Tools | Notes |
 |------------|-------|-------|
 | 🧊 **Spatial awareness** | `scene_snapshot` `scene_inspect` `scene_measure` | Single call gets the full scene spatial model; precise distance, overlap, and gap measurements |
-| 🎨 **Aesthetic analysis** | `scene_aesthetics` | 5 dimensions: color balance (60-30-10), spatial composition (golden ratio / rule of thirds), proportion & scale (ergonomics), lighting quality (three-point setup, fill ratio, color temperature, decay), visual flow |
-| 🎬 **Camera planning** | `camera_create` `camera_orbit` | 8 industry-standard camera types + orbit animation |
-| 🛡️ **Disaster recovery** | `scene_checkpoint` `scene_rollback` `scene_checkpoint_list` | In-memory scene snapshots; rollback rebinds the scene back to the original file |
-| 🧠 **Scene planning** | `scene_plan` | Scene health checks, zone balance, layout tips, conflict prevention, natural-language planning |
-| 📋 **Engineering audit** | `scene_review` `scene_validate` `scene_assert` | 11 deterministic checks (0-100 score) + custom constraint checks + scene assertions |
+| 🎨 **Look quality** | `scene_aesthetics` | 5 dimensions: color balance (60-30-10), spatial composition (golden ratio / rule of thirds), proportion & scale (ergonomics), lighting quality (three-point setup, fill ratio, color temperature, decay), visual flow |
+| 🎬 **Cameras** | `camera_create` `camera_orbit` | 8 built-in shot types + orbit animation |
+| 🛡️ **Disaster recovery** | `scene_checkpoint` `scene_rollback` `scene_checkpoint_list` | Writes the scene to a `.ma` file on disk under `checkpoints/`; rollback opens that file and points the scene back at its original path |
+| 🧠 **Scene planning** | `scene_plan` | Scene health checks, zone balance, layout tips, conflict prevention, plain-language planning |
+| 📋 **Scene checks** | `scene_review` `scene_validate` `scene_assert` | 11 fixed checks (0-100 score) + your own constraint checks + scene assertions |
 | ⚡ **Code execution** | `execute_code` `write_module` | Run arbitrary Python in Maya / inject reusable modules |
-| 👁️ **Visual loop** | `scene_viewport_snapshot` `scene_render_preview` | WYSIWYG viewport capture + single-frame playblast preview (GUI sessions only) |
+| 👁️ **Check by looking** | `scene_viewport_snapshot` `scene_render_preview` | WYSIWYG viewport capture + single-frame playblast preview, so the AI can see the result (GUI sessions only) |
 | 🔌 **Session management** | `list_sessions` `add_session` `maya_setup_guide` | Multi-session discovery/attachment + setup diagnostics and installation guidance |
 | 📦 **Asset library** | `asset_search` `asset_import` | Poly Haven CC0 models — downloads over HTTPS on the host (domain allowlist, MD5 check, size limits, local cache), Maya imports FBX with auto-wired textures, face-count guards, and duplicate prevention via `GRP_asset_<id>` |
 | 📤 **Scene export** | `scene_export` | Export whole scenes or selected objects to FBX/OBJ/USD; format auto-detected from file extension (no guesswork), auto-creates folders, explicit overwrite opt-in, restores selection afterward |
@@ -181,20 +181,20 @@ scene_measure(obj_a="wall_north", obj_b="counter_A", mode="clearance")
 scene_assert(expectations='{"wall": {"exists": true, "position": [0,0,500]}}')
 ```
 
-### Engineering audit
+### Scene checks
 
 ```python
-# 11 deterministic checks (returns 0-100 score)
+# 11 fixed checks (returns 0-100 score)
 scene_review()
 
 # Spatial constraint validation
 scene_validate(rules='[{"type": "min_clearance", "value": 180}]')
 ```
 
-### Camera planning
+### Cameras
 
 ```python
-# Create camera (8 industry-standard types)
+# Create a camera (8 built-in shot types)
 camera_create(target="product_display", shot_type="medium", azimuth=30, elevation=15)
 # Types: extreme_wide / wide / medium / close / extreme_close / bird_eye / low_angle / over_shoulder
 
@@ -205,14 +205,14 @@ camera_orbit(center=[0, 100, 0], radius=500, frames=120)
 ### Disaster recovery
 
 ```python
-# Save checkpoint (in-memory snapshot via exportAll; no undo history)
+# Save the scene to a .ma file on disk under checkpoints/ (no undo history)
 scene_checkpoint(name="before_renovation")
 
 # List all checkpoints
 scene_checkpoint_list()
 
-# Rollback (saves a safety snapshot first, then rebinds the scene name back to the original file; run scene_snapshot afterward to refresh scene state)
-# Scope: Snapshots are self-contained; file references are flattened without modifying reference sources; assumes one scene file per session
+# Read a checkpoint back (it saves the current scene first, then points the scene name back at the original file; run scene_snapshot afterward to refresh scene state)
+# Scope: each file is self-contained; references are flattened without modifying reference sources; assumes one scene file per session
 scene_rollback(filename="cp_before_renovation.ma")
 ```
 
@@ -247,7 +247,7 @@ scene_export(
 # Alembic is not supported (AbcExport is outside the cmds.file interface).
 ```
 
-### Visual loop (GUI sessions only)
+### Check by looking (GUI sessions only)
 
 ```python
 # Viewport WYSIWYG screenshot (includes HUD and selection highlights — see what the artist sees)
@@ -260,9 +260,9 @@ scene_render_preview(camera="CAM_hero", width=640, height=360)
 # Use format="png" for wireframe or line-art review; always rely on returned metadata for actual dimensions
 ```
 
-## CoS notation
+## CoS output format
 
-Default output uses **Chain-of-Symbol** notation to compress scene data. The original research paper reports roughly 65% token savings compared to JSON on demo scenes (arXiv:2305.10276, -65.8%).
+Default output uses **CoS** (Chain-of-Symbol) notation: scene data written as very short lines of text, which saves the number of tokens sent to the AI. The original research paper reports roughly 65% token savings compared to JSON on demo scenes (arXiv:2305.10276, -65.8%).
 
 ```
 SCENE[164obj, 5zones] UNIT=cm UP=y
@@ -279,12 +279,12 @@ The repository includes two **Experimental** skill cards (under the `skills/` fo
 
 | Skill | Purpose |
 |-------|---------|
-| `skills/icev-workflow` | ICEV workflow discipline: every scene edit must follow Inspect→Compute→Execute→Verify |
-| `skills/scene-review-playbook` | Audit guide: scoring details for the 11 checks and how to turn findings into actions |
+| `skills/icev-workflow` | ICEV discipline: every scene edit must look first, work out the change, apply it, then check the result |
+| `skills/scene-review-playbook` | Check guide: scoring details for the 11 checks and how to turn findings into actions |
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-audit-trust.svg" width="100%" alt="Audit & Trust"/>
 
-`scene_review()` provides 11 universal checks (scores 0-100, normalized by rule weight):
+`scene_review()` provides 11 fixed checks (scores 0-100, normalized by rule weight):
 
 | Check | Points | What it checks |
 |-------|--------|----------------|
@@ -292,7 +292,7 @@ The repository includes two **Experimental** skill cards (under the `skills/` fo
 | overlaps | 10 | Bounding box collisions (excluding parent-child) |
 | conflicts | 10 | Object penetration checks |
 | zones | 5 | Zone naming coverage |
-| naming | 5 | Production naming conventions |
+| naming | 5 | Objects still carrying Maya default names |
 | components | 10 | GRP_ grouping and hierarchy nesting depth <= 4 |
 | orphans | 5 | Empty groups and default object names |
 | aesthetics | 15 | 5 aesthetic dimensions (color, composition, scale, lighting, flow) |
@@ -305,7 +305,7 @@ The repository includes two **Experimental** skill cards (under the `skills/` fo
 - **Zero telemetry**: No tracking, no phone-home. This project contains zero tracking or unsolicited outgoing network code, as you can verify in source. The only outgoing network calls are from the two asset tools: they access `api.polyhaven.com` / `dl.polyhaven.org|.com` over HTTPS only when invoked (with domain allowlist, MD5 check, and file size limits in `polyhaven.py`).
 - **Local single-user**: The command port binds to localhost only. Connected MCP clients are treated as trusted callers.
 - **Safety net**: A unified pipeline (`pipeline.py` + `security.py`) checks parameters, enforces token-bucket rate limits (~100 calls/60s for reads, ~20 calls/60s for writes per session), scans patterns (warn-only by default), and maintains an independent JSONL audit log across all 25 tools. It catches accidental mistakes rather than malicious clients. See [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md) for the complete threat model.
-- **Transactional safety**: `scene_checkpoint` and `scene_rollback` offer in-memory snapshots and explicit rollback (snapshots do not keep undo history; file references are flattened).
+- **Transactional safety**: `scene_checkpoint` and `scene_rollback` write the scene to a `.ma` file on disk and read it back on request (a checkpoint file keeps no undo history; file references are flattened).
 - **Strict policy mode (optional)**: Set `MAYA_MCP_DISABLE_EXECUTE=1`, `MAYA_MCP_DISABLE_WRITE_MODULE=1`, or `MAYA_MCP_DISABLE_ARBITRARY=1` (disables all three) to remove code execution tools from `tools/list` and reject calls with `[policy_disabled]`. Read-only tools remain active. These are guardrails against misuse, not impenetrable security boundaries against a malicious agent—agents holding `execute_code` are already inside the trust boundary. They simply reduce the blast radius during demos, testing, or in CI sandboxes. See [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md) and error codes in [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md).
 - **`safe_mode` AST gate (optional)**: When `MAYA_MCP_SAFE_MODE=1` is set (off by default), code payload tools remain listed, but their `code` parameters must pass an AST allowlist that denies everything else by default: imports are limited to standard packages (`maya`, `math`, `json`, `re`, `collections`, `itertools`, `functools`, `dataclasses`, `typing`), blocked builtin functions reject upon reference rather than just call (`eval`, `exec`, `open`, `__import__`, getattr, setattr, etc.), accessing `__builtins__` or dunder attributes is rejected, and unparseable input is rejected immediately. Blocked calls fail with `[safe_mode_rejected]`, reporting the violated rule ID and logging to the audit trail. Successful calls return a `mode: "safe"` field, and the tool description adds a `Boundary:` notice. DISABLE flags take priority by removing tools first—safe_mode only restricts what stays. Like DISABLE flags, this serves as a safety net against accidents, not an impenetrable barrier. See [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md) and error codes in [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md).
 - Vulnerability reporting: See [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md).

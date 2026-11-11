@@ -59,9 +59,9 @@ def test_measure_roundtrip_in_real_maya(real_maya):
 
 
 def test_checkpoint_rollback_reference_edit_roundtrip(real_maya, tmp_path):
-    """D-007: checkpoint->rollback roundtrip on a true exportAll snapshot of a
-    reference edit. exportAll flattens references into a self-contained
-    snapshot; rollback must restore that state and rebind to the original
+    """D-007: save a checkpoint of a reference edit, then read it back. The
+    .ma file flattens references into a self-contained copy; reading it back
+    must restore that state and point the scene at the original
     scene path (S2). Manual tier — never CI.
     """
     import maya_mcp_server.maya_scene_module as m

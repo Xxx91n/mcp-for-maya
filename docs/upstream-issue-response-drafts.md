@@ -113,7 +113,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > Root cause: `create_module(overwrite=True)` builds a new `ModuleType`
 > and replaces the `sys.modules` entry outright — the old module's globals
 > keep a *listening* `QtCommandServer` alive, orphaned: the port stays bound
-> and the replacement server fails to rebind. Every reconnect of an
+> and the replacement server fails to bind the port again. Every reconnect of an
 > already-bootstrapped session hits this.
 >
 > Fixed in our fork ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/),

@@ -26,10 +26,10 @@ from maya_mcp_server.security import InputValidationError
 
 logger = logging.getLogger(__name__)
 
-# Module source paths for _mcp_scene. The fragments are concatenated into
-# the SAME injection unit in this order: introspection, custom validators,
-# zone geometry. One module name / trigger / failure domain, but separately
-# maintained host-side source files.
+# Module source paths for _mcp_scene. The separate files are concatenated
+# into the SAME injected module in this order: introspection, checks you
+# register, zone geometry. One module name / trigger / failure domain, but
+# separately maintained host-side source files.
 _MODULE_SOURCE = Path(__file__).parent / "maya_scene_module.py"
 _INTROSPECT_FRAGMENT = Path(__file__).parent / "introspect_module.py"
 _VALIDATOR_FRAGMENT = Path(__file__).parent / "validator_module.py"
@@ -178,7 +178,7 @@ def register_scene_tools(mcp: Any) -> None:
         """Get a complete spatial overview of the current Maya scene.
 
         Returns a structured description of ALL objects with positions, sizes, and types.
-        Call this once at the start of each workflow to establish spatial awareness.
+        Call this once at the start of each task to see the whole scene before changing it.
 
         Boundary: Disambiguated from scene_inspect (deep-dive inspection of
         specific objects or zones) and scene_nodes (granular DAG/DG node
@@ -187,7 +187,8 @@ def register_scene_tools(mcp: Any) -> None:
         Args:
             detail: Detail level - "compact" (fast),
                 "standard" (+materials/mesh stats), "full" (+vertices).
-            format: Output format - "cos" (Chain-of-Symbol, compact), "json" (full JSON).
+            format: Output format - "cos" (CoS: short one-line-per-object text,
+                compact) or "json" (full JSON).
             session_key: Maya session key (auto-selected if only one session).
 
         Returns:
@@ -408,14 +409,14 @@ result
     ) -> str:
         """Measure the spatial relationship between two objects.
 
-        Call this in the COMPUTE step of the ICEV workflow, to turn a spatial
+        Call this in the compute step (the second of ICEV's four steps), to turn a spatial
         question into a number before you execute a change: size a clearance
         before moving something, prove two objects interpenetrate before you
         separate them, or get the axis detail behind an overlap that
         scene_validate reported.
 
         Read-only and idempotent: it queries world-space bounding boxes and
-        never modifies the scene, so no undo checkpoint is created.
+        never modifies the scene, so no checkpoint file is written.
         Requires an active Maya session.
 
         Every mode measures world-space AABBs, not the mesh surface and not
@@ -493,7 +494,7 @@ result
         """Verify scene state matches expected values.
 
         Use this after modifications to confirm the scene is in the desired state.
-        Enforces the VERIFY step of the ICEV workflow.
+        This is the check step (the last of ICEV's four steps).
 
         Boundary: Disambiguated from scene_validate (checks relational
         spatial constraints across zones rather than exact expected values
@@ -549,11 +550,11 @@ result
         object limits, overlaps, and height requirements. This is a read-only
         check without auto_fix mutations (it cannot modify or repair objects;
         for automated fixes, see scene_plan with auto_fix=True). Because it is
-        non-destructive, no undo rollback checkpoint is created.
+        non-destructive, it needs no undo or rollback checkpoint.
         Requires an active Maya session.
 
-        Boundary: Disambiguated from scene_review (full scene quality audit
-        across 11 checks) and scene_assert (verifies specific numeric
+        Boundary: Disambiguated from scene_review (a full check of scene
+        quality across 11 checks) and scene_assert (verifies specific numeric
         values or object existence).
 
         Args:
@@ -603,26 +604,27 @@ result
         overwrite: bool = False,
         session_key: str | None = None,
     ) -> str:
-        """Save a real scene snapshot (exportAll of in-memory state).
+        """Save the current scene to a `.ma` file on disk under checkpoints/.
 
-        Boundary: Disambiguated from scene_checkpoint_list (enumerate the
-        checkpoints already written) and scene_rollback (open one and rebind
-        the scene to it) — scene_checkpoint is the write half.
+        Boundary: Disambiguated from scene_checkpoint_list (list the
+        checkpoint files already written) and scene_rollback (open one and
+        point the scene at it) — scene_checkpoint is the save half.
 
         Writes a self-contained .ma into a checkpoints/ directory next to
-        the scene file. On untitled (never-saved) scenes an explicit name
-        is required and produces an ad-hoc snapshot under the Maya
-        workspace \u2014 returned with original_file_status="no_original_file"
+        the scene file. A scene that was never saved to disk needs an
+        explicit name, and its temporary checkpoint goes under the Maya
+        workspace — returned with original_file_status="no_original_file"
         and scene_rebound_to=null. Same-name checkpoints are rejected
         unless overwrite=True (the old file is preserved via rename).
 
-        Honest bounds: the snapshot contains no undo history \u2014 after
+        Honest bounds: the file contains no undo history \u2014 after
         scene_rollback, call scene_snapshot to rebuild context.
         References are flattened (self-contained, no write-back).
         Assumes one scene file per session.
 
         Args:
-            name: Checkpoint name (^[A-Za-z0-9_-]+$). Required on untitled scenes.
+            name: Checkpoint name (^[A-Za-z0-9_-]+$). Required when the scene
+                was never saved to disk.
             overwrite: Replace a same-name checkpoint, preserving the old file.
             session_key: Maya session key.
 
@@ -646,27 +648,27 @@ result
         discard_current_state: bool = False,
         session_key: str | None = None,
     ) -> str:
-        """Open a checkpoint and rebind the scene to its original path (S2).
+        """Open a checkpoint file and point the scene at its original path (S2).
 
-        Boundary: Disambiguated from scene_checkpoint (write a checkpoint from
-        the current state) and scene_checkpoint_list (enumerate the ones
-        already written) — scene_rollback is the restore half.
+        Boundary: Disambiguated from scene_checkpoint (save a checkpoint from
+        the current scene) and scene_checkpoint_list (list the ones
+        already written) — scene_rollback is the read-back half.
 
-        Before opening, the current in-memory state is exported to an
-        auto_before_rollback safety snapshot; if that fails, the rollback
-        aborts \u2014 pass discard_current_state=True to escape (the result
-        reports safety_snapshot="skipped_by_user"). Untitled scenes and
-        ad-hoc snapshots have no original path, so the scene stays on the
+        Before opening, the current scene is saved to a file first
+        (auto_before_rollback); if that fails, the read-back aborts \u2014 pass
+        discard_current_state=True to escape (the result reports
+        safety_snapshot="skipped_by_user"). The scene points back only when
+        it has a file path at read-back time; otherwise it stays on the
         checkpoint path (S1) and scene_rebound_to is null.
 
-        The snapshot carries no undo history \u2014 call scene_snapshot
+        The checkpoint file carries no undo history \u2014 call scene_snapshot
         afterwards to rebuild context.
 
         Args:
             filename: Checkpoint filename from scene_checkpoint_list
                 (cp_*.ma or prev_*.ma).
-            discard_current_state: Escape hatch \u2014 proceed even if the
-                safety snapshot fails.
+            discard_current_state: Escape hatch \u2014 proceed even if saving
+                the current scene fails.
             session_key: Maya session key.
 
         Returns:
@@ -695,12 +697,12 @@ result
     ) -> str:
         """List all saved checkpoints for the current scene state.
 
-        Boundary: Disambiguated from scene_checkpoint (write a new checkpoint)
-        and scene_rollback (open one and rebind the scene to it) —
+        Boundary: Disambiguated from scene_checkpoint (save a new checkpoint)
+        and scene_rollback (open one and point the scene at it) —
         scene_checkpoint_list only reads what is already on disk.
 
-        Saved scenes list <scene_dir>/checkpoints; untitled scenes list
-        the workspace ad-hoc snapshots (adhoc flag per entry).
+        Saved scenes list <scene_dir>/checkpoints; a scene never saved to
+        disk lists the workspace checkpoints instead (adhoc flag per entry).
 
         Args:
             session_key: Maya session key.
@@ -737,7 +739,7 @@ result
         a point over many frames) — camera_create frames one static shot and
         adds no animation.
 
-        Supports industry-standard shot types: extreme_wide, wide, medium,
+        Supports the 8 built-in shot types: extreme_wide, wide, medium,
         close, extreme_close, over_shoulder, bird_eye, low_angle.
 
         Args:
@@ -820,9 +822,9 @@ result
         format: str = "json",
         session_key: str | None = None,
     ) -> str:
-        """Professional-grade aesthetic analysis with 5 design dimensions.
+        """Score the scene's look on 5 design dimensions.
 
-        Analyzes scene aesthetics across 5 professional design dimensions:
+        Scores the scene's look across 5 design dimensions:
         1. Color Theory: 60-30-10 rule, temperature balance, harmony type, saturation variety, contrast
         2. Spatial Composition: golden ratio proportions, rule-of-thirds alignment, visual weight balance
         3. Proportion & Scale: human ergonomic reference, size hierarchy (hero/secondary/tertiary)
@@ -833,10 +835,11 @@ result
 
         Boundary: Disambiguated from scene_review (scene_aesthetics evaluates
         visual design theory and artistic harmony in depth, while
-        scene_review is a broad multi-system scene health audit).
+        scene_review is a broad check of the whole scene).
 
         Args:
-            format: Output format - "json" (default) or "cos" (chain-of-symbol, token-efficient).
+            format: Output format - "json" (default) or "cos" (CoS: short
+                one-line-per-object text, saves tokens).
             session_key: Maya session key.
 
         Returns:
@@ -914,13 +917,13 @@ result
         format: str = "json",
         session_key: str | None = None,
     ) -> str:
-        """Comprehensive scene audit - reviews all aspects after operations.
+        """Check a whole scene - all the aspects worth checking after operations.
 
         Runs spatial integrity, overlap detection, zone coverage, aesthetics,
         constraint validation, orphan detection, naming, componentization, conflicts, lighting quality, and scene organization. Returns a score (0-100)
         and detailed issue list.
 
-        Rules registered in the Maya session with
+        Checks you add in the Maya session with
         `_mcp_scene.register_validator(...)` (call it through execute_code) are
         reported in a separate "custom" section - `validators` per rule,
         `score`/`max_score` in weight points, `issues` for what did not pass.
@@ -969,8 +972,8 @@ result
 
             lines = [f"REVIEW: score={score}/100 | errors={errors} | warnings={warnings}"]
             lines += rows(issues, "check")
-            # Studio validators keep their own score line: a compact view that
-            # dropped them would read as "the studio rules passed".
+            # Checks you registered keep their own score line: a compact view
+            # that dropped them would read as "your rules all passed".
             custom = result.get("custom")
             if custom:
                 failing = custom["issues"]
@@ -993,22 +996,22 @@ result
         format: str = "json",
         session_key: str | None = None,
     ) -> str:
-        """Holistic scene planning with organization validation and layout optimization.
+        """Plan a scene layout: organization checks plus layout suggestions.
 
-        Performs comprehensive scene health check and generates actionable plans:
-        - Organization validation: detects orphan meshes, empty groups, default names
-        - Zone analysis: coverage and spatial balance across functional zones
+        Checks the scene and produces an actionable plan:
+        - Organization check: finds orphan meshes, empty groups, default names
+        - Zone analysis: coverage and spatial balance across zones
         - Layout suggestions: spacing, overlap, and clustering detection
-        - Conflict prevention: near-miss collision prediction
+        - Conflict prevention: predicts near-miss collisions
         - Action plan: prioritized step-by-step execution guide
 
-        Based on blockout-first methodology: validate organization and proportions
-        before committing to detailed modeling. Supports natural language objectives.
+        Blockout first: check organization and proportions
+        before committing to detailed modeling. Accepts a plain-language objective.
 
         Boundary: Disambiguated from scene_review (scene_plan focuses on
         forward-looking layout planning and actionable auto_fix
-        reorganization, whereas scene_review provides an overall
-        diagnostic audit score).
+        reorganization, whereas scene_review gives an overall
+        diagnostic score).
 
         Args:
             objective: Natural language goal description.

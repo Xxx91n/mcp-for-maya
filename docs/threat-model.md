@@ -68,7 +68,7 @@ problem.
 | Pattern scan | exact-match blocks (`../` traversal in filenames, `os.system`/`subprocess`/`eval(` in code); everything else warn-only into audit | security.py |
 | Audit log | append-only JSONL, every tool call recorded incl. rejections | security.py |
 | Error contract | host failures raise coded exceptions (isError); Maya-domain failures return `{error:{code,message,suggestion?}}` | pipeline.py, maya_scene_module.py |
-| Checkpoint/rollback | exportAll memory snapshots, auto safety snapshot before rollback, S2 rebind | maya_scene_module.py |
+| Checkpoint/rollback | writes the scene to a `.ma` file on disk under `checkpoints/`, takes a safety save before reading one back, points the scene at its original path again | maya_scene_module.py |
 | userSetup.py merge | marker-block upsert, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
 | Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 25 tools | pipeline.py |
 | Strict policy mode | `MAYA_MCP_DISABLE_*{EXECUTE,WRITE_MODULE,ARBITRARY}` remove the named tools from `tools/list` and deny the call with `[policy_disabled]`, audited as `rejected`; one choke point in the pipeline, none in the tool bodies | pipeline.py (POLICY_ENV_FLAGS, on_list_tools, on_call_tool) |
@@ -145,7 +145,7 @@ authoritative and this table must match it row for row:
 | readOnly=F, destructive=F, idempotent=T, openWorld=T | `asset_import` |
 
 - scene_review keeps readOnly=T: reading the scene is what it does, and a
-  custom validator (#79) inherits no privilege it did not already have —
+  check you register (#79) inherits no privilege it did not already have —
   registering one goes through `execute_code`, which is already
   destructive=T. What does change is repeatability of its **output**: the
   `custom` section reflects the session registry at call time, so a rule

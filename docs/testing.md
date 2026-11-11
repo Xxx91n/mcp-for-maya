@@ -55,7 +55,7 @@ Verified blocked on at least one dev box (Maya 2024, Windows):
 `import maya.standalone` raises a native access violation
 (0xC0000005) inside module creation and `maya.exe -batch` hangs — the
 whole tier is unrunnable there. On such a box, run the Tier-2
-substance (checkpoint/rollback roundtrip, reference-edit case,
+substance (checkpoint/read-back roundtrip, reference-edit case,
 signature collection) through a live GUI session instead — see
 `docs/reference/gui_verify.py` for the reference
 implementation. Launch mayapy from PowerShell/cmd, never Git Bash

@@ -1,14 +1,14 @@
-"""T-03 regression tests: checkpoint = exportAll memory snapshot; rollback = S2 rebind.
+"""T-03 regression tests: checkpoint writes a real .ma file; rollback reads it back.
 
-Pins the true-snapshot checkpoint/rollback semantics (D-015: exportAll +
-explicit adopt, never references) against the stub. The stub persists
-exportAll snapshots as real files (//Maya ASCII header + JSON payload)
-and restores scene state on open, so these tests exercise real disk IO.
+Pins the checkpoint/read-back semantics (D-015: exportAll + explicit adopt,
+never references) against the stub. The stub persists checkpoint files on
+disk (//Maya ASCII header + JSON payload) and restores scene state on open,
+so these tests exercise real disk IO.
 
 Required hidden cases (D-015):
   1. checkpoints path is a file / not writable -> precheck + error
   2. same-name checkpoint -> default reject; overwrite=True preserves old via rename
-  3. snapshot externally deleted/corrupted -> exists + //Maya ASCII header check -> "snapshot lost"
+  3. checkpoint file deleted/corrupted -> exists + //Maya ASCII header check -> "file is gone"
   4. rollback open failure -> structured scene_name_after + suggestion to rebuild via scene_snapshot
 """
 
@@ -37,26 +37,26 @@ def untitled_scene(maya_env, tmp_path):
 
 
 # ------------------------------------------------------------
-# checkpoint = real exportAll snapshot of MEMORY state (P0-3)
+# checkpoint = a real .ma file written from the current scene (P0-3)
 # ------------------------------------------------------------
 
 
 class TestCheckpointSnapshot:
     def test_snapshot_captures_memory_not_stale_disk(self, saved_scene, tmp_path):
-        # Disk file is stale (does not contain GEO_new); memory does.
+        # Disk file is stale (does not contain GEO_new); the scene in Maya does.
         (tmp_path / "shot.ma").write_text("//Maya ASCII 2024 scene\nstale\n")
         saved_scene.scene.add_mesh("GEO_new")
         res = saved_scene.module.save_checkpoint("before_move")
         assert "error" not in res, res
         cp = tmp_path / "checkpoints" / res["filename"]
-        assert cp.exists(), "exportAll must write a real file"
+        assert cp.exists(), "the checkpoint must be a real file on disk"
         text = cp.read_text()
         assert "//Maya ASCII" in text
-        assert "GEO_new" in text, "snapshot must contain memory state, not stale disk copy"
+        assert "GEO_new" in text, "the file must hold the current scene, not the stale disk copy"
 
     def test_snapshot_when_scene_file_missing_on_disk(self, saved_scene, tmp_path):
         # Scene named but never written: copy2-on-disk implementations fail
-        # here; exportAll succeeds because it snapshots memory.
+        # here; exportAll succeeds because it writes the current scene.
         assert not (tmp_path / "shot.ma").exists()
         saved_scene.scene.add_mesh("GEO_a")
         res = saved_scene.module.save_checkpoint("cp1")
@@ -126,13 +126,13 @@ class TestCheckpointSnapshot:
         assert res["error"]["code"] == "untitled_scene"
         # error text must be a self-healing instruction
         err_l = res["error"]["message"].lower()
-        assert "name" in err_l or "ad-hoc" in err_l or "adhoc" in err_l
+        assert "name" in err_l or "temporary checkpoint" in err_l
 
     def test_untitled_adhoc_snapshot(self, untitled_scene, tmp_path):
         untitled_scene.scene.add_mesh("GEO_rescue")
         res = untitled_scene.module.save_checkpoint("rescue")
         assert "error" not in res, res
-        assert res["filename"] == "cp_adhoc_rescue.ma"
+        assert res["filename"] == "cp_adhoc_rescue.ma"  # cp_adhoc_ prefix is a name, not prose
         assert res["original_file_status"] == "no_original_file"
         assert res["adhoc"] is True
         assert res["scene_rebound_to"] is None
@@ -160,7 +160,7 @@ class TestCheckpointSnapshot:
 
 
 # ------------------------------------------------------------
-# rollback = S2 (open + rebind), auto_before_rollback invariant
+# rollback = open the file and point the scene back, auto save first
 # ------------------------------------------------------------
 
 
@@ -186,11 +186,11 @@ class TestRollback:
         rb = saved_scene.module.rollback_to_checkpoint("cp_v1.ma")
         assert rb["success"] is True, rb
         assert rb["scene_name_before"] == scene_path
-        assert rb["scene_name_after"] == scene_path, "S2: rebind to original path"
+        assert rb["scene_name_after"] == scene_path, "S2: scene points back at the original path"
         assert rb["scene_rebound_to"] == scene_path
         assert rb["original_file_status"] == "saved"
         assert rb["safety_snapshot"] != "skipped_by_user"
-        assert os.path.exists(rb["safety_snapshot"]), "auto snapshot must exist on disk"
+        assert os.path.exists(rb["safety_snapshot"]), "the automatic save must exist on disk"
 
     def test_rollback_auto_snapshot_captures_current(self, saved_scene, tmp_path):
         saved_scene.scene.add_mesh("GEO_a")
@@ -200,7 +200,7 @@ class TestRollback:
         assert rb["success"] is True
         with open(rb["safety_snapshot"], encoding="utf-8") as _auto_f:
             auto_text = _auto_f.read()
-        assert "GEO_wip" in auto_text, "auto_before_rollback must snapshot memory state"
+        assert "GEO_wip" in auto_text, "the automatic save must hold the current scene"
 
     def test_rollback_rejects_traversal(self, saved_scene):
         for bad in ["../x.ma", "..\\x.ma", "sub/cp_x.ma", "cp_../../x.ma"]:
@@ -214,7 +214,7 @@ class TestRollback:
     def test_rollback_missing_snapshot(self, saved_scene):
         res = saved_scene.module.rollback_to_checkpoint("cp_ghost.ma")
         assert res["error"]["code"] == "snapshot_lost"
-        assert "快照已丢失" in res["error"]["message"]
+        assert "Checkpoint file is gone" in res["error"]["message"]
         assert "missing" in res["error"]["message"].lower()  # missing, not corrupt
         assert "header" not in res["error"]["message"].lower()
 
@@ -224,7 +224,7 @@ class TestRollback:
         (cp_dir / "cp_bad.ma").write_text("garbage without header")
         res = saved_scene.module.rollback_to_checkpoint("cp_bad.ma")
         assert res["error"]["code"] == "snapshot_lost"
-        assert "快照已丢失" in res["error"]["message"]
+        assert "Checkpoint file is gone" in res["error"]["message"]
         msg = res["error"]["message"].lower()
         assert "header" in msg or "corrupt" in msg
 
@@ -278,15 +278,15 @@ class TestRollback:
         untitled_scene.scene.add_mesh("GEO_after")
         rb = untitled_scene.module.rollback_to_checkpoint("cp_adhoc_rescue.ma")
         assert rb["success"] is True, rb
-        # S1: no original file to rebind to -> stay on the checkpoint path
+        # S1: no file path at read-back time -> stay on the checkpoint path
         assert rb["scene_rebound_to"] is None
         assert rb["original_file_status"] == "no_original_file"
         assert rb["scene_name_after"].endswith("cp_adhoc_rescue.ma")
         assert not untitled_scene.scene.exists("GEO_after")
 
     def test_rollback_untitled_auto_snapshot_lands_workspace(self, untitled_scene, tmp_path):
-        """D-016d: untitled + auto_before_rollback -> auto snapshot lands in
-        the workspace ad-hoc checkpoints dir."""
+        """D-016d: a scene never saved to disk + automatic save before read-back
+        -> the automatic save lands in the workspace checkpoints dir."""
         untitled_scene.scene.add_mesh("GEO_a")
         res = untitled_scene.module.save_checkpoint("rescue")
         assert "error" not in res
@@ -339,15 +339,15 @@ class TestRollback:
 
     def test_rollback_rename_is_standalone(self, saved_scene):
         """D-046-round live find: cmds.file(rename=X, prompt=False)
-        raises '-rename must be used by itself' on real Maya — the S2
-        rebind must call rename with no other flags."""
+        raises '-rename must be used by itself' on real Maya — pointing the
+        scene back (S2) must call rename with no other flags."""
         saved_scene.scene.add_mesh("GEO_a")
         saved_scene.module.save_checkpoint("v1")
         saved_scene.scene.file_calls.clear()
         rb = saved_scene.module.rollback_to_checkpoint("cp_v1.ma")
         assert rb["success"] is True, rb
         renames = [c for c in saved_scene.scene.file_calls if c["kwargs"].get("rename")]
-        assert renames, "saved-scene rollback must rebind via rename"
+        assert renames, "a saved-scene read-back must point the scene back via rename"
         for c in renames:
             assert list(c["kwargs"]) == ["rename"], c
 
