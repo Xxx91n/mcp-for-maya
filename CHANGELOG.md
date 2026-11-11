@@ -71,6 +71,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_checkpoint_rollback.py::TestRollback::test_rollback_missing_snapshot`,
   `tests/test_checkpoint_rollback.py::TestRollback::test_rollback_corrupt_snapshot`,
   `.github/scripts/check_llms_txt.py::render`.
+- **Connection and injection terms now say what they mean** — group 2 of the
+  plain-language pass (#189): `入口端口`, `工作端口`, `临时文件注入`,
+  `asset_descriptor`'s handover sheet, `新模块的三条门槛`,
+  `同一个注入模块里的单独文件`, `模块清理约定`, `端口类型探测`,
+  `免探测端口名单` and `两套 Python 环境` are rewritten in plain words in
+  code comments and docstrings, the session-lifecycle guide, `docs/threat-model.md`,
+  `CONTRIBUTING.md`, `AGENTS.md`, the `[Unreleased]` lane and the connection
+  section of both READMEs. The later groups' terms are untouched. One visible
+  string changed wording only: a port that is not Python now says the helper
+  cannot be injected there; its error type, code and control flow are unchanged,
+  and the test that pins the message moved with it. No public tool name,
+  function name, parameter name or error code changed. `llms.txt` was not
+  hand-edited: no tool description changed, and the generator reports it still
+  matches the registry. Evidence:
+  `tests/test_session_manager.py::TestNonPythonExemption::test_probe_mel_port_marks_exemption`,
+  `tests/test_session_manager.py::TestNonPythonExemption::test_exemption_lifts_when_port_stops_listening`,
+  `tests/test_client.py::TestDetectPortType::test_mel_port_answers_0`,
+  `tests/test_client.py::TestDetectPortType::test_probe_exception_is_unknown`,
+  `tests/test_module_teardown.py::TestCreateModuleTeardown::test_teardown_called_and_resources_closed`.
 - **Defect record #115 no longer reads as open work** — the fix had landed as
   `2f8d51e` (PR #138, merge `894f6ae`) while the ticket stayed open, because
   the closing keyword lived in the child ticket's body and never reached a

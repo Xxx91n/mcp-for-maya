@@ -9,8 +9,8 @@
 # Runtime floor: Maya >=2023 (Python 3.9). This file carries NO
 # __future__ import of its own (it would sit mid-file in the
 # concatenated payload = SyntaxError) - the unquoted PEP-604
-# annotations below are py3.9-safe ONLY because the monolith's
-# `from __future__ import annotations` (maya_scene_module.py:13)
+# annotations below are py3.9-safe ONLY because maya_scene_module.py's
+# `from __future__ import annotations` (line 13)
 # governs the assembled unit and makes every annotation lazy.
 # Do NOT exec/import this file standalone on py3.9.
 

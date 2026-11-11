@@ -120,7 +120,7 @@ def test_visual_module_batch_gate_in_real_maya(real_maya):
 
 # ---------------------------------------------------------------------------
 # D-056② call-form bookings — viewport-independent shapes asserted on a
-# healthy mayapy. Env-blocked on the current box; dormant, not claimed.
+# healthy mayapy. Env-blocked on the current box; not wired in yet, not claimed.
 # ---------------------------------------------------------------------------
 
 

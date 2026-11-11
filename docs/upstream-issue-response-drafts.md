@@ -62,7 +62,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > drops an error into the Script Editor.
 >
 > Fixed in our fork ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/),
-> **>= 0.1.2**): the probe payload is now the bilingual `eval("1/2")` —
+> **>= 0.1.2**): the probe payload is now the port-type `eval("1/2")` —
 > Python 3 answers `0.5`; on a live Maya 2024 MEL port it returns a
 > syntax-error body (verified on a real session — MEL's `eval` expects
 > a command string, not an expression), which still classifies the port as
@@ -119,15 +119,15 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > Fixed in our fork ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/),
 > **>= 0.1.2**): `create_module` now invokes the evicted module's
 > `_mcp_teardown` hook *before* replacing the `sys.modules` entry. The
-> injected helper implements an idempotent teardown — per-item try/except
+> injected helper implements a cleanup that is safe to call twice — per-item try/except
 > so one failing resource cannot block the rest, `deleteLater` semantics
 > for Qt objects, and `stop()` disconnects the `newConnection` signal
 > rather than only closing the socket (prevents double-firing after a
-> reload). A failing teardown surfaces as a `warning` field instead of
+> reload). A failing cleanup surfaces as a `warning` field instead of
 > blocking the replacement.
 >
 > Verification status: covered by stub-tier tests including the Qt signal
-> semantics, and verified on a live Maya 2024 session — the teardown
+> semantics, and verified on a live Maya 2024 session — the cleanup
 > hook fired exactly once across a reconnect, the old listener port was
 > released, and the replacement server bound cleanly.
 >

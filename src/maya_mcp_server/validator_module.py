@@ -22,7 +22,7 @@
 # Runtime floor: Maya >=2023 (Python 3.9). This file carries NO
 # __future__ import of its own (it would sit mid-file in the concatenated
 # payload = SyntaxError) - the unquoted PEP-604 annotations below are
-# py3.9-safe ONLY because the monolith's `from __future__ import annotations`
+# py3.9-safe ONLY because maya_scene_module.py's `from __future__ import annotations`
 # governs the assembled unit. Do NOT exec/import this file standalone on py3.9.
 
 import math
@@ -413,7 +413,7 @@ def scene_review_with_validators(checks: list[str] | None = None) -> dict[str, A
     The built-in `score` never sees a custom weight, so a report from before
     this feature keeps its exact shape.
     """
-    # Indirect on purpose: the monolith's scene_review is a name this file
+    # Indirect on purpose: maya_scene_module.py's scene_review is a name this file
     # only has once the payload is assembled, and a bare reference would be
     # an undefined-name error in the standalone lint pass over this file.
     result: dict[str, Any] = globals()["scene_review"](checks)

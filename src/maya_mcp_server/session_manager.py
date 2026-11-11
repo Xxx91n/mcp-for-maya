@@ -444,11 +444,11 @@ class SessionManager:
         try:
             await client.connect()
             # bootstrap() returns a NEW client on the dedicated working
-            # channel - that is the session, not the config-port client
+            # port - that is the session, not the config-port client
             new_client = await client.bootstrap(client_type=self.client_type.value)
         except MayaConnectionError:
             # An explicit add on a port that turns out non-Python
-            # still earns the exemption so the scanner leaves it alone
+            # still goes on the do-not-probe list so the scanner leaves it alone
             if getattr(client, "_port_type", None) is PortType.MEL:
                 self._non_python_ports.add(config_key)
             raise

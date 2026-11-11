@@ -489,8 +489,8 @@ class ClientChannel:
 
 
 class QtCommandServer:
-    """Qt-based TCP command server for Maya MCP (the primary working
-    channel; the native command port is bootstrap/headless fallback only).
+    """Qt-based TCP command server for Maya MCP (the main working port;
+    the native command port is only the bootstrap and headless fallback).
 
     Runs on Maya's main thread inside the Qt event loop. readyRead is
     event-driven (no polling timer); each connection owns a ClientChannel

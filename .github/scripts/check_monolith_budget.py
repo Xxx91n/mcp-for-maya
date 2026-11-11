@@ -96,10 +96,10 @@ def main() -> int:
         )
         print(
             "Where new code goes instead: new Maya-side capability lands in "
-            "a separate file in the same injection unit (file boundary = "
-            "injection boundary = failure-domain boundary) "
+            "a separate file injected together with maya_scene_module.py "
+            "(one file boundary is also the boundary of what can fail) "
             "(first case: introspect_module.py) — not appended to the "
-            "monolith body."
+            "maya_scene_module.py body."
         )
         return 1
     return 0

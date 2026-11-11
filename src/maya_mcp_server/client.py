@@ -138,16 +138,16 @@ async def ensure_module_injected(
 
     Shared by _mcp_scene/_mcp_asset: reads the module source
     from disk and writes it via write_module, once per session. For
-    large modules on the native (headless) port the source goes to a
-    unique mkstemp file first and Maya reads it back, because the
-    command port cannot carry a payload that big; the Qt channel sends
-    length-prefixed frames up to 16 MiB, so GUI sessions inject
+    large modules on the native command port (normally the headless case)
+    the source goes to a unique mkstemp file first and Maya reads it back,
+    because past ~15K the port can answer stale; the Qt channel sends
+    length-prefixed frames up to 16 MiB, so a Qt session injects
     directly via write_module.
 
     extra_source_paths: more source files appended to the same payload
-    before writing - one module name, one namespace, one place that can
-    fail. Extra files must carry no __future__ import (it would land
-    mid-file = SyntaxError).
+    before writing - one module name, one namespace, and a failure in any
+    of them takes the whole module down. Extra files must carry no
+    __future__ import (it would land mid-file = SyntaxError).
     """
     key = session_key or "_default"
     if key in injected_sessions:
@@ -677,7 +677,8 @@ class MayaClient(BaseMayaClient):
 
         try:
             # Port type probe (upstream #1): Python 3 answers 0.5
-            # (true division); everything else counts as MEL. T-18a live
+            # (true division). Any other reply counts as MEL; no reply at
+            # all stays UNKNOWN (the except below). T-18a live
             # pin (Maya 2024.0.0.4640, zh locale): a real MEL port answers
             # eval("1/2") with a syntax-error body, not silent 0 - the
             # tell is "0.5 vs anything else", and the Script
