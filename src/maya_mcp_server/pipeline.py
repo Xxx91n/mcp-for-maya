@@ -105,7 +105,7 @@ TOOL_ANNOTATIONS: dict[str, mt.ToolAnnotations] = {
     # scene-graph introspection: read-only DG queries
     "scene_describe": _READ,
     "scene_nodes": _READ,
-    # visual loop: net-zero side effect discipline makes readOnly honest
+    # check by looking: net-zero side effect discipline makes readOnly honest
     "scene_viewport_snapshot": _READ,
     "scene_render_preview": _READ,
     # mutation-class tools: scene/filesystem effects, not destructive (7)

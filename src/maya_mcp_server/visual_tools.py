@@ -1,7 +1,7 @@
 """MCP visual tools: GUI-only viewport/render capture.
 
-scene_viewport_snapshot and scene_render_preview close the visual
-loop for the ICEV VERIFY step. They live behind a double headless
+scene_viewport_snapshot and scene_render_preview send a picture back to
+the AI, which is how it checks its own work by looking. They live behind a double headless
 gate (host-side framed_channel short-circuit + Maya-side capability
 check) and return the frozen v1.0 mixed contract
 [ImageContent, TextContent(JSON metadata)].

@@ -1,14 +1,14 @@
-# --- _mcp_scene custom validator fragment (issue #79): own file, same injection unit ---
+# --- _mcp_scene checks-you-register fragment (issue #79): own file, same injected module ---
 #
 # NOT a standalone injected module: scene_tools._ensure_module_injected
 # concatenates this file onto maya_scene_module.py - after
 # introspect_module.py - and injects the assembly as _mcp_scene.
 #
 # Why the scene_review composition lives here: maya_scene_module.py sits at
-# its .github/monolith-budget.json cap, so the audit function cannot grow.
+# its .github/monolith-budget.json cap, so the review function cannot grow.
 # This fragment adds scene_review_with_validators(), the entry the
 # scene_review MCP tool calls; the monolith's own scene_review keeps
-# returning the built-in audit alone, so the built-in 0-100 score is
+# returning the built-in checks alone, so the built-in 0-100 score is
 # unchanged by construction.
 #
 # Guard stance: the registration surface runs caller-defined hooks - strip()
@@ -30,7 +30,7 @@ from collections.abc import Callable
 from typing import Any
 
 
-# The severity vocabulary of the built-in audit (maya_scene_module.py emits
+# The severity vocabulary of the built-in checks (maya_scene_module.py emits
 # error, warning and info), so one severity word means one thing across both
 # sections of a report.
 _VALIDATOR_SEVERITIES = ("error", "warning", "info")
@@ -110,7 +110,7 @@ def register_validator(
     family: str = "custom",
     message: str | None = None,
 ) -> dict[str, Any]:
-    """Register a studio validator that scene_review_with_validators reports.
+    """Register a check of your own that scene_review_with_validators reports.
 
     Args:
         name: unique id; re-registering the same name replaces the old rule.
@@ -312,7 +312,7 @@ def _run_validator(reg: dict[str, Any]) -> dict[str, Any]:
         # Reading the result stays inside this try: len(), [] and str() on
         # whatever came back run the caller's own hooks, and a sequence free to
         # lie about its length has to become a check_error, not an aborted
-        # audit. Strict on both shapes: (1, "note") must not pass where 1
+        # report. Strict on both shapes: (1, "note") must not pass where 1
         # alone fails.
         if isinstance(outcome, bool):
             passed = outcome
@@ -327,12 +327,12 @@ def _run_validator(reg: dict[str, Any]) -> dict[str, Any]:
             broke = True
             message = f"returned {_type_name(outcome)}; expected bool or (bool, message)"
     except Exception as e:
-        # One broken rule must not hide the rest of the audit (issue #79).
+        # One broken rule must not hide the rest of the report (issue #79).
         # Exception, not BaseException: a predicate's own failure is isolated,
         # a KeyboardInterrupt from the human holding the machine is not.
         # _safe_text/_type_name because this line is built inside the except:
         # an exception whose __str__ raises would otherwise escape the very
-        # isolation that caught it and cost the caller the whole audit.
+        # isolation that caught it and cost the caller the whole report.
         broke = True
         message = f"raised {_type_name(e)}: {_safe_text(e)}"
     if message is None:
@@ -404,7 +404,7 @@ def custom_validator_results() -> dict[str, Any] | None:
 
 
 def scene_review_with_validators(checks: list[str] | None = None) -> dict[str, Any]:
-    """Built-in scene_review audit plus the studio `custom` section.
+    """Built-in scene_review checks plus the `custom` section you registered.
 
     Same argument and result shape as scene_review, plus `custom` when at
     least one validator is registered:

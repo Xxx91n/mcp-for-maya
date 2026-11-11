@@ -95,8 +95,8 @@ _SEC = {
     "scene_review": "Analysis",
     "scene_describe": "Introspection",
     "scene_nodes": "Introspection",
-    "scene_viewport_snapshot": "Visual loop (GUI sessions only)",
-    "scene_render_preview": "Visual loop (GUI sessions only)",
+    "scene_viewport_snapshot": "Check by looking (GUI sessions only)",
+    "scene_render_preview": "Check by looking (GUI sessions only)",
     "scene_plan": "Scene planning",
     "camera_create": "Cameras",
     "camera_orbit": "Cameras",
@@ -119,7 +119,7 @@ _ORDER = (
     "Cameras",
     "Export",
     "Assets (Poly Haven, CC0)",
-    "Visual loop (GUI sessions only)",
+    "Check by looking (GUI sessions only)",
     "Escapes (policy-disableable)",
 )
 
@@ -241,9 +241,9 @@ def render(root: Path, matrix: dict[str, dict[str, bool]]) -> str:
     lines: list[str] = [
         "# Maya MCP Server",
         "",
-        "> MCP server for Autodesk Maya: spatial awareness, scene audit, camera",
-        "> planning, checkpoint/rollback, and asset import. Every scene change",
-        "> follows INSPECT -> COMPUTE -> EXECUTE -> VERIFY. This file is",
+        "> MCP server for Autodesk Maya: spatial awareness, scene checks, camera",
+        "> planning, checkpoint and read-back, and asset import. Every scene change",
+        "> follows ICEV: look, work out the change, apply it, then check. This file is",
         f"> generated from the tool registry (v{version}); do not hand-edit it.",
         "",
         "## Docs",

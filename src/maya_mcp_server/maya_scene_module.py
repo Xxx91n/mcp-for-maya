@@ -322,11 +322,10 @@ def get_scene_graph(detail_level="compact") -> dict:
 
 
 def get_zone_map(patterns=None) -> dict:
-    """Group objects by naming-pattern zones.
-
+    """Group objects into zones by name keywords; 7 built-in, scene_plan uses 8.
     Args:
-        patterns: dict of zone_name -> regex_pattern. If None, uses defaults
-                  for pop-up store naming conventions.
+        patterns: dict of zone_name -> regex_pattern. If None, uses the
+                  built-in 7-zone set for a pop-up store.
 
     Returns:
         JSON string with zones list.
@@ -1037,17 +1036,17 @@ def check_constraints(rules):
 
 
 # ============================================================
-# P0: Scene Checkpoint / Rollback: true exportAll snapshot, not references
+# P0: Scene checkpoint / read-back: a real file on disk, not references
 # ============================================================
-# checkpoint = cmds.file(exportAll) snapshot of MEMORY state -> checkpoints/
-# rollback   = open snapshot + rename back to the original scene path (S2);
-#            untitled / ad-hoc snapshots stay on the checkpoint path (S1)
-# invariant: before any overwrite-path op, current memory state is
-#            snapshotted (auto_before_rollback); failure aborts unless
+# checkpoint = cmds.file(exportAll) writes the scene into checkpoints/ as .ma
+# rollback   = open that file + rename back to the original scene path (S2);
+#            a scene never saved to disk keeps the checkpoint path (S1)
+# invariant: before any overwrite-path op, the current scene is saved first
+#            (auto_before_rollback); failure aborts unless
 #            discard_current_state=True escapes it
-# bounds:    no undo history in a snapshot (rebuild via scene_snapshot);
-#            references are flattened (self-contained, no write-back);
-#            assumes one scene file per session
+# bounds:    a checkpoint file carries no undo history (rebuild via
+#            scene_snapshot); references are flattened (self-contained, no
+#            write-back); assumes one scene file per session
 
 _CHECKPOINT_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 _CHECKPOINT_FILE_RE = re.compile(r"^(cp|prev)_[A-Za-z0-9_-]+\.ma$")
@@ -1082,9 +1081,9 @@ def _checkpoint_dir(
 ) -> tuple[str, dict[str, Any] | None]:
     """Resolve the checkpoints dir for the current scene state.
 
-    Saved scenes: <scene_dir>/checkpoints. Untitled scenes: ad-hoc
-    snapshots go under <maya workspace>/checkpoints so they still land
-    somewhere recoverable.
+    A saved scene: <scene_dir>/checkpoints. A scene never saved to disk has
+    no original path, so its temporary checkpoint goes under <maya workspace>/
+    checkpoints, where it can still be found and opened.
 
     Returns (dir, None) or ("", error_dict).
     """
@@ -1100,7 +1099,7 @@ def _checkpoint_dir(
         out = _err(
             "workspace_unavailable",
             "Scene is untitled and no Maya workspace resolves \u2014 "
-            "cannot place an ad-hoc snapshot.",
+            "cannot place a temporary checkpoint.",
             "Save the scene first, then retry.",
         )
         out["original_file_status"] = "no_original_file"
@@ -1137,7 +1136,7 @@ def _ensure_checkpoint_dir(cp_dir: str) -> dict[str, Any] | None:
 
 
 def _write_snapshot(cp_path: str) -> dict[str, Any] | None:
-    """exportAll the in-memory scene state to cp_path.
+    """Write the current scene to cp_path as a `.ma` file on disk.
 
     Returns error dict or None. prompt=False so a GUI modal can never
     hang the MCP round-trip; force=True because name-collision handling
@@ -1148,11 +1147,11 @@ def _write_snapshot(cp_path: str) -> dict[str, Any] | None:
     try:
         cmds.file(cp_path, exportAll=True, type="mayaAscii", force=True, prompt=False)
     except Exception as e:
-        return _err("snapshot_write_failed", f"exportAll snapshot failed: {e}")
+        return _err("snapshot_write_failed", f"Writing the scene file failed: {e}")
     if not os.path.exists(cp_path):
         return _err(
             "snapshot_missing",
-            f"exportAll returned but snapshot file is missing: {cp_path}",
+            f"Maya returned but the scene file is missing: {cp_path}",
         )
     return None
 
@@ -1164,10 +1163,10 @@ def _suggest_name(name: Any) -> str:
 
 
 def _auto_snapshot(cp_dir: str) -> dict[str, Any]:
-    """Internal auto_before_rollback snapshot.
+    """Save the current scene before a checkpoint is read back.
 
     Returns {"path": ..., "filename": ...} or an error dict. Timestamped
-    name + collision suffix so repeated rollbacks never collide.
+    name + collision suffix so repeated read-backs never collide.
     """
     import datetime
     import os
@@ -1195,7 +1194,7 @@ def _rb_error(
     suggestion: str | None = None,
     **extra: Any,
 ) -> dict[str, Any]:
-    """Structured rollback/checkpoint error carrying scene identity."""
+    """Structured checkpoint / read-back error carrying scene identity."""
     err: dict[str, Any] = {"code": code, "message": msg}
     if suggestion:
         err["suggestion"] = suggestion
@@ -1211,15 +1210,15 @@ def _rb_error(
 
 
 def save_checkpoint(name: str | None = None, overwrite: bool = False) -> dict[str, Any]:
-    """Save a real scene snapshot (exportAll of memory state).
+    """Save the current scene to a `.ma` file on disk.
 
     Args:
         name: Checkpoint name, strict whitelist ^[A-Za-z0-9_-]+$. None
-            defaults to "checkpoint" on saved scenes; on untitled scenes
-            an explicit name is required and produces an ad-hoc snapshot
-            under the Maya workspace (original_file_status=
-            "no_original_file", scene_rebound_to=None \u2014 rollback to it
-            stays on the checkpoint path, S1).
+            defaults to "checkpoint" on saved scenes; a scene never saved
+            to disk needs an explicit name, and the file goes under the
+            Maya workspace instead of next to the scene
+            (original_file_status="no_original_file", scene_rebound_to=None
+            \u2014 reading it back leaves the scene on the checkpoint path, S1).
         overwrite: Replace a same-name checkpoint; the old file is
             renamed to prev_<ts>_<filename> before the new write.
 
@@ -1236,10 +1235,10 @@ def save_checkpoint(name: str | None = None, overwrite: bool = False) -> dict[st
         if untitled:
             out = _err(
                 "untitled_scene",
-                "Scene is untitled \u2014 there is no original file to rebind to. "
-                "Save the scene first, or pass an explicit name to create an "
-                "ad-hoc snapshot.",
-                "scene_checkpoint(name='rescue') for an ad-hoc snapshot",
+                "Scene is untitled \u2014 there is no original file to point "
+                "back at. Save the scene first, or pass an explicit name to "
+                "create a temporary checkpoint.",
+                "scene_checkpoint(name='rescue') for a temporary checkpoint",
             )
             out["original_file_status"] = "no_original_file"
             out["scene_rebound_to"] = None
@@ -1315,8 +1314,8 @@ def save_checkpoint(name: str | None = None, overwrite: bool = False) -> dict[st
 def list_checkpoints() -> dict[str, Any]:
     """List all checkpoints for the current scene state.
 
-    Saved scenes list <scene_dir>/checkpoints; untitled scenes list the
-    workspace ad-hoc dir. Returns dict with checkpoints list and count.
+    Saved scenes list <scene_dir>/checkpoints; a scene never saved to disk
+    lists the workspace directory instead.
     """
     import glob
     import os
@@ -1349,26 +1348,26 @@ def list_checkpoints() -> dict[str, Any]:
 
 
 def rollback_to_checkpoint(filename: str, discard_current_state: bool = False) -> dict[str, Any]:
-    """Roll back to a checkpoint: open it, then rebind to the original path.
+    """Read a checkpoint back: open it, then point the scene at its original path.
 
-    S2 semantics: the scene ends up named after the file it was rolled
-    back *for*, so a later save writes to the original scene file \u2014 not
-    silently to the checkpoint. Untitled scenes / ad-hoc snapshots have
-    no original path, so the scene stays on the checkpoint path (S1) and
-    scene_rebound_to is None.
+    S2 semantics: the scene ends up named after the file it was read *for*,
+    so a later save writes to the original scene file \u2014 not silently to
+    the checkpoint. A scene never saved to disk, and a temporary checkpoint,
+    have no original path, so the scene stays on the checkpoint path (S1)
+    and scene_rebound_to is None.
 
-    Invariant: before the scene name is rebound, the current in-memory
-    state has been snapshotted (auto_before_rollback via exportAll). If
-    that auto snapshot fails the rollback aborts, unless
+    Invariant: before the scene name is pointed back at the original path,
+    the current scene has been saved to a file first (auto_before_rollback
+    via exportAll). If that save fails the read-back aborts, unless
     discard_current_state=True escapes it (safety_snapshot becomes
     "skipped_by_user").
 
-      For untitled scenes the auto snapshot lands in the workspace
-      ad-hoc checkpoints dir; failure still aborts unless escaped.
+      For a scene never saved to disk, the automatic save lands in the
+      workspace checkpoints directory; failure still aborts unless escaped.
 
-    Honest bounds: snapshots contain no undo history \u2014 call
+    Honest bounds: a checkpoint file contains no undo history \u2014 call
     scene_snapshot afterwards to rebuild context; references are
-    flattened into the snapshot (self-contained, no write-back).
+    flattened into the file (self-contained, no write-back).
     """
     import os
 
@@ -1418,8 +1417,8 @@ def rollback_to_checkpoint(filename: str, discard_current_state: bool = False) -
     if not os.path.exists(cp_path):
         return _rb_error(
             "snapshot_lost",
-            f"Checkpoint snapshot lost (快照已丢失): {filename} — "
-            "file missing, possibly deleted externally",
+            f"Checkpoint file is gone: {filename} \u2014 "
+            "the file is missing, possibly deleted outside Maya",
             scene_before,
             suggestion="re-create the checkpoint with scene_checkpoint",
         )
@@ -1429,14 +1428,14 @@ def rollback_to_checkpoint(filename: str, discard_current_state: bool = False) -
     except Exception as e:
         return _rb_error(
             "snapshot_lost",
-            f"Checkpoint snapshot lost (快照已丢失): {filename} — unreadable: {e}",
+            f"Checkpoint file is gone: {filename} \u2014 unreadable: {e}",
             scene_before,
             suggestion="check filesystem permissions on the checkpoints dir",
         )
     if _MAYA_ASCII_MAGIC not in head:
         return _rb_error(
             "snapshot_lost",
-            f"Checkpoint snapshot lost (\u5feb\u7167\u5df2\u4e22\u5931): {filename} \u2014 missing "
+            f"Checkpoint file is gone: {filename} \u2014 missing "
             "//Maya ASCII header, file was replaced or corrupted",
             scene_before,
             suggestion="delete the corrupt file and re-create the checkpoint",
@@ -1451,20 +1450,20 @@ def rollback_to_checkpoint(filename: str, discard_current_state: bool = False) -
             detail = cause["message"] if isinstance(cause, dict) else str(cause)
             return _rb_error(
                 "auto_snapshot_failed",
-                f"auto_before_rollback snapshot failed, rollback aborted: {detail}",
+                f"The save before the read failed, nothing opened: {detail}",
                 scene_before,
                 aborted=True,
-                suggestion="fix the snapshot failure, or pass "
-                "discard_current_state=True to roll back without "
-                "a safety snapshot",
+                suggestion="fix the save failure, or pass "
+                "discard_current_state=True to open the checkpoint without "
+                "saving the current scene first",
             )
         safety_snapshot = "skipped_by_user"
     else:
         safety_snapshot = auto["path"]
         if discard_current_state:
             warning = (
-                "discard_current_state=True was passed but the safety "
-                "snapshot succeeded; the flag had no effect."
+                "discard_current_state=True was passed but the scene was saved "
+                "anyway; the flag had no effect."
             )
 
     try:
@@ -1491,7 +1490,7 @@ def rollback_to_checkpoint(filename: str, discard_current_state: bool = False) -
         except Exception as e:
             return _rb_error(
                 "rebind_failed",
-                f"Checkpoint opened but rebind to original scene path failed: {e}",
+                f"The checkpoint opened, but pointing the scene back failed: {e}",
                 scene_before,
                 scene_after=_scene_file_path(),
                 safety_snapshot=safety_snapshot,
@@ -1753,7 +1752,7 @@ _MAYA_STANDARDS = {
 
 
 def analyze_aesthetics():
-    """Professional-grade aesthetic analysis with 5 design dimensions.
+    """Score the scene's look on 5 design dimensions.
 
     Dimensions:
     1. Color Theory (60-30-10 rule, temperature, harmony, saturation, contrast)
@@ -2902,11 +2901,11 @@ def _analyze_style_consistency(objects, materials):
 
 
 def scene_review(checks=None):
-    """Universal Maya scene audit with integrated aesthetic + lighting review.
+    """Check a whole Maya scene, including looks and lighting.
 
-    Reviews scene integrity after MCP operations. Detects spatial conflicts,
-    naming violations, componentization issues, architectural problems,
-    aesthetic quality (5 dimensions), lighting quality, and scene organization.
+    Runs after MCP operations. Finds spatial clashes, naming problems,
+    grouping problems, structural problems, look quality (5 dimensions),
+    lighting quality, and scene organization.
 
     Args:
         checks: list of check names. If None, runs all.
@@ -3191,7 +3190,7 @@ def scene_review(checks=None):
             "coverage": round(coverage, 3),
         }
 
-    # === NAMING CONVENTION (5 pts) ===
+    # === Naming rules (5 pts) ===
     if "naming" in checks:
         max_score += 5
         bad_names = []
@@ -3681,7 +3680,7 @@ def scene_review(checks=None):
 
 
 def scene_plan(objective=None, auto_fix=False):
-    """Holistic scene planning with organization validation and layout suggestions.
+    """Plan a scene layout: organization checks plus layout suggestions.
 
     Based on research findings:
     - Blockout-first methodology (validate proportions before detail)
@@ -4228,7 +4227,7 @@ def _analyze_group_layout(transforms):
 
 
 def _get_zone_hint(group_name):
-    """Determine which zone a group belongs to based on its name."""
+    """Work out which of the plan's 8 zones a group belongs to, from its name."""
     name = group_name.lower()
     if any(kw in name for kw in ["shell", "facade", "exterior", "wall", "floor"]):
         return "structure"

@@ -126,16 +126,16 @@ tool_timeout_sec = 120
 
 > "帮我看看 Maya 场景里有什么，然后在入口处创建一个展示架"
 
-AI 会自动调用 `scene_snapshot()` → 理解场景 → 执行建模 → `scene_review()` 审核结果。
+AI 会自动调用 `scene_snapshot()` → 理解场景 → 执行建模 → 用 `scene_review()` 检查结果。
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-icev-workflow.svg" width="100%" alt="ICEV Workflow"/>
 
-每次场景修改都遵循 **ICEV** 工作流（也内置为 Agent 流程卡，见 `skills/icev-workflow`）：
+每次场景修改都走 **ICEV**：先看场景、再算方案、再动手改、最后复查，四步按顺序走。这四步也内置为 Agent 流程卡，见 `skills/icev-workflow`：
 
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
 │ INSPECT  │ ──→ │ COMPUTE  │ ──→ │ EXECUTE  │ ──→ │ VERIFY   │
-│ 场景快照  │     │ 计算规划  │     │ 执行修改  │     │ 审核验证  │
+│ 读场景    │     │ 算方案    │     │ 动手改    │     │ 复查结果  │
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
 ```
 
@@ -150,13 +150,13 @@ AI 会自动调用 `scene_snapshot()` → 理解场景 → 执行建模 → `sce
 | 能力 | 工具 | 说明 |
 |------|------|------|
 | 🧊 **空间感知** | `scene_snapshot` `scene_inspect` `scene_measure` | 一次调用获取全场景空间模型，精确距离/重叠/间隙测量 |
-| 🎨 **审美分析** | `scene_aesthetics` | 5 维分析：色彩理论(60-30-10)、空间构成(黄金比例/三分法)、比例尺度(人体工学)、光照质量(三点照明/填充比/色温/衰减)、视觉动线 |
-| 🎬 **镜头规划** | `camera_create` `camera_orbit` | 8 种行业标准镜头 + 环绕动画 |
-| 🛡️ **避灾回退** | `scene_checkpoint` `scene_rollback` `scene_checkpoint_list` | exportAll 内存态快照，回滚显式重绑原路径 |
-| 🧠 **大局观统筹** | `scene_plan` | 组织健康检查、区域平衡、布局优化建议、冲突预防、自然语言规划 |
-| 📋 **工程审核** | `scene_review` `scene_validate` `scene_assert` | 11 项确定性检查（0-100 分）+ 自定义约束验证 + 状态断言 |
+| 🎨 **画面质量** | `scene_aesthetics` | 5 维分析：色彩理论(60-30-10)、空间构成(黄金比例/三分法)、比例尺度(人体工学)、光照质量(三点照明/填充比/色温/衰减)、视觉动线 |
+| 🎬 **相机** | `camera_create` `camera_orbit` | 8 种内置镜头类型 + 环绕动画 |
+| 🛡️ **存档与读档** | `scene_checkpoint` `scene_rollback` `scene_checkpoint_list` | 把场景导出成磁盘上的 `.ma` 文件，放在 `checkpoints/`；读档时打开这个文件，再把场景指回原路径 |
+| 🧠 **场景规划** | `scene_plan` | 组织健康检查、区域平衡、布局优化建议、冲突预防、自然语言规划 |
+| 📋 **场景检查** | `scene_review` `scene_validate` `scene_assert` | 11 项固定检查（0-100 分）+ 自定义约束检查 + 状态断言 |
 | ⚡ **代码执行** | `execute_code` `write_module` | 在 Maya 中执行任意 Python 代码 / 注入可复用模块 |
-| 👁️ **视觉闭环** | `scene_viewport_snapshot` `scene_render_preview` | 视口所见即所得捕获 + 单帧 playblast 预览（仅 GUI 会话） |
+| 👁️ **看图复查** | `scene_viewport_snapshot` `scene_render_preview` | 视口所见即所得捕获 + 单帧 playblast 预览，让 AI 看一眼改得对不对（仅 GUI 会话） |
 | 🔌 **会话管理** | `list_sessions` `add_session` `maya_setup_guide` | 多会话发现/接入 + 连接诊断/安装/回退引导 |
 | 📦 **资产库** | `asset_search` `asset_import` | Poly Haven CC0 模型——宿主侧 HTTPS 下载（主机白名单、md5 校验、大小上限、platformdirs 缓存），Maya 侧 FBX 导入带贴图自动接线、面数/尺寸护栏、`GRP_asset_<id>` 去重 |
 | 📤 **场景导出** | `scene_export` | FBX/OBJ/USD 导出——整场景或指定对象；格式按扩展名推断（冲突即报错不猜）、父目录自动创建、覆盖需显式 opt-in、导出后还原选择集 |
@@ -169,7 +169,7 @@ AI 会自动调用 `scene_snapshot()` → 理解场景 → 执行建模 → `sce
 ### 空间感知
 
 ```python
-# 全场景快照（一次调用，返回所有物体的空间数据）
+# 全场景数据（一次调用，返回所有物体的空间数据）
 scene_snapshot(detail="compact", format="cos")
 
 # 深度检查特定物体（含邻居分析）
@@ -182,20 +182,20 @@ scene_measure(obj_a="wall_north", obj_b="counter_A", mode="clearance")
 scene_assert(expectations='{"wall": {"exists": true, "position": [0,0,500]}}')
 ```
 
-### 工程审核
+### 场景检查
 
 ```python
-# 11 项确定性检查（返回 0-100 分）
+# 11 项固定检查（返回 0-100 分）
 scene_review()
 
 # 空间约束验证
 scene_validate(rules='[{"type": "min_clearance", "value": 180}]')
 ```
 
-### 镜头规划
+### 相机
 
 ```python
-# 创建镜头（8 种行业标准类型）
+# 创建相机（8 种内置镜头类型）
 camera_create(target="product_display", shot_type="medium", azimuth=30, elevation=15)
 # 类型：extreme_wide / wide / medium / close / extreme_close / bird_eye / low_angle / over_shoulder
 
@@ -203,17 +203,17 @@ camera_create(target="product_display", shot_type="medium", azimuth=30, elevatio
 camera_orbit(center=[0, 100, 0], radius=500, frames=120)
 ```
 
-### 避灾回退
+### 存档与读档
 
 ```python
-# 保存检查点（快照=内存态 exportAll，不含 undo 历史）
+# 存档（把当前场景导出成磁盘上的 .ma 文件，不含 undo 历史）
 scene_checkpoint(name="before_renovation")
 
-# 列出所有检查点
+# 列出所有存档
 scene_checkpoint_list()
 
-# 回滚（先自动存安全快照，再把场景名重绑回原文件；回滚后请用 scene_snapshot 重建认知）
-# 边界：快照自包含——references 默认展平不回写；假定单场景文件单会话
+# 读档（先自动存一份当前场景，再把场景名指回原文件；读档后请用 scene_snapshot 重建认知）
+# 边界：每个存档都自包含——references 默认展平不回写；假定单场景文件单会话
 scene_rollback(filename="cp_before_renovation.ma")
 ```
 
@@ -245,7 +245,7 @@ scene_export(path="D:/out/kit.usd", objects=["GEO_box"])  # exportSelected；导
 # 不支持 Alembic——AbcExport 不是 cmds.file 面。
 ```
 
-### 视觉闭环（仅 GUI 会话）
+### 看图复查（仅 GUI 会话）
 
 ```python
 # 视口所见即所得截图（含 HUD/选中高亮——验证用户正看到什么）
@@ -258,9 +258,9 @@ scene_render_preview(camera="CAM_hero", width=640, height=360)
 # wireframe/线稿审查建议 format="png"；实际尺寸以返回元数据为准
 ```
 
-## CoS 符号化格式
+## CoS 记号化格式
 
-默认输出使用 **Chain-of-Symbol** 记号化格式压缩场景数据。该格式论文报告在其演示场景上较 JSON 节省约 65% token（arXiv:2305.10276，-65.8%）。
+默认输出使用 **CoS**（Chain-of-Symbol）格式：把场景数据写成很短的一行行文字，省下发给 AI 的字数。该格式论文报告在其演示场景上较 JSON 节省约 65% token（arXiv:2305.10276，-65.8%）。
 
 ```
 SCENE[164obj, 5zones] UNIT=cm UP=y
@@ -277,7 +277,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 | Skill | 用途 |
 |-------|------|
-| `skills/icev-workflow` | ICEV 修改纪律：任何场景变更必走 Inspect→Compute→Execute→Verify |
+| `skills/icev-workflow` | ICEV 修改纪律：任何场景变更都必须先看、再算、再改、再复查 |
 | `skills/scene-review-playbook` | 审核手册：11 项检查的分值解读与 findings→actions 映射 |
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-audit-trust.svg" width="100%" alt="Audit & Trust"/>
@@ -290,7 +290,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 | overlaps | 10 | BBox 碰撞检测（排除父子） |
 | conflicts | 10 | 空间穿透检测 |
 | zones | 5 | 命名规则区域覆盖 |
-| naming | 5 | 生产命名规范 |
+| naming | 5 | 还在用 Maya 默认名的物体 |
 | components | 10 | GRP_ 分组 + 嵌套深度 ≤4 |
 | orphans | 5 | 空组/默认名检测 |
 | aesthetics | 15 | 5 维审美（色彩/构成/比例/光照/动线） |
@@ -303,7 +303,7 @@ entrance (6obj) @(157.3,162.6,-111.6)
 - **零遥测**：zero telemetry, no phone-home——本项目不含任何遥测或主动外发上报代码，可源码核实。唯一外发流量是两个资产工具：仅在调用时经 HTTPS 访问 `api.polyhaven.com` / `dl.polyhaven.org|.com`（`polyhaven.py` 内主机白名单 + md5 校验 + 大小上限）。
 - **本地单用户**：命令端口仅绑定 localhost；接入的 MCP client 是受信方。
 - **安全网**：统一管线（`pipeline.py` + `security.py`）对全部 25 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 独立 JSONL 审计日志（覆盖全部 25 个工具）。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
-- **事务安全**：`scene_checkpoint`/`scene_rollback` 提供内存态快照与显式回滚（快照不含 undo 历史，references 默认展平）。
+- **事务安全**：`scene_checkpoint`/`scene_rollback` 把场景存成磁盘上的 `.ma` 文件，读档时打开它（存档不含 undo 历史，references 默认展平）。
 - **严格策略模式（可选）**：设置 `MAYA_MCP_DISABLE_EXECUTE=1`、`MAYA_MCP_DISABLE_WRITE_MODULE=1` 或 `MAYA_MCP_DISABLE_ARBITRARY=1`（三者全禁），即可把逃生舱工具从 `tools/list` 中移除，并以 `[policy_disabled]` 拒绝调用；只读工具不受影响。它们是**误用护栏，不是恶意 agent 边界**——仍持有 `execute_code` 的 agent 本就在信任边界之内；它们买来的是 demo、误操作或 CI 沙箱场景下更小的爆炸半径。理由见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)，逐码对照见 [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md)。
 - **`safe_mode` AST 门（可选）**：设置 `MAYA_MCP_SAFE_MODE=1`（默认关闭）后，两个代码载荷工具仍在 `tools/list` 中，但其 `code` 参数须通过默认拒绝的 AST 允许清单：v1 import 根限 `maya`/`math`/`json`/`re`/`collections`/`itertools`/`functools`/`dataclasses`/`typing`，拒绝名单内建名——任何引用即拒绝而非仅调用（`eval`/`exec`/`open`/`__import__`/getattr/setattr/……）、`__builtins__` 引用与任何 `__dunder__` 属性访问；无法解析的输入同样拒绝（"无法判定即拒绝"）。拒绝以 `[safe_mode_rejected]` 报出（宿主 `isError` 失败）并点名触发的 rule id、记入审计 `rejected`；成功响应携带 `mode: "safe"` 字段，工具描述增加一行 `Boundary:` 披露。DISABLE 标志先移除工具——safe_mode 只收紧留下的部分。与 DISABLE 标志同一姿态：**安全网，不是安全边界**。理由见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)，逐码对照见 [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md)。
 - 漏洞报告渠道见 [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md)。
