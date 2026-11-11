@@ -66,8 +66,8 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > Python 3 answers `0.5`; on a live Maya 2024 MEL port it returns a
 > syntax-error body (verified on a real session — MEL's `eval` expects
 > a command string, not an expression), which still classifies the port as
-> MEL. Ports detected as non-Python join a session-level permanent
-> exemption set (re-enabled only if the port leaves LISTEN), so the probe
+> MEL. Ports detected as non-Python join this session's do-not-probe
+> list (re-enabled only if the port leaves LISTEN), so the probe
 > costs at most one Script Editor error line per port per session — then
 > the re-probe spam ends entirely. On top of that,
 > `MAYA_MCP_INCLUDE_PORTS` / `MAYA_MCP_EXCLUDE_PORTS` (or the matching
@@ -75,7 +75,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > productizing the workaround reported in this thread.
 >
 > Verified on a live Maya 2024 session: the MEL-port reply shape is pinned
-> in our test suite, and the exemption set bounds residual Script Editor
+> in our test suite, and the do-not-probe list bounds residual Script Editor
 > noise to one line per port.
 >
 > Full status mapping: https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/upstream-issue-status.md
@@ -87,8 +87,8 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 ## Issue #3 — post after 0.1.2 (boundary statement, not a fix announcement)
 
 > This is a declared-boundary note rather than a fix: the injected helper
-> genuinely requires `ast.unparse` (added in Python 3.9), and our fork is a
-> dual-runtime package — the host env needs Python >= 3.10 while the
+> genuinely requires `ast.unparse` (added in Python 3.9), and our fork supports
+> two Python environments — the host env needs Python >= 3.10 while the
 > *injected* side declares its own floor at **Maya >= 2023 (Python >= 3.9)**.
 >
 > What changed in >= 0.1.2 ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/)):

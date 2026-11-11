@@ -11,7 +11,7 @@ from collections import deque
 from typing import Any
 
 
-# Dual-runtime floor (upstream #3): this module is injected into
+# Two Python environments (upstream #3): this module is injected into
 # Maya's own interpreter - Maya >= 2023 ships Python >= 3.9. Refuse early
 # with an actionable message instead of dying later inside ast.unparse.
 if sys.version_info < (3, 9):  # noqa: UP036 - injected side runs Maya's own interpreter, not the host's
@@ -656,10 +656,10 @@ def get_qt_server_port() -> str:
 
 
 def _mcp_teardown() -> str:
-    """Idempotent module teardown (upstream issue #4).
+    """Module cleanup, safe to call twice (upstream issue #4).
 
-    create_module(overwrite=True) invokes this hook on the OLD module
-    object before evicting it from sys.modules. Every resource is released
+    create_module(overwrite=True) calls this on the OLD module object
+    before evicting it from sys.modules. Each resource is released
     inside its own try/except so one failure cannot skip the rest; calling
     it twice is a no-op.
     """

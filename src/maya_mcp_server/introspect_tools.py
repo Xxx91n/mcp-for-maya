@@ -1,10 +1,10 @@
 """MCP scene-graph introspection tools: scene_describe + scene_nodes.
 
-Both tools ride the _mcp_scene injection unit in their own host-side file
-(file boundary = injection boundary = failure-domain boundary):
+Both tools belong to the _mcp_scene module but live in their own host-side
+file (one file boundary is also the boundary of what can fail):
 their Maya-side code lives in introspect_module.py and is concatenated
 into the _mcp_scene payload by scene_tools._ensure_module_injected -
-same module name, same per-session trigger, same failure domain.
+same module name, same per-session trigger, same place that can fail.
 
 Read-only by design: no mark_dirty, no scene-cache lookup (attribute
 metadata, values and enumeration must always be fresh).

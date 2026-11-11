@@ -25,10 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_check_plain_language.py::test_a_clean_doc_passes`,
   `tests/test_check_plain_language.py::test_the_real_repo_loads_the_glossary_and_skips_the_records`.
 - **Internal zone-geometry read for the later `scene_plan` recommendation pass** —
-  the `_mcp_scene` injection unit now carries `get_zone_geometry()`, returning
-  the existing zone boxes plus per-object world sizes. It is a same-unit
-  fragment, not a new MCP tool; default `scene_plan` output stays unchanged
-  until #177 wires the helper in. Evidence:
+  the `_mcp_scene` module now carries `get_zone_geometry()`, returning
+  the existing zone boxes plus per-object world sizes. It is a separate file
+  inside that module, not a new MCP tool; default `scene_plan` output stays
+  unchanged until #177 wires the helper in. Evidence:
   `tests/test_zone_geometry_module.py::TestZoneGeometry::test_multiple_zones_match_the_existing_zone_map`,
   `tests/test_scene_tools_json.py::TestZoneGeometryHostHelper::test_default_scene_plan_bytes_do_not_use_the_helper`.
 - **Opt-in `safe_mode` gate for the code-bearing tools** — `MAYA_MCP_SAFE_MODE=1`

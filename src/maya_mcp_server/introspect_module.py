@@ -1,10 +1,10 @@
-# --- _mcp_scene introspection fragment: own file, same injection unit ---
+# --- _mcp_scene introspection file: own file, one injected module ---
 #
 # NOT a standalone injected module: scene_tools._ensure_module_injected
 # concatenates this file onto maya_scene_module.py and injects the
-# assembly as _mcp_scene - same module name, same trigger, same failure
-# domain (the first T-07 migration unit). Self-contained on purpose: it
-# references nothing private in the monolith.
+# assembly as _mcp_scene - same module name, same trigger, same place
+# that can fail (the first T-07 migration unit). Self-contained on purpose:
+# it references nothing private in the big single file.
 #
 # Runtime floor: Maya >=2023 (Python 3.9). This file carries NO
 # __future__ import of its own (it would sit mid-file in the
@@ -23,8 +23,8 @@ import maya.cmds as cmds
 
 
 def _int_err(code: str, message: str, suggestion: str | None = None) -> dict[str, Any]:
-    """Domain error result; same envelope as the monolith's _err but kept
-    separate so this fragment stays self-contained."""
+    """Domain error result; same envelope as maya_scene_module.py's _err but kept
+    separate so this file stays self-contained."""
     err: dict[str, Any] = {"code": code, "message": message}
     if suggestion:
         err["suggestion"] = suggestion

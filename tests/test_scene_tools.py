@@ -24,8 +24,9 @@ from maya_mcp_server.scene_tools import (
 
 
 class TestInjectionHygiene:
-    """D-082a: native-channel temp-file injection must be mkstemp-unique,
-    permission-restricted, and unlinked on every path."""
+    """D-082a: on the native port, large source goes through a temp file first;
+    that file must be mkstemp-unique, permission-restricted, and deleted on
+    every path."""
 
     async def test_native_channel_tmpfile_lifecycle(self, monkeypatch):
         import os

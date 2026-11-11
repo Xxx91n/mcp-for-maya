@@ -109,7 +109,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-# dormant: #177 wires this fragment into scene_plan recommendations. Its tests
+# dormant: #177 wires this file into scene_plan recommendations. Its tests
 # are contract tests, not production coverage; remove this omit when wired.
 omit = ["src/maya_mcp_server/zone_geometry_module.py"]
 

@@ -769,14 +769,15 @@ class TestLoopbackScanEnforcement:
 
 
 class TestNonPythonExemption:
-    """D-059: ports answering the probe as non-Python earn a session-level
-    permanent exemption - lifted only when the port disappears from LISTEN."""
+    """D-059: a port that answers the probe as non-Python goes on this
+    session's do-not-probe list - it comes off only when the port stops
+    LISTENing."""
 
     def _mel_client(self, mocker) -> MagicMock:
         client = MagicMock()
         client.connect = AsyncMock()
         client.bootstrap = AsyncMock(
-            side_effect=MayaConnectionError("Cannot bootstrap non-Python port (detected: mel)")
+            side_effect=MayaConnectionError("Port is not Python (detected: mel)")
         )
         client._port_type = PortType.MEL
         client.disconnect = AsyncMock()

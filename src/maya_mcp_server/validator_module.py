@@ -1,4 +1,4 @@
-# --- _mcp_scene checks-you-register fragment (issue #79): own file, same injected module ---
+# --- _mcp_scene checks-you-register file (issue #79): own file, one injected module ---
 #
 # NOT a standalone injected module: scene_tools._ensure_module_injected
 # concatenates this file onto maya_scene_module.py - after
@@ -6,8 +6,8 @@
 #
 # Why the scene_review composition lives here: maya_scene_module.py sits at
 # its .github/monolith-budget.json cap, so the review function cannot grow.
-# This fragment adds scene_review_with_validators(), the entry the
-# scene_review MCP tool calls; the monolith's own scene_review keeps
+# This separate file adds scene_review_with_validators(), the entry the
+# scene_review MCP tool calls; maya_scene_module.py's own scene_review keeps
 # returning the built-in checks alone, so the built-in 0-100 score is
 # unchanged by construction.
 #
@@ -43,8 +43,8 @@ _VALIDATORS: dict[str, dict[str, Any]] = {}
 
 
 def _val_err(code: str, message: str, suggestion: str | None = None) -> dict[str, Any]:
-    """Domain error result; same envelope as the monolith's _err, kept
-    separate so this fragment stays self-contained."""
+    """Domain error result; same envelope as maya_scene_module.py's _err, kept
+    separate so this file stays self-contained."""
     err: dict[str, Any] = {"code": code, "message": message}
     if suggestion:
         err["suggestion"] = suggestion

@@ -85,11 +85,11 @@ dispatch → disclosure (a successful gated call gains `mode:"safe"`)
 ## 4. Port and network exposure
 
 - The MCP server speaks stdio/SSE to its client; the Maya channel is a
-  localhost TCP command port (default `:7001`, sourceType=python) used for
-  discovery/bootstrap, plus a Qt TCP working channel (localhost-only,
-  length-prefixed frames, 16 MiB cap, ports 50000-60000) created during
-  bootstrap. Headless Maya (no Qt event loop) keeps a dedicated commandPort
-  as the minimal working channel.
+  localhost TCP command port (default `:7001`, sourceType=python) used to
+  find the session and inject the helper, plus a Qt TCP working port
+  (localhost-only, length-prefixed frames, 16 MiB cap, ports
+  50000-60000) created during injection. Headless Maya (no Qt event loop)
+  keeps a dedicated commandPort as the fallback working port.
 - The command port binds localhost only; `allow_remote_connections`
   defaults to False and there is no remote path today.
 - Anyone who can reach the command port can run Python inside Maya —
