@@ -322,7 +322,7 @@ def get_scene_graph(detail_level="compact") -> dict:
 
 
 def get_zone_map(patterns=None) -> dict:
-    """Group objects into zones by name keywords; 7 built-in, scene_plan uses 8.
+    """Group objects into zones by name keywords; 7 built-in zones.
     Args:
         patterns: dict of zone_name -> regex_pattern. If None, uses the
                   built-in 7-zone set for a pop-up store.

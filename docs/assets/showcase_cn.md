@@ -3,7 +3,7 @@
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-live-demo.svg" width="100%" alt="Live Demo — captured by the product itself"/>
 
-以下素材全部由本产品工具链真实捕获，非 mock：场景经 `execute_code` / `write_module` 程序化构建（另含一次真实 `asset_import`），帧画面经 `scene_render_preview` 渲染，audit 双帧经 `scene_review` + `scene_viewport_snapshot` 采集，环绕序列由 `playblast` 逐帧采集（Maya 2024 GUI 会话）。
+以下素材全部由本产品工具链真实捕获，非 mock：场景经 `execute_code` / `write_module` 程序化构建（另含一次真实 `asset_import`），帧画面经 `scene_render_preview` 渲染，检查前后双帧经 `scene_review` + `scene_viewport_snapshot` 采集，环绕序列由 `playblast` 逐帧采集（Maya 2024 GUI 会话）。
 
 | 指令 | 结果 |
 |---|---|

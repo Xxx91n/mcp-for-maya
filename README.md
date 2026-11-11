@@ -16,7 +16,7 @@
 
 `mcp-for-maya` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets AI agents (such as Codex and Claude) directly control Autodesk Maya for 3D modeling, scene planning, and production-ready work.
 
-**Core capability:** AI no longer writes code blindly. It inspects scene objects, materials, and spatial relationships at any time, auditing changes against real engineering rules.
+**Core capability:** AI no longer writes code blindly. It inspects scene objects, materials, and spatial relationships at any time, then checks its own changes against fixed rules.
 
 > [!WARNING]
 > This server runs Python code directly inside Maya by design, not by accident. For details, see [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
@@ -135,14 +135,14 @@ Every scene edit follows **ICEV**: look at the scene, work out the change, make 
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
 │ INSPECT  │ ──→ │ COMPUTE  │ ──→ │ EXECUTE  │ ──→ │ VERIFY   │
-│ snapshot │     │  plan    │     │  apply   │     │  audit   │
+│ look     │     │ work out │     │  apply   │     │  check   │
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
 ```
 
-1. **INSPECT**: Call `scene_snapshot()` to capture full spatial scene data
-2. **COMPUTE**: Calculate positions, sizes, and spacing from the spatial data
-3. **EXECUTE**: Run Maya Python code via `execute_code()`
-4. **VERIFY**: Check the outcome with `scene_assert()` + `scene_review()`; GUI sessions can use visual tools to verify visually
+1. **INSPECT** (look): Call `scene_snapshot()` to capture full spatial scene data
+2. **COMPUTE** (work out): Calculate positions, sizes, and spacing from the spatial data
+3. **EXECUTE** (apply): Run Maya Python code via `execute_code()`
+4. **VERIFY** (check): Check the outcome with `scene_assert()` + `scene_review()`; GUI sessions can also look at the result
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
 
@@ -280,11 +280,11 @@ The repository includes two **Experimental** skill cards (under the `skills/` fo
 | Skill | Purpose |
 |-------|---------|
 | `skills/icev-workflow` | ICEV discipline: every scene edit must look first, work out the change, apply it, then check the result |
-| `skills/scene-review-playbook` | Audit guide: scoring details for the 11 checks and how to turn findings into actions |
+| `skills/scene-review-playbook` | Check guide: scoring details for the 11 checks and how to turn findings into actions |
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-audit-trust.svg" width="100%" alt="Audit & Trust"/>
 
-`scene_review()` provides 11 universal checks (scores 0-100, normalized by rule weight):
+`scene_review()` provides 11 fixed checks (scores 0-100, normalized by rule weight):
 
 | Check | Points | What it checks |
 |-------|--------|----------------|

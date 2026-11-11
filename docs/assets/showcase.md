@@ -2,7 +2,7 @@
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-live-demo.svg" width="100%" alt="Live Demo — captured by the product itself"/>
 
-All media below were genuinely captured with the toolchain itself (no mockups): scenes were generated via `execute_code` / `write_module` (plus a real `asset_import`), preview frames were rendered through `scene_render_preview`, audit comparisons were captured using `scene_review` + `scene_viewport_snapshot`, and the orbit sequence was recorded frame by frame with `playblast` in a Maya 2024 GUI session.
+All media below were genuinely captured with the toolchain itself (no mockups): scenes were generated via `execute_code` / `write_module` (plus a real `asset_import`), preview frames were rendered through `scene_render_preview`, before/after check comparisons were captured using `scene_review` + `scene_viewport_snapshot`, and the orbit sequence was recorded frame by frame with `playblast` in a Maya 2024 GUI session.
 
 | Prompt | Result |
 |---|---|

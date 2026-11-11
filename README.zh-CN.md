@@ -16,7 +16,7 @@
 
 `mcp-for-maya` 是一个 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 服务器，让Agent（Codex、Claude 等）直接操控 Autodesk Maya，进行三维建模、场景规划和工程级项目落地。
 
-**核心能力：** AI 不再是"闭眼写代码"，而是能随时感知 Maya 场景的空间状态、材质分布、物体关系，并基于工程规范进行确定性审核。
+**核心能力：** AI 不再是"闭眼写代码"，而是能随时感知 Maya 场景的空间状态、材质分布、物体关系，并按固定的规则检查自己改得对不对。
 
 > [!WARNING]
 > 本服务器会使用 Python 代码在 Maya 中执行，这是设计能力而非漏洞。详见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
@@ -139,10 +139,10 @@ AI 会自动调用 `scene_snapshot()` → 理解场景 → 执行建模 → 用 
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
 ```
 
-1. **INSPECT**：`scene_snapshot()` 获取全场景空间数据
-2. **COMPUTE**：基于空间数据计算位置、尺寸、间距
-3. **EXECUTE**：`execute_code()` 执行 Maya Python 代码
-4. **VERIFY**：`scene_assert()` + `scene_review()` 确认结果；GUI 会话可用视觉工具复核
+1. **INSPECT**（读场景）：`scene_snapshot()` 获取全场景空间数据
+2. **COMPUTE**（算方案）：基于空间数据计算位置、尺寸、间距
+3. **EXECUTE**（动手改）：`execute_code()` 执行 Maya Python 代码
+4. **VERIFY**（复查结果）：`scene_assert()` + `scene_review()` 确认结果；GUI 会话还可以直接看图
 
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-capability-matrix.svg" width="100%" alt="Capability Matrix"/>
@@ -258,7 +258,7 @@ scene_render_preview(camera="CAM_hero", width=640, height=360)
 # wireframe/线稿审查建议 format="png"；实际尺寸以返回元数据为准
 ```
 
-## CoS 记号化格式
+## CoS 输出格式
 
 默认输出使用 **CoS**（Chain-of-Symbol）格式：把场景数据写成很短的一行行文字，省下发给 AI 的字数。该格式论文报告在其演示场景上较 JSON 节省约 65% token（arXiv:2305.10276，-65.8%）。
 
@@ -278,11 +278,11 @@ entrance (6obj) @(157.3,162.6,-111.6)
 | Skill | 用途 |
 |-------|------|
 | `skills/icev-workflow` | ICEV 修改纪律：任何场景变更都必须先看、再算、再改、再复查 |
-| `skills/scene-review-playbook` | 审核手册：11 项检查的分值解读与 findings→actions 映射 |
+| `skills/scene-review-playbook` | 检查手册：11 项检查的分值解读与 findings→actions 映射 |
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-audit-trust.svg" width="100%" alt="Audit & Trust"/>
 
-`scene_review()` 提供 11 项通用检查（0-100 分，按各项分值归一化）：
+`scene_review()` 提供 11 项固定检查（0-100 分，按各项分值归一化）：
 
 | 检查 | 分值 | 检查内容 |
 |------|------|----------|

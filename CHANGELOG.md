@@ -63,10 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   descriptions and error strings. Two claims that contradicted the code are
   fixed: `scene_checkpoint` is described as writing a `.ma` file to disk under
   `checkpoints/` (it used to be described as living only in Maya's memory),
-  and `get_zone_map()`
-  is described as 7 built-in zones while `scene_plan` uses a different set of
-  8 (the glossary said 9). No public tool name, function name, parameter name
-  or error code changed; `llms.txt` was regenerated, not hand-edited. Evidence:
+  and the zone text now names `get_zone_map()`'s 7 built-in zones instead of
+  the 9 the glossary used to claim. No public tool name, function name,
+  parameter name or error code changed; `llms.txt` was regenerated, not
+  hand-edited. Evidence:
   `tests/test_checkpoint_rollback.py::TestRollback::test_rollback_missing_snapshot`,
   `tests/test_checkpoint_rollback.py::TestRollback::test_rollback_corrupt_snapshot`,
   `.github/scripts/check_llms_txt.py::render`.
