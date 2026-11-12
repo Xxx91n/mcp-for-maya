@@ -123,8 +123,9 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > so one failing resource cannot block the rest, `deleteLater` semantics
 > for Qt objects, and `stop()` disconnects the `newConnection` signal
 > rather than only closing the socket (prevents double-firing after a
-> reload). A failing cleanup surfaces as a `warning` field instead of
-> blocking the replacement.
+> reload). A cleanup that raises surfaces as a `warning` field instead of
+> blocking the replacement; the shipped hook catches its own failures and
+> reports them in the JSON result it returns, which is not forwarded.
 >
 > Verification status: covered by stub-tier tests including the Qt signal
 > semantics, and verified on a live Maya 2024 session — the cleanup

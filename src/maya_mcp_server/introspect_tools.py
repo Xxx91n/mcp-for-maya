@@ -1,11 +1,12 @@
 """MCP scene-graph introspection tools: scene_describe + scene_nodes.
 
-Both tools belong to the _mcp_scene module but live in their own host-side
-file. Their Maya-side code lives in introspect_module.py and is concatenated
-into the _mcp_scene payload by scene_tools._ensure_module_injected -
-same module name, same per-session trigger. This file has no separate
-failure domain: a syntax or import-time error here stops the whole
-_mcp_scene module from loading, though a runtime error only fails that call.
+Both tools belong to the _mcp_scene module. The tool wrappers live in this
+host-side file; their Maya-side code lives in introspect_module.py, which is
+concatenated into the _mcp_scene payload by scene_tools._ensure_module_injected
+- same module name, same per-session trigger. The injected half shares the
+module's load step: a syntax or import-time error in introspect_module.py stops
+the whole _mcp_scene module from loading, though a runtime error only fails
+that call.
 
 Read-only by design: no mark_dirty, no scene-cache lookup (attribute
 metadata, values and enumeration must always be fresh).
