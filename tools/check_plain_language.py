@@ -249,15 +249,23 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
     """
     out: list[tuple[int, str]] = []
     fence: str | None = None
+    fence_indent = 0
     list_indent: int | None = None
     for number, line in enumerate(text.splitlines(), 1):
         body = line.lstrip(" ")
         indent = len(line) - len(body)
         if fence is not None:
-            # A closer is checked first, at any indent: a fence held by a list
-            # item is indented with it, so the indented-code skip must not win.
+            # A closer is checked before the indented-code skip, because a fence
+            # held by a list item is indented with it. It may sit three spaces
+            # deeper than the opener, or at the opener's own indent; deeper than
+            # that and it is sample content, not a closer.
             closer = FENCE_CLOSE.match(body)
-            if closer and closer.group(1)[0] == fence[0] and len(closer.group(1)) >= len(fence):
+            if (
+                closer
+                and closer.group(1)[0] == fence[0]
+                and len(closer.group(1)) >= len(fence)
+                and indent <= max(3, fence_indent)
+            ):
                 fence = None
             continue
         if indent >= 4 and list_indent is None:
@@ -267,6 +275,7 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
         # forbids a backtick in a backtick fence's info string.
         if opener and (opener.group(1)[0] != "`" or "`" not in body[opener.end() :]):
             fence = opener.group(1)
+            fence_indent = indent
             if list_indent is not None and indent <= list_indent:
                 list_indent = None
             continue
