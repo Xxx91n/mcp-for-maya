@@ -8,7 +8,7 @@ Performance targets: 100 objects < 50ms, 1000 objects < 200ms.
 """
 
 # annotations lazily evaluated: the assembled payload concatenates
-# introspect_module.py below this file's end, so the fragment's PEP-604
+# introspect_module.py below this file's end, so this file's PEP-604
 # annotations are strings at Maya-runtime (Py3.9) - never evaluated.
 from __future__ import annotations
 

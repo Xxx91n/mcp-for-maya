@@ -138,15 +138,17 @@ async def ensure_module_injected(
 
     Shared by _mcp_scene/_mcp_asset: reads the module source
     from disk and writes it via write_module, once per session. For
-    large modules on the NATIVE (headless/bootstrap) channel the source
-    is staged through a unique mkstemp file to avoid command-port
-    buffer issues; the Qt framed channel carries length-prefixed frames
-    up to 16 MiB, so GUI sessions inject directly via write_module.
+    large modules on the native command port (normally the headless case)
+    the source goes to a unique mkstemp file first and Maya reads it back,
+    because past ~15K the port can answer stale; the Qt channel sends
+    length-prefixed frames up to 16 MiB, so a Qt session injects
+    directly via write_module.
 
-    extra_source_paths: additional source files concatenated
-    into the SAME module payload before writing - one module name, one
-    namespace, one failure domain. Fragment files
-    must carry no __future__ import (it lands mid-file = SyntaxError).
+    extra_source_paths: more source files appended to the same payload
+    before writing - one module name, one namespace, one load step: a
+    syntax or import-time error in any of them stops the whole module from
+    loading. Extra files must carry no __future__ import (it would land
+    mid-file = SyntaxError).
     """
     key = session_key or "_default"
     if key in injected_sessions:
@@ -162,8 +164,9 @@ async def ensure_module_injected(
 
         import platformdirs as _pd
 
-        # Injection temp-file hygiene: mkstemp under the platformdirs user
-        # cache (no predictable shared-temp path), 0600 perms, unlink in finally.
+        # The file is written to a temp path first: mkstemp under the
+        # platformdirs user cache (no predictable shared-temp path), 0600
+        # perms, removed in finally.
         _dir = _os.path.join(_pd.user_cache_dir("mcp-for-maya"), "inject")
         _os.makedirs(_dir, exist_ok=True)
         _fd, _tmp = _tf.mkstemp(prefix=tmp_prefix, suffix=".py", dir=_dir)
@@ -674,13 +677,14 @@ class MayaClient(BaseMayaClient):
             return self._port_type
 
         try:
-            # Bilingual probe (upstream #1): Python 3 answers 0.5
-            # (true division); everything else classifies MEL. T-18a live
+            # Port type probe (upstream #1): Python 3 answers 0.5
+            # (true division). Any other reply counts as MEL; no reply at
+            # all stays UNKNOWN (the except below). T-18a live
             # pin (Maya 2024.0.0.4640, zh locale): a real MEL port answers
             # eval("1/2") with a syntax-error body, not silent 0 - the
-            # discriminant is "0.5 vs anything else", and the Script
+            # tell is "0.5 vs anything else", and the Script
             # Editor does log the error. Operands must stay int/int:
-            # 1.0/2 would collapse the discriminant.
+            # 1.0/2 would make the two answers identical.
             response = await self._send_receive('eval("1/2")')
 
             result_str = _result_str(response)
@@ -712,7 +716,8 @@ class MayaClient(BaseMayaClient):
             # form, with the source wrapped in a python() call, and this path
             # does not build that wrapper - it refuses the port instead.
             raise MayaConnectionError(
-                f"Cannot bootstrap non-Python port (detected: {port_type.value})"
+                f"Port is not Python, so the helper cannot be injected here "
+                f"(detected: {port_type.value})"
             )
 
         helper_code = get_helper_module_code()
@@ -896,9 +901,9 @@ class MayaClient(BaseMayaClient):
             if qt_client is not None:
                 new_client = qt_client
             else:
-                # Headless Maya (mayapy) has no Qt event loop. The
-                # native commandPort is the minimal fallback working channel
-                # there - it never promises large payloads.
+                # Headless Maya (mayapy) has no Qt event loop. The native
+                # commandPort is the fallback working port there - it
+                # never promises large payloads.
                 logger.warning(
                     f"Qt server unavailable ({qt_error}); "
                     "falling back to a dedicated native commandPort"
@@ -1006,7 +1011,7 @@ class MayaClient(BaseMayaClient):
 class MayaQtClient(BaseMayaClient):
     """Async client for the custom Maya Qt command server.
 
-    Primary working channel: length-prefixed frames (16 MiB cap) over a
+    The main working port: length-prefixed frames (16 MiB cap) over a
     localhost-only QTcpServer; per-connection FIFO queue Maya-side;
     requests here are serialized by self._lock and correlated by id.
     """

@@ -1,11 +1,11 @@
 """Issue #79 Maya-side contract tests: custom scene_review validators.
 
-Most run against the stub-bound _mcp_scene injection unit (monolith + all
-fragments assembled - maya_env.module), the same seam
+Most run against the stub-bound _mcp_scene module (the big file plus all
+the extra files assembled - maya_env.module), the same seam
 tests/test_introspect_module.py uses. Those are CONTRACT tests: the
 registration surface, the score separation and the check_error isolation must
 hold in real Maya, where the predicate runs against a live DG. The last class
-pins the scene-review skill card against this fragment - mostly through the
+pins the scene-review skill card against this code - mostly through the
 same stub seam, and never against a real Maya.
 """
 
@@ -541,7 +541,7 @@ class TestSessionScope:
 
 class TestCardPinsTheShippedApi:
     """The scene-review card carries the validator recipe so nobody has to open
-    this fragment to use it, and `skills/` sits outside check_doc_claims.py's
+    this code to use it, and `skills/` sits outside check_doc_claims.py's
     surfaces - so these are the only assertions that go red when card and code
     drift apart.
 

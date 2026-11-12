@@ -64,7 +64,7 @@ async def visual_module(gui_client):
 
 async def test_bootstrap_uses_framed_qt_channel(gui_client):
     """issue #7 PySide2 item: bootstrap on a real GUI session must yield
-    the framed Qt working channel."""
+    the framed Qt working port."""
     assert isinstance(gui_client, MayaQtClient)
     assert gui_client.framed_channel is True
 

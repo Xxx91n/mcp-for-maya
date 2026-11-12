@@ -1,4 +1,4 @@
-# --- _mcp_scene checks-you-register fragment (issue #79): own file, same injected module ---
+# --- _mcp_scene checks-you-register file (issue #79): own file, one injected module ---
 #
 # NOT a standalone injected module: scene_tools._ensure_module_injected
 # concatenates this file onto maya_scene_module.py - after
@@ -6,8 +6,8 @@
 #
 # Why the scene_review composition lives here: maya_scene_module.py sits at
 # its .github/monolith-budget.json cap, so the review function cannot grow.
-# This fragment adds scene_review_with_validators(), the entry the
-# scene_review MCP tool calls; the monolith's own scene_review keeps
+# This separate file adds scene_review_with_validators(), the entry the
+# scene_review MCP tool calls; maya_scene_module.py's own scene_review keeps
 # returning the built-in checks alone, so the built-in 0-100 score is
 # unchanged by construction.
 #
@@ -22,7 +22,7 @@
 # Runtime floor: Maya >=2023 (Python 3.9). This file carries NO
 # __future__ import of its own (it would sit mid-file in the concatenated
 # payload = SyntaxError) - the unquoted PEP-604 annotations below are
-# py3.9-safe ONLY because the monolith's `from __future__ import annotations`
+# py3.9-safe ONLY because maya_scene_module.py's `from __future__ import annotations`
 # governs the assembled unit. Do NOT exec/import this file standalone on py3.9.
 
 import math
@@ -43,8 +43,8 @@ _VALIDATORS: dict[str, dict[str, Any]] = {}
 
 
 def _val_err(code: str, message: str, suggestion: str | None = None) -> dict[str, Any]:
-    """Domain error result; same envelope as the monolith's _err, kept
-    separate so this fragment stays self-contained."""
+    """Domain error result; same envelope as maya_scene_module.py's _err, kept
+    separate so this file stays self-contained."""
     err: dict[str, Any] = {"code": code, "message": message}
     if suggestion:
         err["suggestion"] = suggestion
@@ -413,7 +413,7 @@ def scene_review_with_validators(checks: list[str] | None = None) -> dict[str, A
     The built-in `score` never sees a custom weight, so a report from before
     this feature keeps its exact shape.
     """
-    # Indirect on purpose: the monolith's scene_review is a name this file
+    # Indirect on purpose: maya_scene_module.py's scene_review is a name this file
     # only has once the payload is assembled, and a bare reference would be
     # an undefined-name error in the standalone lint pass over this file.
     result: dict[str, Any] = globals()["scene_review"](checks)

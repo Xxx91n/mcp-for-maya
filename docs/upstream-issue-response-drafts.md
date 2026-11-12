@@ -62,12 +62,12 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > drops an error into the Script Editor.
 >
 > Fixed in our fork ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/),
-> **>= 0.1.2**): the probe payload is now the bilingual `eval("1/2")` —
+> **>= 0.1.2**): the probe payload is now the port-type `eval("1/2")` —
 > Python 3 answers `0.5`; on a live Maya 2024 MEL port it returns a
 > syntax-error body (verified on a real session — MEL's `eval` expects
 > a command string, not an expression), which still classifies the port as
-> MEL. Ports detected as non-Python join a session-level permanent
-> exemption set (re-enabled only if the port leaves LISTEN), so the probe
+> MEL. Ports detected as non-Python join this session's do-not-probe
+> list (re-enabled only if the port leaves LISTEN), so the probe
 > costs at most one Script Editor error line per port per session — then
 > the re-probe spam ends entirely. On top of that,
 > `MAYA_MCP_INCLUDE_PORTS` / `MAYA_MCP_EXCLUDE_PORTS` (or the matching
@@ -75,7 +75,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > productizing the workaround reported in this thread.
 >
 > Verified on a live Maya 2024 session: the MEL-port reply shape is pinned
-> in our test suite, and the exemption set bounds residual Script Editor
+> in our test suite, and the do-not-probe list bounds residual Script Editor
 > noise to one line per port.
 >
 > Full status mapping: https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/upstream-issue-status.md
@@ -87,8 +87,8 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 ## Issue #3 — post after 0.1.2 (boundary statement, not a fix announcement)
 
 > This is a declared-boundary note rather than a fix: the injected helper
-> genuinely requires `ast.unparse` (added in Python 3.9), and our fork is a
-> dual-runtime package — the host env needs Python >= 3.10 while the
+> genuinely requires `ast.unparse` (added in Python 3.9), and our fork supports
+> two Python environments — the host env needs Python >= 3.10 while the
 > *injected* side declares its own floor at **Maya >= 2023 (Python >= 3.9)**.
 >
 > What changed in >= 0.1.2 ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/)):
@@ -119,15 +119,16 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > Fixed in our fork ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/),
 > **>= 0.1.2**): `create_module` now invokes the evicted module's
 > `_mcp_teardown` hook *before* replacing the `sys.modules` entry. The
-> injected helper implements an idempotent teardown — per-item try/except
+> injected helper implements a cleanup that is safe to call twice — per-item try/except
 > so one failing resource cannot block the rest, `deleteLater` semantics
 > for Qt objects, and `stop()` disconnects the `newConnection` signal
 > rather than only closing the socket (prevents double-firing after a
-> reload). A failing teardown surfaces as a `warning` field instead of
-> blocking the replacement.
+> reload). A cleanup that raises surfaces as a `warning` field instead of
+> blocking the replacement; the shipped hook catches its own failures and
+> reports them in the JSON result it returns, which is not forwarded.
 >
 > Verification status: covered by stub-tier tests including the Qt signal
-> semantics, and verified on a live Maya 2024 session — the teardown
+> semantics, and verified on a live Maya 2024 session — the cleanup
 > hook fired exactly once across a reconnect, the old listener port was
 > released, and the replacement server bound cleanly.
 >

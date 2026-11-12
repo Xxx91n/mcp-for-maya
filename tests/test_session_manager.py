@@ -533,7 +533,7 @@ class TestAddSession:
     async def test_add_session_stores_bootstrap_client(
         self, session_manager: SessionManager, mocker
     ) -> None:
-        """D-013 regression: bootstrap() returns the working-channel client.
+        """D-013 regression: bootstrap() returns the working-port client.
         The session must store THAT client under its communication-port key,
         not the config-port client."""
         config_client = MagicMock(spec=MayaClient)
@@ -769,14 +769,15 @@ class TestLoopbackScanEnforcement:
 
 
 class TestNonPythonExemption:
-    """D-059: ports answering the probe as non-Python earn a session-level
-    permanent exemption - lifted only when the port disappears from LISTEN."""
+    """D-059: a port that answers the probe as non-Python goes on this
+    session's do-not-probe list - it comes off only when the port stops
+    LISTENing."""
 
     def _mel_client(self, mocker) -> MagicMock:
         client = MagicMock()
         client.connect = AsyncMock()
         client.bootstrap = AsyncMock(
-            side_effect=MayaConnectionError("Cannot bootstrap non-Python port (detected: mel)")
+            side_effect=MayaConnectionError("Port is not Python (detected: mel)")
         )
         client._port_type = PortType.MEL
         client.disconnect = AsyncMock()

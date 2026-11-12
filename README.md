@@ -90,7 +90,7 @@ Each `commandPort` binds to a specific `host:port`. A second instance cannot use
 |---------------|-------------|-------|
 | Instance A | `:7001` python | Main workspace |
 | Instance B | `:7002` python | Second instance |
-| Instance A | `:7011` mel | MEL port (auto-detected and skipped to avoid spamming errors) |
+| Instance A | `:7011` mel | MEL port (identified once, then never probed again) |
 
 Run `cmds.commandPort(name=":<port>", sourceType="python")` in each instance's Script Editor (or each one's `userSetup.py`). **Auto-scan** is the primary method — the server regularly scans local Maya listening ports and sets up connections. If an instance is missed, call `add_session(host, port)` manually. If port scanning touches other local TCP services, set `MAYA_MCP_INCLUDE_PORTS=7001,7002` (comma-separated, ranges like `7005-7010` supported) to limit the scan, or use `MAYA_MCP_EXCLUDE_PORTS=<port>` to ignore specific ports.
 
@@ -105,7 +105,7 @@ Note: A `commandPort` **does not persist across sessions** — it closes when Ma
 | userSetup.py does not run | Check that the file is in the right scripts folder, then restart Maya |
 | Blocked by firewall | Make sure localhost:7001 can be accessed locally |
 | Second Maya instance not found | Each instance needs its own port (same port causes bind conflicts); if scanning still misses it, use `add_session(host, port)` |
-| Script Editor spams syntax errors | An older symptom of scanning MEL ports. Current versions ignore non-Python ports automatically; if it still happens, exclude the port with `MAYA_MCP_EXCLUDE_PORTS` |
+| Script Editor spams syntax errors | An older symptom of scanning MEL ports. Current versions identify a non-Python port once and then stop probing it; if it still happens, exclude the port with `MAYA_MCP_EXCLUDE_PORTS` |
 
 ### 3. Configure your MCP client
 

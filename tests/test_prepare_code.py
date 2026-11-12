@@ -490,7 +490,7 @@ class TestResultExecution:
 
 
 class TestFloorGuard:
-    """D-060① dual-runtime floor: the injected helper requires
+    """D-060① two Python environments floor: the injected helper requires
     Maya >= 2023 (Python >= 3.9) on the Maya side."""
 
     def test_unparse_missing_degrades_to_no_capture(self, monkeypatch) -> None:

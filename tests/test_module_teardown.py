@@ -1,8 +1,8 @@
-"""Teardown protocol regression tests (D-058 / upstream issue #4).
+"""Module cleanup regression tests (D-058 / upstream issue #4).
 
-create_module(overwrite=True) must invoke the old module's _mcp_teardown
-hook before evicting it from sys.modules; the injected helper ships an
-idempotent _mcp_teardown that releases its Qt server and stream capture.
+create_module(overwrite=True) must call the old module's _mcp_teardown
+before evicting it from sys.modules; the injected helper ships a
+_mcp_teardown that can run twice and releases its Qt server and stream capture.
 """
 
 from __future__ import annotations

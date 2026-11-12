@@ -120,7 +120,7 @@ def test_visual_module_batch_gate_in_real_maya(real_maya):
 
 # ---------------------------------------------------------------------------
 # D-056② call-form bookings — viewport-independent shapes asserted on a
-# healthy mayapy. Env-blocked on the current box; dormant, not claimed.
+# healthy mayapy. Env-blocked on the current box; not wired in yet, not claimed.
 # ---------------------------------------------------------------------------
 
 
@@ -173,10 +173,10 @@ def test_callform_about_batch_is_true(real_maya):
 
 
 def _injection_unit():
-    """Exec the real _mcp_scene payload shape in mayapy: monolith source
-    + all three fragments concatenated into one namespace - the same bytes
+    """Exec the real _mcp_scene payload shape in mayapy: the big file's source
+    plus all three extra files concatenated into one namespace - the same bytes
     the host ships via write_module (D-095). A __future__ slip or py-unsafe
-    syntax in a fragment fails here exactly as in Maya. __mcp_payload__ is
+    syntax in any of them fails here exactly as in Maya. __mcp_payload__ is
     test-only metadata for the byte-parity check."""
     import sys
     import types
@@ -184,7 +184,7 @@ def _injection_unit():
 
     src_dir = Path(__file__).resolve().parents[1] / "src" / "maya_mcp_server"
     source = (src_dir / "maya_scene_module.py").read_text(encoding="utf-8")
-    # No exists() guard: the host reads the fragments unconditionally, so a
+    # No exists() guard: the host reads these files unconditionally, so a
     # missing one has to fail here rather than silently shrink this payload
     # below the shipped one.
     for frag_name in ("introspect_module.py", "validator_module.py", "zone_geometry_module.py"):
@@ -224,7 +224,7 @@ def test_list_nodes_in_real_maya(real_maya):
 
 
 def test_zone_geometry_in_real_maya(real_maya):
-    """Issue #176: the appended fragment runs inside the assembled unit."""
+    """Issue #176: the appended file runs inside the assembled module."""
     m = _injection_unit()
     real_maya.polyCube(name="GEO_shelf_probe", width=2, height=1, depth=3)
     res = m.get_zone_geometry()

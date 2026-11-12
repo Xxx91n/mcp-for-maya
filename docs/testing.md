@@ -10,7 +10,7 @@ Two test tiers exist. They are deliberately separate.
 | Injected helper (inside Maya) | Maya >= 2023 i.e. Python >= 3.9 — the `ast.unparse` floor is enforced with a friendly refusal at injection time |
 | Empirically verified | Maya 2024 GUI (Tier 3) |
 
-Multi-instance note (D-060): each Maya instance binds its own `commandPort` on a distinct port — a second instance on the same port fails to bind. The scanner probes all listening ports; MEL commandPorts are positively identified by the bilingual `eval("1/2")` probe and permanently exempted while they keep LISTENing (upstream issue #1). Bound or exclude probe targets via `MAYA_MCP_INCLUDE_PORTS` / `MAYA_MCP_EXCLUDE_PORTS` (comma-separated ports or `a-b` ranges).
+Multi-instance note (D-060): each Maya instance binds its own `commandPort` on a distinct port — a second instance on the same port fails to bind. The scanner probes all listening ports; a port that answers the port-type `eval("1/2")` probe as non-Python goes on this session's do-not-probe list and is not probed again while it keeps LISTENing (upstream issue #1). Bound or exclude probe targets via `MAYA_MCP_INCLUDE_PORTS` / `MAYA_MCP_EXCLUDE_PORTS` (comma-separated ports or `a-b` ranges).
 
 ## Tier 1 — stub tests (CI-safe, no Maya needed)
 
@@ -99,8 +99,8 @@ the SIL(stub)/PIL(mayapy)/HIL(live GUI) mapping:
 
 ```bash
 # machine-checkable items — real asserts against a live session
-# (probes MAYA_MCP_GUI_ADDR=host:port, default 127.0.0.1:7001 bootstrap
-# commandPort; skips cleanly when no session is up)
+# (probes MAYA_MCP_GUI_ADDR=host:port, default 127.0.0.1:7001 entry
+# port; skips cleanly when no session is up)
 python -m pytest tests/ -m gui
 
 # human-eye checklist — tests exist, print manual steps, always skip
@@ -108,7 +108,7 @@ python -m pytest tests/ -m gui
 python -m pytest tests/ -m human_verify -s
 ```
 
-`gui` covers: framed-channel bootstrap (PySide2/Qt real session),
+`gui` covers: the framed-channel setup after injection (PySide2/Qt real session),
 str `result_type` over the real wire (D-046), viewport_snapshot PNG
 contract, render_preview net-zero side effects (panel camera +
 currentTime restored), returned-metadata `width/height` matching

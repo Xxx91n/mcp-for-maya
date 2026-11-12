@@ -1,9 +1,9 @@
 """T-24b Maya-side contract tests: describe_node / list_nodes (D-094).
 
-Runs against the stub-bound _mcp_scene injection unit (monolith +
-fragments assembled - maya_env.module). These are
+Runs against the stub-bound _mcp_scene module (the big file plus the extra
+files assembled - maya_env.module). These are
 CONTRACT tests: shapes and error codes must hold in real Maya, where
-the fragment runs inside a live DG.
+this code runs inside a live DG.
 """
 
 from __future__ import annotations

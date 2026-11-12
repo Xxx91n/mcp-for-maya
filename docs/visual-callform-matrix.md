@@ -112,7 +112,7 @@ teardown so the probe frame cannot leak into the caller's capture.
 ## Introspection call sites (D-094)
 
 Scope: every cmds.* call site in `src/maya_mcp_server/introspect_module.py`
-(concatenated into the `_mcp_scene` injection unit, D-095) plus the stub
+(concatenated into the `_mcp_scene` module, D-095) plus the stub
 surface added to `tests/maya_stub/cmds.py`. All rows verified verbatim
 against the official Maya 2024 CommandsPython pages on 2026-09-25.
 

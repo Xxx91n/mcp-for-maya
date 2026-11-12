@@ -28,8 +28,9 @@ logger = logging.getLogger(__name__)
 
 # Module source paths for _mcp_scene. The separate files are concatenated
 # into the SAME injected module in this order: introspection, checks you
-# register, zone geometry. One module name / trigger / failure domain, but
-# separately maintained host-side source files.
+# register, zone geometry. One module name, one trigger; a syntax or
+# import-time error in any of them stops the whole module from loading.
+# The host-side files are still maintained separately.
 _MODULE_SOURCE = Path(__file__).parent / "maya_scene_module.py"
 _INTROSPECT_FRAGMENT = Path(__file__).parent / "introspect_module.py"
 _VALIDATOR_FRAGMENT = Path(__file__).parent / "validator_module.py"
