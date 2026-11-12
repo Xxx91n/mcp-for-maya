@@ -91,10 +91,14 @@ resolves and a test count that no longer matches the suite it cites. Every
 
 ### Asset directory discipline
 
-`.github/assets/` is append-only: README imagery is referenced by absolute
-`main` URLs and published PyPI pages render `main` forever — deleting or
-renaming a published asset permanently breaks historical release pages. New
-captures get NEW filenames.
+`.github/assets/` only grows: files are added, never deleted, renamed, or
+edited in place. README imagery is referenced by absolute `main` URLs, and
+published PyPI pages render `main` forever — a delete, rename, or in-place
+edit of a published asset permanently changes what historical release pages
+show. The guard checks `--diff-filter=DMRT`, so a modified file fails the job
+just like a deleted one. New captures get NEW filenames. The guard does have
+a stated escape hatch: a maintainer-aware merge that names the removal in the
+PR body, which is how the three asset fixes before this cleanup landed.
 
 ## Pull requests
 

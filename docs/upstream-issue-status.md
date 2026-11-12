@@ -29,6 +29,12 @@ durable version pointer -> fork disclosure -> offer to upstream the fix);
 drafts lived in `docs/upstream-issue-response-drafts.md`. All six comments
 were posted after user authorization once 0.1.2 was public:
 
+> **Note on the drafts file**: the plain-language pass (#188-#191) rewrote
+> the wording in `docs/upstream-issue-response-drafts.md`. The comments
+> actually posted are unchanged and still use the old words, so the drafts
+> file is now the plain restatement, not a byte copy. The links below are
+> the record of what was said.
+
 | Issue | Comment |
 |-------|---------|
 | #1 | [issuecomment-5780348679](https://github.com/chadrik/maya-mcp-server/issues/1#issuecomment-5780348679) |

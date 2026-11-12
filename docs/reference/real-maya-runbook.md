@@ -1,5 +1,7 @@
 # Maya MCP Server — v1.0.0 真机验证窗执行手册 (Runbook)
 
+> **这份文件是什么（白话摘要）**：2026 年 9 月那轮"在真 Maya 上跑一遍"的验证手册，留作历史记录，正文不改。它讲的是怎么在一台装好 Maya 2024 的机器上，按三条车道（mayapy 无界面、桌面脚本、GUI 界面）把十项检查逐项跑完并记下结果。真正的结果表在 `docs/evidence/real-maya-window-2026-09-30.md`，本文只是当时的操作步骤。文中 `D-xxx` 是已退役决策账本的编号，原文用 `git show '1c5befe^:docs/decision-ledger.md'` 取；`.scratch/` 下的草稿不入仓。第 5 步提到的「脏场景守卫」只在文档里写过，代码里没有实现（#185）。
+
 > **文档标识**：docs/reference/real-maya-runbook.md（原工作副本 `.scratch/t32/runbook.md`，rev 1.1 返工修订版；`.scratch/` 已不入仓）
 > **修订日期**：2026-09-29
 > **审计返工依据**：2026-09-29 T-32a 独立审计报告（纠正 D-146 渠道与单次核销语义、跑序上下游依赖、框2 版本矩阵拆行、Scope 固定行 build/stdio 补齐、GUI 前置脏场景守卫、AC-01 逃生通道恢复 live GUI 降级退路、度量口径订正）

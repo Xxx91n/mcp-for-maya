@@ -3,7 +3,7 @@
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-live-demo.svg" width="100%" alt="Live Demo — captured by the product itself"/>
 
-以下素材全部由本产品工具链真实捕获，非 mock：场景经 `execute_code` / `write_module` 程序化构建（另含一次真实 `asset_import`），帧画面经 `scene_render_preview` 渲染，检查前后双帧经 `scene_review` + `scene_viewport_snapshot` 采集，环绕序列由 `playblast` 逐帧采集（Maya 2024 GUI 会话）。
+下面这些东西全是用这套工具自己做出来的，没有拿假图充数。场景由 `execute_code` / `write_module` 建，另外真跑了把 `asset_import`。预览帧用 `scene_render_preview` 渲染。检查前后的两张图用 `scene_review` 加 `scene_viewport_snapshot` 截下来。环绕动画是在 Maya 2024 GUI 里用 `playblast` 一帧一帧录的。
 
 | 指令 | 结果 |
 |---|---|

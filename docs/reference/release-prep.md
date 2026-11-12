@@ -1,8 +1,100 @@
 # T-18c release prep — v0.1.2 (D-068)
 
-All artifacts below are PREPARED ONLY. Every step past the "prepared" line
-is a human gate — nothing here has been pushed, published, yanked, or
-posted.
+The v0.1.2 section below is PREPARED ONLY: every step past the "prepared"
+line was a human gate, and nothing in that section was pushed, published,
+yanked, or posted by the agent. The Registry section near the top is a
+different kind of record — it lists publishes the maintainer already ran, with
+the check that confirmed each one. Read the header of each section before
+trusting it.
+
+## MCP Registry listing — publish records and the standing rule
+
+These records were kept in `docs/distribution-surfaces.md` until that file
+was deleted in the plain-language cleanup (#192). They live here now, next
+to the other release records. The rule they carry: every new version gets
+re-published, and the published `version` string must match PyPI exactly.
+
+| Date (UTC) | Version | Result |
+|---|---|---|
+| 2026-09-30 | 0.5.0 | First listing (`io.github.Xxx91n/mcp-for-maya`) |
+| 2026-10-25 17:29:14 | 0.6.0 | Re-published; `status=active`, `isLatest=true` |
+| 2026-10-28 09:57:46 | 0.7.0 | Re-published; `status=active`, `isLatest=true` |
+
+How each publish was checked:
+
+- v0.6.0: offline `mcp-publisher validate` (exit 0), then `mcp-publisher
+  login github` and `mcp-publisher publish` (exit 0). The 1.8.4 `status`
+  subcommand only writes, so the record was confirmed with the authenticated
+  Registry API: `GET /v0.1/servers/io.github.Xxx91n%2Fmcp-for-maya/versions/0.6.0`
+  returned HTTP 200 with `version=0.6.0`, `status=active`, `isLatest=true`,
+  `publishedAt=2026-10-25T17:29:14Z`, matching PyPI 0.6.0 exactly.
+- v0.7.0: same sequence (offline `validate`, then login and publish, both
+  exit 0). Confirmed with the public endpoint (no auth):
+  `GET /v0.1/servers/io.github.Xxx91n%2Fmcp-for-maya/versions/0.7.0`
+  returned HTTP 200 with `version=0.7.0`, `status=active`, `isLatest=true`,
+  `publishedAt=2026-10-28T09:57:46Z`, matching PyPI 0.7.0 exactly (artifacts
+  uploaded 08:55:37Z wheel and 08:55:39Z sdist).
+- A public HTTP 200 is evidence the listing is there. An anonymous 404 is
+  not evidence that it is gone.
+
+The 30-day re-check window starts at the publish date, not the release date.
+The current window started 2026-10-28, the v0.7.0 publish date, and it
+replaced the 2026-10-25 window. Removing or renaming a listing goes through
+the publish side's `status` field (`active`/`deprecated`/`deleted`), not by
+deleting the record.
+
+What the 30-day check actually involves — the ledger carried these steps and
+they are easy to lose otherwise:
+
+1. Look at four channels: mcp.so, PulseMCP, the VS Code MCP gallery, and the
+   Cline marketplace. These are the ones still in passive observation; the
+   rest are either listed already or structurally rejected.
+2. Ask one question per channel: did the latest Registry publish show up
+   there, or not. The VS Code gallery has no API, so that one is a manual
+   search.
+3. Record the answer per channel as a plain "synced" or "not synced" fact,
+   then re-decide that channel's state: no listing and no signal means stay
+   passive or drop the debt; listed means it goes quiet, no further action.
+
+Cline carries the least urgency of the four: it stays on hold until its
+catalogue shows a DCC/Maya entry, and its check rides this same window at no
+extra cost.
+
+### Other listing surfaces — the facts that outlived the ledger
+
+`docs/distribution-surfaces.md` also carried a per-channel table. These facts
+still govern what this repo does at each channel, so they are kept here.
+The rest of that table is recoverable with
+`git show bf06a54:docs/distribution-surfaces.md`.
+
+- **Glama** — listed and claimed 2026-09-30 (OAuth claim by the maintainer;
+  the auto-index page answered HTTP 200). Glama's build surface needs a
+  Dockerfile, and this repo has none. That is the normal state: do not turn
+  on a Docker build or health-check surface for it, because a Maya GUI host
+  cannot build in a container and a red health check hurts the listing.
+- **awesome-mcp-servers** — listed. The PR
+  ([punkpeye/awesome-mcp-servers#15382](https://github.com/punkpeye/awesome-mcp-servers/pull/15382))
+  added this repo to the Art & Culture section and was merged 2026-10-23.
+- **mcp.so** — rejected, and the reason matters: the decision rests on the
+  manual GitHub-issue submission path plus low audience quality. It is not
+  the "aggregators sync automatically" assumption, which was never checked.
+- **Cline marketplace** — held back on purpose. Its one-click install
+  promise clashes with the Maya-on-the-same-host precondition: the install
+  appears to work, then the server cannot connect. Revisit only when its
+  catalogue shows a DCC/Maya entry.
+- **Structural rejections** — Claude Connectors Directory (its docs stop
+  taking local MCPB servers and accept remote HTTPS only), Docker MCP
+  Catalog (containers only), Cursor directory (code-editing workflows only),
+  Windsurf/Zed (no third-party submission path), Smithery (stdio plus Maya
+  host does not fit its hosted scanning). Each is a one-way "no" until that
+  channel changes its rules.
+
+One rule from that table has no home yet: when the repo's own description
+changes, check that the listing descriptions still match it, so a stale
+listing does not become a second source of wrong claims. This branch changed
+the README tagline, so that check is due — the Registry 0.7.0 record and the
+Glama page still carry the older wording. Nothing in the tree enforces this
+today; it stays a manual step, recorded here rather than dropped.
 
 ## Per-version defect audit (git show on release tags)
 

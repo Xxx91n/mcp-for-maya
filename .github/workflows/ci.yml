@@ -39,7 +39,7 @@ jobs:
         run: uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json
       - name: compare against the ruff error budget
         run: python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json
-      - name: assets append-only guard
+      - name: assets only grow guard
         env:
           GUARD_BEFORE: ${{ github.event.before }}
         run: python .github/scripts/check_assets_append_only.py

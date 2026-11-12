@@ -1,4 +1,4 @@
-"""Append-only guard for published README/asset dirs.
+"""Guard that published README/asset dirs only grow.
 
 .github/assets/ is referenced by absolute URLs pinned to main — old
 PyPI release descriptions embed them permanently, so a delete, modify,
@@ -39,7 +39,7 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[2]
-# GUARDED is a GOVERNANCE constant (append-only), so its
+# GUARDED is a GOVERNANCE constant (the assets dir only grows), so its
 # single source is the per-domain spec file -- derived here at runtime, never
 # restated inline.
 GUARDED = json.loads(
@@ -98,7 +98,7 @@ def main() -> int:
         return 0
     for f in bad:
         print(
-            f"::error file={f}::.github/assets/ is append-only —"
+            f"::error file={f}::.github/assets/ only grows —"
             " delete/modify/rename blocked. Escape hatch:"
             " maintainer-aware merge with the removal stated in the PR"
             " body."

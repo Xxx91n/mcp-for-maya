@@ -8,15 +8,15 @@
 
 # mcp-for-maya
 
-> MCP server giving AI agents spatial awareness of Autodesk Maya scenes
+> MCP server that lets AI agents see what is actually in an Autodesk Maya scene
 
 [![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/Xxx91n/mcp-for-maya/blob/main/LICENSE) [![Python](https://img.shields.io/pypi/pyversions/mcp-for-maya)](https://pypi.org/project/mcp-for-maya/)
 
 ## What this is
 
-`mcp-for-maya` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets AI agents (such as Codex and Claude) directly control Autodesk Maya for 3D modeling, scene planning, and production-ready work.
+`mcp-for-maya` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets AI agents (such as Codex and Claude) drive Autodesk Maya: build models, plan scenes, and finish production work.
 
-**Core capability:** AI no longer writes code blindly. It inspects scene objects, materials, and spatial relationships at any time, then checks its own changes against fixed rules.
+**Core capability:** AI no longer writes code blind. It can look at scene objects, materials, and how things sit in space at any time, then check its own changes against fixed rules.
 
 > [!WARNING]
 > This server runs Python code directly inside Maya by design, not by accident. For details, see [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
@@ -126,7 +126,7 @@ Chat naturally in your agent:
 
 > "Check out what's in my Maya scene, then put together a display shelf by the entrance"
 
-The AI automatically calls `scene_snapshot()` → inspects the scene → builds the model → checks the result with `scene_review()`.
+The AI calls `scene_snapshot()` to see the scene, builds the model, then checks the result with `scene_review()`.
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-icev-workflow.svg" width="100%" alt="ICEV Workflow"/>
 
@@ -148,18 +148,18 @@ Every scene edit follows **ICEV**: look at the scene, work out the change, make 
 
 | Capability | Tools | Notes |
 |------------|-------|-------|
-| 🧊 **Spatial awareness** | `scene_snapshot` `scene_inspect` `scene_measure` | Single call gets the full scene spatial model; precise distance, overlap, and gap measurements |
+| 🧊 **Spatial awareness** | `scene_snapshot` `scene_inspect` `scene_measure` | One call gets the objects, their types, world positions, and sizes. The size is the object's own bounding box, not scaled by the object or its parents, so a scaled-up object really is bigger than the number says. For a true world size of one object, call `scene_measure` with the same object as both `obj_a` and `obj_b` and `mode="bbox"`: it overlaps itself, so `details.overlap_dims` gives the three world-space axis extents (still box extents, not mesh surface). Measurements are all world-space axis-aligned bounding boxes: overlapping boxes can belong to shapes that do not touch, and rotated or concave shapes measure looser than they look. The default CoS output picks a listing cap that fits the scene size (50 on a small scene up to 1000 on a huge one), so in practice it drops nothing until the scene passes 1000 objects; past that it adds a `... N more objects` line before the `STATS:` line. `format="json"` has no cap, but the result is much bigger |
 | 🎨 **Look quality** | `scene_aesthetics` | 5 dimensions: color balance (60-30-10), spatial composition (golden ratio / rule of thirds), proportion & scale (ergonomics), lighting quality (three-point setup, fill ratio, color temperature, decay), visual flow |
 | 🎬 **Cameras** | `camera_create` `camera_orbit` | 8 built-in shot types + orbit animation |
 | 🛡️ **Disaster recovery** | `scene_checkpoint` `scene_rollback` `scene_checkpoint_list` | Writes the scene to a `.ma` file on disk under `checkpoints/`; rollback opens that file and points the scene back at its original path |
 | 🧠 **Scene planning** | `scene_plan` | Scene health checks, zone balance, layout tips, conflict prevention, plain-language planning |
 | 📋 **Scene checks** | `scene_review` `scene_validate` `scene_assert` | 11 fixed checks (0-100 score) + your own constraint checks + scene assertions |
 | ⚡ **Code execution** | `execute_code` `write_module` | Run arbitrary Python in Maya / inject reusable modules |
-| 👁️ **Check by looking** | `scene_viewport_snapshot` `scene_render_preview` | WYSIWYG viewport capture + single-frame playblast preview, so the AI can see the result (GUI sessions only) |
+| 👁️ **Check by looking** | `scene_viewport_snapshot` `scene_render_preview` | Viewport screenshot of exactly what the artist sees, plus a one-frame playblast preview, so the AI can look at the result (GUI sessions only) |
 | 🔌 **Session management** | `list_sessions` `add_session` `maya_setup_guide` | Multi-session discovery/attachment + setup diagnostics and installation guidance |
 | 📦 **Asset library** | `asset_search` `asset_import` | Poly Haven CC0 models — downloads over HTTPS on the host (domain allowlist, MD5 check, size limits, local cache), Maya imports FBX with auto-wired textures, checks face count and size limits, and prevents duplicates via `GRP_asset_<id>` |
 | 📤 **Scene export** | `scene_export` | Export whole scenes or selected objects to FBX/OBJ/USD; format auto-detected from file extension (no guesswork), auto-creates folders, explicit overwrite opt-in, restores selection afterward |
-| 🔎 **Scene-graph inspection** | `scene_describe` `scene_nodes` | Node self-description (exact types, attribute details, connection wiring with size caps) + bounded enumeration including materials and tool nodes, with clean pagination |
+| 🔎 **Scene-graph inspection** | `scene_describe` `scene_nodes` | Tells you what a node is (exact types, per-attribute metadata such as type, enum choices, and ranges, and how it is wired, with a response size cap — `limit` can go to 1000, and a cut-off result says so via `*_truncated`) and lists nodes page by page, including materials and tool nodes; `has_more`/`next_cursor` do the paging. Attribute values are not included by default: pass `include_values=True` to get the current value of each attribute |
 
 25 MCP tools in total.
 
@@ -174,7 +174,7 @@ scene_snapshot(detail="compact", format="cos")
 # Inspect a specific object (including neighboring objects)
 scene_inspect(target="wall_entrance", include_neighbors=True)
 
-# Precise measurement (4 modes)
+# Measurement (4 modes, on world-space bounding boxes)
 scene_measure(obj_a="wall_north", obj_b="counter_A", mode="clearance")
 
 # Verify scene state
@@ -250,7 +250,7 @@ scene_export(
 ### Check by looking (GUI sessions only)
 
 ```python
-# Viewport WYSIWYG screenshot (includes HUD and selection highlights — see what the artist sees)
+# Viewport screenshot of exactly what the artist sees (includes HUD and selection highlights)
 scene_viewport_snapshot(max_size=800, format="jpeg")
 
 # Single-frame playblast preview (clean preview without HUD; supports camera selection, dimensions rounded up to multiples of 4)
@@ -302,9 +302,9 @@ The repository includes two **Experimental** skill cards (under the `skills/` fo
 
 ## Security & privacy
 
-- **Zero telemetry**: No tracking, no phone-home. This project contains zero tracking or unsolicited outgoing network code, as you can verify in source. The only outgoing network calls are from the two asset tools: they access `api.polyhaven.com` / `dl.polyhaven.org|.com` over HTTPS only when invoked (with domain allowlist, MD5 check, and file size limits in `polyhaven.py`).
-- **Local single-user**: The command port binds to localhost only. A connected MCP client is trusted not to do deliberate harm.
-- **Guards against slips**: A unified pipeline (`pipeline.py` + `security.py`) checks parameters, enforces token-bucket rate limits (~100 calls/60s for reads, ~20 calls/60s for writes per session), scans patterns (warn-only by default), and keeps an independent JSONL call record across all 25 tools. It catches accidental mistakes, not malicious clients. See [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md) for the complete threat model.
+- **No telemetry**: nothing is tracked and nothing is phoned home. You can check this in the source. The only outgoing network calls come from the two asset tools, and only when you call them: they reach `api.polyhaven.com` / `dl.polyhaven.org|.com` over HTTPS, with the domain allowlist, MD5 check, and size limits written in `polyhaven.py`.
+- **Local single-user**: the command port binds to localhost only, and a connected MCP client is trusted not to mean harm.
+- **Guards against slips**: one pipeline (`pipeline.py` + `security.py`) checks parameters, rate-limits calls (~100 calls/60s for reads, ~20 calls/60s for writes per session), scans patterns, and writes one JSON line per call, covering all 25 tools. The scan has two levels: a few precise patterns are blocked outright and the call fails with `[blocked_pattern]` (`os.system`, bare `subprocess`, and a handful of others with no false-positive history), while the broader patterns only record a warning. A call can also be rejected for other reasons — a rate limit, one of the `MAYA_MCP_DISABLE_*` flags, or `safe_mode` — and those carry their own error codes, so the code in the error tells you which one fired. It catches honest mistakes, not a client that means harm. For the complete threat model, see [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md).
 - **Transactional safety**: `scene_checkpoint` and `scene_rollback` write the scene to a `.ma` file on disk and read it back on request (a checkpoint file keeps no undo history; file references are flattened).
 - **Strict policy mode (optional)**: Set `MAYA_MCP_DISABLE_EXECUTE=1`, `MAYA_MCP_DISABLE_WRITE_MODULE=1`, or `MAYA_MCP_DISABLE_ARBITRARY=1` (disables all three) to remove code execution tools from `tools/list` and reject calls with `[policy_disabled]`. Read-only tools remain active. These guard against accidental misuse; they are not a hard boundary against a malicious agent, since an agent holding `execute_code` is already trusted. They only limit how much damage one mistake can do during demos, testing, or in CI sandboxes. See [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md) and error codes in [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md).
 - **`safe_mode` code allowlist (optional)**: When `MAYA_MCP_SAFE_MODE=1` is set (off by default), code payload tools remain listed, but their `code` parameters must pass an allowlist checked on the parsed code, which denies everything else by default: imports are limited to standard packages (`maya`, `math`, `json`, `re`, `collections`, `itertools`, `functools`, `dataclasses`, `typing`), blocked builtin functions reject upon reference rather than just call (`eval`, `exec`, `open`, `__import__`, getattr, setattr, etc.), accessing `__builtins__` or dunder attributes is rejected, and unparseable input is rejected immediately. Blocked calls fail with `[safe_mode_rejected]`, reporting the violated rule ID and recording it in the call record. Successful calls return a `mode: "safe"` field, and the tool description adds a `Boundary:` notice. DISABLE flags take priority by removing tools first—safe_mode only restricts what stays. Like DISABLE flags, this guards against mistakes rather than deliberate attacks, and it is not a hard barrier. See [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md) and error codes in [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md).
