@@ -1,7 +1,7 @@
 """T-19a tests: _mcp_asset Maya-side importer (D-074/D-075).
 
-Runs the real asset_module against the stub scene: the fbx_fixture
-teaches the stub what 'the FBX contained', so the tests verify the
+Runs the real asset_module against the fake Maya scene: the fbx_fixture
+teaches the fake what 'the FBX contained', so the tests verify the
 importer's own logic - plugin gate, unit globals, diff/group, polycount
 gate, texture wiring, dedup, dims sanity - not the FBX binary itself
 (that is the real-Maya window's job).
@@ -254,7 +254,7 @@ class TestTextureWiring:
 
 # ------------------------------------------------------------------
 # displacement (D-082b) — graph contract only; render semantics stay
-# on the gui/human_verify tier ("connected" != "renders correctly")
+# with the human-run checklist ("connected" != "renders correctly")
 # ------------------------------------------------------------------
 
 

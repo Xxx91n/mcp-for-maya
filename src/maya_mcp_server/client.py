@@ -489,7 +489,7 @@ class BaseMayaClient(ABC):
 
         # Qt server JSON protocol over the framed channel. There is no
         # retry: execution errors are returned in the response (never
-        # raised here) and surface to callers via the two-layer contract.
+        # raised here) and reach callers through the two error paths.
         response = await self._send_receive(
             self.EXECUTE_TEMPLATE,
             {"code": code, "result_type": result_type.value},

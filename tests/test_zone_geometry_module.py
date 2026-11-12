@@ -134,7 +134,7 @@ class TestZoneGeometry:
     def test_duplicate_short_names_keep_their_own_full_paths(self, maya_env):
         left = maya_env.scene.add_group("GRP_left")
         right = maya_env.scene.add_transform("GRP_right", t=(50, 0, 0))
-        # Maya allows the same leaf name under two parents; the stub's convenience
+        # Maya allows the same leaf name under two parents; the fake's convenience
         # builder would auto-rename it, so create the duplicate transforms directly.
         left_shelf = maya_env.scene.add_node("GEO_shelf", "transform", parent=left, exists_ok=True)
         right_shelf = maya_env.scene.add_node(

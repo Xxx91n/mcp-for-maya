@@ -1,6 +1,6 @@
-"""Regression tests for maya_scene_module running on the maya stub.
+"""Regression tests for maya_scene_module running on the Maya fake.
 
-Each test pins a P0/P1 fix from the grill handoff (rui.txt). The stub's
+Each test pins a P0/P1 fix from the grill handoff (rui.txt). The fake's
 matrix/bbox math is verified independently in test_maya_stub.py, so
 failures here mean the production module is wrong — not the harness.
 """
@@ -110,7 +110,7 @@ class TestWorldBbox:
 
         Two axis-aligned cubes of side `size`; shifting B by t on an axis
         yields gap = |t| - size, so t = gap + size realises any gap >= -size.
-        Node names must be unique per call -- the stub keys transforms by name,
+        Node names must be unique per call -- the fake keys transforms by name,
         so reusing them inside one scene silently keeps the first geometry.
         """
         a, b = f"GEO_a{tag}", f"GEO_b{tag}"

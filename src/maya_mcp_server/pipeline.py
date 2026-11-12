@@ -105,7 +105,7 @@ TOOL_ANNOTATIONS: dict[str, mt.ToolAnnotations] = {
     # scene-graph introspection: read-only DG queries
     "scene_describe": _READ,
     "scene_nodes": _READ,
-    # check by looking: the put-everything-back discipline makes readOnly honest
+    # check by looking: putting everything back makes readOnly honest
     "scene_viewport_snapshot": _READ,
     "scene_render_preview": _READ,
     # mutation-class tools: scene/filesystem effects, not destructive (7)
@@ -464,9 +464,9 @@ def _resolve_session_id(context: MiddlewareContext[Any], args: dict[str, Any]) -
 def _result_is_error(result: Any) -> bool:
     """Detect domain-level errors inside a successful tool result.
 
-    The two-layer contract returns domain failures as
-    {"error": {...}} payloads rather than exceptions; for the call record
-    they count as outcome="error".
+    Domain failures come back inside a successful tool result, not as an
+    exception: the two error paths put them in {"error": {...}} payloads, and
+    for the call record they count as outcome="error".
     """
     if getattr(result, "isError", False):
         return True

@@ -116,7 +116,7 @@ def test_callform_checklist_gui_tier():
 
 def test_callform_checklist_mayapy_tier():
     """D-056②: viewport-independent call forms are booked to the real
-    interpreter — manual checklists exist in test_mayapy_smoke.py and run
+    interpreter — the assertion tests live in test_mayapy_smoke.py and run
     whenever a healthy interpreter is available (env-blocked on this box)."""
     _steps(
         "run mayapy -m pytest tests/ -m mayapy on a healthy box",

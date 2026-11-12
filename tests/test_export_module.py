@@ -1,4 +1,4 @@
-"""T-23b tests: _mcp_export.export_scene on the maya stub.
+"""T-23b tests: _mcp_export.export_scene on the Maya fake.
 
 D-092 contract coverage: format inference/conflict mirror rules,
 exists->domain error, parent auto-create, objects pre-validation,

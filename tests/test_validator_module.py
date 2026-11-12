@@ -1,12 +1,12 @@
 """Issue #79 Maya-side contract tests: custom scene_review validators.
 
-Most run against the stub-bound _mcp_scene module (the big file plus all
+Most run against the fake-bound _mcp_scene module (the big file plus all
 the extra files assembled - maya_env.module), the same seam
 tests/test_introspect_module.py uses. Those are CONTRACT tests: the
 registration surface, the score separation and the check_error isolation must
 hold in real Maya, where the predicate runs against a live DG. The last class
 pins the scene-review skill card against this code - mostly through the
-same stub seam, and never against a real Maya.
+same fake seam, and never against a real Maya.
 """
 
 from __future__ import annotations

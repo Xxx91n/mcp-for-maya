@@ -2,9 +2,9 @@
 
 ``maya_scene_module.py`` is one registered big file under T-07: splits
 happen where a fix already touches the code, never as a one-shot
-rewrite — and the file must not keep growing (the cap only goes down,
-never up). The budget file caps each registered file's physical line
-count:
+rewrite — and the file must not keep growing (the cap may only be
+lowered, in the pull request that earns it). The budget file caps each
+registered file's physical line count:
 
 - count > budget  -> fail the lint job
 - count < budget  -> pass, but print a "may be lowered" hint so the
@@ -37,7 +37,7 @@ def physical_lines(path: Path) -> int:
 
 
 def check(root: Path, budget_path: Path) -> tuple[bool, list[str], list[str]]:
-    """(ok, errors, warnings) — warnings are the non-fatal pawl hints."""
+    """(ok, errors, warnings) — warnings are the non-fatal "may be lowered" hints."""
     try:
         budget = json.loads(budget_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:

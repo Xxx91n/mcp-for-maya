@@ -331,7 +331,7 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
         # shape (Maya 2024 probe, docs/evidence/probes/probe-displacement.json)
         # —
         # but "connection established" is not render semantics; visual
-        # proof stays on the gui/human_verify tier.
+        # proof stays with the human-run checklist.
         disp = None
         try:
             disp = cmds.shadingNode("displacementShader", asUtility=True, name=file_node + "_disp")

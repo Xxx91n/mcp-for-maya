@@ -68,9 +68,9 @@ crash) — queued until a healthy headless Maya env exists.
 ### Call-form items booked to mayapy (env-blocked on this box)
 
 Viewport-independent call forms whose real-return shape must be
-asserted on a healthy real Maya interpreter (manual checklists in
-`tests/test_mayapy_smoke.py` — they run when the tier is available,
-skip honestly otherwise). Evidence table:
+asserted on a healthy real Maya interpreter (the tests in
+`tests/test_mayapy_smoke.py` run when one is available and skip honestly
+otherwise). Evidence table:
 `docs/visual-callform-matrix.md`.
 
 - `cmds.camera(name=X)` -> `[transform, shape]` list (X1 rename authority)

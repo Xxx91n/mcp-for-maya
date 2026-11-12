@@ -1,4 +1,4 @@
-"""D-049b real-Maya cmds list check — the fake may only drift one way.
+"""D-049b real-Maya cmds list check — the fake may not invent API.
 
 The maya fake may only model API that EXISTS in the real-Maya baseline
 (tests/maya_stub/presence-baseline.json) or is explicitly allowlisted
@@ -10,7 +10,7 @@ and cmds.file(rename+prompt) bugs while CI stayed green.
 Baseline collected on Maya 2024 over the live session via
 inspect.signature attempt + dir() (mayapy is broken on that box — see
 baseline_meta). cmds builtins carry no inspectable signature, so the
-auditable contract is presence + method-name lists — the file is named
+auditable contract is "does it exist" plus the method-name lists — the file is named
 presence-baseline accordingly (D-056). Re-collect on any Maya version
 bump.
 """
@@ -31,7 +31,7 @@ ALLOWLIST_PATH = Path(__file__).parent / "maya_stub" / "presence-allowlist.json"
 
 @pytest.fixture
 def surface(maya_env):
-    """The installed stub modules — the surface tests actually bind to."""
+    """The installed fake modules — the surface tests actually bind to."""
     import sys
 
     return {
@@ -50,7 +50,7 @@ def _allowlist() -> dict:
 
 
 def test_stub_cmds_functions_exist_in_real_maya(surface):
-    """Every public stub cmds function must exist in real maya.cmds
+    """Every public fake cmds function must exist in real maya.cmds
     (or carry an allowlist reason)."""
     baseline, allow = _baseline(), _allowlist()
     missing, allowed = [], []
@@ -61,7 +61,7 @@ def test_stub_cmds_functions_exist_in_real_maya(surface):
         if sym is None or not sym.get("exists"):
             (allowed if f"cmds.{name}" in allow else missing).append(name)
     assert not missing, (
-        f"stub cmds functions absent from real-Maya baseline and not allowlisted: {missing}"
+        f"fake cmds functions absent from real-Maya baseline and not allowlisted: {missing}"
     )
 
 
@@ -75,11 +75,11 @@ def test_stub_om_classes_exist_in_real_maya(surface):
             sym = baseline.get(f"{mod_key}.{name}")
             if (sym is None or not sym.get("exists")) and f"{mod_key}.{name}" not in allow:
                 missing.append(f"{mod_key}.{name}")
-    assert not missing, f"stub classes absent from real-Maya baseline: {missing}"
+    assert not missing, f"fake classes absent from real-Maya baseline: {missing}"
 
 
 def test_stub_methods_exist_in_real_maya(surface):
-    """Every public method on a stub class must exist on the real class
+    """Every public method on a fake class must exist on the real class
     (allowlist covers version-conditional API like 2025+ MImage)."""
     baseline, allow = _baseline(), _allowlist()
     missing = []
@@ -97,7 +97,7 @@ def test_stub_methods_exist_in_real_maya(surface):
                 key = f"{mod_key}.{name}.{m}"
                 if m not in real_methods and key not in allow:
                     missing.append(key)
-    assert not missing, f"stub methods absent from real-Maya baseline: {missing}"
+    assert not missing, f"fake methods absent from real-Maya baseline: {missing}"
 
 
 def test_baseline_is_version_stamped():

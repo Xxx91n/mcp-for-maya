@@ -117,14 +117,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `单文件大模块`, `统一入口` and `Boundary: 一句` are rewritten in plain
   words in `AGENTS.md`, `CONTRIBUTING.md`, `docs/testing.md`,
   `docs/threat-model.md`, `docs/visual-callform-matrix.md`,
-  `docs/upstream-issue-status.md`, the CI script comments and messages,
-  `pyproject.toml` comments, and the comments and docstrings in `src/` and
-  `tests/` that describe them. Behaviour is unchanged: no public tool name,
-  function name, parameter name, error code, file name or pytest marker
-  changed. Two CI script message strings were reworded where no test pinned
-  them; the two that a test does pin moved with their test. `llms.txt` was not
-  hand-edited: no tool description's first sentence changed, and the generator
-  reports it still matches the registry. Evidence:
+  `docs/guide/error-codes.md`, `docs/distribution-surfaces.md`,
+  `docs/upstream-issue-status.md`, `docs/upstream-issue-response-drafts.md`,
+  the CI script comments and messages, the CI workflow step names, the
+  pre-commit comments, `pyproject.toml` comments and marker descriptions, and
+  the comments and docstrings in `src/` and `tests/` that describe them.
+  Behaviour is unchanged: no public tool name, function name, parameter name,
+  error code, file name, gate id or pytest marker changed. Two CI script
+  message strings were reworded where no test pinned them; the one that a
+  test does pin — the derivation-floor message — moved with its test.
+  `llms.txt` was not hand-edited: no tool description's first sentence
+  changed, and the generator reports it still matches the registry. Evidence:
   `tests/test_check_monolith_budget.py::test_repo_monolith_within_budget`,
   `tests/test_check_ruff_budget.py::test_below_budget_passes_ratchet_hint`,
   `tests/test_presence_baseline.py::test_stub_cmds_functions_exist_in_real_maya`.

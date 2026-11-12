@@ -434,7 +434,7 @@ def check_coverage_and_derivation(root: Path, data: dict) -> tuple[list[str], li
     exempt with a reason, and the reverse direction is asserted too so a stale
     entry cannot rot unnoticed.
 
-    Derivation is a tightening floor, not an absolute one. Tools that predate
+    Derivation may only tighten, not loosen. Tools that predate
     the floor are listed in DERIVATION_BASELINE; the gate fails only when the
     violation set GROWS, and shrinks as each tool converges. That is the same
     shape as check_ruff_budget.py / check_monolith_budget.py, and it is what

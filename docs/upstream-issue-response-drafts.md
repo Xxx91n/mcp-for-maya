@@ -127,7 +127,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > blocking the replacement; the shipped hook catches its own failures and
 > reports them in the JSON result it returns, which is not forwarded.
 >
-> Verification status: covered by stub-tier tests including the Qt signal
+> Verification status: covered by fake Maya tests including the Qt signal
 > semantics, and verified on a live Maya 2024 session — the cleanup
 > hook fired exactly once across a reconnect, the old listener port was
 > released, and the replacement server bound cleanly.

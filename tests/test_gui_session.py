@@ -1,10 +1,11 @@
-"""GUI manual tier (D-049a): machine-checkable items against a
+"""GUI manual run (D-049a): machine-checkable items against a
 live Maya GUI session.
 
 These carry the ``gui`` marker and skip cleanly when no session is
 reachable (conftest ``gui_client`` probes MAYA_MCP_GUI_ADDR or
-:7001). They are the HIL layer of the SIL/PIL/HIL split: real asserts
-on real wire — never pixel assertions, which stay with human_verify.
+:7001). They are the live third layer of the fake / real-interpreter /
+live-GUI split: real asserts on a real wire — never pixel assertions,
+which stay with the manual checklist.
 """
 
 from __future__ import annotations

@@ -35,7 +35,7 @@ from maya_mcp_server.visual_tools import (
 
 
 class VisualExecClient:
-    """Fake framed client: runs generated code on the stub module."""
+    """Fake framed client: runs generated code on the fake module."""
 
     framed_channel = True
     key = "127.0.0.1:50999"
@@ -328,7 +328,7 @@ def _cell_mean(rows, w, h, x0, y0, x1, y1):
 
 
 class TestVp2ReadbackTruth:
-    """The stub models the documented VP2 defect shape: readColorBuffer
+    """The fake models the documented VP2 defect shape: readColorBuffer
     fills BGRA + top-down by default; the module asks for RGBA at the
     source (readRGBA=True) and lets writeToFile do float->byte — the
     floatPixels pointer path is gone (MScriptUtil removed in 2024). A
@@ -567,7 +567,7 @@ class TestActivePanelProbe:
 # ------------------------------------------------------------
 # VP2 direction runtime probe (D-082d)
 #
-# The stub cannot render the probe marker — scene.vp2_readback_bottom_up
+# The fake cannot render the probe marker — scene.vp2_readback_bottom_up
 # models the DEVICE-level buffer orientation instead: the pattern is
 # viewport truth, the knob decides whether readColorBuffer hands it back
 # flipped. The probe samples whichever buffer arrives, so a bottom-up

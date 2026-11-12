@@ -1,7 +1,7 @@
 """T-03 regression tests: checkpoint writes a real .ma file; rollback reads it back.
 
 Pins the checkpoint/read-back semantics (D-015: exportAll + explicit adopt,
-never references) against the stub. The stub persists checkpoint files on
+never references) against the Maya fake. The fake persists checkpoint files on
 disk (//Maya ASCII header + JSON payload) and restores scene state on open,
 so these tests exercise real disk IO.
 

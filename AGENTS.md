@@ -12,7 +12,7 @@ rc=0; uv run python -m mypy src/ > mypy-report.txt || rc=$?; if [ "$rc" -gt 1 ];
 uv run pre-commit run --all-files          # hook sweep (the why is in CONTRIBUTING's dev setup)
 
 ## Gates
-A "governance gate" is any check a job runs in `.github/workflows/ci.yml`; `.github/gate-registry.yaml` indexes every enforced one with its pins, and `check_gate_registry.py` fails an unregistered or unwired entry, so neither list can rot quietly. To see what CI actually runs, read the `run:` lines: `grep -E 'run: python .github/scripts' .github/workflows/ci.yml`. All three baseline budgets only go down — the ruff error budget and the big module's line cap are `lint` steps, the mypy baseline is its own job.
+A "governance gate" is any check a job runs in `.github/workflows/ci.yml`; `.github/gate-registry.yaml` indexes every enforced one with its pins, and `check_gate_registry.py` fails an unregistered or unwired entry, so neither list can rot quietly. To see what CI actually runs, read the `run:` lines: `grep -E 'run: python .github/scripts' .github/workflows/ci.yml`. All three baseline limits only go down — the ruff error budget and the big single-file module's line cap are `lint` steps, the mypy error baseline is its own job.
 
 ## Don't touch
 - `src/maya_mcp_server/maya_scene_module.py` is line-capped by `.github/monolith-budget.json`; new Maya-side capability goes in a separate file that is injected together with it.

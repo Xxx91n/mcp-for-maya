@@ -1,6 +1,6 @@
 """T-19a tests: asset_search / asset_import tool layer.
 
-ExecClient runs the generated code against the stub-bound _mcp_asset
+ExecClient runs the generated code against the fake-bound _mcp_asset
 module through the REAL result-capture transform - same harness pattern
 as test_scene_tools_json.py. The host-side downloader is monkeypatched
 to a canned descriptor; network tests live in test_polyhaven.py.

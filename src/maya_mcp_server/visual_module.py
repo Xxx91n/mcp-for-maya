@@ -2,10 +2,9 @@
 
 GUI-only capture paths. The host never injects this module into a
 headless session (framed_channel gate), but every public function
-still re-checks GUI capability and returns the two-layer error
-contract's domain shape {error:{code,message,suggestion}}
-for extreme headless-ish GUI environments (missing omui/PySide,
-batch mode, no modelPanel).
+still re-checks GUI capability and returns the Maya-side error shape
+{error:{code,message,suggestion}} for extreme headless-ish GUI
+environments (missing omui/PySide, batch mode, no modelPanel).
 
 Public API:
     viewport_snapshot(max_size, format, quality) -> dict
@@ -129,7 +128,7 @@ def _gui_block() -> dict[str, Any] | None:
 
 
 # ---------------------------------------------------------------------------
-# Viewport state helpers (save-and-put-back machinery)
+# Viewport state helpers (save it, then put it back)
 # ---------------------------------------------------------------------------
 
 
