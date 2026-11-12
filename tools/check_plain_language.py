@@ -256,15 +256,15 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
         indent = len(line) - len(body)
         if fence is not None:
             # A closer is checked before the indented-code skip, because a fence
-            # held by a list item is indented with it. It may sit three spaces
-            # deeper than the opener, or at the opener's own indent; deeper than
-            # that and it is sample content, not a closer.
+            # held by a list item is indented with it. It may sit up to three
+            # spaces deeper than the opener; deeper than that and it is sample
+            # content, not a closer.
             closer = FENCE_CLOSE.match(body)
             if (
                 closer
                 and closer.group(1)[0] == fence[0]
                 and len(closer.group(1)) >= len(fence)
-                and indent <= max(3, fence_indent)
+                and indent <= fence_indent + 3
             ):
                 fence = None
             continue

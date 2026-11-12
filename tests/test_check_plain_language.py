@@ -228,6 +228,13 @@ def test_a_word_between_two_code_spans_still_reports(tmp_path):
     assert findings == ["NOTES.md:1: 回滚 -> 读档（rollback）"]
 
 
+def test_a_closer_one_space_deeper_than_its_opener_still_closes(tmp_path):
+    """The three-space allowance is relative to the opener, not to column zero."""
+    root = _repo(tmp_path, doc="- 步骤\n\n    ```\n    x\n     ```\n回滚\n")
+    findings, _, _ = M.scan(root, M.load_avoid_map(root / "GLOSSARY.md"))
+    assert findings == ["NOTES.md:6: 回滚 -> 读档（rollback）"]
+
+
 def test_an_indented_fence_marker_inside_a_block_is_content(tmp_path):
     """A closer may sit three spaces deep at most; four is part of the sample."""
     root = _repo(tmp_path, doc="```text\n    ```\n回滚\n```\n正文里的回滚会被报告。\n")
