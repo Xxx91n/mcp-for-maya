@@ -95,7 +95,7 @@ def _audit_asset_download(
         }
         audit.record(event)
     except Exception as e:
-        logger.warning("asset audit record failed: %s", e)
+        logger.warning("asset call record write failed: %s", e)
 
 
 def register_asset_tools(mcp: Any, audit: AuditLogger | None = None) -> None:
@@ -181,7 +181,7 @@ def register_asset_tools(mcp: Any, audit: AuditLogger | None = None) -> None:
             max_polycount: Face-count guard (default 100000); imports
                 over the limit are deleted and rejected.
             allow_high_polycount: Override the polycount guard (the
-                override is disclosed in the audit log).
+                override is written to the call record).
             force: Re-import even when GRP_asset_<id> already exists.
             session_key: Maya session key.
 
@@ -225,7 +225,7 @@ def register_asset_tools(mcp: Any, audit: AuditLogger | None = None) -> None:
             ),
         )
         # Real download+import wall time — duration_ms=0.0 was
-        # a placeholder that lied in every supplementary audit row.
+        # a placeholder that lied in every supplementary call-record row.
         _audit_asset_download(
             audit, session_key, descriptor, result, (time.monotonic() - t0) * 1000.0
         )

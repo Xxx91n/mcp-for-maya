@@ -1,9 +1,9 @@
 """Unified security pipeline: every tool call goes through validate,
-rate-limit, pattern scan, safe_mode gate, dispatch and audit.
+rate-limit, pattern scan, safe_mode code allowlist, dispatch and call record.
 
 One FastMCP middleware funnels every tool call through:
-    input validation -> rate limit -> pattern scan -> safe_mode gate ->
-    dispatch -> disclosure -> audit.
+    input validation -> rate limit -> pattern scan -> safe_mode code allowlist ->
+    dispatch -> disclosure -> call record.
 
 TOOL_ANNOTATIONS is the single source for each tool's four MCP hints;
 the same map drives the read/write rate-limit bucket classification.
@@ -136,14 +136,14 @@ def tool_annotations(name: str) -> mt.ToolAnnotations:
 
 
 # ---------------------------------------------------------------------------
-# Strict policy mode — operator-side misuse guardrails.
+# Strict policy mode — operator-side guards against misuse.
 #
-# This is NOT a hostile-agent boundary: an agent that can still call
-# execute_code is inside the trust boundary already, and no env flag changes
-# that. What these flags buy is the opposite direction — an operator (or a
-# host that embeds this server) who wants a smaller blast radius for a
-# mistake, a demo, or a CI sandbox can remove the dangerous tools from the
-# surface entirely instead of trusting everyone to pass the right arguments.
+# This is NOT a boundary against a hostile agent: an agent that can still
+# call execute_code is already trusted, and no env flag changes that. What
+# these flags buy is the opposite direction — an operator (or a host that
+# embeds this server) who wants one mistake to break less in a demo or a CI
+# sandbox can remove the dangerous tools from the surface entirely instead of
+# trusting everyone to pass the right arguments.
 # docs/threat-model.md says so in the same words.
 #
 # Enforcement lives here and nowhere else: on_call_tool denies the call and
@@ -177,7 +177,7 @@ def policy_disabled_tools(env: dict[str, str] | None = None) -> frozenset[str]:
 
 
 def safe_mode_enabled(env: dict[str, str] | None = None) -> bool:
-    """Whether the opt-in safe_mode AST gate is active.
+    """Whether the opt-in safe_mode code allowlist is active.
 
     Deliberately not a POLICY_ENV_FLAGS member: those flags remove a tool from
     tools/list, while safe_mode narrows the payloads of tools that remain.
@@ -197,7 +197,7 @@ class SecurityPipeline(Middleware):
 
     Rejections (validation/rate-limit/pattern block/safe_mode) raise
     PipelineError -> MCP isError with a [code] prefix (host layer). Every call \u2014
-    success, error, or rejected \u2014 is recorded to the audit JSONL.
+    success, error, or rejected \u2014 is recorded to the call-record JSONL.
     """
 
     def __init__(
@@ -311,7 +311,7 @@ class SecurityPipeline(Middleware):
                         ),
                     )
 
-            # 4. safe_mode — opt-in AST gate for the two code-bearing tools.
+            # 4. safe_mode — opt-in code allowlist for the two code-bearing tools.
             # DISABLE ran at stage 0 (a removed tool never reaches this stage);
             # the always-on pattern scan stays the broad first layer, and this
             # is the stricter second layer over what remains.
@@ -445,7 +445,7 @@ def _with_boundary_line(tool: Tool) -> Tool:
 
 
 def _resolve_session_id(context: MiddlewareContext[Any], args: dict[str, Any]) -> str:
-    """Rate-limit/audit session key: session_key arg, else MCP session id."""
+    """Rate-limit/call-record session key: session_key arg, else MCP session id."""
     sk = args.get("session_key")
     if isinstance(sk, str) and sk:
         return sk
@@ -465,7 +465,7 @@ def _result_is_error(result: Any) -> bool:
     """Detect domain-level errors inside a successful tool result.
 
     The two-layer contract returns domain failures as
-    {"error": {...}} payloads rather than exceptions; for audit purposes
+    {"error": {...}} payloads rather than exceptions; for the call record
     they count as outcome="error".
     """
     if getattr(result, "isError", False):

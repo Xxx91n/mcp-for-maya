@@ -539,7 +539,8 @@ def import_asset(
             return _err(
                 "polycount_exceeded",
                 f"{faces} faces exceeds the {int(max_polycount)} default limit",
-                "pass allow_high_polycount=True to keep the import (decision is audited)",
+                "pass allow_high_polycount=True to keep the import "
+                "(the decision is written to the call record)",
             )
 
         wiring = _wire_textures(descriptor.get("texture_parts") or {}, new_nodes, meshes, asset_id)

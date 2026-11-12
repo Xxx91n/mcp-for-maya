@@ -31,16 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged until #177 wires the helper in. Evidence:
   `tests/test_zone_geometry_module.py::TestZoneGeometry::test_multiple_zones_match_the_existing_zone_map`,
   `tests/test_scene_tools_json.py::TestZoneGeometryHostHelper::test_default_scene_plan_bytes_do_not_use_the_helper`.
-- **Opt-in `safe_mode` gate for the code-bearing tools** — `MAYA_MCP_SAFE_MODE=1`
+- **Opt-in `safe_mode` code allowlist for the code-bearing tools** — `MAYA_MCP_SAFE_MODE=1`
   makes `execute_code` and `write_module` reject imports outside the v1 allowlist
-  with `[safe_mode_rejected]` before dispatch; the rejection is audited as
+  with `[safe_mode_rejected]` before dispatch; the rejection is recorded as
   `rejected` with the triggering rule id, and the suggestion points at typed
   tools or unsetting the flag. Default off, and the flag is standalone (not a
   `MAYA_MCP_DISABLE_*` member), so DISABLE still removes tools from `tools/list`
   before safe_mode narrows what remains. The response disclosure lands in a
   follow-up ticket. Evidence:
   `tests/test_pipeline.py::TestSafeModeGate::test_unsafe_import_rejected_before_dispatch`.
-- **Full deny-by-default `safe_mode` rule matrix** — the AST gate now also
+- **Full deny-by-default `safe_mode` rule matrix** — the code allowlist now also
   rejects syntax constructs outside the v1 node allowlist (`with`, `raise`,
   `assert`, `del`, `global`/`nonlocal`, `yield`, `await`, `async`, `match`),
   references to the denied builtin names (`open`, `eval`, `exec`, `compile`,
@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   any `__x__` attribute access (the `().__class__.__base__.__subclasses__()`
   family, including the `from x import __path__` spelling), each under its own
   `safe-mode-*` rule id. `def`/`class`/`lambda` bodies are walked under the
-  same rules recursively. Safety net, not a boundary. Evidence:
+  same rules recursively. Catches slips, not a boundary. Evidence:
   `tests/test_security.py::TestScanSafeModeCode::test_allowlisted_constructs_pass`,
   `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`.
 
@@ -60,7 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Zone`, `命名规则`, `scene_review`, `自定义检查项`, `场景存档`, `读档` and
   `临时存档` are rewritten in plain words in both READMEs, the two skill
   cards, `docs/` prose, the `server.py` instructions, tool descriptions and
-  error strings. Audit-log wording and the later groups' terms are untouched.
+  error strings. Wording for the call record and for the later groups' terms
+  was left out of that pass.
   Two claims that contradicted the code are
   fixed: `scene_checkpoint` is described as writing a `.ma` file to disk under
   `checkpoints/` (it used to be described as living only in Maya's memory),
@@ -90,6 +91,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_client.py::TestDetectPortType::test_mel_port_answers_0`,
   `tests/test_client.py::TestDetectPortType::test_probe_exception_is_unknown`,
   `tests/test_module_teardown.py::TestCreateModuleTeardown::test_teardown_called_and_resources_closed`.
+- **Security terms now say what they mean** — group 3 of the plain-language
+  pass (#190): `可信调用方`, `防手滑措施`, `调用记录`, `自动维护的代码块`,
+  `safe_mode`'s description, `影响范围` and `被带偏的代理` are rewritten in
+  plain words in both READMEs, `SECURITY.md`, the threat model, the error-code
+  guide, the ICEV workflow card, code comments and docstrings, and the tests
+  that describe them. The earlier and later groups' terms are untouched. A
+  handful of operator-visible strings changed wording only, with no change to
+  codes, fields or control flow: `maya_setup_guide`'s confirm hint, the
+  fallback install guide and the agent guide now say "managed block" or
+  这段代码块 where they used the retired word for that block, and the asset
+  polycount suggestion says the decision is written to the call record instead
+  of "audited". No public tool name, function name,
+  parameter name or error code changed. `llms.txt` was not hand-edited:
+  `check_llms_txt.py --write` reports the registry already matches, because no
+  tool description's first sentence changed. Evidence:
+  `tests/test_pipeline.py::TestStrictPolicyMode::test_read_only_surface_is_unaffected`,
+  `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`,
+  `tests/test_polyhaven.py::TestGuards::test_url_whitelist_rejects_foreign_host`,
+  `tests/test_security.py::TestAuditDualWrite::test_failed_write_still_logs_and_recovers`.
 - **Defect record #115 no longer reads as open work** — the fix had landed as
   `2f8d51e` (PR #138, merge `894f6ae`) while the ticket stayed open, because
   the closing keyword lived in the child ticket's body and never reached a

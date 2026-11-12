@@ -51,7 +51,7 @@ pip install -e .
 
 1. 确保 Maya 已启动
 2. 在 Agent 中输入任意指令（如"查看 Maya 场景"）
-3. 如果未连接，Agent 会自动运行诊断并可安装 `userSetup.py`（幂等标记块合并，写入前自动备份）
+3. 如果未连接，Agent 会自动运行诊断并可安装 `userSetup.py`（只改自动维护的那段代码，重复执行结果一样，写入前自动备份）
 4. 重启 Maya 后，命令端口自动打开
 
 #### 方式二：手动配置
@@ -158,7 +158,7 @@ AI 会自动调用 `scene_snapshot()` → 理解场景 → 执行建模 → 用 
 | ⚡ **代码执行** | `execute_code` `write_module` | 在 Maya 中执行任意 Python 代码 / 注入可复用模块 |
 | 👁️ **看图复查** | `scene_viewport_snapshot` `scene_render_preview` | 视口所见即所得捕获 + 单帧 playblast 预览，让 AI 看一眼改得对不对（仅 GUI 会话） |
 | 🔌 **会话管理** | `list_sessions` `add_session` `maya_setup_guide` | 多会话发现/接入 + 连接诊断/安装/回退引导 |
-| 📦 **资产库** | `asset_search` `asset_import` | Poly Haven CC0 模型——宿主侧 HTTPS 下载（主机白名单、md5 校验、大小上限、platformdirs 缓存），Maya 侧 FBX 导入带贴图自动接线、面数/尺寸护栏、`GRP_asset_<id>` 去重 |
+| 📦 **资产库** | `asset_search` `asset_import` | Poly Haven CC0 模型——宿主侧 HTTPS 下载（主机白名单、md5 校验、大小上限、platformdirs 缓存），Maya 侧 FBX 导入带贴图自动接线、面数/尺寸上限检查、`GRP_asset_<id>` 去重 |
 | 📤 **场景导出** | `scene_export` | FBX/OBJ/USD 导出——整场景或指定对象；格式按扩展名推断（冲突即报错不猜）、父目录自动创建、覆盖需显式 opt-in、导出后还原选择集 |
 | 🔎 **场景图内省** | `scene_describe` `scene_nodes` | API 级节点自描述（精确类型、逐属性元数据 keyable/connectable/enum/取值范围、连接布线——响应有界，`limit` 最高放宽至 1000，截断经 `*_truncated` 披露）+ 有界枚举（含非 DAG 节点：材质/工具节点），`has_more`/`next_cursor` 诚实分页 |
 
@@ -230,7 +230,7 @@ asset_import(asset_id="Camera_01", resolution="1k")
 # （diff/rough/metal/nor_gl/ao/disp...），sRGB/Raw 色彩空间 + bump2d 法线。
 # 单件资产使用裸贴图名（Diffuse/Rough/Metal...）——同样被识别并接到
 # 该资产的唯一材质上。
-# 护栏：默认 100k 面数上限（allow_high_polycount 可放宽）、尺寸合理性检查。
+# 上限检查：默认 100k 面数上限（allow_high_polycount 可放宽）、尺寸合理性检查。
 ```
 
 ### 场景导出
@@ -301,11 +301,11 @@ entrance (6obj) @(157.3,162.6,-111.6)
 ## 安全与隐私
 
 - **零遥测**：zero telemetry, no phone-home——本项目不含任何遥测或主动外发上报代码，可源码核实。唯一外发流量是两个资产工具：仅在调用时经 HTTPS 访问 `api.polyhaven.com` / `dl.polyhaven.org|.com`（`polyhaven.py` 内主机白名单 + md5 校验 + 大小上限）。
-- **本地单用户**：命令端口仅绑定 localhost；接入的 MCP client 是受信方。
-- **安全网**：统一管线（`pipeline.py` + `security.py`）对全部 25 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 独立 JSONL 审计日志（覆盖全部 25 个工具）。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
+- **本地单用户**：命令端口仅绑定 localhost；接入的 MCP client 可信，假定它不会故意作恶。
+- **防手滑措施**：统一管线（`pipeline.py` + `security.py`）对全部 25 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 每个工具调用都写一行的独立 JSONL 调用记录。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
 - **事务安全**：`scene_checkpoint`/`scene_rollback` 把场景存成磁盘上的 `.ma` 文件，读档时打开它（存档不含 undo 历史，references 默认展平）。
-- **严格策略模式（可选）**：设置 `MAYA_MCP_DISABLE_EXECUTE=1`、`MAYA_MCP_DISABLE_WRITE_MODULE=1` 或 `MAYA_MCP_DISABLE_ARBITRARY=1`（三者全禁），即可把逃生舱工具从 `tools/list` 中移除，并以 `[policy_disabled]` 拒绝调用；只读工具不受影响。它们是**误用护栏，不是恶意 agent 边界**——仍持有 `execute_code` 的 agent 本就在信任边界之内；它们买来的是 demo、误操作或 CI 沙箱场景下更小的爆炸半径。理由见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)，逐码对照见 [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md)。
-- **`safe_mode` AST 门（可选）**：设置 `MAYA_MCP_SAFE_MODE=1`（默认关闭）后，两个代码载荷工具仍在 `tools/list` 中，但其 `code` 参数须通过默认拒绝的 AST 允许清单：v1 import 根限 `maya`/`math`/`json`/`re`/`collections`/`itertools`/`functools`/`dataclasses`/`typing`，拒绝名单内建名——任何引用即拒绝而非仅调用（`eval`/`exec`/`open`/`__import__`/getattr/setattr/……）、`__builtins__` 引用与任何 `__dunder__` 属性访问；无法解析的输入同样拒绝（"无法判定即拒绝"）。拒绝以 `[safe_mode_rejected]` 报出（宿主 `isError` 失败）并点名触发的 rule id、记入审计 `rejected`；成功响应携带 `mode: "safe"` 字段，工具描述增加一行 `Boundary:` 披露。DISABLE 标志先移除工具——safe_mode 只收紧留下的部分。与 DISABLE 标志同一姿态：**安全网，不是安全边界**。理由见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)，逐码对照见 [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md)。
+- **严格策略模式（可选）**：设置 `MAYA_MCP_DISABLE_EXECUTE=1`、`MAYA_MCP_DISABLE_WRITE_MODULE=1` 或 `MAYA_MCP_DISABLE_ARBITRARY=1`（三者全禁），即可把逃生舱工具从 `tools/list` 中移除，并以 `[policy_disabled]` 拒绝调用；只读工具不受影响。它们只防误用，不是挡住恶意 agent 的硬边界——仍持有 `execute_code` 的 agent 本来就在信任范围内；它们能做的只是让 demo、误操作或 CI 沙箱里的一次错误坏得少一点。理由见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)，逐码对照见 [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md)。
+- **`safe_mode` 代码允许清单（可选）**：设置 `MAYA_MCP_SAFE_MODE=1`（默认关闭）后，两个代码载荷工具仍在 `tools/list` 中，但其 `code` 参数要先过允许清单（按解析后的语法树判断，默认全拒）：v1 import 根限 `maya`/`math`/`json`/`re`/`collections`/`itertools`/`functools`/`dataclasses`/`typing`，拒绝名单内建名——任何引用即拒绝而非仅调用（`eval`/`exec`/`open`/`__import__`/getattr/setattr/……）、`__builtins__` 引用与任何 `__dunder__` 属性访问；无法解析的输入同样拒绝（"无法判定即拒绝"）。拒绝以 `[safe_mode_rejected]` 报出（宿主 `isError` 失败）并点名触发的 rule id、记入调用记录的 `rejected`；成功响应携带 `mode: "safe"` 字段，工具描述增加一行 `Boundary:` 披露。DISABLE 标志先移除工具——safe_mode 只收紧留下的部分。和 DISABLE 标志一样：它防手滑，不防故意作恶，也不是硬边界。理由见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)，逐码对照见 [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md)。
 - 漏洞报告渠道见 [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md)。
 
 ## 环境要求

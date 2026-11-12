@@ -254,7 +254,7 @@ class TestAssetImport:
             json.loads(line) for line in tools.audit_path.read_text().splitlines() if line.strip()
         ]
         rows = [line for line in lines if line.get("asset_download")]
-        assert rows, "supplementary asset_download audit row missing"
+        assert rows, "supplementary asset_download call-record row missing"
         row = rows[0]["asset_download"]
         assert row["source"] == "download"
         assert row["size_bytes"] == 9
@@ -267,7 +267,7 @@ class TestAssetImport:
 
     async def test_audit_duration_ms_is_measured(self, tools, monkeypatch):
         """D-082f: duration_ms is a real wall-clock measurement, not the
-        old 0.0 placeholder lying in every supplementary audit row."""
+        old 0.0 placeholder lying in every supplementary call-record row."""
         # first monotonic() call is the t0 start mark; every later call
         # returns the end mark -> measured span is exactly 250 ms even
         # if the call sites gain extra monotonic probes.
