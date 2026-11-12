@@ -65,7 +65,7 @@ Pending: the mayapy/batch run must also cover the `gui_session_required`
 headless gate (visual tools must return the structured error, not
 crash) — queued until a healthy headless Maya env exists.
 
-### Call-form items booked to mayapy (env-blocked on this box)
+### Call-form items booked to the real interpreter (env-blocked on this box)
 
 Viewport-independent call forms whose real-return shape must be
 asserted on a healthy real Maya interpreter (the tests in

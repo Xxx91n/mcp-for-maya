@@ -59,7 +59,7 @@ class ExecClient:
 
 @pytest.fixture
 def tools(maya_env, monkeypatch, tmp_path):
-    """Stub scene + bound _mcp_asset + captured tool fns."""
+    """Fake scene + bound _mcp_asset + captured tool fns."""
     module = maya_stub.load_asset_module()
     sys.modules["_mcp_asset"] = module
     _asset_injected.add("_default")

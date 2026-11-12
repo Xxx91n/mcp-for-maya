@@ -186,7 +186,7 @@ class TestMImageModuleLayout:
         """2024 layout: OpenMayaUI lacks MImage -> resolves via
         maya.api.OpenMaya and capture still works. (convertPixelFormat
         is C++-only — absent from Python API 2.0 on every documented
-        version, so the stub no longer models it: D-056⑤.)"""
+        version, so the fake no longer models it: D-056⑤.)"""
         maya_env.scene.setup_gui()
         omui = sys.modules["maya.api.OpenMayaUI"]
         monkeypatch.delattr(omui, "MImage")
@@ -432,7 +432,7 @@ class TestPreviewContract:
         assert len(calls) >= 2, "a restore camera edit must have happened"
 
     async def test_current_time_restored(self, vtools):
-        """Stub playblast slams the timeline (undo bug #21) - the module
+        """Fake playblast slams the timeline (undo bug #21) - the module
         must restore it."""
         vtools.env.scene.current_time = 42
         await vtools.fns["scene_render_preview"]()

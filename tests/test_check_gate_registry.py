@@ -117,7 +117,7 @@ def test_unregistered_bound_object_is_red(tmp_path):
 
 
 def test_a_gate_script_added_later_is_caught_as_unregistered(tmp_path):
-    """The tighten-only case (D-215 1/4): the registry was correct when written, then
+    """The registry-drift case (D-215 1/4): the registry was correct when written, then
     someone added a gate. This is the failure the gate exists to prevent."""
     mod = _load()
     root = _tree(tmp_path, scripts=["check_demo"], wired=["check_demo"])

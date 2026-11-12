@@ -2,9 +2,10 @@
 
 GUI-only capture paths. The host never injects this module into a
 headless session (framed_channel gate), but every public function
-still re-checks GUI capability and returns the Maya-side error shape
-{error:{code,message,suggestion}} for extreme headless-ish GUI
-environments (missing omui/PySide, batch mode, no modelPanel).
+still re-checks GUI capability and returns the Maya-side half of the
+two error paths, {error:{code,message,suggestion}}, for extreme
+headless-ish GUI environments (missing omui/PySide, batch mode, no
+modelPanel).
 
 Public API:
     viewport_snapshot(max_size, format, quality) -> dict

@@ -65,7 +65,7 @@ class ExecClient:
 
 @pytest.fixture
 def tools(maya_env, monkeypatch, tmp_path):
-    """Stub scene + bound _mcp_export + captured tool fns."""
+    """Fake scene + bound _mcp_export + captured tool fns."""
     module = maya_stub.load_export_module()
     sys.modules["_mcp_export"] = module
     _export_injected.add("_default")

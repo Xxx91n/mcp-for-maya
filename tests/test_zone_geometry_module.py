@@ -1,6 +1,6 @@
 """Issue #176 Maya-side tests: zone geometry from the assembled _mcp_scene unit.
 
-These run on the maya stub. They check the data the later recommendation pass
+These run on the Maya fake. They check the data the later recommendation pass
 will read: zone boxes, object sizes, empty/unusable zones, and the unchanged
 default scene_plan answer.
 """

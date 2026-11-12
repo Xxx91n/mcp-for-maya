@@ -1,4 +1,4 @@
-"""Compare a ruff JSON report against the frozen error budget.
+"""Compare a ruff JSON report against the per-rule error budget.
 
 Usage: check_ruff_budget.py <ruff-report.json> <ruff-baseline.json>
 

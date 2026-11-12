@@ -123,9 +123,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pre-commit comments, `pyproject.toml` comments and marker descriptions, and
   the comments and docstrings in `src/` and `tests/` that describe them.
   Behaviour is unchanged: no public tool name, function name, parameter name,
-  error code, file name, gate id or pytest marker changed. Two CI script
-  message strings were reworded where no test pinned them; the one that a
-  test does pin — the derivation-floor message — moved with its test.
+  error code, file name, gate id or pytest marker changed. Four CI message
+  strings were reworded: three where no test pinned the text, and the
+  derivation-floor message, whose test moved with it.
   `llms.txt` was not hand-edited: no tool description's first sentence
   changed, and the generator reports it still matches the registry. Evidence:
   `tests/test_check_monolith_budget.py::test_repo_monolith_within_budget`,

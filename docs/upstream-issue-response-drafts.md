@@ -23,7 +23,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 >
 > In our fork ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/))
 > this failure mode does not exist: the dependency surface contains no
-> `fakeredis` at all — the test suite runs against an in-repo Maya stub
+> `fakeredis` at all — the test suite runs against an in-repo Maya fake
 > instead. This holds for **every released version (>= 0.1.0)**, verified from
 > the published `requires_dist` metadata, not from memory.
 >

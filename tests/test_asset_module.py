@@ -17,7 +17,7 @@ import pytest
 
 @pytest.fixture
 def asset_env(maya_env, tmp_path):
-    """Stub scene + bound _mcp_asset + on-disk descriptor files."""
+    """Fake scene + bound _mcp_asset + on-disk descriptor files."""
     module = maya_stub.load_asset_module()
 
     fbx = tmp_path / "Camera_01_1k.fbx"

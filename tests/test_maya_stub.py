@@ -52,8 +52,8 @@ class TestMatrixMath:
 
 class TestMVectorSplit:
     """D-056④: real MVector is NOT an MPoint subclass — len==3, no w,
-    cross product via ^; MPoint len==4 with w. The stub's MVector(MPoint)
-    inheritance made isinstance/len()/w all lie (stub-green, real-red).
+    cross product via ^; MPoint len==4 with w. The fake's MVector(MPoint)
+    inheritance made isinstance/len()/w all lie (fake-green, real-red).
     Conversion ctors mirror the real API: MVector(MPoint) drops w,
     MPoint(MVector) sets w=1.0."""
 
@@ -296,7 +296,7 @@ class TestCmdsFacade:
 
 
 class TestGuiSurface:
-    """D-039: stub GUI surface fidelity - modelPanel camera API and a
+    """D-039: fake GUI surface fidelity - modelPanel camera API and a
     type-disambiguated lookThru with warn/strict anomaly policy."""
 
     def test_model_panel_camera_roundtrip(self, scene):

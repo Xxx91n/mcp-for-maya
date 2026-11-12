@@ -2,14 +2,15 @@
 
 ``maya_scene_module.py`` is one registered big file under T-07: splits
 happen where a fix already touches the code, never as a one-shot
-rewrite — and the file must not keep growing (the cap may only be
-lowered, in the pull request that earns it). The budget file caps each
-registered file's physical line count:
+rewrite — and the file must not keep growing. A raise needs a reasoned
+budget edit in the same pull request that earns it; a lower count may
+be budgeted down the same way. The budget file caps each registered
+file's physical line count:
 
 - count > budget  -> fail the lint job
 - count < budget  -> pass, but print a "may be lowered" hint so the
-  cap keeps tightening instead of decaying into a high-water mark
-  (the OmniRoute #8584 failure mode: a cap that only blocks but
+  cap keeps tightening instead of settling at a number the file never
+  needs (the OmniRoute #8584 failure mode: a cap that only blocks but
   never tightens silently licenses growth back up to the line)
 - count == budget -> pass
 
@@ -71,7 +72,7 @@ def check(root: Path, budget_path: Path) -> tuple[bool, list[str], list[str]]:
         elif n < cap:
             warnings.append(
                 f"{rel}: {n}/{cap} — below budget; the budget may be lowered "
-                "in the same PR commit (keep tightening)"
+                "in the same PR commit (lower it to the new count)"
             )
         else:
             print(f"{rel}: {n}/{cap} at budget — OK")

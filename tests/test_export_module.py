@@ -17,7 +17,7 @@ import pytest
 
 @pytest.fixture
 def env(maya_env, tmp_path):
-    """Stub scene + freshly imported export_module bound to it."""
+    """Fake scene + freshly imported export_module bound to it."""
     module = maya_stub.load_export_module()
     maya_env.scene.add_mesh("GEO_box")
     maya_env.scene.add_mesh("GEO_ball")
