@@ -139,7 +139,7 @@ Every scene edit follows **ICEV**: look at the scene, work out the change, make 
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
 ```
 
-1. **INSPECT** (look): Call `scene_snapshot()` to capture full spatial scene data
+1. **INSPECT** (look): Call `scene_snapshot()` to capture the scene's spatial data
 2. **COMPUTE** (work out): Calculate positions, sizes, and spacing from the spatial data
 3. **EXECUTE** (apply): Run Maya Python code via `execute_code()`
 4. **VERIFY** (check): Check the outcome with `scene_assert()` + `scene_review()`; GUI sessions can also look at the result
@@ -211,7 +211,7 @@ scene_checkpoint(name="before_renovation")
 # List all checkpoints
 scene_checkpoint_list()
 
-# Read a checkpoint back (it saves the current scene first, then points the scene name back at the original file; run scene_snapshot afterward to refresh scene state)
+# Read a checkpoint back (it saves the current scene first, then points the scene name back at the original file; a scene that was never saved has no original file, so it stays in the checkpoint file; run scene_snapshot afterward to refresh scene state)
 # Scope: each file is self-contained; references are flattened without modifying reference sources; assumes one scene file per session
 scene_rollback(filename="cp_before_renovation.ma")
 ```

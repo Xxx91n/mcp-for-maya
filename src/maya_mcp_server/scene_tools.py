@@ -839,8 +839,9 @@ result
         scene_review is a broad check of the whole scene).
 
         Args:
-            format: Output format - "json" (default) or "cos" (CoS: short
-                one-line-per-object text, saves tokens).
+            format: Output format - "json" (default) or "cos" (a short score
+                summary: the overall score, each dimension's score, and the
+                suggestions).
             session_key: Maya session key.
 
         Returns:

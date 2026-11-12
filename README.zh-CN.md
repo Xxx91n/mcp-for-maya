@@ -139,7 +139,7 @@ AI 会调用 `scene_snapshot()` 看一遍场景，然后建模，再用 `scene_r
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
 ```
 
-1. **INSPECT**（读场景）：`scene_snapshot()` 获取全场景空间数据
+1. **INSPECT**（读场景）：`scene_snapshot()` 获取场景空间数据
 2. **COMPUTE**（算方案）：基于空间数据计算位置、尺寸、间距
 3. **EXECUTE**（动手改）：`execute_code()` 执行 Maya Python 代码
 4. **VERIFY**（复查结果）：`scene_assert()` + `scene_review()` 确认结果；GUI 会话还可以直接看图
@@ -212,7 +212,7 @@ scene_checkpoint(name="before_renovation")
 # 列出所有存档
 scene_checkpoint_list()
 
-# 读档（先自动存一份当前场景，再把场景名指回原文件；读档后请用 scene_snapshot 重建认知）
+# 读档（先自动存一份当前场景，再把场景名指回原文件；没保存过的场景没有原文件，读档后就停在这个存档里；读档后请用 scene_snapshot 重建认知）
 # 边界：每个存档都自包含——references 默认展平不回写；假定单场景文件单会话
 scene_rollback(filename="cp_before_renovation.ma")
 ```

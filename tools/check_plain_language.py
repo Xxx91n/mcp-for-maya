@@ -85,11 +85,9 @@ from pathlib import Path
 ENTRY = re.compile(r"^\*\*(.+?)\*\*")
 AVOID_PREFIX = "_Avoid_"
 AVOID_SPLIT = "、"
-
-# A CommonMark code span opens with a backtick run and closes with a run of
-# the SAME length, so ``a`` is one span and ``` ``` ``` is another. Matching
-# single pairs would leave the inner backticks behind as prose.
-CODE_SPAN = re.compile(r"(`+)(.+?)(`+)")
+# A list item opens with a marker at any indent, so a nested item ("    - x")
+# is still list prose and not an indented code block.
+LIST_ITEM = re.compile(r"^(\s*)(?:[-*+]|\d{1,9}[.)])(?:\s|$)")
 
 # A fence opens with three or more backticks or tildes and closes with the
 # same character at the same length or longer. An info string may follow the
@@ -189,17 +187,43 @@ def term_pattern(term: str) -> re.Pattern[str]:
 
 
 def strip_code_spans(line: str) -> str:
-    """Remove CommonMark code spans, matching their delimiter runs by length."""
+    """Remove CommonMark code spans, matching their delimiter runs by length.
+
+    A span closes only on a run of the SAME length, and the search for that
+    closer skips past shorter runs: a two-backtick span may hold a single
+    backtick, and stopping there would put the code back in the prose.
+    """
     out: list[str] = []
     pos = 0
-    for match in CODE_SPAN.finditer(line):
-        opening, _, closing = match.groups()
-        # A closer of a different length is not a closer; keep it as prose.
-        if len(opening) != len(closing):
+    index = 0
+    length = len(line)
+    while index < length:
+        if line[index] != "`":
+            index += 1
             continue
-        out.append(line[pos : match.start()])
+        start = index
+        while index < length and line[index] == "`":
+            index += 1
+        opening = index - start
+        closing = -1
+        end = -1
+        probe = index
+        while probe < length:
+            if line[probe] != "`":
+                probe += 1
+                continue
+            run_start = probe
+            while probe < length and line[probe] == "`":
+                probe += 1
+            if probe - run_start == opening:
+                closing = run_start
+                end = probe
+                break
+        if closing < 0:
+            continue  # no closer of this length: the run stays prose
+        out.append(line[pos:start])
         out.append(" ")
-        pos = match.end()
+        pos = end
     out.append(line[pos:])
     return "".join(out)
 
@@ -210,14 +234,18 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
     A fence closes only on the same character at the same length or longer,
     and only on a marker followed by whitespace alone: ` ```python ` inside a
     block is content. A line indented four spaces or more is an indented code
-    block, so its content is code too -- and a fence marker there is not a
-    fence, which is why the indent is checked before the marker.
+    block only when no list is open: inside a list, four spaces is a nested
+    item's own margin (`- step` then `    - rollback`), so that line is prose.
+    A fence marker there is not a fence, which is why the indent is checked
+    before the marker.
     """
     out: list[tuple[int, str]] = []
     fence: str | None = None
+    list_indent: int | None = None
     for number, line in enumerate(text.splitlines(), 1):
         body = line.lstrip(" ")
-        if len(line) - len(body) >= 4:
+        indent = len(line) - len(body)
+        if indent >= 4 and list_indent is None:
             continue
         if fence is None:
             opener = FENCE.match(body)
@@ -231,6 +259,12 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
             if closer and closer.group(1)[0] == fence[0] and len(closer.group(1)) >= len(fence):
                 fence = None
             continue
+        if fence is None:
+            item = LIST_ITEM.match(line)
+            if item:
+                list_indent = indent
+            elif list_indent is not None and body.strip() and indent <= list_indent:
+                list_indent = None
         out.append((number, strip_code_spans(line)))
     return out
 

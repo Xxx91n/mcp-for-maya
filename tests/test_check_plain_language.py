@@ -214,6 +214,20 @@ def test_a_double_backtick_code_span_is_one_span(tmp_path):
     assert findings == []
 
 
+def test_a_span_with_an_inner_single_backtick_is_one_span(tmp_path):
+    """A two-backtick span may hold a single backtick, and it stays one span."""
+    root = _repo(tmp_path, doc="正文 ``回滚`x`` 结束。\n")
+    findings, _, _ = M.scan(root, M.load_avoid_map(root / "GLOSSARY.md"))
+    assert findings == []
+
+
+def test_a_nested_list_item_is_prose(tmp_path):
+    """Inside a list, four spaces is a nested item, not an indented code block."""
+    root = _repo(tmp_path, doc="- 步骤\n    - 回滚\n")
+    findings, _, _ = M.scan(root, M.load_avoid_map(root / "GLOSSARY.md"))
+    assert findings == ["NOTES.md:2: 回滚 -> 读档（rollback）"]
+
+
 def test_a_four_backtick_fence_is_not_closed_by_three(tmp_path):
     """A four-backtick block may contain ```; the prose after the real close is read."""
     root = _repo(tmp_path, doc="````md\n```\n回滚\n```\n````\n正文里的回滚会被报告。\n")
