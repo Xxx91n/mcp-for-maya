@@ -221,6 +221,13 @@ def test_a_span_with_an_inner_single_backtick_is_one_span(tmp_path):
     assert findings == []
 
 
+def test_a_word_between_two_code_spans_still_reports(tmp_path):
+    """Spans are matched one at a time; the cursor must resume after each closer."""
+    root = _repo(tmp_path, doc="正文 `x` 回滚 `y` 结束。\n")
+    findings, _, _ = M.scan(root, M.load_avoid_map(root / "GLOSSARY.md"))
+    assert findings == ["NOTES.md:1: 回滚 -> 读档（rollback）"]
+
+
 def test_a_nested_list_item_is_prose(tmp_path):
     """Inside a list, four spaces is a nested item, not an indented code block."""
     root = _repo(tmp_path, doc="- 步骤\n    - 回滚\n")

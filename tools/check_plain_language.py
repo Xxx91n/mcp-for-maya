@@ -224,6 +224,7 @@ def strip_code_spans(line: str) -> str:
         out.append(line[pos:start])
         out.append(" ")
         pos = end
+        index = end  # resume after the closer, not inside the span
     out.append(line[pos:])
     return "".join(out)
 
