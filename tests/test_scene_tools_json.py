@@ -408,7 +408,7 @@ class TestZoneGeometryHostHelper:
         expected = await tools.fns["scene_plan"](format=format)
 
         def should_not_run():
-            raise AssertionError("scene_plan must not call the dormant geometry helper")
+            raise AssertionError("scene_plan must not call a helper that is not wired up yet")
 
         monkeypatch.setattr(tools.env.module, "get_zone_geometry", should_not_run)
         actual = await tools.fns["scene_plan"](format=format)

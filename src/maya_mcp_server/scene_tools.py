@@ -111,7 +111,7 @@ async def _execute_scene_code(
     return await fetch()
 
 
-# dormant: #177 is the first planned production caller. Keep this helper out
+# not wired up yet: #177 is the first planned production caller. Keep this helper out
 # of scene_plan until the recommendation opt-in lands; default output is frozen.
 async def get_zone_geometry(  # pragma: no cover
     client: Any, session_key: str | None = None

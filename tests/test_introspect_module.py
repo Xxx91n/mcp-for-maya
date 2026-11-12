@@ -175,8 +175,8 @@ class TestListNodes:
 class TestDescribeBudget:
     """D-110 response-size caps: soft 200 default / hard 1000 via limit=,
     *_truncated + totals disclosure (never silent). Mechanism tests run
-    at small explicit limits - the stub's attr_meta rebuild is O(n^2)
-    per-attr so large real-scale seeds are kept off the stub tier; the
+    at small explicit limits - the fake's attr_meta rebuild is O(n^2)
+    per-attr so large real-scale seeds are kept off the fake Maya layer; the
     cap constants themselves are pinned directly.
     """
 

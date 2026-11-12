@@ -1,7 +1,7 @@
-"""Maya stub package — fake maya.cmds + maya.api.OpenMaya.
+"""Maya fake package — stands in for maya.cmds + maya.api.OpenMaya.
 
-Purpose (D-004 stub tier): run maya_scene_module.py logic in pytest
-WITHOUT a real Maya install. The stub implements a real DAG scene graph,
+Purpose (D-004 fake Maya layer): run maya_scene_module.py logic in pytest
+WITHOUT a real Maya install. The fake implements a real DAG scene graph,
 row-major matrix math, and 8-corner world-bbox transforms — semantically
 correct, so tests catch real math bugs (e.g. min*M/max*M shortcuts).
 
@@ -11,12 +11,12 @@ Usage in tests:
         maya_env.scene.add_mesh("GEO_box", t=(10, 0, 0))
         result = maya_env.module.measure("GEO_box", "GEO_other", "bbox")
 
-The fixture installs stub modules into sys.modules, imports
-maya_scene_module bound to the stub, and cleans up afterwards.
+The fixture installs the fake modules into sys.modules, imports
+maya_scene_module bound to them, and cleans up afterwards.
 
 NOT a Maya replacement: it models just enough cmds/OpenMaya surface used
-by the scene module. Real-Maya verification stays on the mayapy tier
-(docs/testing.md — manual, local-only, never in CI).
+by the scene module. Real-Maya verification stays on the real interpreter
+run (docs/testing.md — manual, local-only, never in CI).
 """
 
 from __future__ import annotations

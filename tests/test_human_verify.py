@@ -1,4 +1,4 @@
-"""human_verify tier (D-049a): the versioned manual checklist.
+"""human_verify marker (D-049a): the versioned manual checklist.
 
 Each test exists so ``pytest --collect-only -m human_verify`` enumerates
 the human-eye acceptance list and ``-s`` prints the manual steps. They
@@ -115,9 +115,9 @@ def test_callform_checklist_gui_tier():
 
 
 def test_callform_checklist_mayapy_tier():
-    """D-056②: viewport-independent call forms are booked to mayapy —
-    skeleton asserts exist in test_mayapy_smoke.py and run whenever a
-    healthy interpreter is available (env-blocked on this box)."""
+    """D-056②: viewport-independent call forms are booked to the real
+    interpreter — manual checklists exist in test_mayapy_smoke.py and run
+    whenever a healthy interpreter is available (env-blocked on this box)."""
     _steps(
         "run mayapy -m pytest tests/ -m mayapy on a healthy box",
         "cmds.camera(name=X) -> [transform, shape] list",

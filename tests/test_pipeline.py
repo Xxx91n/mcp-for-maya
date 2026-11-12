@@ -498,7 +498,7 @@ async def test_in_tool_pipeline_error_counts_as_error(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# D-207 7: strict policy mode. Stub tier, in CI: assert the flag bites and
+# D-207 7: strict policy mode. Fake Maya layer, in CI: assert the flag bites and
 # assert the read-only surface is untouched. A guard against misuse with no
 # acceptance test is an adoption without acceptance.
 # ---------------------------------------------------------------------------
@@ -804,7 +804,7 @@ class TestSafeModeGate:
 # ---------------------------------------------------------------------------
 # T3: safe_mode disclosure surfaces. Successful gated calls carry
 # mode: "safe" on their structured payload; tools/list descriptions gain a
-# Boundary line while the flag is on. Both are absent when the flag is off
+# a `Boundary:` line while the flag is on. Both are absent when the flag is off
 # and neither touches rejections, errors, or other tools.
 # ---------------------------------------------------------------------------
 
@@ -908,7 +908,7 @@ class TestSafeModeDisclosure:
             assert SAFE_MODE_BOUNDARY_LINE not in tool.description
 
     async def test_original_tool_instances_are_not_mutated(self, tmp_path, monkeypatch):
-        """The Boundary line rides a clone — the registry's Tool objects must
+        """The `Boundary:` line rides a clone — the registry's Tool objects must
         stay flag-off clean or the disclosure would leak into the next listing."""
         monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
         pipe, _audit, _log = _pipeline(tmp_path)
@@ -924,7 +924,7 @@ class TestSafeModeDisclosure:
 
     async def test_disabled_tool_does_not_gain_the_line(self, tmp_path, monkeypatch):
         """Composition: DISABLE removes the tool entirely, so there is no
-        description left for the Boundary line to land on."""
+        description left for the `Boundary:` line to land on."""
         monkeypatch.setenv("MAYA_MCP_DISABLE_EXECUTE", "1")
         monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
         pipe, _audit, _log = _pipeline(tmp_path)

@@ -1,13 +1,14 @@
 """T-08 contract tests: visual tools (D-023..D-027).
 
 VisualExecClient runs the code visual_tools generates against the
-stub-bound _mcp_visual module using the REAL result-capture
+fake-bound _mcp_visual module using the REAL result-capture
 transform, so these tests exercise the full chain: host gate ->
 injection -> generated code -> Maya-side module -> mixed blocks.
 
-Stub layer = contract layer (D-027): no pixel assertions, no golden
-images, no exact call-sequence pinning. Terminal-state roundtrips
-(success AND failure paths) and loose restore evidence instead.
+The fake Maya layer is where the contract is checked (D-027): no pixel
+assertions, no golden images, no exact call-sequence pinning.
+Terminal-state roundtrips (success AND failure paths) and loose restore
+evidence instead.
 """
 
 from __future__ import annotations
@@ -416,7 +417,7 @@ class TestPreviewContract:
         assert kw["editorPanelName"] == "modelPanel1"
 
     async def test_camera_switch_terminal_state(self, vtools):
-        """Net-zero: panel camera after == before; restore evidenced
+        """Put back: panel camera after == before; restore evidenced
         loosely (a second modelPanel camera edit back to the prior
         camera, D-039)."""
         vtools.env.scene.add_camera("CAM_x")

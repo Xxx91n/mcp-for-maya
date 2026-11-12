@@ -1,9 +1,9 @@
-"""D-049b presence audit — ratchet against stub drift.
+"""D-049b real-Maya cmds list check — the fake may only drift one way.
 
-The maya stub may only model API that EXISTS in the real-Maya baseline
+The maya fake may only model API that EXISTS in the real-Maya baseline
 (tests/maya_stub/presence-baseline.json) or is explicitly allowlisted
-with a reason (presence-allowlist.json). A stub symbol missing from
-both means the stub models something real Maya doesn't have — the exact
+with a reason (presence-allowlist.json). A fake symbol missing from
+both means the fake models something real Maya doesn't have — the exact
 class of drift that let 0.1.1 ship str-result_type, omui.MImage-on-2024
 and cmds.file(rename+prompt) bugs while CI stayed green.
 

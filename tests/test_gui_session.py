@@ -253,7 +253,7 @@ eds = cmds.lsUI(editors=True)
 ct0 = cmds.currentTime(q=True)
 cmds.currentTime(1.0, edit=True)
 ct1 = cmds.currentTime(q=True)
-cmds.currentTime(ct0, edit=True)  # net-zero restore (D-026 discipline)
+cmds.currentTime(ct0, edit=True)  # put the time back (D-026 discipline)
 ct2 = cmds.currentTime(q=True)
 {
     "focus_str_or_none": focus is None or isinstance(focus, str),

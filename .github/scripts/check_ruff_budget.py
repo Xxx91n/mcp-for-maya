@@ -2,7 +2,7 @@
 
 Usage: check_ruff_budget.py <ruff-report.json> <ruff-baseline.json>
 
-Budget semantics (frozen budget, ratchet-only-down, per-rule since T-10b):
+Budget semantics (per rule, only ever goes down, per-rule since T-10b):
 - each top-level segment (src/, tests/, anything else) holds a {rule: count} map;
 - count > budget for any rule -> fail (new lint debt — rules cannot subsidise
   each other: fixing 10 E501 can no longer hide 5 new F401);
@@ -77,7 +77,7 @@ def main() -> int:
 
     if failed:
         print(
-            "Frozen budget is ratchet-only-down per rule: fix the new errors, or"
+            "The per-rule budget only goes down: fix the new errors, or"
             " lower the budget file in the same PR with the reason stated."
         )
         return 1

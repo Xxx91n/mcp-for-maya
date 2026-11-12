@@ -5,14 +5,14 @@ MCP server for LLM agents to inspect, plan, and edit Autodesk Maya scenes throug
 ## Install / run / test
 uv sync --frozen
 python -m maya_mcp_server -vv
-uv run python -m pytest tests/ -q          # stub tier
+uv run python -m pytest tests/ -q          # fake Maya test layer
 uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json          # lint report: red findings must not fail the shell
-python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint gate: frozen per-rule budget
+python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint gate: per-rule budget that only goes down
 rc=0; uv run python -m mypy src/ > mypy-report.txt || rc=$?; if [ "$rc" -gt 1 ]; then cat mypy-report.txt; false; else uv run mypy-baseline filter < mypy-report.txt; fi   # type-check gate: raw exit is non-zero on the baselined errors; rc 2 (crash) prints and stays red at exit 1 here, not CI's 2, so a pasted line cannot close the shell
 uv run pre-commit run --all-files          # hook sweep (the why is in CONTRIBUTING's dev setup)
 
 ## Gates
-A "governance gate" is any check a job runs in `.github/workflows/ci.yml`; `.github/gate-registry.yaml` indexes every enforced one with its pins, and `check_gate_registry.py` fails an unregistered or unwired entry, so neither list can rot quietly. To see what CI actually runs, read the `run:` lines: `grep -E 'run: python .github/scripts' .github/workflows/ci.yml`. The three baseline ratchets only ever move down — ruff budget and monolith line budget are `lint` steps, the mypy baseline is its own job.
+A "governance gate" is any check a job runs in `.github/workflows/ci.yml`; `.github/gate-registry.yaml` indexes every enforced one with its pins, and `check_gate_registry.py` fails an unregistered or unwired entry, so neither list can rot quietly. To see what CI actually runs, read the `run:` lines: `grep -E 'run: python .github/scripts' .github/workflows/ci.yml`. All three baseline budgets only go down — the ruff error budget and the big module's line cap are `lint` steps, the mypy baseline is its own job.
 
 ## Don't touch
 - `src/maya_mcp_server/maya_scene_module.py` is line-capped by `.github/monolith-budget.json`; new Maya-side capability goes in a separate file that is injected together with it.

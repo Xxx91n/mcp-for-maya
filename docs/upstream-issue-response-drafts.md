@@ -1,6 +1,6 @@
 # Upstream issue response drafts (D-063/D-064)
 
-Status: **DRAFT — human gate**. Posting to chadrik/maya-mcp-server is an
+Status: **DRAFT — needs the user to act**. Posting to chadrik/maya-mcp-server is an
 external side effect; these drafts are prepared by the agent and published by
 the user (or under explicit authorization). One comment per issue, no
 follow-up comments.

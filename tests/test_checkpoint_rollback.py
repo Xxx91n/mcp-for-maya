@@ -390,7 +390,7 @@ class TestListCheckpoints:
 
 
 # ------------------------------------------------------------
-# D-019 error contract: {error: {code, message, suggestion?}}
+# D-019 two error paths: {error: {code, message, suggestion?}}
 # ------------------------------------------------------------
 
 

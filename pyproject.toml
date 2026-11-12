@@ -69,8 +69,8 @@ exclude = [".github"]
 packages = ["src/maya_mcp_server"]
 
 [tool.pytest.ini_options]
-# D-111 warnings ratchet: warnings escalate to errors. The exemption list
-# is a ratchet — entries may only be REMOVED once their trigger fires,
+# D-111 warnings policy: warnings escalate to errors. The exemption list
+# may only shrink — entries are REMOVED once their trigger fires,
 # never added silently (each carries its removal trigger + evidence).
 filterwarnings = [
     "error",
@@ -93,7 +93,7 @@ filterwarnings = [
 # D-117 redeemed (T-27b): trigger verified 2026-09-27 — uv.lock pins
 # pytest 9.1.1 and every CI cell installs the same lock via
 # `uv sync --frozen`, so all 4 cells resolve pytest >=9.1. The
-# warnings-as-errors native ratchet slot is now armed: the suite
+# warnings-as-errors native slot is now armed: the suite
 # fails when any warning escapes the filterwarnings=error wall
 # (collection-phase warnings included).
 max_warnings = 0
@@ -105,7 +105,7 @@ addopts = "--strict-markers"
 markers = [
     "mayapy: requires a real Maya interpreter (mayapy) — local manual tier, never CI",
     "gui: requires a live Maya GUI session (MAYA_MCP_GUI_ADDR or :7001) — manual tier, real asserts (D-049a)",
-    "human_verify: manual checklist skeletons — prints steps, never asserts, always skips (D-049a)",
+    "human_verify: manual checklists — prints steps, never asserts, always skips (D-049a)",
 ]
 
 [tool.coverage.run]
@@ -135,6 +135,6 @@ lines-after-imports = 2
 [tool.mypy]
 python_version = "3.10"
 strict = true
-# ratchet pawls: unused ignores/config entries must surface immediately
+# unused ignores/config entries must surface immediately
 warn_unused_ignores = true
 warn_unused_configs = true

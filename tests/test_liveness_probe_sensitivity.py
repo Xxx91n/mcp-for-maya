@@ -1,4 +1,4 @@
-"""D-212 tier-2 sensitivity track for the liveness probe.
+"""D-212 tier 2 sensitivity track for the liveness probe.
 
 An INSTRUMENT has no veto power: nothing it produces can turn a PR red, which
 is exactly why the ruling does not hand it a per-PR pin. It gets the weaker

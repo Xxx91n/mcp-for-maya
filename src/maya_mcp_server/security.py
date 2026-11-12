@@ -49,7 +49,7 @@ AUDIT_VALUE_PREVIEW_CHARS = 60
 
 
 # ---------------------------------------------------------------------------
-# Error contract: host-side failures raise coded exceptions which
+# Two error paths: host-side failures raise coded exceptions which
 # surface through MCP isError with a [code] prefix embedded in the text.
 # ---------------------------------------------------------------------------
 
@@ -513,7 +513,7 @@ SAFE_MODE_TOOLS: frozenset[str] = frozenset({"execute_code", "write_module"})
 
 # T3 disclosure surfaces, both conditional on the flag: successful gated-tool
 # results carry `mode: "safe"` on their structured payload, and the tools/list
-# descriptions gain one Boundary line (ADR-0028 convention). Neither appears
+# descriptions gain one `Boundary:` line (ADR-0028 convention). Neither appears
 # when the flag is off; rejections never carry the mode field.
 SAFE_MODE_RESULT_FIELD = "mode"
 SAFE_MODE_RESULT_VALUE = "safe"

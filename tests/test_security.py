@@ -822,9 +822,9 @@ class TestAuditDualWrite:
 
 
 # ---------------------------------------------------------------------------
-# D-019 error contract, pinned generically. D-207 4 requires every documented
+# D-019 two error paths, pinned generically. D-207 4 requires every documented
 # code to carry a pytest node ID, and the base class plus server_not_started
-# have no per-code raise test of their own - so pin the contract once for the
+# have no per-code raise test of their own - so pin the shape once for the
 # whole set instead of writing a test per code that only restates the class.
 # ---------------------------------------------------------------------------
 

@@ -105,7 +105,7 @@ TOOL_ANNOTATIONS: dict[str, mt.ToolAnnotations] = {
     # scene-graph introspection: read-only DG queries
     "scene_describe": _READ,
     "scene_nodes": _READ,
-    # check by looking: net-zero side effect discipline makes readOnly honest
+    # check by looking: the put-everything-back discipline makes readOnly honest
     "scene_viewport_snapshot": _READ,
     "scene_render_preview": _READ,
     # mutation-class tools: scene/filesystem effects, not destructive (7)
@@ -147,8 +147,8 @@ def tool_annotations(name: str) -> mt.ToolAnnotations:
 # docs/threat-model.md says so in the same words.
 #
 # Enforcement lives here and nowhere else: on_call_tool denies the call and
-# on_list_tools hides the tool, so there is one choke point rather than a
-# per-tool check that a future tool could forget.
+# on_list_tools hides the tool, so every call passes through one place rather
+# than a per-tool check that a future tool could forget.
 # ---------------------------------------------------------------------------
 
 POLICY_ENV_FLAGS: dict[str, frozenset[str]] = {
@@ -193,7 +193,7 @@ def safe_mode_enabled(env: dict[str, str] | None = None) -> bool:
 
 
 class SecurityPipeline(Middleware):
-    """The single choke point every MCP tool call passes through.
+    """The one place every MCP tool call passes through.
 
     Rejections (validation/rate-limit/pattern block/safe_mode) raise
     PipelineError -> MCP isError with a [code] prefix (host layer). Every call \u2014
@@ -232,7 +232,7 @@ class SecurityPipeline(Middleware):
         A tool the agent cannot see is one it will not plan around; on_call_tool
         still denies it, because hiding is an affordance and not a boundary.
         Under safe_mode the two gated tools stay listed; their descriptions
-        gain a Boundary line (ADR-0028 convention) instead.
+        gain a `Boundary:` line (ADR-0028 convention) instead.
         """
         disabled = policy_disabled_tools()
         disclose = safe_mode_enabled()
@@ -426,7 +426,7 @@ def _mirrors_payload(content: Sequence[Any], payload: dict[str, Any]) -> bool:
 
 
 def _with_boundary_line(tool: Tool) -> Tool:
-    """Return a copy of tool with the safe_mode Boundary line appended.
+    """Return a copy of tool with the safe_mode `Boundary:` line appended.
 
     tools/list re-serves the registry's Tool instances, so the line is added
     to a clone — mutating the original would leak the disclosure into the
