@@ -1,8 +1,8 @@
 """Unified security pipeline: every tool call goes through validate,
-rate-limit, pattern scan, safe_mode check, dispatch and call record.
+rate-limit, pattern scan, safe_mode code allowlist, dispatch and call record.
 
 One FastMCP middleware funnels every tool call through:
-    input validation -> rate limit -> pattern scan -> safe_mode check ->
+    input validation -> rate limit -> pattern scan -> safe_mode code allowlist ->
     dispatch -> disclosure -> call record.
 
 TOOL_ANNOTATIONS is the single source for each tool's four MCP hints;
@@ -177,7 +177,7 @@ def policy_disabled_tools(env: dict[str, str] | None = None) -> frozenset[str]:
 
 
 def safe_mode_enabled(env: dict[str, str] | None = None) -> bool:
-    """Whether the opt-in safe_mode code check is active.
+    """Whether the opt-in safe_mode code allowlist is active.
 
     Deliberately not a POLICY_ENV_FLAGS member: those flags remove a tool from
     tools/list, while safe_mode narrows the payloads of tools that remain.
@@ -311,7 +311,7 @@ class SecurityPipeline(Middleware):
                         ),
                     )
 
-            # 4. safe_mode — opt-in code check for the two code-bearing tools.
+            # 4. safe_mode — opt-in code allowlist for the two code-bearing tools.
             # DISABLE ran at stage 0 (a removed tool never reaches this stage);
             # the always-on pattern scan stays the broad first layer, and this
             # is the stricter second layer over what remains.

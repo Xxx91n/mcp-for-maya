@@ -185,7 +185,7 @@ def _backup_file(path: Path) -> str:
 
 
 def _block_region(lines: list[str]) -> tuple[int, int] | None:
-    """(start, end) line indexes of the marker region, or None.
+    """(start, end) line indexes of the managed region, or None.
 
     (start, -1) marks an unterminated block (BEGIN without END).
     """
@@ -203,7 +203,7 @@ def _block_region(lines: list[str]) -> tuple[int, int] | None:
 
 
 def _strip_block(content: str) -> str | None:
-    """Remove the marker region; None when absent/unterminated."""
+    """Remove the managed region; None when absent/unterminated."""
     lines = content.splitlines(keepends=True)
     region = _block_region(lines)
     if region is None or region[1] < 0:
@@ -213,7 +213,7 @@ def _strip_block(content: str) -> str | None:
 
 
 def _replace_block(content: str, block: str) -> str | None:
-    """Swap the marker region for a fresh block; None when absent."""
+    """Swap the managed region for a fresh block; None when absent."""
     lines = content.splitlines(keepends=True)
     region = _block_region(lines)
     if region is None or region[1] < 0:
@@ -228,7 +228,7 @@ def install_user_setup(
     dry_run: bool = False,
     confirm: bool = False,
 ) -> dict[str, Any]:
-    """Merge the maintained block into userSetup.py.
+    """Merge the managed block into userSetup.py.
 
     Args:
         port: Command port number.
@@ -425,7 +425,7 @@ def uninstall_user_setup(
     target_version: str | None = None,
     remove_empty_file: bool = False,
 ) -> dict[str, Any]:
-    """Strip the maintained block from userSetup.py.
+    """Strip the managed block from userSetup.py.
 
     Args:
         target_version: Specific Maya version; None targets all.
@@ -566,7 +566,7 @@ Maya 的 userSetup.py：文件不存在时直接创建；已存在且没有这�
 proposed_block，需 `confirm=True` 二次调用才合并；已存在这段代码块时原位更新。
 每次写入前会生成 `<file>.bak.<timestamp>` 备份。
 
-Calling maya_setup_guide(action="install") merges the maintained code
+Calling maya_setup_guide(action="install") merges the managed code
 block below into userSetup.py: missing files are created; existing
 files without the block require a second call with confirm=True; an
 existing block is updated in place. A <file>.bak.<timestamp> backup

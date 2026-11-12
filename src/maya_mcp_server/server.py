@@ -173,7 +173,7 @@ register_export_tools(mcp)
 register_introspect_tools(mcp)
 
 # Unified security pipeline: every tool call passes through validation,
-# rate limiting, pattern scanning, the safe_mode code check, and the
+# rate limiting, pattern scanning, the safe_mode code allowlist, and the
 # call record.
 mcp.add_middleware(SecurityPipeline(config=_security_config, audit=_audit_logger))
 
@@ -320,9 +320,9 @@ async def write_module(
     dunder attribute access, and unparseable input are rejected with
     safe_mode_rejected naming the triggering rule id. Successful
     responses carry mode: "safe" on their structured payload. Under the
-    code check, execute_code payloads can only import the v1 allowlisted
+    code allowlist, execute_code payloads can only import the v1 allowlisted
     roots, so a module defined here whose root is not one of those roots
-    is not importable by name from gated code.
+    is not importable by name from allowlisted code.
 
     Boundary: Use write_module to define reusable libraries and helper functions;
     use execute_code for one-shot imperative execution or expression evaluation.

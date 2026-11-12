@@ -29,7 +29,7 @@ The following are **not** security boundaries:
 - Input validation. It rejects malformed inputs, not malicious intent.
 - Rate limiting. It slows accidents, not adversaries.
 - The call record. It records what happened; it prevents nothing.
-- The `userSetup.py` maintained block. It protects *your* file from
+- The `userSetup.py` managed block. It protects *your* file from
   being overwritten; it does not protect Maya from the block.
 - Anything Maya-side (`maya_mcp_helper.py`, `_mcp_scene`).
   Code reaching Maya runs with Maya's full privileges — __builtins__ is
@@ -39,17 +39,17 @@ The following are **not** security boundaries:
   D-207 1). These **guard against misuse, they are not a hostile-agent
   boundary**, and the distinction is load-bearing: an agent that can
   still reach `execute_code` is inside the trust boundary already and
-  no flag moves that. What they buy is the *other* direction — an
-  operator, a demo, or a CI sandbox can limit how much one mistake can
-  break without trusting every caller to pass sensible arguments.
+  no flag moves that. What they help with is the *other* direction — an
+  operator, a demo, or a CI sandbox can make one mistake do less damage
+  without trusting every caller to pass sensible arguments.
   They are config, not a jail, and must never be described as one.
 - `safe_mode` (`MAYA_MCP_SAFE_MODE=1`, implemented, opt-in, default
   off). Same class as the DISABLE flags: while the
   two code-bearing tools stay listed, the code allowlist narrows their
   `code` payloads to a v1 allowlist and rejections raise
   `safe_mode_rejected` (a host `isError` failure) with the triggering
-  rule id. It slows payloads from an agent that was talked into trouble;
-  it does not contain a hostile caller —
+  rule id. It slows an agent that was talked into trouble; it does not
+  contain a hostile caller —
   the client stays trusted, and successful calls disclose
   `mode: "safe"` rather than claim a boundary. Config, not a jail.
 
@@ -69,7 +69,7 @@ problem.
 | Call record | append-only JSONL, every tool call recorded incl. rejections | security.py |
 | Error contract | host failures raise coded exceptions (isError); Maya-domain failures return `{error:{code,message,suggestion?}}` | pipeline.py, maya_scene_module.py |
 | Checkpoint/rollback | writes the scene to a `.ma` file on disk under `checkpoints/`, takes a safety save before reading one back, points the scene at its original path again | maya_scene_module.py |
-| userSetup.py merge | upsert of the maintained block, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
+| userSetup.py merge | upsert of the managed block, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
 | Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 25 tools | pipeline.py |
 | Strict policy mode | `MAYA_MCP_DISABLE_*{EXECUTE,WRITE_MODULE,ARBITRARY}` remove the named tools from `tools/list` and deny the call with `[policy_disabled]`, recorded as `rejected` in the call record; one choke point in the pipeline, none in the tool bodies | pipeline.py (POLICY_ENV_FLAGS, on_list_tools, on_call_tool) |
 | `safe_mode` code allowlist | opt-in (`MAYA_MCP_SAFE_MODE=1`, default off); deny-by-default allowlist over `execute_code`/`write_module` `code` payloads — v1 import roots (maya/math/json/re/collections/itertools/functools/dataclasses/typing) + node allowlist, denied builtin names rejected on any reference (not just calls)/`__builtins__`/dunder access rejected, unparseable input rejects ("cannot decide ⇒ deny"); raises `[safe_mode_rejected]` + rule id, recorded as `rejected`; success responses carry `mode:"safe"`, tools/list gains a Boundary line | security.py (SAFE_* tables, scan_safe_mode_code), pipeline.py (on_call_tool stage 4, _with_safe_mode_field, _with_boundary_line) |
@@ -78,8 +78,8 @@ problem.
 All 25 tools pass through one FastMCP middleware pipeline:
 policy-disabled check (MAYA_MCP_DISABLE_* removes the tool from
 tools/list and denies calls) → validate → rate-limit → pattern-scan →
-safe_mode check (opt-in; `execute_code`/`write_module` only) →
-dispatch → disclosure (a successful gated call gains `mode:"safe"`)
+safe_mode code allowlist (opt-in; `execute_code`/`write_module` only) →
+dispatch → disclosure (a successful call under the allowlist gains `mode:"safe"`)
 → call record.
 
 ## 4. Port and network exposure
@@ -171,8 +171,8 @@ authoritative and this table must match it row for row:
   modal dialog can hang the channel. Residuals registered honestly: no
   realpath/symlink resolution (a symlinked parent is followed silently)
   and no per-directory allowlist (any path the Maya process can write
-  is writable). `safe_mode` narrows nothing here — it gates `code`
-  payloads only, and `path` stays an informed-acceptance string; both
+  is writable). `safe_mode` narrows nothing here — it only checks `code`
+  payloads, and `path` stays an informed-acceptance string; both
   residuals are acknowledged, not fixed.
 - `scene_viewport_snapshot` / `scene_render_preview` are readOnly
   under the net-zero side-effect discipline (camera/current-time

@@ -31,16 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged until #177 wires the helper in. Evidence:
   `tests/test_zone_geometry_module.py::TestZoneGeometry::test_multiple_zones_match_the_existing_zone_map`,
   `tests/test_scene_tools_json.py::TestZoneGeometryHostHelper::test_default_scene_plan_bytes_do_not_use_the_helper`.
-- **Opt-in `safe_mode` gate for the code-bearing tools** — `MAYA_MCP_SAFE_MODE=1`
+- **Opt-in `safe_mode` code allowlist for the code-bearing tools** — `MAYA_MCP_SAFE_MODE=1`
   makes `execute_code` and `write_module` reject imports outside the v1 allowlist
-  with `[safe_mode_rejected]` before dispatch; the rejection is audited as
+  with `[safe_mode_rejected]` before dispatch; the rejection is recorded as
   `rejected` with the triggering rule id, and the suggestion points at typed
   tools or unsetting the flag. Default off, and the flag is standalone (not a
   `MAYA_MCP_DISABLE_*` member), so DISABLE still removes tools from `tools/list`
   before safe_mode narrows what remains. The response disclosure lands in a
   follow-up ticket. Evidence:
   `tests/test_pipeline.py::TestSafeModeGate::test_unsafe_import_rejected_before_dispatch`.
-- **Full deny-by-default `safe_mode` rule matrix** — the AST gate now also
+- **Full deny-by-default `safe_mode` rule matrix** — the code allowlist now also
   rejects syntax constructs outside the v1 node allowlist (`with`, `raise`,
   `assert`, `del`, `global`/`nonlocal`, `yield`, `await`, `async`, `match`),
   references to the denied builtin names (`open`, `eval`, `exec`, `compile`,
@@ -95,14 +95,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `safe_mode`'s description, `影响范围` and `被带偏的代理` are rewritten in
   plain words in both READMEs, `SECURITY.md`, the threat model, the error-code
   guide, the ICEV workflow card, code comments and docstrings, and the tests
-  that describe them. The earlier and later groups' terms are untouched. One
-  visible string changed wording only: installing into a `userSetup.py` that
-  has no managed block now says "managed block" where it used to say
-  "the code between the `# >>> mcp-for-maya >>>` lines";
-  its action name, fields and control flow are unchanged. No public tool name,
-  function name, parameter name or error code changed. `llms.txt` was not
-  hand-edited: `check_llms_txt.py --write` reports the registry already
-  matches, because no tool description's first sentence changed. Evidence:
+  that describe them. The earlier and later groups' terms are untouched. A few
+  visible strings changed wording only, with no change to codes, fields or
+  control flow: `maya_setup_guide` and the fallback install guide now say
+  "managed block" where they used the retired word for that block; the asset
+  polycount suggestion says the decision is written to the call record instead
+  of "audited". No public tool name, function name,
+  parameter name or error code changed. `llms.txt` was not hand-edited:
+  `check_llms_txt.py --write` reports the registry already matches, because no
+  tool description's first sentence changed. Evidence:
   `tests/test_pipeline.py::TestStrictPolicyMode::test_read_only_surface_is_unaffected`,
   `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`,
   `tests/test_polyhaven.py::TestGuards::test_url_whitelist_rejects_foreign_host`,

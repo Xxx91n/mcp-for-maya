@@ -29,7 +29,7 @@ In scope:
   guards against slips were designed to catch (e.g., path traversal in a
   filename parameter reaching the filesystem).
 - Call record corruption or silent loss of rejection events.
-- userSetup.py merge writing outside the one maintained block or without backup.
+- userSetup.py merge writing outside the one managed block or without backup.
 - Checkpoint/rollback writing outside the checkpoints directory.
 
 Out of scope (by design):

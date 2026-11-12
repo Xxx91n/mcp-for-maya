@@ -676,7 +676,7 @@ SAFE_RULE_UNPARSEABLE = "safe-mode-unparseable"
 
 @dataclass(frozen=True)
 class SafeModeViolation:
-    """One safe_mode gate hit: the rule that fired plus its message."""
+    """One safe_mode allowlist hit: the rule that fired plus its message."""
 
     rule_id: str
     message: str
@@ -785,7 +785,7 @@ class _SafeModeVisitor(ast.NodeVisitor):
 def scan_safe_mode_code(code: object) -> SafeModeViolation | None:
     """Return the first safe_mode violation in code, or None when allowed.
 
-    The gate is deny-by-default: every parsed node must be a SAFE_NODE_TYPES
+    The allowlist is deny-by-default: every parsed node must be a SAFE_NODE_TYPES
     member, imports must stay inside SAFE_IMPORT_ROOTS, denied builtin names /
     __builtins__ references / dunder attribute access reject, and payloads the
     parser cannot decide (non-string input, syntax errors, pathologically deep
@@ -802,7 +802,7 @@ def scan_safe_mode_code(code: object) -> SafeModeViolation | None:
         visitor.visit(tree)
     except RecursionError:
         # A parseable but pathologically deep tree can exhaust the recursive
-        # walk: the gate cannot classify it, so it rejects rather than escaping
+        # walk: the check cannot classify it, so it rejects rather than escaping
         # as an unclassified host error.
         return _safe_mode_violation(SAFE_RULE_UNPARSEABLE)
     return visitor.violation
