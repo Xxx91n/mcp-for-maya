@@ -1,10 +1,10 @@
-"""Semantically-correct matrix/bbox math for the maya stub.
+"""Semantically-correct matrix/bbox math for the Maya fake.
 
 Mirrors OpenMaya conventions: row-major 4x4 matrices, row-vector points
 (p' = p * M), translation in elements [12],[13],[14], rotation order XYZ
 (Maya default rotateOrder), degrees for cmds-level APIs.
 
-If this math is wrong the stub produces false greens — keep it honest.
+If this math is wrong the fake produces false greens — keep it honest.
 """
 
 from __future__ import annotations
@@ -92,7 +92,7 @@ class MVector:
     """Vector — real OpenMaya MVector: len()==3, NO w, cross product.
 
     Deliberately NOT an MPoint subclass (D-056④): inheriting made
-    isinstance/len()/w/distanceTo all lie — stub-green, real-red.
+    isinstance/len()/w/distanceTo all lie — fake-green, real-red.
     """
 
     __slots__ = ("x", "y", "z")
