@@ -533,7 +533,7 @@ class TestAddSession:
     async def test_add_session_stores_bootstrap_client(
         self, session_manager: SessionManager, mocker
     ) -> None:
-        """D-013 regression: bootstrap() returns the working-channel client.
+        """D-013 regression: bootstrap() returns the working-port client.
         The session must store THAT client under its communication-port key,
         not the config-port client."""
         config_client = MagicMock(spec=MayaClient)

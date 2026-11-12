@@ -97,7 +97,8 @@ def main() -> int:
         print(
             "Where new code goes instead: new Maya-side capability lands in "
             "a separate file injected together with maya_scene_module.py "
-            "(one file boundary is also the boundary of what can fail) "
+            "(same module name and the same load step, so a syntax or "
+            "import-time error there stops the whole module from loading) "
             "(first case: introspect_module.py) — not appended to the "
             "maya_scene_module.py body."
         )

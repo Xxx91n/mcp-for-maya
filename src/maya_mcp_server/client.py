@@ -145,9 +145,10 @@ async def ensure_module_injected(
     directly via write_module.
 
     extra_source_paths: more source files appended to the same payload
-    before writing - one module name, one namespace, and a failure in any
-    of them takes the whole module down. Extra files must carry no
-    __future__ import (it would land mid-file = SyntaxError).
+    before writing - one module name, one namespace, one load step: a
+    syntax or import-time error in any of them stops the whole module from
+    loading. Extra files must carry no __future__ import (it would land
+    mid-file = SyntaxError).
     """
     key = session_key or "_default"
     if key in injected_sessions:

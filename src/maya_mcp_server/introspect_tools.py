@@ -3,8 +3,9 @@
 Both tools belong to the _mcp_scene module but live in their own host-side
 file. Their Maya-side code lives in introspect_module.py and is concatenated
 into the _mcp_scene payload by scene_tools._ensure_module_injected -
-same module name, same per-session trigger. This is not its own failure
-domain: an error in this file takes the whole _mcp_scene module with it.
+same module name, same per-session trigger. This file has no separate
+failure domain: a syntax or import-time error here stops the whole
+_mcp_scene module from loading, though a runtime error only fails that call.
 
 Read-only by design: no mark_dirty, no scene-cache lookup (attribute
 metadata, values and enumeration must always be fresh).
