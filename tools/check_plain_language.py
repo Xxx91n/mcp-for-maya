@@ -253,28 +253,28 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
     for number, line in enumerate(text.splitlines(), 1):
         body = line.lstrip(" ")
         indent = len(line) - len(body)
-        if indent >= 4 and list_indent is None:
-            continue
-        if fence is None:
-            opener = FENCE.match(body)
-            # ```name``` on one line is a code span, not a fence: CommonMark
-            # forbids a backtick in a backtick fence's info string.
-            if opener and (opener.group(1)[0] != "`" or "`" not in body[opener.end() :]):
-                fence = opener.group(1)
-                if list_indent is not None and indent <= list_indent:
-                    list_indent = None
-                continue
-        else:
+        if fence is not None:
+            # A closer is checked first, at any indent: a fence held by a list
+            # item is indented with it, so the indented-code skip must not win.
             closer = FENCE_CLOSE.match(body)
             if closer and closer.group(1)[0] == fence[0] and len(closer.group(1)) >= len(fence):
                 fence = None
             continue
-        if fence is None:
-            item = LIST_ITEM.match(line)
-            if item:
-                list_indent = indent
-            elif list_indent is not None and body.strip() and indent <= list_indent:
+        if indent >= 4 and list_indent is None:
+            continue
+        opener = FENCE.match(body)
+        # ```name``` on one line is a code span, not a fence: CommonMark
+        # forbids a backtick in a backtick fence's info string.
+        if opener and (opener.group(1)[0] != "`" or "`" not in body[opener.end() :]):
+            fence = opener.group(1)
+            if list_indent is not None and indent <= list_indent:
                 list_indent = None
+            continue
+        item = LIST_ITEM.match(line)
+        if item:
+            list_indent = indent
+        elif list_indent is not None and body.strip() and indent <= list_indent:
+            list_indent = None
         out.append((number, strip_code_spans(line)))
     return out
 

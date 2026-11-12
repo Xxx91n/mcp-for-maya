@@ -228,6 +228,13 @@ def test_a_word_between_two_code_spans_still_reports(tmp_path):
     assert findings == ["NOTES.md:1: 回滚 -> 读档（rollback）"]
 
 
+def test_a_fence_indented_under_a_nested_item_still_closes(tmp_path):
+    """A closer is looked for at any indent, or the fence swallows the prose after it."""
+    root = _repo(tmp_path, doc="- 外层\n    - 内层\n\n    ```\n    x\n    ```\n回滚\n")
+    findings, _, _ = M.scan(root, M.load_avoid_map(root / "GLOSSARY.md"))
+    assert findings == ["NOTES.md:7: 回滚 -> 读档（rollback）"]
+
+
 def test_a_fence_after_a_list_ends_the_list(tmp_path):
     """A flush-left fence cannot live inside an item, so the next indented block is code."""
     root = _repo(tmp_path, doc="- 步骤\n\n```\nx\n```\n\n    回滚\n")
