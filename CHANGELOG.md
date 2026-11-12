@@ -60,7 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Zone`, `命名规则`, `scene_review`, `自定义检查项`, `场景存档`, `读档` and
   `临时存档` are rewritten in plain words in both READMEs, the two skill
   cards, `docs/` prose, the `server.py` instructions, tool descriptions and
-  error strings. Audit-log wording and the later groups' terms are untouched.
+  error strings. Wording for the call record and for the later groups' terms
+  was left out of that pass.
   Two claims that contradicted the code are
   fixed: `scene_checkpoint` is described as writing a `.ma` file to disk under
   `checkpoints/` (it used to be described as living only in Maya's memory),
@@ -95,10 +96,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `safe_mode`'s description, `影响范围` and `被带偏的代理` are rewritten in
   plain words in both READMEs, `SECURITY.md`, the threat model, the error-code
   guide, the ICEV workflow card, code comments and docstrings, and the tests
-  that describe them. The earlier and later groups' terms are untouched. A few
-  visible strings changed wording only, with no change to codes, fields or
-  control flow: `maya_setup_guide` and the fallback install guide now say
-  "managed block" where they used the retired word for that block; the asset
+  that describe them. The earlier and later groups' terms are untouched. A
+  handful of operator-visible strings changed wording only, with no change to
+  codes, fields or control flow: `maya_setup_guide`'s confirm hint, the
+  fallback install guide and the agent guide now say "managed block" or
+  这段代码块 where they used the retired word for that block, and the asset
   polycount suggestion says the decision is written to the call record instead
   of "audited". No public tool name, function name,
   parameter name or error code changed. `llms.txt` was not hand-edited:

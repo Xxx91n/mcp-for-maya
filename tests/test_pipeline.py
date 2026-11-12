@@ -614,7 +614,7 @@ class TestStrictPolicyMode:
 
 
 # ---------------------------------------------------------------------------
-# T1: safe_mode plumbing - opt-in code check after the pattern scan, before
+# T1: safe_mode plumbing - opt-in code allowlist after the pattern scan, before
 # dispatch. Catches slips, not a boundary.
 # ---------------------------------------------------------------------------
 

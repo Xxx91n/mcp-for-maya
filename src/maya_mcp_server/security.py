@@ -2,7 +2,7 @@
 
 All 25 MCP tools funnel through the SecurityPipeline middleware
 (pipeline.py): input validation -> rate limit -> pattern scan ->
-safe_mode code check (opt-in) -> dispatch -> call record. This module
+safe_mode code allowlist (opt-in) -> dispatch -> call record. This module
 catches slips and agents that were talked into trouble; it is NOT a
 security boundary (see SECURITY.md).
 """
@@ -126,7 +126,7 @@ class PolicyDisabledError(PipelineError):
 
 
 class SafeModeRejectedError(PipelineError):
-    """Raised when an opt-in safe_mode code check rejects a code payload.
+    """Raised when an opt-in safe_mode code allowlist rejects a code payload.
 
     Same framing as PolicyDisabledError: safe_mode narrows what
     execute_code/write_module accept. It catches slips; it is not a

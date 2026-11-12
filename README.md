@@ -230,7 +230,7 @@ asset_import(asset_id="Camera_01", resolution="1k")
 # (diff/rough/metal/nor_gl/ao/disp...), using sRGB/Raw color spaces and bump2d normals.
 # Single-part assets with simple texture names (Diffuse/Rough/Metal...)
 # are also recognized and connected to the asset's material.
-# Safety guards: default 100k polygon cap (bypass with allow_high_polycount), dimension sanity check.
+# Limits: default 100k polygon cap (bypass with allow_high_polycount), dimension sanity check.
 ```
 
 ### Scene export
