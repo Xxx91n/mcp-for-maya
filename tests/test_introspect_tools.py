@@ -1,6 +1,6 @@
 """T-24b host-tool tests: scene_describe / scene_nodes (D-094/D-095).
 
-ExecClient runs generated code against the stub-bound _mcp_scene
+ExecClient runs generated code against the fake-bound _mcp_scene
 assembly (the big file plus the extra files) via the REAL
 result-capture transform - same chain as test_scene_tools_json.py and
 test_export_tools.py. Covers injection lifecycle, dual channels,
@@ -23,7 +23,7 @@ from maya_mcp_server.types import CommandResponse, OutputBuffer, ResultType
 
 
 class ExecClient:
-    """Fake framed-channel client: runs generated code on the stub module."""
+    """Fake framed-channel client: runs generated code on the fake module."""
 
     framed_channel = True
 

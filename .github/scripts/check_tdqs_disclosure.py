@@ -1,4 +1,4 @@
-"""TDQS disclosure elements static ratchet.
+"""TDQS disclosure elements static check.
 
 Asserts that required disclosure elements (cataloged in
 .github/tdqs-elements.yaml) are present in the live
@@ -434,8 +434,8 @@ def check_coverage_and_derivation(root: Path, data: dict) -> tuple[list[str], li
     exempt with a reason, and the reverse direction is asserted too so a stale
     entry cannot rot unnoticed.
 
-    Derivation is a ratchet, not an absolute floor. Tools that predate the
-    floor are listed in DERIVATION_BASELINE; the gate fails only when the
+    Derivation may only tighten, not loosen. Tools that predate
+    the floor are listed in DERIVATION_BASELINE; the gate fails only when the
     violation set GROWS, and shrinks as each tool converges. That is the same
     shape as check_ruff_budget.py / check_monolith_budget.py, and it is what
     makes "tighten only" enforceable rather than aspirational.
@@ -531,7 +531,7 @@ def check_coverage_and_derivation(root: Path, data: dict) -> tuple[list[str], li
                 f"reason, and the waiver lane closing after gate review"
             )
 
-    # -- derivable minimum set, as a shrink-only ratchet ------------------
+    # -- derivable minimum set, shrink-only --------------------------
     violations: set[tuple[str, str]] = set()
     for tool, cfg in sorted(tools.items()):
         if not isinstance(cfg, dict):
@@ -558,7 +558,7 @@ def check_coverage_and_derivation(root: Path, data: dict) -> tuple[list[str], li
         stale = DERIVATION_BASELINE - violations
         if stale:
             errors.append(
-                f"::error file={ELEMENTS_FILE}::derivable-minimum-set ratchet shrank but the "
+                f"::error file={ELEMENTS_FILE}::derivable-minimum-set got smaller but the "
                 f"baseline still lists {len(stale)} violation(s) "
                 f"({', '.join(f'{t}/{e}' for t, e in sorted(stale))}) — drop them from "
                 f"DERIVATION_BASELINE in .github/scripts/check_tdqs_disclosure.py "

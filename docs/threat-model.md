@@ -67,12 +67,12 @@ problem.
 | Rate limiting | per-session token buckets: ~20 writes/60s, ~100 reads/60s | security.py |
 | Pattern scan | exact-match blocks (`../` traversal in filenames, `os.system`/`subprocess`/`eval(` in code); everything else warn-only into the call record | security.py |
 | Call record | append-only JSONL, every tool call recorded incl. rejections | security.py |
-| Error contract | host failures raise coded exceptions (isError); Maya-domain failures return `{error:{code,message,suggestion?}}` | pipeline.py, maya_scene_module.py |
+| Two error paths | host failures raise coded exceptions (isError); Maya-side failures return `{error:{code,message,suggestion?}}` | pipeline.py, maya_scene_module.py |
 | Checkpoint/rollback | writes the scene to a `.ma` file on disk under `checkpoints/`, takes a safety save before reading one back, points the scene at its original path again | maya_scene_module.py |
 | userSetup.py merge | upsert of the managed block, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
 | Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 25 tools | pipeline.py |
-| Strict policy mode | `MAYA_MCP_DISABLE_*{EXECUTE,WRITE_MODULE,ARBITRARY}` remove the named tools from `tools/list` and deny the call with `[policy_disabled]`, recorded as `rejected` in the call record; one choke point in the pipeline, none in the tool bodies | pipeline.py (POLICY_ENV_FLAGS, on_list_tools, on_call_tool) |
-| `safe_mode` code allowlist | opt-in (`MAYA_MCP_SAFE_MODE=1`, default off); deny-by-default allowlist over `execute_code`/`write_module` `code` payloads — v1 import roots (maya/math/json/re/collections/itertools/functools/dataclasses/typing) + node allowlist, denied builtin names rejected on any reference (not just calls)/`__builtins__`/dunder access rejected, unparseable input rejects ("cannot decide ⇒ deny"); raises `[safe_mode_rejected]` + rule id, recorded as `rejected`; success responses carry `mode:"safe"`, tools/list gains a Boundary line | security.py (SAFE_* tables, scan_safe_mode_code), pipeline.py (on_call_tool stage 4, _with_safe_mode_field, _with_boundary_line) |
+| Strict policy mode | `MAYA_MCP_DISABLE_*{EXECUTE,WRITE_MODULE,ARBITRARY}` remove the named tools from `tools/list` and deny the call with `[policy_disabled]`, recorded as `rejected` in the call record; one single place in the pipeline, none in the tool bodies | pipeline.py (POLICY_ENV_FLAGS, on_list_tools, on_call_tool) |
+| `safe_mode` code allowlist | opt-in (`MAYA_MCP_SAFE_MODE=1`, default off); deny-by-default allowlist over `execute_code`/`write_module` `code` payloads — v1 import roots (maya/math/json/re/collections/itertools/functools/dataclasses/typing) + node allowlist, denied builtin names rejected on any reference (not just calls)/`__builtins__`/dunder access rejected, unparseable input rejects ("cannot decide ⇒ deny"); raises `[safe_mode_rejected]` + rule id, recorded as `rejected`; success responses carry `mode:"safe"`, tools/list gains one more `Boundary:` line | security.py (SAFE_* tables, scan_safe_mode_code), pipeline.py (on_call_tool stage 4, _with_safe_mode_field, _with_boundary_line) |
 | Asset egress whitelist | asset_search/asset_import reach https only on api.polyhaven.com + dl.polyhaven.org/.com, mandatory User-Agent, size+timeout caps, per-file md5 verify, platformdirs cache | polyhaven.py |
 
 All 25 tools pass through one FastMCP middleware pipeline:
@@ -175,7 +175,7 @@ authoritative and this table must match it row for row:
   payloads, and `path` stays an informed-acceptance string; both
   residuals are acknowledged, not fixed.
 - `scene_viewport_snapshot` / `scene_render_preview` are readOnly
-  under the net-zero side-effect discipline (camera/current-time
+  because they put back whatever they changed (camera/current-time
   restored on every path, D-026) - the visible transient is documented
   in the tool docstrings.
 - `scene_describe` / `scene_nodes` (D-094) are pure read queries and

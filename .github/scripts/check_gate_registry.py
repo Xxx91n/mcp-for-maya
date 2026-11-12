@@ -447,7 +447,7 @@ def main() -> int:
         return 2
 
     for finding in findings:
-        # One choke point instead of per-message stripping: every finding
+        # One place instead of per-message stripping: every finding
         # echoes something it read from the registry (a gate_id, a pointer, a
         # bound_class, a resolution reason), and the registry is a file an
         # author edits. Filtering here covers fields this file never named.

@@ -1,12 +1,12 @@
-"""Real-Maya smoke tests — mayapy tier only.
+"""Real-Maya smoke tests — real interpreter only.
 
 Run inside a real Maya interpreter:
 
     set PYTHONPATH=<repo>/src;<repo>/tests
     mayapy -m pytest tests/ -m mayapy
 
-Under vanilla python (or the stub) these skip — they exist so docs/testing.md
-describes a real tier, not a hypothetical one.
+Under vanilla python (or the fake) these skip — they exist so docs/testing.md
+describes a real run, not a hypothetical one.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ pytestmark = pytest.mark.mayapy
 def _maya_standalone_init():
     """mayapy hard-crashes (Windows access violation) if maya.api.OpenMaya
     is imported before maya.standalone.initialize() — initialize once per
-    tier run. Under vanilla python / the stub the import fails and this
+    tier run. Under vanilla python / the fake the import fails and this
     is a no-op; the real_maya fixture still gates the tests."""
     try:
         import maya.standalone
@@ -35,7 +35,7 @@ def real_maya():
     cmds = pytest.importorskip("maya.cmds", reason="requires real Maya (mayapy)")
     f = getattr(cmds, "__file__", "") or ""
     if "maya_stub" in f or "tests" in f.replace("\\", "/"):
-        pytest.skip("maya stub is installed — mayapy tier needs a real interpreter")
+        pytest.skip("the Maya fake is installed — the real interpreter is needed")
     return cmds
 
 

@@ -1,13 +1,14 @@
 """T-08 contract tests: visual tools (D-023..D-027).
 
 VisualExecClient runs the code visual_tools generates against the
-stub-bound _mcp_visual module using the REAL result-capture
+fake-bound _mcp_visual module using the REAL result-capture
 transform, so these tests exercise the full chain: host gate ->
 injection -> generated code -> Maya-side module -> mixed blocks.
 
-Stub layer = contract layer (D-027): no pixel assertions, no golden
-images, no exact call-sequence pinning. Terminal-state roundtrips
-(success AND failure paths) and loose restore evidence instead.
+The fake Maya layer is where the contract is checked (D-027): no pixel
+assertions, no golden images, no exact call-sequence pinning.
+Terminal-state roundtrips (success AND failure paths) and loose restore
+evidence instead.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ from maya_mcp_server.visual_tools import (
 
 
 class VisualExecClient:
-    """Fake framed client: runs generated code on the stub module."""
+    """Fake framed client: runs generated code on the fake module."""
 
     framed_channel = True
     key = "127.0.0.1:50999"
@@ -185,7 +186,7 @@ class TestMImageModuleLayout:
         """2024 layout: OpenMayaUI lacks MImage -> resolves via
         maya.api.OpenMaya and capture still works. (convertPixelFormat
         is C++-only — absent from Python API 2.0 on every documented
-        version, so the stub no longer models it: D-056⑤.)"""
+        version, so the fake no longer models it: D-056⑤.)"""
         maya_env.scene.setup_gui()
         omui = sys.modules["maya.api.OpenMayaUI"]
         monkeypatch.delattr(omui, "MImage")
@@ -327,7 +328,7 @@ def _cell_mean(rows, w, h, x0, y0, x1, y1):
 
 
 class TestVp2ReadbackTruth:
-    """The stub models the documented VP2 defect shape: readColorBuffer
+    """The fake models the documented VP2 defect shape: readColorBuffer
     fills BGRA + top-down by default; the module asks for RGBA at the
     source (readRGBA=True) and lets writeToFile do float->byte — the
     floatPixels pointer path is gone (MScriptUtil removed in 2024). A
@@ -416,7 +417,7 @@ class TestPreviewContract:
         assert kw["editorPanelName"] == "modelPanel1"
 
     async def test_camera_switch_terminal_state(self, vtools):
-        """Net-zero: panel camera after == before; restore evidenced
+        """Put back: panel camera after == before; restore evidenced
         loosely (a second modelPanel camera edit back to the prior
         camera, D-039)."""
         vtools.env.scene.add_camera("CAM_x")
@@ -431,7 +432,7 @@ class TestPreviewContract:
         assert len(calls) >= 2, "a restore camera edit must have happened"
 
     async def test_current_time_restored(self, vtools):
-        """Stub playblast slams the timeline (undo bug #21) - the module
+        """Fake playblast slams the timeline (undo bug #21) - the module
         must restore it."""
         vtools.env.scene.current_time = 42
         await vtools.fns["scene_render_preview"]()
@@ -566,7 +567,7 @@ class TestActivePanelProbe:
 # ------------------------------------------------------------
 # VP2 direction runtime probe (D-082d)
 #
-# The stub cannot render the probe marker — scene.vp2_readback_bottom_up
+# The fake cannot render the probe marker — scene.vp2_readback_bottom_up
 # models the DEVICE-level buffer orientation instead: the pattern is
 # viewport truth, the knob decides whether readColorBuffer hands it back
 # flipped. The probe samples whichever buffer arrives, so a bottom-up

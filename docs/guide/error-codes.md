@@ -33,8 +33,8 @@ not part of the contract.
 ## Maya-side domain errors
 
 Maya-domain failures do **not** raise. They return a successful tool result
-whose payload is `{"error": {"code", "message", "suggestion"?}}` (the two-layer
-contract: host failures return `isError`; Maya domain failures return this
+whose payload is `{"error": {"code", "message", "suggestion"?}}` (the two
+error paths: host failures return `isError`; Maya-side failures return this
 structured object). The code set there is owned by
 `src/maya_mcp_server/maya_scene_module.py` and its injected siblings, and is
 **not** part of the host set this table enumerates. Domain codes are documented at their

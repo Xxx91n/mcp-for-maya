@@ -2,10 +2,10 @@
 
 GUI-only capture paths. The host never injects this module into a
 headless session (framed_channel gate), but every public function
-still re-checks GUI capability and returns the two-layer error
-contract's domain shape {error:{code,message,suggestion}}
-for extreme headless-ish GUI environments (missing omui/PySide,
-batch mode, no modelPanel).
+still re-checks GUI capability and returns the Maya-side half of the
+two error paths, {error:{code,message,suggestion}}, for extreme
+headless-ish GUI environments (missing omui/PySide, batch mode, no
+modelPanel).
 
 Public API:
     viewport_snapshot(max_size, format, quality) -> dict
@@ -129,7 +129,7 @@ def _gui_block() -> dict[str, Any] | None:
 
 
 # ---------------------------------------------------------------------------
-# Viewport state helpers (net-zero side effect machinery)
+# Viewport state helpers (save it, then put it back)
 # ---------------------------------------------------------------------------
 
 
@@ -162,7 +162,7 @@ def _camera_switch_restored(panel: str, camera: str | None) -> Iterator[None]:
     """Point *panel* at *camera*, restoring the prior camera afterwards.
 
     Switching a modelPanel's camera is instantaneous, visible, and NOT
-    undoable - so the restore is what makes this net-zero. The finally
+    undoable - so the restore is what puts it back. The finally
     block guards on panel survival; a failed restore is logged, never
     raised over the business result. Camera switching uses the
     unambiguous modelPanel named-argument API.
@@ -354,8 +354,8 @@ def _probe_vp2_direction(view: Any, panel: str | None) -> bool | None:
     Builds a disposable ortho camera + red surfaceShader cube far below
     the scene (user content stays out of frame), points the active model
     panel at it for one refresh, and checks which vertical half of the
-    readback carries the red block. Net-zero, extended to this probe:
-    undo recording is suspended WITHOUT flushing the user's queue, and
+    readback carries the red block. Everything this probe changes is put
+    back: undo recording is suspended WITHOUT flushing the user's queue, and
     selection / panel camera / scene-dirty flag are all restored — every
     created node is deleted on every path. Returns None on any failure
     so the caller falls back rather than flip on a guess.
@@ -547,7 +547,7 @@ def render_preview(
 ) -> dict[str, Any]:
     """Single-frame playblast from *camera* (or the panel's current camera).
 
-    Net-zero side effect: the panel camera and the timeline are
+    Everything is put back afterwards: the panel camera and the timeline are
     restored on every path - success or failure - unless the process is
     killed mid-call. width/height arrive already rounded up to /4 by
     the host (playblast Windows constraint).

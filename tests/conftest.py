@@ -109,10 +109,10 @@ def event_loop():
 
 @pytest.fixture
 def maya_env():
-    """Install the maya stub and import maya_scene_module bound to it.
+    """Install the Maya fake and import maya_scene_module bound to it.
 
-    Yields a namespace: .scene (stub Scene builder), .module (the
-    maya_scene_module under test), .cmds (stub maya.cmds).
+    Yields a namespace: .scene (fake Scene builder), .module (the
+    maya_scene_module under test), .cmds (fake maya.cmds).
     """
     scene = maya_stub.install()
     module = maya_stub.load_scene_module()

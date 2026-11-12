@@ -440,7 +440,7 @@ def test_a_provenance_reclaim_is_non_empty_red():
         "  and gated — never hand-edit."
     )
     assert _error_codes_provenance_claims(wrapped) == [wrapped]
-    pathless = "- One choke point; undocumented error codes fail their gates."
+    pathless = "- One single place; undocumented error codes fail their gates."
     assert _error_codes_provenance_claims(pathless) == [pathless]
     negated = "`docs/guide/error-codes.md` is not derived or gated."
     assert _error_codes_provenance_claims(negated) == [negated]

@@ -1,4 +1,4 @@
-# Thin pre-commit set (D-044 / D-045: frozen baselines, ratchet only downward).
+# Thin pre-commit set (D-044 / D-045: baseline budgets that only go down).
 # Local:  uv sync --frozen && uv run pre-commit install && uv run pre-commit run --all-files
 # CI fallback: lint job in .github/workflows/ci.yml (guards --no-verify pushes).
 # Hook rev upkeep: dependabot pre-commit ecosystem (monthly) or manual
@@ -22,8 +22,8 @@ repos:
     rev: v0.17.1 # aligned with ci.yml (uvx ruff@0.17.1)
     hooks:
       - id: ruff-check
-        # Legacy frozen-budget debt files (122 errors as of 2026-09-19): excluded so
-        # --all-files stays green while the per-rule budget gate ratchets them down
+        # Legacy budget-debt files (122 errors as of 2026-09-19): excluded so
+        # --all-files stays green while the per-rule budget gate brings them down
         # in .github/ruff-baseline.json. Drop entries as each file reaches zero.
         exclude: ^(src/maya_mcp_server/(maya_scene_module|scene_tools)\.py|tests/(test_scene_tools|test_pipeline|test_security|test_connection_guide|test_cos_formatter|test_mayapy_smoke|test_scene_cache)\.py)$
       - id: ruff-format

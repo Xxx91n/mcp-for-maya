@@ -1,7 +1,8 @@
 """Regression tests for .github/scripts/check_ruff_budget.py.
 
-Per-rule frozen budget (D-044/T-10b): a rule may never exceed its cap even
-when the segment total stays flat — rules cannot subsidise each other.
+Per-rule budget that only goes down (D-044/T-10b): a rule may never exceed
+its cap even when the segment total stays flat — rules cannot subsidise
+each other.
 """
 
 from __future__ import annotations

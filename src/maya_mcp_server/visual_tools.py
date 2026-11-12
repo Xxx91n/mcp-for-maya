@@ -232,7 +232,7 @@ def register_visual_tools(mcp: Any) -> None:
         Side-effect disclosures (read_only_hint is honest):
         1. Switching the panel camera via the modelPanel camera flag
            is instantaneous, visible, and NOT undoable in Maya.
-        2. Net-zero side effect: the panel camera is restored on every
+        2. Everything is put back: the panel camera is restored on every
            path - success or failure - so terminal state equals entry.
         3. The current time may visibly jump during capture; it is
            restored afterwards (playblast timeline quirk).

@@ -68,8 +68,8 @@ class MayaUnavailableError(PipelineError):
     code = "maya_unavailable"
 
 
-# Backwards-compatible alias: the wire code is maya_unavailable per the
-# two-layer error contract; this name is still both raised and imported.
+# Backwards-compatible alias: the wire code is maya_unavailable under the
+# two error paths; this name is still both raised and imported.
 MayaConnectionError = MayaUnavailableError
 
 
@@ -105,7 +105,7 @@ def _domain_error_text(error: Any) -> str:
 def raise_for_error(response: CommandResponse) -> None:
     """Raise MayaExecutionError if the response carries a Maya-side error.
 
-    Single choke point so both server.execute_code and the scene-tool layer
+    One place so both server.execute_code and the scene-tool layer
     surface errors identically (message sanitized, code/type + traceback kept).
     """
     err = getattr(response, "error", None)
@@ -489,7 +489,7 @@ class BaseMayaClient(ABC):
 
         # Qt server JSON protocol over the framed channel. There is no
         # retry: execution errors are returned in the response (never
-        # raised here) and surface to callers via the two-layer contract.
+        # raised here) and reach callers through the two error paths.
         response = await self._send_receive(
             self.EXECUTE_TEMPLATE,
             {"code": code, "result_type": result_type.value},

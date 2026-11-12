@@ -1,6 +1,6 @@
 # Upstream issue response drafts (D-063/D-064)
 
-Status: **DRAFT — human gate**. Posting to chadrik/maya-mcp-server is an
+Status: **DRAFT — needs the user to act**. Posting to chadrik/maya-mcp-server is an
 external side effect; these drafts are prepared by the agent and published by
 the user (or under explicit authorization). One comment per issue, no
 follow-up comments.
@@ -23,7 +23,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 >
 > In our fork ([Xxx91n/mcp-for-maya](https://pypi.org/project/mcp-for-maya/))
 > this failure mode does not exist: the dependency surface contains no
-> `fakeredis` at all — the test suite runs against an in-repo Maya stub
+> `fakeredis` at all — the test suite runs against an in-repo Maya fake
 > instead. This holds for **every released version (>= 0.1.0)**, verified from
 > the published `requires_dist` metadata, not from memory.
 >
@@ -127,7 +127,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > blocking the replacement; the shipped hook catches its own failures and
 > reports them in the JSON result it returns, which is not forwarded.
 >
-> Verification status: covered by stub-tier tests including the Qt signal
+> Verification status: covered by fake Maya tests including the Qt signal
 > semantics, and verified on a live Maya 2024 session — the cleanup
 > hook fired exactly once across a reconnect, the old listener port was
 > released, and the replacement server bound cleanly.

@@ -1,15 +1,16 @@
-"""Monolith line-count ratchet.
+"""Big single-file module line cap.
 
-``maya_scene_module.py`` is a registered monolith under T-07
-strangler discipline: incremental splits happen where fixes touch,
-never a big-bang rewrite — and the file must not keep growing
-("ratchet": frozen baseline, only downward edits). The frozen budget
-file caps each registered file's physical line count:
+``maya_scene_module.py`` is one registered big file under T-07: splits
+happen where a fix already touches the code, never as a one-shot
+rewrite — and the file must not keep growing. A raise needs a reasoned
+budget edit in the same pull request that earns it; a lower count may
+be budgeted down the same way. The budget file caps each registered
+file's physical line count:
 
 - count > budget  -> fail the lint job
 - count < budget  -> pass, but print a "may be lowered" hint so the
-  ratchet keeps closing instead of decaying into a high-water mark
-  (the OmniRoute #8584 failure mode: a cap that only blocks but
+  cap keeps tightening instead of settling at a number the file never
+  needs (the OmniRoute #8584 failure mode: a cap that only blocks but
   never tightens silently licenses growth back up to the line)
 - count == budget -> pass
 
@@ -37,7 +38,7 @@ def physical_lines(path: Path) -> int:
 
 
 def check(root: Path, budget_path: Path) -> tuple[bool, list[str], list[str]]:
-    """(ok, errors, warnings) — warnings are the non-fatal pawl hints."""
+    """(ok, errors, warnings) — warnings are the non-fatal "may be lowered" hints."""
     try:
         budget = json.loads(budget_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
@@ -66,12 +67,12 @@ def check(root: Path, budget_path: Path) -> tuple[bool, list[str], list[str]]:
         if n > cap:
             errors.append(
                 f"::error file={rel},line={cap + 1}::{rel} is {n} physical lines, "
-                f"over the frozen monolith budget of {cap}"
+                f"over the big-file line cap of {cap}"
             )
         elif n < cap:
             warnings.append(
                 f"{rel}: {n}/{cap} — below budget; the budget may be lowered "
-                "in the same PR commit (ratchet pawl)"
+                "in the same PR commit (lower it to the new count)"
             )
         else:
             print(f"{rel}: {n}/{cap} at budget — OK")

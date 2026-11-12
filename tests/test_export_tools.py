@@ -1,6 +1,6 @@
 """T-23b tests: scene_export tool layer.
 
-ExecClient runs the generated code against the stub-bound _mcp_export
+ExecClient runs the generated code against the fake-bound _mcp_export
 module through the REAL result-capture transform - same harness pattern
 as test_asset_tools.py / test_scene_tools_json.py. Covers host-side
 validation, domain-error passthrough, the injection lifecycle on both
@@ -65,7 +65,7 @@ class ExecClient:
 
 @pytest.fixture
 def tools(maya_env, monkeypatch, tmp_path):
-    """Stub scene + bound _mcp_export + captured tool fns."""
+    """Fake scene + bound _mcp_export + captured tool fns."""
     module = maya_stub.load_export_module()
     sys.modules["_mcp_export"] = module
     _export_injected.add("_default")

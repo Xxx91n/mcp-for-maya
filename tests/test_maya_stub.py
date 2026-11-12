@@ -1,6 +1,6 @@
 """Self-tests for tests/maya_stub — the harness must be right
-before product tests can be trusted (D-004 stub tier: maya_scene_module runs
-against a fake maya.cmds, not a live session)."""
+before product tests can be trusted (D-004 fake Maya layer: maya_scene_module
+runs against a fake maya.cmds, not a live session)."""
 
 from __future__ import annotations
 
@@ -52,8 +52,8 @@ class TestMatrixMath:
 
 class TestMVectorSplit:
     """D-056④: real MVector is NOT an MPoint subclass — len==3, no w,
-    cross product via ^; MPoint len==4 with w. The stub's MVector(MPoint)
-    inheritance made isinstance/len()/w all lie (stub-green, real-red).
+    cross product via ^; MPoint len==4 with w. The fake's MVector(MPoint)
+    inheritance made isinstance/len()/w all lie (fake-green, real-red).
     Conversion ctors mirror the real API: MVector(MPoint) drops w,
     MPoint(MVector) sets w=1.0."""
 
@@ -296,7 +296,7 @@ class TestCmdsFacade:
 
 
 class TestGuiSurface:
-    """D-039: stub GUI surface fidelity - modelPanel camera API and a
+    """D-039: fake GUI surface fidelity - modelPanel camera API and a
     type-disambiguated lookThru with warn/strict anomaly policy."""
 
     def test_model_panel_camera_roundtrip(self, scene):

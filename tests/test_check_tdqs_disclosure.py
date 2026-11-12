@@ -1,6 +1,6 @@
 """Regression tests for .github/scripts/check_tdqs_disclosure.py.
 
-D-175: static ratchet asserting that tool docstrings disclose the required
+D-175: static check asserting that tool docstrings disclose the required
 elements cataloged in .github/tdqs-elements.yaml.
 """
 
@@ -769,7 +769,7 @@ def test_derivation_fires_when_the_floor_shrinks_but_the_baseline_stays():
     data["tools"]["scene_snapshot"]["required_elements"].append(
         {"id": "session_prerequisite", "why": "test", "any": ["session_key"]}
     )
-    hits = _covers_err(mod, data, "ratchet shrank")
+    hits = _covers_err(mod, data, "got smaller")
     assert hits, "a stale baseline entry must fire"
     assert any("scene_snapshot/session_prerequisite" in h for h in hits), hits
 

@@ -5,7 +5,7 @@
 # introspect_module.py - and injects the assembly as _mcp_scene.
 #
 # Why the scene_review composition lives here: maya_scene_module.py sits at
-# its .github/monolith-budget.json cap, so the review function cannot grow.
+# its .github/monolith-budget.json line cap, so the review function cannot grow.
 # This separate file adds scene_review_with_validators(), the entry the
 # scene_review MCP tool calls; maya_scene_module.py's own scene_review keeps
 # returning the built-in checks alone, so the built-in 0-100 score is
