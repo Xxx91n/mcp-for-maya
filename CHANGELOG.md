@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   any `__x__` attribute access (the `().__class__.__base__.__subclasses__()`
   family, including the `from x import __path__` spelling), each under its own
   `safe-mode-*` rule id. `def`/`class`/`lambda` bodies are walked under the
-  same rules recursively. Safety net, not a boundary. Evidence:
+  same rules recursively. Catches slips, not a boundary. Evidence:
   `tests/test_security.py::TestScanSafeModeCode::test_allowlisted_constructs_pass`,
   `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`.
 
@@ -90,6 +90,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_client.py::TestDetectPortType::test_mel_port_answers_0`,
   `tests/test_client.py::TestDetectPortType::test_probe_exception_is_unknown`,
   `tests/test_module_teardown.py::TestCreateModuleTeardown::test_teardown_called_and_resources_closed`.
+- **Security terms now say what they mean** — group 3 of the plain-language
+  pass (#190): `可信调用方`, `防手滑措施`, `调用记录`, `自动维护的代码块`,
+  `safe_mode`'s description, `影响范围` and `被带偏的代理` are rewritten in
+  plain words in both READMEs, `SECURITY.md`, the threat model, the error-code
+  guide, the ICEV workflow card, code comments and docstrings, and the tests
+  that describe them. The earlier and later groups' terms are untouched. One
+  visible string changed wording only: installing into a `userSetup.py` that
+  has no managed block now says "managed block" where it used to say
+  "the code between the `# >>> mcp-for-maya >>>` lines";
+  its action name, fields and control flow are unchanged. No public tool name,
+  function name, parameter name or error code changed. `llms.txt` was not
+  hand-edited: `check_llms_txt.py --write` reports the registry already
+  matches, because no tool description's first sentence changed. Evidence:
+  `tests/test_pipeline.py::TestStrictPolicyMode::test_read_only_surface_is_unaffected`,
+  `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`,
+  `tests/test_polyhaven.py::TestGuards::test_url_whitelist_rejects_foreign_host`,
+  `tests/test_security.py::TestAuditDualWrite::test_failed_write_still_logs_and_recovers`.
 - **Defect record #115 no longer reads as open work** — the fix had landed as
   `2f8d51e` (PR #138, merge `894f6ae`) while the ticket stayed open, because
   the closing keyword lived in the child ticket's body and never reached a

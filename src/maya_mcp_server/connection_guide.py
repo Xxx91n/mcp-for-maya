@@ -5,21 +5,21 @@ the Maya command port connection. Handles platform differences
 (Windows/Linux/macOS) and Maya version detection.
 
 Key responsibilities:
-1. Managed marker-block install/uninstall of userSetup.py
+1. Managed block install/uninstall of userSetup.py
 2. Detect Maya installation paths per platform
 3. Provide human-readable fallback instructions when auto-setup fails
 4. Diagnose connection issues and suggest fixes
 
-Marker-block semantics (only the marker region is rewritten, the rest
+Managed block semantics (only the enclosed region is rewritten, the rest
 of userSetup.py is preserved):
 - The block lives between "# >>> mcp-for-maya >>>" / "# <<< mcp-for-maya <<<".
 - Missing file        -> create it directly.
-- Existing file, no marker -> return the proposed block first; only a
+- Existing file, no such block -> return the proposed block first; only a
   second call with confirm=True merges (appends) the block.
-- Existing marker     -> replace in place (idempotent upgrade).
+- Existing block      -> replace in place (running it again changes nothing).
 - Unparseable file    -> refuse, report fallback guidance.
 - Every write first creates <file>.bak.<timestamp> and reports its path.
-- uninstall strips only the marker region; when the file held nothing
+- uninstall strips only the managed region; when the file held nothing
   else, it asks before deleting (remove_empty_file=True).
 """
 
@@ -163,7 +163,7 @@ def find_maya_installations() -> list[MayaInstallInfo]:
 
 
 # ---------------------------------------------------------------------------
-# Marker-block install/uninstall
+# Managed block install/uninstall
 # ---------------------------------------------------------------------------
 
 
@@ -228,14 +228,14 @@ def install_user_setup(
     dry_run: bool = False,
     confirm: bool = False,
 ) -> dict[str, Any]:
-    """Merge the managed marker block into userSetup.py.
+    """Merge the maintained block into userSetup.py.
 
     Args:
         port: Command port number.
         target_version: Specific Maya version to target (e.g., "2024").
         dry_run: If True, only report what would happen.
         confirm: Required to merge into an existing userSetup.py that
-            does not yet contain the marker block. The first call on
+            does not yet contain the managed block. The first call on
             such a file returns action="needs_confirm" plus the
             proposed block; nothing is written.
 
@@ -391,7 +391,7 @@ def install_user_setup(
             entry["proposed_block"] = block
             entry["confirm_hint"] = (
                 "userSetup.py already exists and has no mcp-for-maya "
-                "marker block. Review proposed_block, then call install "
+                "managed block. Review proposed_block, then call install "
                 "again with confirm=True to append it (the existing "
                 "content is preserved and a backup is written first)."
             )
@@ -425,11 +425,11 @@ def uninstall_user_setup(
     target_version: str | None = None,
     remove_empty_file: bool = False,
 ) -> dict[str, Any]:
-    """Strip the managed marker block from userSetup.py.
+    """Strip the maintained block from userSetup.py.
 
     Args:
         target_version: Specific Maya version; None targets all.
-        remove_empty_file: When the file contains ONLY the marker block,
+        remove_empty_file: When the file contains ONLY the managed block,
             delete it. Otherwise the emptied file is left in place and
             file_now_empty is reported.
 
@@ -561,18 +561,18 @@ def get_fallback_instructions(port: int = DEFAULT_COMMAND_PORT) -> str:
 
 ### 方式一：自动安装 / Option A: Managed Install
 
-调用 `maya_setup_guide(action="install")` 会把下面的受管标记块写入
-Maya 的 userSetup.py：文件不存在时直接创建；已存在且无标记块时先返回
-proposed_block，需 `confirm=True` 二次调用才合并；已存在标记块时原位更新。
+调用 `maya_setup_guide(action="install")` 会把下面那段自动维护的代码块写入
+Maya 的 userSetup.py：文件不存在时直接创建；已存在且没有这段代码块时先返回
+proposed_block，需 `confirm=True` 二次调用才合并；已存在这段代码块时原位更新。
 每次写入前会生成 `<file>.bak.<timestamp>` 备份。
 
-Calling maya_setup_guide(action="install") merges the managed marker
+Calling maya_setup_guide(action="install") merges the maintained code
 block below into userSetup.py: missing files are created; existing
 files without the block require a second call with confirm=True; an
 existing block is updated in place. A <file>.bak.<timestamp> backup
 precedes every write.
 
-### 方式二：手动粘贴标记块 / Option B: Paste the block manually
+### 方式二：手动粘贴这段代码块 / Option B: Paste the block manually
 
 如果自动安装未执行或失败，把下面这段原样追加到 userSetup.py 末尾
 （与工具写入的内容逐字节相同），然后重启 Maya：
@@ -601,7 +601,7 @@ print(cmds.commandPort(query=True, listPorts=True))
 
 1. **端口被占用**: 关闭其他 Maya 实例，或换一个端口号
 2. **防火墙阻止**: 确保本地防火墙允许 Maya 监听 localhost:{port}
-3. **userSetup.py 未执行**: 确认标记块在正确的 scripts 目录文件中（见下）
+3. **userSetup.py 未执行**: 确认这段代码块在正确的 scripts 目录文件中（见下）
 
 ### 各平台 scripts 目录路径
 
@@ -644,7 +644,7 @@ print(cmds.commandPort(query=True, listPorts=True))
 
 默认端口: {port}
 如需更改端口，重新运行 `maya_setup_guide(action="install", port=<新端口>)`
-（已存在的标记块会原位更新），并在 Script Editor 中用 Option C 立即生效。
+（已有的这段代码块会原位更新），并在 Script Editor 中用 Option C 立即生效。
 """
 
     return instructions
@@ -809,14 +809,14 @@ cmds.commandPort(name=":{port}", sourceType="python")
     agent_guide += """
 ## 自动安装 userSetup.py
 
-可通过 MCP 工具自动把受管标记块合并进 userSetup.py：
+可通过 MCP 工具自动把那段自动维护的代码块合并进 userSetup.py：
 
 maya_setup_guide(action="install")
 
-- 文件不存在 → 直接创建（内容仅为标记块）
-- 文件已存在且无标记块 → 先返回 proposed_block，confirm=True 二次调用才合并
-- 已存在标记块 → 原位更新
-- 卸载: maya_setup_guide(action="uninstall")（只摘标记块）
+- 文件不存在 → 直接创建（内容只有这段代码块）
+- 文件已存在且没有这段代码块 → 先返回 proposed_block，confirm=True 二次调用才合并
+- 已有这段代码块 → 原位更新
+- 卸载: maya_setup_guide(action="uninstall")（只摘掉这段代码块）
 """
 
     return agent_guide

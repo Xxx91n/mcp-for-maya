@@ -3,11 +3,12 @@
 ## Scope
 
 mcp-for-maya is a **local, single-user** bridge between an MCP client
-and Autodesk Maya. The safety machinery (validation, rate limits,
-pattern scan, audit log) is a net for accidents and confused-deputy
-scenarios — see [docs/threat-model.md](docs/threat-model.md). It is not
-a boundary against a malicious MCP client: any client can already ask
-for arbitrary tool calls by design.
+and Autodesk Maya. The guards against slips (validation, rate limits,
+pattern scan, call record) catch accidents and agents that were talked
+into doing something the user never asked for — see
+[docs/threat-model.md](docs/threat-model.md). They are not a boundary
+against a malicious MCP client: any client can already ask for arbitrary
+tool calls by design.
 
 ## Reporting a vulnerability
 
@@ -25,10 +26,10 @@ impact looks like from the client's seat.
 
 In scope:
 - A bug that lets a *confused but non-malicious* agent cause damage the
-  safety net was designed to catch (e.g., path traversal in a filename
-  parameter reaching the filesystem).
-- Audit log corruption or silent loss of rejection events.
-- userSetup.py merge writing outside the marker block or without backup.
+  guards against slips were designed to catch (e.g., path traversal in a
+  filename parameter reaching the filesystem).
+- Call record corruption or silent loss of rejection events.
+- userSetup.py merge writing outside the one maintained block or without backup.
 - Checkpoint/rollback writing outside the checkpoints directory.
 
 Out of scope (by design):

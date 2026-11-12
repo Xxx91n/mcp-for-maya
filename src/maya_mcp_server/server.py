@@ -161,7 +161,7 @@ mcp = FastMCP(
 register_scene_tools(mcp)
 register_visual_tools(mcp)
 
-# One AuditLogger shared by the pipeline (per-call events) and the
+# One AuditLogger shared by the pipeline (per-call entries) and the
 # asset tools (result-side download detail: URL/size/files_hash).
 _audit_logger = (
     AuditLogger(Path(_security_config.audit_log_path) if _security_config.audit_log_path else None)
@@ -173,7 +173,8 @@ register_export_tools(mcp)
 register_introspect_tools(mcp)
 
 # Unified security pipeline: every tool call passes through validation,
-# rate limiting, pattern scanning, the safe_mode gate, and audit logging.
+# rate limiting, pattern scanning, the safe_mode code check, and the
+# call record.
 mcp.add_middleware(SecurityPipeline(config=_security_config, audit=_audit_logger))
 
 # Global session manager - initialized when server starts
@@ -248,20 +249,20 @@ async def maya_setup_guide(
     Args:
         action: What to do:
             - "diagnose": Run connection diagnostics and return status
-            - "install": Merge the managed marker block into userSetup.py.
+            - "install": Merge the managed block into userSetup.py.
               Existing files without the block require a second call with
               confirm=True (the first call returns the proposed block).
             - "guide": Get full step-by-step connection guide
-            - "uninstall": Remove the managed marker block from userSetup.py
+            - "uninstall": Remove the managed block from userSetup.py
         port: Maya command port number (default: 7001)
         target_version: Specific Maya version (e.g., "2024").
             If None, targets all detected versions.
         confirm: Required to write into an existing userSetup.py that has
-            no mcp-for-maya marker block (first install call is dry-run).
+            no mcp-for-maya managed block (first install call is dry-run).
         dry_run: Preview the install: return the proposed block without
             writing anything.
         remove_empty_file: On uninstall, delete the file when it only
-            contained the marker block.
+            contained the managed block.
 
     Returns:
         Dict with diagnostics, installation results, or guide text
@@ -313,15 +314,15 @@ async def write_module(
     Requires an active Maya session.
 
     Under safe_mode (MAYA_MCP_SAFE_MODE, opt-in, default off) this code
-    payload passes the same deny-by-default AST allowlist as execute_code:
+    payload passes the same deny-by-default allowlist as execute_code:
     non-allowlisted imports, denied builtin names (any reference, not
     just calls), __builtins__ references,
     dunder attribute access, and unparseable input are rejected with
     safe_mode_rejected naming the triggering rule id. Successful
-    responses carry mode: "safe" on their structured payload. Gated
-    execute_code payloads can only import the v1 allowlisted roots, so a
-    module defined here whose root is not one of those roots is not
-    importable by name from gated code.
+    responses carry mode: "safe" on their structured payload. Under the
+    code check, execute_code payloads can only import the v1 allowlisted
+    roots, so a module defined here whose root is not one of those roots
+    is not importable by name from gated code.
 
     Boundary: Use write_module to define reusable libraries and helper functions;
     use execute_code for one-shot imperative execution or expression evaluation.
@@ -377,7 +378,8 @@ async def execute_code(
     Requires an established Maya session (discoverable via list_sessions).
 
     Under safe_mode (MAYA_MCP_SAFE_MODE, opt-in, default off) the code
-    payload passes a deny-by-default AST allowlist before dispatch:
+    payload passes a deny-by-default allowlist checked on the parsed code
+    before dispatch:
     imports outside the v1 roots (maya/math/json/re/collections/
     itertools/functools/dataclasses/typing), denied builtins
     (eval/exec/open/__import__/getattr/setattr/...), __builtins__
@@ -385,7 +387,7 @@ async def execute_code(
     dunder attribute access, and unparseable input are
     rejected with safe_mode_rejected naming the triggering rule id.
     Successful responses carry mode: "safe" on their structured payload.
-    The gate is a misuse guardrail, not a sandbox — code that passes
+    This catches slips, it is not a sandbox — code that passes
     still runs with full session privileges.
 
     Args:

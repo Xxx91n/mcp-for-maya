@@ -259,7 +259,8 @@ def execute(code: str, result_type: str = "NONE") -> str:
     error = None
     # Dedicated exec namespace for result capture. NOT a security boundary:
     # __builtins__ is fully present and code runs with Maya's privileges —
-    # the safety net is host-side (pattern scan, rate limit, audit).
+    # the guards against slips live on the host side (pattern scan, rate
+    # limit, call record).
     import sys
 
     context = {"__builtins__": __builtins__, "__name__": "__mcp_exec__", "__doc__": None}

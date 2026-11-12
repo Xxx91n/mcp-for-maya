@@ -45,4 +45,4 @@ Apply changes with `execute_code` — batch related edits into one call. Before 
 
 - Never report "done" on a mutating task without a check step in the same turn.
 - Batch related changes into one `execute_code` call; run `scene_review` after a unit of work, not between micro-edits.
-- The pipeline (validation, rate limits, pattern scan) is a safety net for accidents — treat its rejections as stop signals, not obstacles to route around.
+- The pipeline (validation, rate limits, pattern scan) catches slips — treat its rejections as stop signals, not obstacles to route around.

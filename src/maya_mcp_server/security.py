@@ -2,8 +2,9 @@
 
 All 25 MCP tools funnel through the SecurityPipeline middleware
 (pipeline.py): input validation -> rate limit -> pattern scan ->
-safe_mode AST gate (opt-in) -> dispatch -> audit. This module is a safety
-net for confused-deputy scenarios, NOT a security boundary (see SECURITY.md).
+safe_mode code check (opt-in) -> dispatch -> call record. This module
+catches slips and agents that were talked into trouble; it is NOT a
+security boundary (see SECURITY.md).
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ RATE_LIMIT_WINDOW = 60.0  # seconds
 RATE_LIMIT_READ_MAX_CALLS = 100  # read-class tools per window per session
 RATE_LIMIT_WRITE_MAX_CALLS = 20  # mutation-class tools per window per session
 
-# Audit log configuration
+# Call record configuration
 AUDIT_APP_NAME = "mcp-for-maya"
 AUDIT_LOG_FILENAME = "audit.jsonl"
 AUDIT_MAX_BYTES = 10 * 1024 * 1024  # 10 MiB per segment
@@ -115,20 +116,20 @@ class GuiSessionRequiredError(PipelineError):
 class PolicyDisabledError(PipelineError):
     """Raised when an operator policy flag disables a tool.
 
-    Misuse guardrail, NOT a hostile-agent boundary: an agent that can run
-    execute_code bypasses every flag here. The threat model restates that
-    (docs/threat-model.md); this class only makes the operator's intent
-    mechanical and auditable.
+    Guards against misuse, NOT a boundary against a hostile agent: an agent
+    that can run execute_code bypasses every flag here. The threat model
+    restates that (docs/threat-model.md); this class only makes the
+    operator's intent mechanical and recorded in the call record.
     """
 
     code = "policy_disabled"
 
 
 class SafeModeRejectedError(PipelineError):
-    """Raised when an opt-in safe_mode AST gate rejects a code payload.
+    """Raised when an opt-in safe_mode code check rejects a code payload.
 
-    Same misuse-guardrail framing as PolicyDisabledError: safe_mode is a
-    safety net that narrows what execute_code/write_module accept, not a
+    Same framing as PolicyDisabledError: safe_mode narrows what
+    execute_code/write_module accept. It catches slips; it is not a
     sandbox and not a boundary against a hostile client.
     """
 
@@ -351,7 +352,7 @@ class PatternRule:
     param_kinds: frozenset[str] | None = None
 
 
-# Broad warn-only rules: recorded to the audit log, never block.
+# Broad warn-only rules: recorded to the call record, never block.
 PATTERN_RULES: list[PatternRule] = [
     # --- precise block rules (zero-false-positive class) ---
     PatternRule(
@@ -457,8 +458,8 @@ def scan_tool_params(
         exclusions: Optional extra (rule_id, tool, param) suppression set.
 
     Returns:
-        (warnings, blocked): warnings are audit-only hits; blocked are
-        hits on block-action rules.
+        (warnings, blocked): warnings are warn-only hits, recorded to the
+        call record; blocked are hits on block-action rules.
     """
     excl = PATTERN_EXCLUSIONS | (exclusions or set())
     warnings: list[dict[str, str]] = []
@@ -496,11 +497,12 @@ def scan_for_dangerous_patterns(code: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# safe_mode: opt-in AST gate for the two code-bearing tools.
+# safe_mode: opt-in code allowlist for the two code-bearing tools.
 #
-# A safety net, NOT a sandbox or a hostile-agent boundary: it narrows what a
-# confused or hallucinating agent can send through execute_code/write_module
-# while those tools stay listed, exactly like the strict-policy flags.
+# Catches slips; NOT a sandbox and NOT a boundary against a hostile agent. It
+# narrows what a confused or hallucinating agent can send through
+# execute_code/write_module while those tools stay listed, exactly like the
+# strict-policy flags.
 # ---------------------------------------------------------------------------
 
 SAFE_MODE_ENV_FLAG = "MAYA_MCP_SAFE_MODE"
@@ -807,7 +809,7 @@ def scan_safe_mode_code(code: object) -> SafeModeViolation | None:
 
 
 def compute_code_hash(code: str) -> str:
-    """Compute SHA-256 hash of code for audit logging."""
+    """Compute SHA-256 hash of code for the call record."""
     return hashlib.sha256(code.encode("utf-8")).hexdigest()[:32]
 
 
@@ -820,7 +822,7 @@ _SENSITIVE_PARAM_RE = re.compile(r"token|secret|password|credential|api[_-]?key"
 
 
 def summarize_params(params: dict[str, Any]) -> str:
-    """Build a sanitized <=200-char input summary for the audit log.
+    """Build a sanitized <=200-char input summary for the call record.
 
     Records param names with short previews \u2014 never a bare hash of the
     whole input, never credential-shaped values. Large strings get a
@@ -860,24 +862,24 @@ def sanitize_error_message(message: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Audit log: dedicated JSONL file, independent rotation, 0600,
+# Call record: dedicated JSONL file, independent rotation, 0600,
 # dual-written to the app logger, and never blocks tool execution.
 # ---------------------------------------------------------------------------
 
 
 def default_audit_log_path() -> Path:
-    """Audit log path under the platformdirs user log directory."""
+    """Call record path under the platformdirs user log directory."""
     import platformdirs
 
     return Path(platformdirs.user_log_dir(AUDIT_APP_NAME)) / AUDIT_LOG_FILENAME
 
 
 class AuditLogger:
-    """Append-only JSONL audit writer with size-based rotation.
+    """Append-only JSONL call-record writer with size-based rotation.
 
     Rotates audit.jsonl -> audit.jsonl.N (N up to backup_count). Write
-    failures are logged to the app logger and swallowed \u2014 auditing is an
-    observability surface, never a tool-execution blocker.
+    failures are logged to the app logger and swallowed \u2014 keeping the
+    record is for after-the-fact checking, never a tool-execution blocker.
     """
 
     def __init__(
@@ -893,7 +895,7 @@ class AuditLogger:
         self._warned = False
 
     def record(self, event: dict[str, Any]) -> None:
-        """Write one audit event; never raises.
+        """Write one call-record line; never raises.
 
         The event is always dual-written to the application logger, even
         when the JSONL write fails. A failed JSONL write warns once per
@@ -903,14 +905,14 @@ class AuditLogger:
         try:
             line = json.dumps(event, ensure_ascii=False, default=str)
         except Exception as e:
-            logger.warning(f"audit event serialization failed: {e}")
+            logger.warning(f"call record entry serialization failed: {e}")
             return
         try:
             self._append(line)
             self._warned = False
         except Exception as e:
             if not self._warned:
-                logger.warning(f"audit log write failed ({self.path}): {e}")
+                logger.warning(f"call record write failed ({self.path}): {e}")
                 self._warned = True
         # Dual-write to the application logger (independent of the JSONL file)
         logger.info("audit %s", line)
@@ -951,7 +953,7 @@ def build_audit_event(
     duration_ms: float,
     warnings: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Build one audit event dict (the JSONL schema)."""
+    """Build one call-record entry (the JSONL schema)."""
     return {
         "event_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc)

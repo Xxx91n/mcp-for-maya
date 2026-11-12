@@ -499,8 +499,8 @@ async def test_in_tool_pipeline_error_counts_as_error(tmp_path):
 
 # ---------------------------------------------------------------------------
 # D-207 7: strict policy mode. Stub tier, in CI: assert the flag bites and
-# assert the read-only surface is untouched. A guardrail with no acceptance
-# test is an adoption without acceptance.
+# assert the read-only surface is untouched. A guard against misuse with no
+# acceptance test is an adoption without acceptance.
 # ---------------------------------------------------------------------------
 
 
@@ -525,7 +525,7 @@ ALL_TOOLS = tuple(TOOL_ANNOTATIONS)
 
 
 class TestStrictPolicyMode:
-    """operator-side misuse guardrails (D-207 1) - not a hostile-agent boundary."""
+    """operator-side guards against misuse (D-207 1) - not a boundary against a hostile agent."""
 
     @pytest.mark.parametrize(
         "flag,tool",
@@ -555,7 +555,7 @@ class TestStrictPolicyMode:
     async def test_read_only_surface_is_unaffected(self, tmp_path, monkeypatch):
         """The guard narrows the dangerous tools only. A read-class tool still
         dispatches with every flag on - otherwise the flag would be a mute
-        button rather than a guardrail."""
+        button rather than a guard against misuse."""
         for flag in POLICY_ENV_FLAGS:
             monkeypatch.setenv(flag, "1")
         pipe, _audit, log = _pipeline(tmp_path)
@@ -614,8 +614,8 @@ class TestStrictPolicyMode:
 
 
 # ---------------------------------------------------------------------------
-# T1: safe_mode plumbing - opt-in AST gate after the pattern scan, before
-# dispatch. A safety net, not a boundary.
+# T1: safe_mode plumbing - opt-in code check after the pattern scan, before
+# dispatch. Catches slips, not a boundary.
 # ---------------------------------------------------------------------------
 
 
@@ -752,8 +752,8 @@ class TestSafeModeGate:
         assert calls == [], "the backend must never see a rejected payload"
         ev = _read_events(log)[-1]
         assert ev["outcome"] == "rejected"
-        # AC: every rule-table entry's exact rule_id reaches the audit row, not
-        # just the import class the T1 test already pins.
+        # AC: every rule-table entry's exact rule_id reaches the call-record row,
+        # not just the import class the T1 test already pins.
         assert any(w["rule_id"] == rule_id for w in ev["warnings"])
 
     @pytest.mark.parametrize(
