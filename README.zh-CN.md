@@ -8,15 +8,15 @@
 
 # mcp-for-maya
 
-> 让 AI Agent 拥有 Maya 三维空间感知能力的 MCP 服务器
+> 让 AI Agent 能真正看懂 Maya 场景的 MCP 服务器
 
 [![CI](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml/badge.svg)](https://github.com/Xxx91n/mcp-for-maya/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/mcp-for-maya?cacheSeconds=300)](https://pypi.org/project/mcp-for-maya/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/Xxx91n/mcp-for-maya/blob/main/LICENSE) [![Python](https://img.shields.io/pypi/pyversions/mcp-for-maya)](https://pypi.org/project/mcp-for-maya/)
 
 ## 这是什么
 
-`mcp-for-maya` 是一个 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 服务器，让Agent（Codex、Claude 等）直接操控 Autodesk Maya，进行三维建模、场景规划和工程级项目落地。
+`mcp-for-maya` 是一个 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 服务器，让 Agent（Codex、Claude 等）直接操作 Autodesk Maya：建模、规划场景、把活干完。
 
-**核心能力：** AI 不再是"闭眼写代码"，而是能随时感知 Maya 场景的空间状态、材质分布、物体关系，并按固定的规则检查自己改得对不对。
+**核心能力：** AI 不再是"闭眼写代码"，而是随时能看场景里有哪些物体、用了什么材质、彼此怎么摆，再按固定规则检查自己改得对不对。
 
 > [!WARNING]
 > 本服务器会使用 Python 代码在 Maya 中执行，这是设计能力而非漏洞。详见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
@@ -126,7 +126,7 @@ tool_timeout_sec = 120
 
 > "帮我看看 Maya 场景里有什么，然后在入口处创建一个展示架"
 
-AI 会自动调用 `scene_snapshot()` → 理解场景 → 执行建模 → 用 `scene_review()` 检查结果。
+AI 会调用 `scene_snapshot()` 看一遍场景，然后建模，再用 `scene_review()` 检查结果。
 
 <img src="https://raw.githubusercontent.com/Xxx91n/mcp-for-maya/main/.github/assets/section-icev-workflow.svg" width="100%" alt="ICEV Workflow"/>
 
@@ -149,18 +149,18 @@ AI 会自动调用 `scene_snapshot()` → 理解场景 → 执行建模 → 用 
 
 | 能力 | 工具 | 说明 |
 |------|------|------|
-| 🧊 **空间感知** | `scene_snapshot` `scene_inspect` `scene_measure` | 一次调用获取全场景空间模型，精确距离/重叠/间隙测量 |
+| 🧊 **空间感知** | `scene_snapshot` `scene_inspect` `scene_measure` | 一次调用拿到物体、类型、世界位置和大小。这里的「大小」是物体自己的包围盒，没有算上它自己和父级的缩放，所以放大过的物体实际比这个数字大。要单独拿一个物体的真实世界尺寸，用 `scene_measure` 把同一个物体同时传给 `obj_a` 和 `obj_b`、`mode="bbox"`：它和自己必然重叠，`details.overlap_dims` 就是世界坐标下的三轴尺寸（还是盒子尺寸，不是网格表面）。所有测量都是世界坐标的轴对齐包围盒：两个形状没碰到，盒子也可能重叠；转过的或凹进去的形状，量出来会比看上去松。默认 CoS 输出按场景大小自己挑一个列出上限（小场景 50 个，超大场景 1000 个），所以实际上 1000 个以内一个都不会漏；超过 1000 才会在 `STATS:` 那行前面多出一行 `... N more objects`。要完全不设上限用 `format="json"`，但结果大很多 |
 | 🎨 **画面质量** | `scene_aesthetics` | 5 维分析：色彩理论(60-30-10)、空间构成(黄金比例/三分法)、比例尺度(人体工学)、光照质量(三点照明/填充比/色温/衰减)、视觉动线 |
 | 🎬 **相机** | `camera_create` `camera_orbit` | 8 种内置镜头类型 + 环绕动画 |
 | 🛡️ **存档与读档** | `scene_checkpoint` `scene_rollback` `scene_checkpoint_list` | 把场景导出成磁盘上的 `.ma` 文件，放在 `checkpoints/`；读档时打开这个文件，再把场景指回原路径 |
 | 🧠 **场景规划** | `scene_plan` | 组织健康检查、区域平衡、布局优化建议、冲突预防、自然语言规划 |
 | 📋 **场景检查** | `scene_review` `scene_validate` `scene_assert` | 11 项固定检查（0-100 分）+ 自定义约束检查 + 状态断言 |
 | ⚡ **代码执行** | `execute_code` `write_module` | 在 Maya 中执行任意 Python 代码 / 注入可复用模块 |
-| 👁️ **看图复查** | `scene_viewport_snapshot` `scene_render_preview` | 视口所见即所得捕获 + 单帧 playblast 预览，让 AI 看一眼改得对不对（仅 GUI 会话） |
+| 👁️ **看图复查** | `scene_viewport_snapshot` `scene_render_preview` | 截一张视口图，看到的就是美术看到的那一帧（含 HUD 和选中高亮），另有单帧 playblast 预览，让 AI 看一眼改得对不对（仅 GUI 会话） |
 | 🔌 **会话管理** | `list_sessions` `add_session` `maya_setup_guide` | 多会话发现/接入 + 连接诊断/安装/回退引导 |
 | 📦 **资产库** | `asset_search` `asset_import` | Poly Haven CC0 模型——宿主侧 HTTPS 下载（主机白名单、md5 校验、大小上限、platformdirs 缓存），Maya 侧 FBX 导入带贴图自动接线、面数/尺寸上限检查、`GRP_asset_<id>` 去重 |
 | 📤 **场景导出** | `scene_export` | FBX/OBJ/USD 导出——整场景或指定对象；格式按扩展名推断（冲突即报错不猜）、父目录自动创建、覆盖需显式 opt-in、导出后还原选择集 |
-| 🔎 **场景图内省** | `scene_describe` `scene_nodes` | API 级节点自描述（精确类型、逐属性元数据 keyable/connectable/enum/取值范围、连接布线——响应有界，`limit` 最高放宽至 1000，截断经 `*_truncated` 披露）+ 有界枚举（含非 DAG 节点：材质/工具节点），`has_more`/`next_cursor` 诚实分页 |
+| 🔎 **场景图内省** | `scene_describe` `scene_nodes` | 讲清一个节点是什么（准确类型、逐条属性和它们的类型/可选值/取值范围、连到哪，响应有长度上限，`limit` 最高放宽到 1000，截断时经 `*_truncated` 说明），并按页列出节点（含材质和工具节点）；翻页用 `has_more`/`next_cursor`。属性当前值默认不返回，需要时传 `include_values=True` |
 
 共 25 个 MCP 工具。
 
@@ -175,7 +175,7 @@ scene_snapshot(detail="compact", format="cos")
 # 深度检查特定物体（含邻居分析）
 scene_inspect(target="wall_entrance", include_neighbors=True)
 
-# 精确测量（4 种模式）
+# 测量（4 种模式，按世界坐标包围盒算）
 scene_measure(obj_a="wall_north", obj_b="counter_A", mode="clearance")
 
 # 验证场景状态
@@ -248,7 +248,7 @@ scene_export(path="D:/out/kit.usd", objects=["GEO_box"])  # exportSelected；导
 ### 看图复查（仅 GUI 会话）
 
 ```python
-# 视口所见即所得截图（含 HUD/选中高亮——验证用户正看到什么）
+# 截一张视口图，看到的就是美术看到的那一帧（含 HUD 和选中高亮）
 scene_viewport_snapshot(max_size=800, format="jpeg")
 
 # 单帧 playblast 预览（干净无 HUD；可指定相机，width/height 服务端向上取整 /4）
@@ -300,11 +300,11 @@ entrance (6obj) @(157.3,162.6,-111.6)
 
 ## 安全与隐私
 
-- **零遥测**：zero telemetry, no phone-home——本项目不含任何遥测或主动外发上报代码，可源码核实。唯一外发流量是两个资产工具：仅在调用时经 HTTPS 访问 `api.polyhaven.com` / `dl.polyhaven.org|.com`（`polyhaven.py` 内主机白名单 + md5 校验 + 大小上限）。
+- **零遥测**：没有埋点，不往外上报任何东西——源码里可以自己查。唯一的外网请求来自两个资产工具：只有你调用它们时，才会经 HTTPS 访问 `api.polyhaven.com` / `dl.polyhaven.org|.com`（`polyhaven.py` 里限定了域名、校验 md5、限制大小）。
 - **本地单用户**：命令端口仅绑定 localhost；接入的 MCP client 可信，假定它不会故意作恶。
-- **防手滑措施**：统一管线（`pipeline.py` + `security.py`）对全部 25 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ pattern 扫描（默认 warn-only）+ 每个工具调用都写一行的独立 JSONL 调用记录。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
+- **防手滑措施**：统一管线（`pipeline.py` + `security.py`）对全部 25 个工具做参数校验 + token-bucket 限流（读取类 ~100 次/60s、变更类 ~20 次/60s，按会话）+ 模式扫描 + 每个工具调用写一行的独立 JSONL 调用记录。扫描分两档：少数几条精确规则直接拦下，调用以 `[blocked_pattern]` 报错（`os.system`、裸 `subprocess` 等几条从没误报过的），其余更宽的规则只记一条警告。调用被拒也可能是别的原因——限流、`MAYA_MCP_DISABLE_*` 开关、或 `safe_mode`，它们各自有错误码，看报错里的码就知道是哪一条。它防误操作，不防恶意 client——完整模型见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)。
 - **事务安全**：`scene_checkpoint`/`scene_rollback` 把场景存成磁盘上的 `.ma` 文件，读档时打开它（存档不含 undo 历史，references 默认展平）。
-- **严格策略模式（可选）**：设置 `MAYA_MCP_DISABLE_EXECUTE=1`、`MAYA_MCP_DISABLE_WRITE_MODULE=1` 或 `MAYA_MCP_DISABLE_ARBITRARY=1`（三者全禁），即可把逃生舱工具从 `tools/list` 中移除，并以 `[policy_disabled]` 拒绝调用；只读工具不受影响。它们只防误用，不是挡住恶意 agent 的硬边界——仍持有 `execute_code` 的 agent 本来就在信任范围内；它们能做的只是让 demo、误操作或 CI 沙箱里的一次错误坏得少一点。理由见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)，逐码对照见 [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md)。
+- **严格策略模式（可选）**：设置 `MAYA_MCP_DISABLE_EXECUTE=1`、`MAYA_MCP_DISABLE_WRITE_MODULE=1` 或 `MAYA_MCP_DISABLE_ARBITRARY=1`（三者全禁），就能把跑代码的工具从 `tools/list` 里拿掉，调用时报 `[policy_disabled]`；只读工具不受影响。这些开关防的是手滑，挡不住存心作恶的 agent——手里有 `execute_code` 的 agent 本来就在信任范围内。它们能做的只是让 demo、误操作或 CI 沙箱里的一次失误坏得少一点。理由见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)，报错码见 [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md)。
 - **`safe_mode` 代码允许清单（可选）**：设置 `MAYA_MCP_SAFE_MODE=1`（默认关闭）后，两个代码载荷工具仍在 `tools/list` 中，但其 `code` 参数要先过允许清单（按解析后的语法树判断，默认全拒）：v1 import 根限 `maya`/`math`/`json`/`re`/`collections`/`itertools`/`functools`/`dataclasses`/`typing`，拒绝名单内建名——任何引用即拒绝而非仅调用（`eval`/`exec`/`open`/`__import__`/getattr/setattr/……）、`__builtins__` 引用与任何 `__dunder__` 属性访问；无法解析的输入同样拒绝（"无法判定即拒绝"）。拒绝以 `[safe_mode_rejected]` 报出（宿主 `isError` 失败）并点名触发的 rule id、记入调用记录的 `rejected`；成功响应携带 `mode: "safe"` 字段，工具描述增加一句 `Boundary:` 说明。DISABLE 标志先移除工具——safe_mode 只收紧留下的部分。和 DISABLE 标志一样：它防手滑，不防故意作恶，也不是硬边界。理由见 [docs/threat-model.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/threat-model.md)，逐码对照见 [docs/guide/error-codes.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/docs/guide/error-codes.md)。
 - 漏洞报告渠道见 [SECURITY.md](https://github.com/Xxx91n/mcp-for-maya/blob/main/SECURITY.md)。
 

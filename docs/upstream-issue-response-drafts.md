@@ -1,21 +1,28 @@
 # Upstream issue response drafts (D-063/D-064)
 
-Status: **DRAFT — needs the user to act**. Posting to chadrik/maya-mcp-server is an
-external side effect; these drafts are prepared by the agent and published by
-the user (or under explicit authorization). One comment per issue, no
-follow-up comments.
+Status: **POSTED — this is a record, not a to-do**. All six comments went up on
+chadrik/maya-mcp-server on 2026-09-23 after the maintainer authorized them
+(links in `docs/upstream-issue-status.md`). Do not post again: the plan was one
+comment per issue, no follow-up comments. The text below is kept for reading,
+not for sending.
+
+> **Where these drafts stand after the plain-language pass**: they were
+> rewritten in plain words by groups 1-4 (#188, #189, #190, #191) instead of
+> being skipped as published records. The posted comments still use the retired
+> words, so this file is now the plain version of what was said, not a byte
+> copy of it. Read the posted comments for the exact words.
 
 Shared template: root cause -> fix path -> durable version pointer -> fork
 disclosure -> offer to contribute the fix back.
 
-Timing (D-064): **#2 and #7 are publishable now** — the claims hold for every
-released version and survive the planned 0.1.1 yank. **#1/#3/#4/#5 wait for
-the 0.1.2 release** so the version pointer resolves to a public artifact
-(with real-Maya verification landed by then).
+Timing (D-064, as planned at the time): **#2 and #7 were publishable at once** —
+the claims hold for every released version and survived the 0.1.1 yank.
+**#1/#3/#4/#5 waited for the 0.1.2 release** so the version pointer resolved to
+a public artifact. All six have since been posted.
 
 ---
 
-## Issue #2 — publishable now
+## Issue #2 — posted 2026-09-23
 
 > Root cause: upstream pinned/instantiated `FakeConnection` from fakeredis,
 > which was removed in newer fakeredis releases — the import itself fails at
@@ -33,7 +40,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > retained). If the maintainers want it, we are happy to contribute the
 > approach back.
 
-## Issue #7 — publishable now
+## Issue #7 — posted 2026-09-23
 
 > Root cause: `execute_code` returned `result.result` and dropped
 > `result.error`, so exceptions raised inside Maya were silently swallowed.
@@ -55,7 +62,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 
 ---
 
-## Issue #1 — post after 0.1.2
+## Issue #1 — posted 2026-09-23
 
 > Root cause: the session scanner probes every listening commandPort with a
 > Python payload; a MEL commandPort cannot evaluate it, so each scan cycle
@@ -84,7 +91,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > retained). If the maintainers want it, we are happy to contribute the
 > approach back.
 
-## Issue #3 — post after 0.1.2 (boundary statement, not a fix announcement)
+## Issue #3 — posted 2026-09-23 (boundary statement, not a fix announcement)
 
 > This is a declared-boundary note rather than a fix: the injected helper
 > genuinely requires `ast.unparse` (added in Python 3.9), and our fork supports
@@ -108,7 +115,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > retained). If the maintainers want it, we are happy to contribute the
 > approach back.
 
-## Issue #4 — post after 0.1.2
+## Issue #4 — posted 2026-09-23
 
 > Root cause: `create_module(overwrite=True)` builds a new `ModuleType`
 > and replaces the `sys.modules` entry outright — the old module's globals
@@ -138,7 +145,7 @@ the 0.1.2 release** so the version pointer resolves to a public artifact
 > retained). If the maintainers want it, we are happy to contribute the
 > approach back.
 
-## Issue #5 — post after 0.1.2
+## Issue #5 — posted 2026-09-23
 
 > Root cause: the README never documented multi-instance commandPort
 > topology — one bound host:port listener per port — so running a

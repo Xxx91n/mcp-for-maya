@@ -117,7 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `单文件大模块`, `统一入口` and `Boundary: 一句` are rewritten in plain
   words in `AGENTS.md`, `CONTRIBUTING.md`, `docs/testing.md`,
   `docs/threat-model.md`, `docs/visual-callform-matrix.md`,
-  `docs/guide/error-codes.md`, `docs/distribution-surfaces.md`,
+  `docs/guide/error-codes.md`,
   `docs/upstream-issue-status.md`, `docs/upstream-issue-response-drafts.md`,
   the CI script comments and messages, the CI workflow step names, the
   pre-commit comments, `pyproject.toml` comments and marker descriptions, and
@@ -187,9 +187,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The distribution ledger's validation path names a mechanism that exists** —
   the Registry publish section's obligation pointed at row 10 of a
   release-preflight checklist that left with the retired ADR layer and is not
-  in this repository; the obligation now points at the section's own dated
+  in this repository; the obligation now pointed at the section's own dated
   publish records — the real carrier, written at each publish — and the
-  retired row's provenance is stated once so a reader knows where it went.
+  retired row's provenance was stated once so a reader knows where it went.
   Evidence: `dfbc572:docs/distribution-surfaces.md:58` and
   `dfbc572:docs/distribution-surfaces.md:65`.
 - **The documented check commands now run the way CI runs them** — both rule
@@ -221,6 +221,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Three retired documents leave the historical shelf** — group 5 of the
+  plain-language pass (#192). `docs/distribution-surfaces.md` was deleted
+  after its 2026-10-25 and 2026-10-28 Registry publish records moved to
+  `docs/reference/release-prep.md`; the two GLOSSARY entries it cited
+  (`收录/叙事双轨` and `收录面三态判置`) never existed and went with the file.
+  `docs/reference/audit-r3.txt` and `docs/reference/2026-09-22-audit.md` were
+  deleted too: nothing in the tree linked to either. Historical bodies were
+  not rewritten — the runbook gained a plain summary above its unchanged body.
+  Recovery for each path is `git show bf06a54:<path>`. Evidence:
+  `tools/check_plain_language.py` exits 0 with no old words found.
 - **Migration-shape gate** — the prose-integrity gate script and its 32-test
   file left together with the gate's registry entry, its CI step, and the
   steering/domain-doc prose that described its two-revision semantics, so the
@@ -844,7 +854,7 @@ executed and its results are now in-repo, machine-readable form.
   `docs/distribution-surfaces.md` tracking listing-surface three-state
   registrations (actionable, passive-observation-with-trigger, structural-rejection)
   alongside 30-day post-publish verification obligations.
-  Evidence: `docs/distribution-surfaces.md:1`.
+  Evidence: `dfbc572:docs/distribution-surfaces.md:1`.
 
 ### Changed
 

@@ -22,9 +22,8 @@ What it never reads, because those are records rather than prose to rewrite.
 `[Unreleased]` window for ``CHANGELOG.md`` is applied in ``prose_lines_of``
 because it is a line range, not a path:
 
-* ``docs/reference/``       the historical shelf: the runbook body, the two
-                            audits, release-prep, and the archived
-                            verification script
+* ``docs/reference/``       the historical shelf: the runbook body,
+                            release-prep, and the archived verification script
 * ``docs/evidence/``        evidence artifacts
 * ``CHANGELOG.md`` outside the ``[Unreleased]`` section
                             released sections are point-in-time records
@@ -36,12 +35,12 @@ because it is a line range, not a path:
 * ``.github/assets-src/``   README/showcase image generators, out of the
                             PR0 map's scope
 
-Two files PR0 proposes to skip but the ticket does not name are deliberately
-STILL READ: ``docs/upstream-issue-status.md`` (a live upstream-issue table)
-and ``docs/upstream-issue-response-drafts.md`` (a drafted reply). PR0 marks
-both "X -- proposed record skip, your decision", so skipping them here would
-settle a user decision this ticket cannot settle. They report until that
-decision lands.
+Two files PR0 proposed to skip are read on purpose: ``docs/upstream-issue-status.md``
+(a live upstream-issue table) and ``docs/upstream-issue-response-drafts.md``
+(a drafted reply). PR0 marked both "X -- proposed record skip, your decision".
+Group 4 (#191) rewrote their wording instead of skipping them, so both now scan
+clean; `SKIP_FILES` still leaves them out of the skip list, which keeps that
+choice visible rather than silently inherited.
 
 A hit is a LEAD, not a verdict. Three spellings carry a second, unrelated
 meaning, and PR0's location table rules them out: the call record's
@@ -60,7 +59,7 @@ Scope limits, disclosed rather than papered over:
 * A hit inside a table cell or a link is still a hit: the checker reads prose
   lines, not document structure.
 * ``docs/reference/real-maya-runbook.md`` is skipped whole, including the
-  plain summary group 5 plans to add above its body.
+  plain summary #192 added above its body.
 
 Scope limit beyond prose: this is a local checker, not a CI gate. It is
 deliberately not wired into ``.github/workflows/ci.yml`` and has no
@@ -122,7 +121,7 @@ SKIP_FILES = (
 )
 
 SKIP_PREFIXES = (
-    "docs/reference/",  # historical shelf: runbook body, audits, release-prep
+    "docs/reference/",  # historical shelf: runbook body, release-prep
     "docs/evidence/",  # evidence artifacts
     ".security-review-raw/",  # security-audit evidence artifacts
     ".github/assets-src/",  # README/showcase image generators, out of scope
