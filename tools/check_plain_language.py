@@ -58,6 +58,12 @@ Scope limits, disclosed rather than papered over:
   cannot make. The group tickets own those lines.
 * A hit inside a table cell or a link is still a hit: the checker reads prose
   lines, not document structure.
+* Markdown indentation is read by a rule, not a parser. A four-space line
+  counts as indented code only when no list is open. Two shapes still read
+  wrong: a code block indented deeper than a list item's own margin is read as
+  prose, and a two-space continuation paragraph under a list item may be read
+  as prose too. Both cost false positives, never a silent pass on a plain
+  paragraph.
 * ``docs/reference/real-maya-runbook.md`` is skipped whole, including the
   plain summary #192 added above its body.
 
@@ -189,9 +195,10 @@ def term_pattern(term: str) -> re.Pattern[str]:
 def strip_code_spans(line: str) -> str:
     """Remove CommonMark code spans, matching their delimiter runs by length.
 
-    A span closes only on a run of the SAME length, and the search for that
-    closer skips past shorter runs: a two-backtick span may hold a single
-    backtick, and stopping there would put the code back in the prose.
+    A span closes only on a run of the SAME length; the search for that closer
+    skips every run of a different length, longer or shorter. A two-backtick
+    span may hold a single backtick, and stopping there would put the code back
+    in the prose.
     """
     out: list[str] = []
     pos = 0
@@ -234,11 +241,11 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
 
     A fence closes only on the same character at the same length or longer,
     and only on a marker followed by whitespace alone: ` ```python ` inside a
-    block is content. A line indented four spaces or more is an indented code
-    block only when no list is open: inside a list, four spaces is a nested
-    item's own margin (`- step` then `    - rollback`), so that line is prose.
-    A fence marker there is not a fence, which is why the indent is checked
-    before the marker.
+    block is content. A line indented four spaces or more is indented code only
+    when no list is open: inside a list, four spaces is a nested item's own
+    margin, so that line is prose. A fence at or left of the open item's indent
+    ends the list, because a list item holds a fence only when it is indented
+    under it.
     """
     out: list[tuple[int, str]] = []
     fence: str | None = None
@@ -254,6 +261,8 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
             # forbids a backtick in a backtick fence's info string.
             if opener and (opener.group(1)[0] != "`" or "`" not in body[opener.end() :]):
                 fence = opener.group(1)
+                if list_indent is not None and indent <= list_indent:
+                    list_indent = None
                 continue
         else:
             closer = FENCE_CLOSE.match(body)
