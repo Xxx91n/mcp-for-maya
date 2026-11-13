@@ -20,6 +20,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_scene_tools_json.py::TestSceneModifiedFlag::test_cached_object_list_does_not_hide_a_later_change`,
   `tests/test_scene_tools_json.py::TestSceneModifiedFlag::test_cos_header_writes_the_flag_in_both_states`,
   `tests/test_cos_formatter.py::TestFormatSceneCos::test_modified_flag_reads_y_when_the_scene_changed`.
+- **`scene_rollback` says whether the scene had unsaved changes before the
+  switch** — the result now carries `scene_modified_before`, read fresh (never
+  from the cache) from the same Maya flag `scene_snapshot` reports. The read
+  happens just before the rollback is asked for and before any file is opened;
+  after the open that flag describes the checkpoint, not the scene it replaced.
+  The value never decides anything: `discard_current_state` keeps its old
+  meaning, a changed scene and a clean scene take the same path, and the copy
+  written before the switch is unchanged with its path still in
+  `safety_snapshot`. The one new failure is Maya refusing to answer that
+  question: the call then errors with nothing opened, rather than printing a
+  made-up "clean". The read is its own round trip, so when two rollbacks for one
+  session overlap, the value describes the scene as it was at that read, which
+  may be a scene the other call already replaced; the rollback itself takes the
+  same steps either way. Evidence:
+  `tests/test_scene_tools_json.py::TestRollbackSceneModifiedBefore::test_changed_scene_reports_true_and_writes_the_copy`,
+  `tests/test_scene_tools_json.py::TestRollbackSceneModifiedBefore::test_clean_scene_reports_false`,
+  `tests/test_scene_tools_json.py::TestRollbackSceneModifiedBefore::test_the_object_cache_never_hides_a_later_change`,
+  `tests/test_scene_tools_json.py::TestRollbackSceneModifiedBefore::test_discard_flag_does_not_move_the_reported_state`,
+  `tests/test_scene_tools_json.py::TestRollbackSceneModifiedBefore::test_an_unreadable_flag_stops_before_anything_opens`,
+  `tests/test_checkpoint_rollback.py::TestRollback::test_the_unsaved_flag_never_gates_a_read_back`.
 - **Plain-language glossary plus a local checker for the words it retires** —
   `GLOSSARY.md` now gives every term one plain sentence and an `_Avoid_:` line
   naming the words it replaced, and `tools/check_plain_language.py` reads those

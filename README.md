@@ -213,6 +213,11 @@ scene_checkpoint_list()
 
 # Read a checkpoint back (it saves the current scene first, then points the scene name back at the original file; a scene that was never saved has no original file, so it stays in the checkpoint file; run scene_snapshot afterward to refresh scene state)
 # Scope: each file is self-contained; references are flattened without modifying reference sources; assumes one scene file per session
+# The result says scene_modified_before: whether the scene had unsaved changes
+# at the moment this call read the flag. That flag blocks nothing: the copy
+# taken before the switch is written exactly as before, and its path is in
+# safety_snapshot (only a save that fails, with discard_current_state set,
+# turns that into "skipped_by_user").
 scene_rollback(filename="cp_before_renovation.ma")
 ```
 
