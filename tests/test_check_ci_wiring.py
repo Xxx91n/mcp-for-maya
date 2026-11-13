@@ -409,3 +409,38 @@ def test_each_required_fault_exits_one(tmp_path):
         )
         assert proc.returncode == 1, (number, proc.stdout, proc.stderr)
         assert "::error" in proc.stdout
+
+
+def test_dash_run_block_cannot_hide_a_skip_flag(tmp_path):
+    text = VALID.replace(
+        "      - name: mypy | mypy-baseline filter\n        run: |",
+        "      - run: |",
+    ).replace(
+        "          uv run mypy-baseline filter < mypy-report.txt\n",
+        "          uv run mypy-baseline filter < mypy-report.txt\n        if: false\n",
+    )
+    assert any("step_skipped" in f for f in _check(tmp_path, text))
+
+
+def test_registered_script_only_in_comment_is_red(tmp_path):
+    import json
+
+    registry = tmp_path / ".github/gate-registry.yaml"
+    registry.parent.mkdir()
+    registry.write_text(
+        json.dumps(
+            {
+                "entries": [
+                    {"gate_id": "check_ruff_budget", "bound_class": "gate"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert _check(tmp_path, VALID) == []
+    text = VALID.replace(
+        "run: python .github/scripts/check_ruff_budget.py",
+        "run: echo budget disabled # python .github/scripts/check_ruff_budget.py",
+    )
+    findings = _check(tmp_path, text)
+    assert any("check_ruff_budget: tool_not_executed" in f for f in findings)

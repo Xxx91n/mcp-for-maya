@@ -65,3 +65,20 @@ job requires `always()`. Unknown continue-on-error values fail closed.
 - Report contents and whether mypy really checked files belong to A2 (#226).
   No type-error budget, strictness setting, Maya behavior or baseline changes
   are part of this check.
+
+The checker also reads the existing registry's `bound_class: gate` entries and
+requires a real Python script call in parsed run text across workflow files.
+This closes the comment-only registration gap without copying its script list.
+For a supplied ci.yml copy, that copy replaces ci.yml in this scan; other
+workflow files still come from the repository (for example the PyPI check).
+This extra presence check does not prove every non-critical workflow's control
+flow; skip/failure rules here apply to the four protected CI jobs only.
+
+## Local verification (2026-11-13)
+
+With `uv sync --frozen` on Python 3.11: 28 wiring tests passed; full suite
+1293 passed, 27 skipped. Ruff 0.17.1 stayed within the unchanged per-rule
+budget. The existing mypy + mypy-baseline command reported zero new errors.
+Registry, doc-claims and the other local lint-job scripts passed; the monolith
+check only noted its existing spare line. These are local results, not a claim
+that the GitHub Actions Linux/Windows matrix has run on this branch.

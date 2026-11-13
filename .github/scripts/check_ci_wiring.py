@@ -58,6 +58,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -254,7 +255,7 @@ def _parse_workflow(text: str) -> dict[str, dict]:
                 value = rest[len("run:") :].strip()
                 if value in ("|", "|-", "|+", ">", ">-", ">+"):
                     run_block = True
-                    run_indent = indent
+                    run_indent = indent + 2
                     run_lines = []
                 elif value:
                     current_step["run"] = _strip_yaml_comment(value)
@@ -357,6 +358,35 @@ def check(root: Path, workflow_path: Path | None = None) -> list[str]:
         return ["workflow_unreadable -- no jobs could be read from the workflow file"]
 
     findings: list[str] = []
+
+    # Reuse the existing inventory; do not keep a second list of script gates.
+    registry = root / ".github" / "gate-registry.yaml"
+    if registry.exists():
+        try:
+            entries = json.loads(registry.read_text(encoding="utf-8"))["entries"]
+            required = {e["gate_id"] for e in entries if e["bound_class"] == "gate"}
+            executed = set()
+            workflow_texts = [text]
+            directory = root / ".github" / "workflows"
+            for other in (*directory.glob("*.yml"), *directory.glob("*.yaml")):
+                if other.resolve() != (root / ".github/workflows/ci.yml").resolve():
+                    workflow_texts.append(other.read_text(encoding="utf-8"))
+            for source in workflow_texts:
+                for job in _parse_workflow(source).values():
+                    for line in _run_text(job).splitlines():
+                        call = re.match(
+                            r"^\s*(?:uv run )?python(?:3)? "
+                            r"\.github/scripts/([A-Za-z0-9_]+)\.py(?:\s|$)",
+                            line,
+                        )
+                        if call:
+                            executed.add(call.group(1))
+            for gate in sorted(required - executed):
+                findings.append(
+                    f"{gate}: tool_not_executed -- registered gate has no actual script call"
+                )
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            findings.append(f"workflow_unreadable -- cannot check registered gates: {exc}")
 
     for job_name in (*PROTECTED_JOBS, SUMMARY_JOB):
         if job_name not in jobs:
