@@ -4,10 +4,10 @@ Maya has zero network surface: this module is the HOST half of the
 asset pipeline. It queries api.polyhaven.com, downloads FBX + texture
 files from the Poly Haven CDN into a platformdirs cache, verifies size
 and the official per-file md5 (PH publishes md5 in /files/{id}), and
-returns a validated asset_descriptor - the handoff contract the
+returns a validated asset_descriptor - the handover sheet the
 Maya-side importer (asset_module / _mcp_asset) consumes.
 
-Guardrails (safety net, not a boundary - threat-model.md):
+Guards against slips (not a boundary - see threat-model.md):
   * https-only, host whitelist (api.polyhaven.com + dl.polyhaven.org/.com)
   * mandatory User-Agent (Poly Haven API requirement)
   * per-file + total size caps, timeouts

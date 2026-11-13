@@ -10,17 +10,17 @@ uv run pre-commit run --all-files    # hook sweep — CI's lint fallback. doc-cl
                                      # so it runs the PATH `python`: `.venv/Scripts/pre-commit.exe run
                                      # doc-claims --all-files` exits 1 with `SRE module mismatch` at
                                      # python 3.11.9 against the uv 3.13 venv; `uv run` of it exits 0
-python -m pytest tests/ -q         # stub-layer suite (contract tests vs the maya.cmds stub)
+python -m pytest tests/ -q         # fake-Maya test layer (contract tests against the maya.cmds fake)
 uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json          # lint pass 1: report only, red findings must not fail the shell
-python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint pass 2: frozen per-rule budget, ratchet only goes down
+python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint pass 2: per-rule budget that only goes down
 rc=0; uv run python -m mypy src/ > mypy-report.txt || rc=$?; if [ "$rc" -gt 1 ]; then cat mypy-report.txt; false; else uv run mypy-baseline filter < mypy-report.txt; fi   # type-check gate: the raw exit is non-zero on the baselined errors; `false` rather than `exit` keeps a pasted line from closing the shell, so a crash lands at exit 1 here and CI's 2
 python -m maya_mcp_server -vv      # run with DEBUG logs (-v=INFO, -vv=DEBUG)
 ```
 
 House rules:
 
-- Every fix ships with a regression test on the maya stub layer.
-- Real-Maya tests are a separate local manual tier (`pytest -m mayapy`, see docs/testing.md) — never mixed with the stub tier.
+- Every fix ships with a regression test on the fake Maya test layer.
+- Real-Maya tests are a separate local manual tier (`pytest -m mayapy`, see docs/testing.md) — never mixed with the fake Maya test layer.
 - If your change makes a doc line stale, fix that line in the same commit — the [cross-module dependency rules](#cross-module-dependency-rules-联动规范) table below is the propagation matrix: it names, per module, the files that must move with it.
 - When folding `[Unreleased]` into a release section, rewrite each Fixed entry's
   `fixed version: [Unreleased]` literal to that release's version number by hand
@@ -34,38 +34,38 @@ stale companions cause integration failures and gate reds.
 | Module modified | Must also update | Reason |
 |-----------------|------------------|--------|
 | `maya_scene_module.py` (scene_plan) | `scene_tools.py`, `server.py`, `README.md`, `README.zh-CN.md` | Scene planning tool needs MCP tool + docs |
-| `maya_scene_module.py` (aesthetic/lighting/scene_review functions) | `scene_tools.py`, `tests/test_maya_scene_module.py` | Inline `_score_*` functions are the sole implementation; tool descriptions + stub-tier coverage must match |
+| `maya_scene_module.py` (aesthetic/lighting/scene_review functions) | `scene_tools.py`, `tests/test_maya_scene_module.py` | Inline `_score_*` functions are the sole implementation; tool descriptions + fake-Maya-layer coverage must match |
 | `maya_scene_module.py` (new function) | `scene_tools.py`, `server.py`, `README.md`, `README.zh-CN.md`, `tests/` | Every new Maya function needs an MCP tool, docs, and tests |
-| `maya_scene_module.py` (line-count growth) | `.github/monolith-budget.json` | Ratchet: growth past the cap fails lint; legitimate additions need a reasoned budget edit in the same PR; new capability routes to a separate file in the same injection unit, never appended to the monolith |
+| `maya_scene_module.py` (line-count growth) | `.github/monolith-budget.json` | Only down: growth past the cap fails lint; legitimate additions need a reasoned budget edit in the same PR; new capability goes in a separate file injected together with it, never appended to `maya_scene_module.py` |
 | `visual_module.py` / `visual_tools.py` | `server.py` instructions, `pipeline.py` annotations, `tests/test_visual_tools.py`, READMEs, `docs/threat-model.md` | Capture contract, annotations, and docs must stay in sync |
 | `asset_tools.py` / `polyhaven.py` / `asset_module.py` | `pipeline.py`, `server.py`, `docs/threat-model.md`, asset tests, `tests/maya_stub/` (new cmds surface), READMEs | Host-side download/cache vs Maya-side import — every piece in sync |
 | `export_tools.py` / `export_module.py` | `pipeline.py`, `server.py`, `docs/threat-model.md`, export tests, `tests/maya_stub/` (export surface), READMEs | Host validation/registration vs Maya-side export contract |
-| `introspect_tools.py` / `introspect_module.py` | `pipeline.py`, `server.py`, `docs/threat-model.md`, `docs/visual-callform-matrix.md`, introspect tests, `tests/maya_stub/`, READMEs | Fragment concatenated into the `_mcp_scene` payload (same-unit file); the D-110 response budget (`limit`, `*_truncated`, `total_*` fields) is part of the contract |
-| `validator_module.py` | `scene_tools.py` (`extra_source_paths` + the `scene_review` tool), `tests/maya_stub/__init__.py`, `tests/test_mayapy_smoke.py`, `tests/test_validator_module.py` (whose `TestCardPinsTheShippedApi` goes red when the card and the fragment drift), `skills/scene-review-playbook/SKILL.md`, `GLOSSARY.md`, `docs/threat-model.md` §5 | Fragment concatenated into the `_mcp_scene` payload after `introspect_module.py`; both stub-tier assemblers must list it or they stop matching the shipped bytes. The session-scoped registry composes `scene_review_with_validators` Maya-side. #79 deliberately ships no registration MCP tool — calls go through `execute_code` — which is the exception the `maya_scene_module.py (new function)` row above does not cover, and nothing persists host-side |
-| `zone_geometry_module.py` | `scene_tools.py` (`extra_source_paths` + the internal `get_zone_geometry` host helper), `tests/maya_stub/__init__.py`, `tests/test_mayapy_smoke.py`, `tests/test_zone_geometry_module.py`, `tests/test_scene_tools_json.py`, `pyproject.toml` (dormant-code coverage omit) | Fragment concatenated into the `_mcp_scene` payload after `validator_module.py` (order: monolith → introspect → validator → zone geometry); both stub-tier assemblers must list it and the assembled bytes must match the host write. Dormant until #177 wires it into the recommendation pass: no new MCP tool, and default `scene_plan` output stays unchanged |
+| `introspect_tools.py` / `introspect_module.py` | `pipeline.py`, `server.py`, `docs/threat-model.md`, `docs/visual-callform-matrix.md`, introspect tests, `tests/maya_stub/`, READMEs | Its source is concatenated into the `_mcp_scene` payload (a separate file of the same module); the D-110 response budget (`limit`, `*_truncated`, `total_*` fields) is part of the contract |
+| `validator_module.py` | `scene_tools.py` (`extra_source_paths` + the `scene_review` tool), `tests/maya_stub/__init__.py`, `tests/test_mayapy_smoke.py`, `tests/test_validator_module.py` (whose `TestCardPinsTheShippedApi` goes red when the card and the code drift), `skills/scene-review-playbook/SKILL.md`, `GLOSSARY.md`, `docs/threat-model.md` §5 | Its source is concatenated into the `_mcp_scene` payload after `introspect_module.py`; both fake-Maya-layer assemblers must list it or they stop matching the shipped bytes. The session-scoped registry composes `scene_review_with_validators` Maya-side. #79 deliberately ships no registration MCP tool — calls go through `execute_code` — which is the exception the `maya_scene_module.py (new function)` row above does not cover, and nothing persists host-side |
+| `zone_geometry_module.py` | `scene_tools.py` (`extra_source_paths` + the internal `get_zone_geometry` host helper), `tests/maya_stub/__init__.py`, `tests/test_mayapy_smoke.py`, `tests/test_zone_geometry_module.py`, `tests/test_scene_tools_json.py`, `pyproject.toml` (coverage omit for the not-yet-wired module) | Its source is concatenated into the `_mcp_scene` payload after `validator_module.py` (order: `maya_scene_module.py` → introspect → validator → zone geometry); both fake-Maya-layer assemblers must list it and the assembled bytes must match the host write. Not wired up yet: #177 connects it to the recommendation pass, so there is no new MCP tool and default `scene_plan` output stays unchanged |
 | `scene_tools.py` (new tool) | `server.py` instructions, READMEs, `AGENTS.md` | Tool surface changes require documentation sync |
 | `scene_cache.py` | `scene_tools.py`, `session_manager.py` | Cache invalidation consistency |
 | `security.py` | `pipeline.py`, `tests/test_security.py`, `tests/test_pipeline.py` | Rules enforced by the middleware pipeline |
 | `security.py` (`safe_mode` rule table: `SAFE_IMPORT_ROOTS`/`SAFE_NODE_TYPES`/denied builtins) | `docs/threat-model.md` §2/§3, `GLOSSARY.md`, `README.md` + `README.zh-CN.md`, `server.py` docstrings, `tests/test_security.py::TestScanSafeModeCode`, `tests/test_pipeline.py::TestSafeModeGate`, the error-code registry under `docs/guide/` | The v1 deny-by-default matrix is the single source — docs, tool docstrings, and pin tests restate it; every rule change propagates |
-| `pipeline.py` strict policy flags (`MAYA_MCP_DISABLE_*`) | `docs/threat-model.md` §2/§3, `llms.txt`, `tests/test_pipeline.py::TestStrictPolicyMode` | One choke point; uncovered dangerous tools fail their gates |
-| `connection_guide.py` | `server.py` (maya_setup_guide params), `tests/test_connection_guide.py` | Marker-block semantics + flags |
+| `pipeline.py` strict policy flags (`MAYA_MCP_DISABLE_*`) | `docs/threat-model.md` §2/§3, `llms.txt`, `tests/test_pipeline.py::TestStrictPolicyMode` | Every tool call passes through one place; uncovered dangerous tools fail their gates |
+| `connection_guide.py` | `server.py` (maya_setup_guide params), `tests/test_connection_guide.py` | Managed-block semantics + flags |
 | `cos_formatter.py` | `scene_tools.py` | Formatter changes affect all tool COS outputs |
 | Derived surfaces | — | `llms.txt` (from TOOL_ANNOTATIONS) and the version list (pyproject/`__init__`/server.json/CHANGELOG/llms.txt) are derived and gated — never hand-edit; `docs/guide/session-lifecycle.md` is prose, NOT derived; the eight `path::symbol` bullets under its Anchors heading are hand-maintained, no gate resolves them, and all eight currently resolve |
 | `.github/gate-registry.yaml` / `check_gate_registry.py` / `*-spec.yaml` | `tests/`, `ci.yml`, `AGENTS.md`, `CHANGELOG.md` | Gates register pins (human-authored, never generated); exemptions carry `expires\|issue`; governance constants live in per-domain spec files, not code; spec files must not mirror object state (second source of truth) |
 
-### Injected-module admission criteria
+### When a new Maya-side module is allowed
 
 New Maya-side capability defaults to a NEW per-domain injected module — never
-into the `maya_scene_module.py` monolith. A new module is allowed only when all
-criteria hold: (1) independent injection timing — the capability is needed in
-session shapes of its own; (2) independent Maya-side API surface; (3)
-independent failure domain; (4) target-module health — when criteria FAIL and
-the destination is the registered monolith, land the code as a separate
-host-side file assembled into the same injection unit (first case:
-introspection → `_mcp_scene` unit). Cross-module calls must be declared
+into `maya_scene_module.py`. A new module is allowed only when all three
+thresholds hold: (1) its own injection timing — the capability is needed in
+session shapes of its own; (2) its own Maya-side API; (3) its own failure
+domain — if it breaks, nothing else breaks with it. If any of them fails and
+the destination is `maya_scene_module.py`,
+land the code as a separate host-side file injected together with that module
+(first case: introspection → `_mcp_scene`). Cross-module calls must be declared
 explicitly — injected modules are self-contained by architecture.
 
-Host-side calls into injected units go through `client.py` primitives:
+Host-side calls into injected modules go through `client.py` primitives:
 `module_call(module, fn, *args, **kw)` (JSON-payload builder — user input never
 becomes executable source) and `exec_module_code(client, code)`. Per-domain
 `_ensure_X_injected` binders pin module_name/source_path/session-set = domain
@@ -91,21 +91,25 @@ resolves and a test count that no longer matches the suite it cites. Every
 
 ### Asset directory discipline
 
-`.github/assets/` is append-only: README imagery is referenced by absolute
-`main` URLs and published PyPI pages render `main` forever — deleting or
-renaming a published asset permanently breaks historical release pages. New
-captures get NEW filenames.
+`.github/assets/` only grows: files are added, never deleted, renamed, or
+edited in place. README imagery is referenced by absolute `main` URLs, and
+published PyPI pages render `main` forever — a delete, rename, or in-place
+edit of a published asset permanently changes what historical release pages
+show. The guard checks `--diff-filter=DMRT`, so a modified file fails the job
+just like a deleted one. New captures get NEW filenames. The guard does have
+a stated escape hatch: a maintainer-aware merge that names the removal in the
+PR body, which is how the three asset fixes before this cleanup landed.
 
 ## Pull requests
 
 - One branch per change; keep diffs small and reviewable.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (feat / fix / docs / refactor / test / chore).
 - CI gates (`.github/workflows/ci.yml`): `pytest` must be green on ubuntu + windows; the ruff budget
-  (`.github/ruff-baseline.json`) is ratchet-only-down — above budget fails, and a lower count may be
+  (`.github/ruff-baseline.json`) may only go down — above budget fails, and a lower count may be
   budgeted down in the same PR commit with the reason stated. `mypy` is baseline-gated in CI
-  (`mypy-baseline.txt`; 184 errors in 2 files as of the D-124 dormant-module deletion —
-  baseline counts are stub-env sensitive; drift trail 221→223→212→223→184 across formatter,
-  stub-environment changes and dormant-code removal): the type-check row in
+  (`mypy-baseline.txt`; 184 errors in 2 files as of the D-124 removal of the code that was not wired up —
+  baseline counts are sensitive to the fake Maya environment; drift trail 221→223→212→223→184 across formatter,
+  fake-Maya-environment changes and removal of code that was not wired up): the type-check row in
   Development setup above is that gate — the filter fails only on NEW errors,
   and the wrapper keeps a mypy crash (raw exit above 1) red.
   After resolving errors, regenerate the baseline from the same guarded report —

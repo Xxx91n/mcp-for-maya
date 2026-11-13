@@ -1,8 +1,7 @@
 """Regression tests for .github/scripts/check_monolith_budget.py.
 
-D-125: the monolith may only shrink — over budget fails, under
-budget warns "may be lowered" (ratchet pawl, non-fatal), at budget
-passes.
+D-125: the big single file may only shrink — over budget fails, under
+budget warns "may be lowered" (non-fatal), at budget passes.
 """
 
 from __future__ import annotations
@@ -84,11 +83,11 @@ def test_main_fail_message_carries_exemption_and_routing(tmp_path, monkeypatch, 
     monkeypatch.setattr("sys.argv", ["check_monolith_budget.py"])
     assert mod.main() == 1
     out = capsys.readouterr().out
-    assert "line shuffling" in out and "same injection unit" in out
+    assert "line shuffling" in out and "injected together with" in out
 
 
 def test_repo_monolith_within_budget():
-    """The live monolith must sit at-or-under its frozen budget."""
+    """The live big single file must sit at-or-under its line cap."""
     mod = _load()
     ok, errors, _ = mod.check(REPO, REPO / ".github" / "monolith-budget.json")
     assert ok, errors

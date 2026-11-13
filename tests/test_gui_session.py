@@ -1,10 +1,11 @@
-"""GUI manual tier (D-049a): machine-checkable items against a
+"""GUI manual run (D-049a): machine-checkable items against a
 live Maya GUI session.
 
 These carry the ``gui`` marker and skip cleanly when no session is
 reachable (conftest ``gui_client`` probes MAYA_MCP_GUI_ADDR or
-:7001). They are the HIL layer of the SIL/PIL/HIL split: real asserts
-on real wire — never pixel assertions, which stay with human_verify.
+:7001). They are the live third layer of the fake / real-interpreter /
+live-GUI split: real asserts on a real wire — never pixel assertions,
+which stay with the manual checklist.
 """
 
 from __future__ import annotations
@@ -64,7 +65,7 @@ async def visual_module(gui_client):
 
 async def test_bootstrap_uses_framed_qt_channel(gui_client):
     """issue #7 PySide2 item: bootstrap on a real GUI session must yield
-    the framed Qt working channel."""
+    the framed Qt working port."""
     assert isinstance(gui_client, MayaQtClient)
     assert gui_client.framed_channel is True
 
@@ -253,7 +254,7 @@ eds = cmds.lsUI(editors=True)
 ct0 = cmds.currentTime(q=True)
 cmds.currentTime(1.0, edit=True)
 ct1 = cmds.currentTime(q=True)
-cmds.currentTime(ct0, edit=True)  # net-zero restore (D-026 discipline)
+cmds.currentTime(ct0, edit=True)  # put the time back (D-026 discipline)
 ct2 = cmds.currentTime(q=True)
 {
     "focus_str_or_none": focus is None or isinstance(focus, str),

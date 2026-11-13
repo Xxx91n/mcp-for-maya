@@ -934,9 +934,10 @@ class TestExecuteCodeResultTypeCoercion:
 
 
 class TestDetectPortType:
-    """D-059: eval("1/2") is a bilingual probe - Python answers 0.5 while
-    MEL eval() integer-divides to 0, so a MEL commandPort replies without
-    a Script Editor error (upstream issue #1)."""
+    """D-059: eval("1/2") tells the port language apart. Python answers 0.5;
+    a MEL commandPort answers with a syntax-error body, which contains no
+    0.5, so it counts as MEL - and the Script Editor logs one line for it
+    (upstream issue #1)."""
 
     @pytest.mark.asyncio
     async def test_python_port_answers_05(self, maya_client: MayaClient, mocker) -> None:

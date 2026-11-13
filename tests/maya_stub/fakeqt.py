@@ -36,7 +36,7 @@ def png_pixels(w, h, rgb_rows):
 
     rgb_rows: h rows of flat bytes/bytearray, each w*3 bytes (R,G,B,...).
     This is what MImage.writeToFile needs so pixel assertions can be
-    honest at the stub tier (D-056⑤)."""
+    honest on the fake Maya layer (D-056⑤)."""
     w, h = int(w), int(h)
     assert len(rgb_rows) == h, f"expected {h} rows, got {len(rgb_rows)}"
     ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
@@ -98,7 +98,7 @@ def _png_size(data):
 
 
 def jpeg_bytes(w, h, quality=80):
-    """Deterministic JFIF-magic bytes (not a real jpeg; contract layer)."""
+    """Deterministic JFIF-magic bytes (not a real jpeg; the fake Maya layer)."""
     payload = f"FAKEJPEG w={int(w)} h={int(h)} q={int(quality)}"
     return b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + payload.encode()
 

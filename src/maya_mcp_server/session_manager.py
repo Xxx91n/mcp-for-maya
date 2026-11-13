@@ -75,8 +75,8 @@ class SessionManager:
         self.scan_interval = scan_interval
         self.client_type = client_type
         self.failed_port_retry_after = failed_port_retry_after
-        # config ports positively identified as non-Python: the port
-        # exemption set - never re-probed while they keep LISTENing
+        # config ports positively identified as non-Python: this session's
+        # do-not-probe list - never re-probed while they keep LISTENing
         self._non_python_ports: set[str] = set()
         self.include_ports = (
             include_ports
@@ -204,8 +204,8 @@ class SessionManager:
             if config_key in self._config_to_session:
                 continue
 
-            # Permanent exemption: ports that answered the probe as
-            # non-Python are never re-probed while they keep LISTENing
+            # A port that answered the probe as non-Python stays on the
+            # do-not-probe list, so it is never probed again while it keeps LISTENing
             if config_key in self._non_python_ports:
                 continue
 
@@ -240,7 +240,7 @@ class SessionManager:
         for key in [k for k in self._failed_ports if k not in listening_config_keys]:
             del self._failed_ports[key]
 
-        # Same lifecycle for the exemption set: a port leaves it
+        # Same lifecycle for the do-not-probe list: a port leaves it
         # only once it disappears from LISTEN, so whatever shows up on it
         # next gets probed fresh
         for key in [k for k in self._non_python_ports if k not in listening_config_keys]:
@@ -267,15 +267,15 @@ class SessionManager:
             return new_client
         except MayaConnectionError:
             # A port that answered the probe as definitively
-            # non-Python (e.g. a MEL commandPort) goes on the session-level
-            # exemption set - one log line per port per session, then the
+            # non-Python (e.g. a MEL commandPort) goes on this session's
+            # do-not-probe list - one log line per port per session, then the
             # scanner never touches it again while it keeps LISTENing
             if getattr(client, "_port_type", None) is PortType.MEL:
                 config_key = self._session_key(host, port)
                 self._non_python_ports.add(config_key)
                 logger.info(
                     f"Port {config_key} answered as non-Python "
-                    f"({PortType.MEL.value}); exempted from probing for this session"
+                    f"({PortType.MEL.value}); no longer probed for this session"
                 )
             try:
                 await client.disconnect()
@@ -444,11 +444,11 @@ class SessionManager:
         try:
             await client.connect()
             # bootstrap() returns a NEW client on the dedicated working
-            # channel - that is the session, not the config-port client
+            # port - that is the session, not the config-port client
             new_client = await client.bootstrap(client_type=self.client_type.value)
         except MayaConnectionError:
             # An explicit add on a port that turns out non-Python
-            # still earns the exemption so the scanner leaves it alone
+            # still goes on the do-not-probe list so the scanner leaves it alone
             if getattr(client, "_port_type", None) is PortType.MEL:
                 self._non_python_ports.add(config_key)
             raise

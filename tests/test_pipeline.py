@@ -498,9 +498,9 @@ async def test_in_tool_pipeline_error_counts_as_error(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# D-207 7: strict policy mode. Stub tier, in CI: assert the flag bites and
-# assert the read-only surface is untouched. A guardrail with no acceptance
-# test is an adoption without acceptance.
+# D-207 7: strict policy mode. Fake Maya layer, in CI: assert the flag bites and
+# assert the read-only surface is untouched. A guard against misuse with no
+# acceptance test is an adoption without acceptance.
 # ---------------------------------------------------------------------------
 
 
@@ -525,7 +525,7 @@ ALL_TOOLS = tuple(TOOL_ANNOTATIONS)
 
 
 class TestStrictPolicyMode:
-    """operator-side misuse guardrails (D-207 1) - not a hostile-agent boundary."""
+    """operator-side guards against misuse (D-207 1) - not a boundary against a hostile agent."""
 
     @pytest.mark.parametrize(
         "flag,tool",
@@ -555,7 +555,7 @@ class TestStrictPolicyMode:
     async def test_read_only_surface_is_unaffected(self, tmp_path, monkeypatch):
         """The guard narrows the dangerous tools only. A read-class tool still
         dispatches with every flag on - otherwise the flag would be a mute
-        button rather than a guardrail."""
+        button rather than a guard against misuse."""
         for flag in POLICY_ENV_FLAGS:
             monkeypatch.setenv(flag, "1")
         pipe, _audit, log = _pipeline(tmp_path)
@@ -614,8 +614,8 @@ class TestStrictPolicyMode:
 
 
 # ---------------------------------------------------------------------------
-# T1: safe_mode plumbing - opt-in AST gate after the pattern scan, before
-# dispatch. A safety net, not a boundary.
+# T1: safe_mode plumbing - opt-in code allowlist after the pattern scan, before
+# dispatch. Catches slips, not a boundary.
 # ---------------------------------------------------------------------------
 
 
@@ -752,8 +752,8 @@ class TestSafeModeGate:
         assert calls == [], "the backend must never see a rejected payload"
         ev = _read_events(log)[-1]
         assert ev["outcome"] == "rejected"
-        # AC: every rule-table entry's exact rule_id reaches the audit row, not
-        # just the import class the T1 test already pins.
+        # AC: every rule-table entry's exact rule_id reaches the call-record row,
+        # not just the import class the T1 test already pins.
         assert any(w["rule_id"] == rule_id for w in ev["warnings"])
 
     @pytest.mark.parametrize(
@@ -804,7 +804,7 @@ class TestSafeModeGate:
 # ---------------------------------------------------------------------------
 # T3: safe_mode disclosure surfaces. Successful gated calls carry
 # mode: "safe" on their structured payload; tools/list descriptions gain a
-# Boundary line while the flag is on. Both are absent when the flag is off
+# a `Boundary:` line while the flag is on. Both are absent when the flag is off
 # and neither touches rejections, errors, or other tools.
 # ---------------------------------------------------------------------------
 
@@ -908,7 +908,7 @@ class TestSafeModeDisclosure:
             assert SAFE_MODE_BOUNDARY_LINE not in tool.description
 
     async def test_original_tool_instances_are_not_mutated(self, tmp_path, monkeypatch):
-        """The Boundary line rides a clone — the registry's Tool objects must
+        """The `Boundary:` line rides a clone — the registry's Tool objects must
         stay flag-off clean or the disclosure would leak into the next listing."""
         monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
         pipe, _audit, _log = _pipeline(tmp_path)
@@ -924,7 +924,7 @@ class TestSafeModeDisclosure:
 
     async def test_disabled_tool_does_not_gain_the_line(self, tmp_path, monkeypatch):
         """Composition: DISABLE removes the tool entirely, so there is no
-        description left for the Boundary line to land on."""
+        description left for the `Boundary:` line to land on."""
         monkeypatch.setenv("MAYA_MCP_DISABLE_EXECUTE", "1")
         monkeypatch.setenv(SAFE_MODE_ENV_FLAG, "1")
         pipe, _audit, _log = _pipeline(tmp_path)

@@ -1,6 +1,6 @@
 """T-02 regression tests: tool-layer JSON serialization + error passthrough.
 
-The ExecClient executes the code scene_tools generates against the stub-bound
+The ExecClient executes the code scene_tools generates against the fake-bound
 _mcp_scene module using the REAL helper result-capture transform — so these
 tests exercise the full chain: arg serialization -> generated code ->
 Maya-side module -> returned dict.
@@ -27,7 +27,7 @@ from maya_mcp_server.types import CommandResponse, OutputBuffer, ResultType
 
 
 class ExecClient:
-    """Fake client: runs generated code on the stub scene module."""
+    """Fake client: runs generated code on the fake scene module."""
 
     def __init__(self, module):
         self.module = module
@@ -408,7 +408,7 @@ class TestZoneGeometryHostHelper:
         expected = await tools.fns["scene_plan"](format=format)
 
         def should_not_run():
-            raise AssertionError("scene_plan must not call the dormant geometry helper")
+            raise AssertionError("scene_plan must not call a helper that is not wired up yet")
 
         monkeypatch.setattr(tools.env.module, "get_zone_geometry", should_not_run)
         actual = await tools.fns["scene_plan"](format=format)

@@ -9,23 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Plain-language glossary plus a local checker for the words it retires** —
+  `GLOSSARY.md` now gives every term one plain sentence and an `_Avoid_:` line
+  naming the words it replaced, and `tools/check_plain_language.py` reads those
+  lines and reports prose uses with file and line. The checker reads tracked
+  prose (Markdown outside code blocks and code spans, Python comments and
+  docstrings, `#` comment lines in TOML/YAML) and skips the records the
+  cleanup must not rewrite: the historical shelf under `docs/reference/`,
+  `docs/evidence/`, released `CHANGELOG` sections, the derived `llms.txt`,
+  `mypy-baseline.txt`, `GLOSSARY.md` itself, the security-audit artifacts, and
+  the showcase image generators under `.github/assets-src/`. It is not a CI
+  gate and has no gate-registry entry; only its tests run in the suite. Evidence:
+  `tests/test_check_plain_language.py::test_an_active_doc_with_an_old_word_fails`,
+  `tests/test_check_plain_language.py::test_a_historical_path_with_the_same_word_is_skipped`,
+  `tests/test_check_plain_language.py::test_a_clean_doc_passes`,
+  `tests/test_check_plain_language.py::test_the_real_repo_loads_the_glossary_and_skips_the_records`.
 - **Internal zone-geometry read for the later `scene_plan` recommendation pass** —
-  the `_mcp_scene` injection unit now carries `get_zone_geometry()`, returning
-  the existing zone boxes plus per-object world sizes. It is a same-unit
-  fragment, not a new MCP tool; default `scene_plan` output stays unchanged
-  until #177 wires the helper in. Evidence:
+  the `_mcp_scene` module now carries `get_zone_geometry()`, returning
+  the existing zone boxes plus per-object world sizes. It is a separate file
+  inside that module, not a new MCP tool; default `scene_plan` output stays
+  unchanged until #177 wires the helper in. Evidence:
   `tests/test_zone_geometry_module.py::TestZoneGeometry::test_multiple_zones_match_the_existing_zone_map`,
   `tests/test_scene_tools_json.py::TestZoneGeometryHostHelper::test_default_scene_plan_bytes_do_not_use_the_helper`.
-- **Opt-in `safe_mode` gate for the code-bearing tools** — `MAYA_MCP_SAFE_MODE=1`
+- **Opt-in `safe_mode` code allowlist for the code-bearing tools** — `MAYA_MCP_SAFE_MODE=1`
   makes `execute_code` and `write_module` reject imports outside the v1 allowlist
-  with `[safe_mode_rejected]` before dispatch; the rejection is audited as
+  with `[safe_mode_rejected]` before dispatch; the rejection is recorded as
   `rejected` with the triggering rule id, and the suggestion points at typed
   tools or unsetting the flag. Default off, and the flag is standalone (not a
   `MAYA_MCP_DISABLE_*` member), so DISABLE still removes tools from `tools/list`
   before safe_mode narrows what remains. The response disclosure lands in a
   follow-up ticket. Evidence:
   `tests/test_pipeline.py::TestSafeModeGate::test_unsafe_import_rejected_before_dispatch`.
-- **Full deny-by-default `safe_mode` rule matrix** — the AST gate now also
+- **Full deny-by-default `safe_mode` rule matrix** — the code allowlist now also
   rejects syntax constructs outside the v1 node allowlist (`with`, `raise`,
   `assert`, `del`, `global`/`nonlocal`, `yield`, `await`, `async`, `match`),
   references to the denied builtin names (`open`, `eval`, `exec`, `compile`,
@@ -34,12 +49,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   any `__x__` attribute access (the `().__class__.__base__.__subclasses__()`
   family, including the `from x import __path__` spelling), each under its own
   `safe-mode-*` rule id. `def`/`class`/`lambda` bodies are walked under the
-  same rules recursively. Safety net, not a boundary. Evidence:
+  same rules recursively. Catches slips, not a boundary. Evidence:
   `tests/test_security.py::TestScanSafeModeCode::test_allowlisted_constructs_pass`,
   `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`.
 
 ### Changed
 
+- **Scene and workflow terms now say what they mean** — group 1 of the
+  plain-language pass (#188): `ICEV`, `看图复查`, `scene_snapshot`, `CoS`,
+  `Zone`, `命名规则`, `scene_review`, `自定义检查项`, `场景存档`, `读档` and
+  `临时存档` are rewritten in plain words in both READMEs, the two skill
+  cards, `docs/` prose, the `server.py` instructions, tool descriptions and
+  error strings. Wording for the call record and for the later groups' terms
+  was left out of that pass.
+  Two claims that contradicted the code are
+  fixed: `scene_checkpoint` is described as writing a `.ma` file to disk under
+  `checkpoints/` (it used to be described as living only in Maya's memory),
+  and the zone text now names `get_zone_map()`'s 7 built-in zones instead of
+  the 9 the glossary used to claim. No public tool name, function name,
+  parameter name or error code changed; `llms.txt` was regenerated, not
+  hand-edited. Evidence:
+  `tests/test_checkpoint_rollback.py::TestRollback::test_rollback_missing_snapshot`,
+  `tests/test_checkpoint_rollback.py::TestRollback::test_rollback_corrupt_snapshot`,
+  `.github/scripts/check_llms_txt.py::render`.
+- **Connection and injection terms now say what they mean** — group 2 of the
+  plain-language pass (#189): `入口端口`, `工作端口`, `临时文件注入`,
+  `asset_descriptor`'s handover sheet, `新模块的三条门槛`,
+  `同一个注入模块里的单独文件`, `模块清理约定`, `端口类型探测`,
+  `免探测端口名单` and `两套 Python 环境` are rewritten in plain words in
+  code comments and docstrings, the session-lifecycle guide, `docs/threat-model.md`,
+  `CONTRIBUTING.md`, `AGENTS.md`, the `[Unreleased]` lane and the connection
+  section of both READMEs. The later groups' terms are untouched. One visible
+  string changed wording only: a port that is not Python now says the helper
+  cannot be injected there; its error type, code and control flow are unchanged,
+  and the test that pins the message moved with it. No public tool name,
+  function name, parameter name or error code changed. `llms.txt` was not
+  hand-edited: no tool description changed, and the generator reports it still
+  matches the registry. Evidence:
+  `tests/test_session_manager.py::TestNonPythonExemption::test_probe_mel_port_marks_exemption`,
+  `tests/test_session_manager.py::TestNonPythonExemption::test_exemption_lifts_when_port_stops_listening`,
+  `tests/test_client.py::TestDetectPortType::test_mel_port_answers_0`,
+  `tests/test_client.py::TestDetectPortType::test_probe_exception_is_unknown`,
+  `tests/test_module_teardown.py::TestCreateModuleTeardown::test_teardown_called_and_resources_closed`.
+- **Security terms now say what they mean** — group 3 of the plain-language
+  pass (#190): `可信调用方`, `防手滑措施`, `调用记录`, `自动维护的代码块`,
+  `safe_mode`'s description, `影响范围` and `被带偏的代理` are rewritten in
+  plain words in both READMEs, `SECURITY.md`, the threat model, the error-code
+  guide, the ICEV workflow card, code comments and docstrings, and the tests
+  that describe them. The earlier and later groups' terms are untouched. A
+  handful of operator-visible strings changed wording only, with no change to
+  codes, fields or control flow: `maya_setup_guide`'s confirm hint, the
+  fallback install guide and the agent guide now say "managed block" or
+  这段代码块 where they used the retired word for that block, and the asset
+  polycount suggestion says the decision is written to the call record instead
+  of "audited". No public tool name, function name,
+  parameter name or error code changed. `llms.txt` was not hand-edited:
+  `check_llms_txt.py --write` reports the registry already matches, because no
+  tool description's first sentence changed. Evidence:
+  `tests/test_pipeline.py::TestStrictPolicyMode::test_read_only_surface_is_unaffected`,
+  `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`,
+  `tests/test_polyhaven.py::TestGuards::test_url_whitelist_rejects_foreign_host`,
+  `tests/test_security.py::TestAuditDualWrite::test_failed_write_still_logs_and_recovers`.
+- **Engineering and CI terms now say what they mean** — group 4 of the
+  plain-language pass (#191): `假 Maya 测试层`, `真机 Maya 测试`,
+  `改完复原`, `两种出错返回`, `需要人确认的事`, `只降不升的预算`,
+  `只减不增的检查`, `暂时没接上的代码`, `人工验收清单`, `真机 cmds 清单`,
+  `单文件大模块`, `统一入口` and `Boundary: 一句` are rewritten in plain
+  words in `AGENTS.md`, `CONTRIBUTING.md`, `docs/testing.md`,
+  `docs/threat-model.md`, `docs/visual-callform-matrix.md`,
+  `docs/guide/error-codes.md`,
+  `docs/upstream-issue-status.md`, `docs/upstream-issue-response-drafts.md`,
+  the CI script comments and messages, the CI workflow step names, the
+  pre-commit comments, `pyproject.toml` comments and marker descriptions, and
+  the comments and docstrings in `src/` and `tests/` that describe them.
+  Behaviour is unchanged: no public tool name, function name, parameter name,
+  error code, file name, gate id or pytest marker changed. Four CI message
+  strings were reworded: three where no test pinned the text, and the
+  derivation-floor message, whose test moved with it.
+  `llms.txt` was not hand-edited: no tool description's first sentence
+  changed, and the generator reports it still matches the registry. Evidence:
+  `tests/test_check_monolith_budget.py::test_repo_monolith_within_budget`,
+  `tests/test_check_ruff_budget.py::test_below_budget_passes_ratchet_hint`,
+  `tests/test_presence_baseline.py::test_stub_cmds_functions_exist_in_real_maya`.
 - **Defect record #115 no longer reads as open work** — the fix had landed as
   `2f8d51e` (PR #138, merge `894f6ae`) while the ticket stayed open, because
   the closing keyword lived in the child ticket's body and never reached a
@@ -96,9 +187,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The distribution ledger's validation path names a mechanism that exists** —
   the Registry publish section's obligation pointed at row 10 of a
   release-preflight checklist that left with the retired ADR layer and is not
-  in this repository; the obligation now points at the section's own dated
+  in this repository; the obligation now pointed at the section's own dated
   publish records — the real carrier, written at each publish — and the
-  retired row's provenance is stated once so a reader knows where it went.
+  retired row's provenance was stated once so a reader knows where it went.
   Evidence: `dfbc572:docs/distribution-surfaces.md:58` and
   `dfbc572:docs/distribution-surfaces.md:65`.
 - **The documented check commands now run the way CI runs them** — both rule
@@ -108,15 +199,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lint invocation that exits red with a pipe that swallows the type-check's
   raw non-zero exit. Both now describe the two passes CI actually performs:
   a lint report written without failing the shell, compared against the
-  frozen per-rule budget, and a type-check whose raw exit is expected to be
+  per-rule budget, and a type-check whose raw exit is expected to be
   non-zero, filtered against the baseline with a crash kept red. Evidence:
   `32dad67:AGENTS.md:9` and `3a8bc13:CONTRIBUTING.md:14`.
 - **The three budget files are described per file, not as a family** —
-  `AGENTS.md` called the ruff, monolith and mypy baselines "regenerated
+  `AGENTS.md` called the ruff, big-file and mypy baselines "regenerated
   archives", which is true of only one of them and contradicted how
   `CONTRIBUTING.md` describes their upkeep; the agent file now states what is
   true: CI reads all three and never writes them, `mypy-baseline.txt` is
-  regenerated by its sync tool, and the lint budget and monolith line cap are
+  regenerated by its sync tool, and the lint budget and the big-file line cap are
   maintained by hand and may be tightened in the pull request that earns it.
   Evidence: `32dad67:AGENTS.md:20`.
 - **The two developer FIXMEs read as known limitations** — each comment kept
@@ -130,6 +221,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Three retired documents leave the historical shelf** — group 5 of the
+  plain-language pass (#192). `docs/distribution-surfaces.md` was deleted
+  after its 2026-10-25 and 2026-10-28 Registry publish records moved to
+  `docs/reference/release-prep.md`; the two GLOSSARY entries it cited
+  (`收录/叙事双轨` and `收录面三态判置`) never existed and went with the file.
+  `docs/reference/audit-r3.txt` and `docs/reference/2026-09-22-audit.md` were
+  deleted too: nothing in the tree linked to either. Historical bodies were
+  not rewritten — the runbook gained a plain summary above its unchanged body.
+  Recovery for each path is `git show bf06a54:<path>`. Evidence:
+  `tools/check_plain_language.py` exits 0 with no old words found.
 - **Migration-shape gate** — the prose-integrity gate script and its 32-test
   file left together with the gate's registry entry, its CI step, and the
   steering/domain-doc prose that described its two-revision semantics, so the
@@ -753,7 +854,7 @@ executed and its results are now in-repo, machine-readable form.
   `docs/distribution-surfaces.md` tracking listing-surface three-state
   registrations (actionable, passive-observation-with-trigger, structural-rejection)
   alongside 30-day post-publish verification obligations.
-  Evidence: `docs/distribution-surfaces.md:1`.
+  Evidence: `dfbc572:docs/distribution-surfaces.md:1`.
 
 ### Changed
 

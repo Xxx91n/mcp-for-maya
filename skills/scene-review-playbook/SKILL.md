@@ -1,6 +1,6 @@
 ---
 name: scene-review-playbook
-description: "Run and act on the mcp-for-maya scene_review audit: pick the right checks, interpret the 0-100 score and per-check results, register studio validators into the review, and map common findings (orphans, naming violations, overlaps, weak aesthetics, lighting gaps) to concrete fixes. Use after structural scene changes, before reporting a scene as done, or when a scene feels disorganized."
+description: "Run and act on the mcp-for-maya scene_review check: pick the right checks, interpret the 0-100 score and per-check results, add your own checks to the run, and map common findings (orphans, naming problems, overlaps, weak aesthetics, lighting gaps) to concrete fixes. Use after structural scene changes, before reporting a scene as done, or when a scene feels disorganized."
 compatibility: "Tested on Claude Code only; requires mcp-for-maya MCP server"
 ---
 
@@ -8,7 +8,7 @@ compatibility: "Tested on Claude Code only; requires mcp-for-maya MCP server"
 
 > **Experimental.** Evaluated on Claude Code only; untested on Codex/Gemini CLI/Cursor. Tracked in issue #3.
 
-`scene_review()` runs up to 11 deterministic checks and returns `{checks, issues, score, total_issues, errors, warnings, standards}` — score is 0-100 (weighted per-check, normalized). Studio validators registered in the session add a `custom` section with its own score.
+`scene_review()` runs up to 11 fixed checks and returns `{checks, issues, score, total_issues, errors, warnings, standards}` — score is 0-100 (weighted per-check, normalized). Checks you add for this session show up in a separate `custom` section with its own score.
 
 ## Checks
 
@@ -17,7 +17,7 @@ compatibility: "Tested on Claude Code only; requires mcp-for-maya MCP server"
 | spatial | object/camera/light presence vs expectations |
 | overlaps | bbox collisions (parent-child excluded) |
 | conflicts | penetration between unrelated objects |
-| zones | zone coverage vs naming-rule zones |
+| zones | zone coverage against the names the zone map knows |
 | naming | GRP_/GEO_/MAT_/CAM_/LGT_/LOC_ prefix discipline |
 | components | GRP_ grouping, nesting depth ≤ 4 |
 | orphans | empty groups, default Maya names |
@@ -26,29 +26,29 @@ compatibility: "Tested on Claude Code only; requires mcp-for-maya MCP server"
 | organization | overall hierarchy health |
 | constraints | the built-in 500-object budget (not the `custom` section below) |
 
-Per-check weights are defined in the review engine — see the audit table in README.md for exact max points; this card intentionally does not duplicate them.
+Per-check weights are defined in the review engine — see the score table in README.md for exact max points; this card intentionally does not duplicate them.
 
 ## How to run
 
-- Full audit: `scene_review()` — after structural changes.
+- Full run: `scene_review()` — after structural changes.
 - Subset: `scene_review(checks="overlaps,conflicts")` — one comma-separated string; cheaper re-verify after a targeted fix. The tool splits it itself, so a Python list is not the shape it accepts.
-- Maya-side, for the same subset: `_mcp_scene.scene_review_with_validators(["overlaps","conflicts"])` — a Python list, reached through `execute_code` once `_mcp_scene` is in the session (see Studio validators below). That is the Maya-side entry point the MCP tool itself calls, not the MCP argument; the bare `_mcp_scene.scene_review(...)` takes the same list but drops the `custom` section.
+- Maya-side, for the same subset: `_mcp_scene.scene_review_with_validators(["overlaps","conflicts"])` — a Python list, reached through `execute_code` once `_mcp_scene` is in the session (see Your own checks below). That is the Maya-side entry point the MCP tool itself calls, not the MCP argument; the bare `_mcp_scene.scene_review(...)` takes the same list but drops the `custom` section.
 - Interpret: each entry in `issues[]` carries `severity` (error > warning > info), `check`, and a `msg` summary (counts + advice). An `info` row lands in neither the `errors` nor the `warnings` count. Per-object detail lives under `checks[]` — e.g. `checks.overlaps.details` names the colliding pairs (sampled list). Fix errors first; warnings are judgment calls.
 
 ## Findings → actions
 
 - `orphans`: root-level meshes or empty groups → reparent under a `GRP_*` group; delete empty groups.
-- `naming`: rename to the prefix convention; never ship `pCube1`-style names.
+- `naming`: rename the object to use the agreed prefixes; never ship `pCube1`-style names.
 - `overlaps` / `conflicts`: `scene_measure(obj_a, obj_b, mode="clearance")`, then move or resize; re-run those checks.
 - `zones` low coverage: `scene_plan` for zone mapping and auto-grouping suggestions.
 - `aesthetics` / `lighting` weak: `scene_aesthetics()` for the 5-dimension breakdown; lighting fixes follow three-point discipline (key/fill/rim).
 - `constraints` violations: read the rule type in the issue, then satisfy it or re-validate via `scene_validate`.
 
-## Studio validators
+## Your own checks
 
-Register rules in the Maya session via `execute_code` and `scene_review()` reports them in a separate `custom` section — `validators` (each with `name`, `family`, `severity`, `weight`, `passed`, `status` — `passed` | `failed` | `check_error` — and `message`), `score`/`max_score` in weight points from one denominator, and `issues` (each with `severity`, `check: "custom"`, `name`, `family`, `msg`) for whatever did not pass. The built-in 0-100 never moves and the section is absent when nothing is registered. Nothing in `custom` reaches the top-level `errors`/`warnings`/`total_issues` counts — those belong to the built-in audit, so the `custom` section has to be read on its own.
+Register rules in the Maya session via `execute_code` and `scene_review()` reports them in a separate `custom` section — `validators` (each with `name`, `family`, `severity`, `weight`, `passed`, `status` — `passed` | `failed` | `check_error` — and `message`), `score`/`max_score` in weight points from one denominator, and `issues` (each with `severity`, `check: "custom"`, `name`, `family`, `msg`) for whatever did not pass. The built-in 0-100 never moves and the section is absent when nothing is registered. Nothing in `custom` reaches the top-level `errors`/`warnings`/`total_issues` counts — those belong to the built-in checks, so the `custom` section has to be read on its own.
 
-`_mcp_scene` is not in a fresh session until a tool that uses it injects it, and `execute_code` never injects anything — it only forwards code to Maya. Run `scene_review()` (or `scene_snapshot()`) once first; the audit before you register is the built-in one.
+`_mcp_scene` is not in a fresh session until a tool that uses it injects it, and `execute_code` never injects anything — it only forwards code to Maya. Run `scene_review()` (or `scene_snapshot()`) once first; the checks before you register are the built-in ones.
 
 Pre-import the module in its own `execute_code` call, then send each validator call as one expression with `result_type="JSON"` — `execute_code` defaults to `result_type="NONE"`, which runs statements and hands back `None`, so with the default there is no return to read. `import _mcp_scene; _mcp_scene.register_validator(...)` in one payload is the shape that fails under result capture. JSON capture may hand you the decoded dict or its JSON text; handle both.
 
@@ -80,5 +80,5 @@ A predicate returns `bool` or `(bool, message)` — the pair accepted as a tuple
 ## Done means
 
 - errors: 0; warnings reviewed (not necessarily zero — judgment).
-- with validators registered, `custom` is part of done too: a failing row or a `check_error` there is not covered by `errors: 0`.
+- with checks registered, `custom` is part of done too: a failing row or a `check_error` there is not covered by `errors: 0`.
 - after fixes, re-run the affected checks; never re-report a stale score.

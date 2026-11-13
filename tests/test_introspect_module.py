@@ -1,9 +1,9 @@
 """T-24b Maya-side contract tests: describe_node / list_nodes (D-094).
 
-Runs against the stub-bound _mcp_scene injection unit (monolith +
-fragments assembled - maya_env.module). These are
+Runs against the fake-bound _mcp_scene module (the big file plus the extra
+files assembled - maya_env.module). These are
 CONTRACT tests: shapes and error codes must hold in real Maya, where
-the fragment runs inside a live DG.
+this code runs inside a live DG.
 """
 
 from __future__ import annotations
@@ -175,8 +175,8 @@ class TestListNodes:
 class TestDescribeBudget:
     """D-110 response-size caps: soft 200 default / hard 1000 via limit=,
     *_truncated + totals disclosure (never silent). Mechanism tests run
-    at small explicit limits - the stub's attr_meta rebuild is O(n^2)
-    per-attr so large real-scale seeds are kept off the stub tier; the
+    at small explicit limits - the fake's attr_meta rebuild is O(n^2)
+    per-attr so large real-scale seeds are kept off the fake Maya layer; the
     cap constants themselves are pinned directly.
     """
 

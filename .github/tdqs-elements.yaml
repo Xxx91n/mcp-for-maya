@@ -318,7 +318,7 @@
       "required_elements": [
         {"id": "session_prerequisite", "why": "requires a live/connected session before use", "any": ["(?i)(active|connected|open|live|established)\\s+(Maya\\s+)?session", "(?i)session_key", "(?i)requires\\s+a\\s+session"]},
         {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
-        {"id": "boundary_targets_named", "why": "names sibling tools — vs scene_checkpoint_list (enumerate the checkpoints already written) / scene_rollback (open one and rebind the scene)", "all": ["scene_checkpoint_list", "scene_rollback"]}
+        {"id": "boundary_targets_named", "why": "names sibling tools — vs scene_checkpoint_list (list the checkpoint files already written) / scene_rollback (open one and point the scene at it)", "all": ["scene_checkpoint_list", "scene_rollback"]}
       ]
     },
     "scene_checkpoint_list": {
@@ -327,7 +327,7 @@
       "required_elements": [
         {"id": "session_prerequisite", "why": "requires a live/connected session before use", "any": ["(?i)(active|connected|open|live|established)\\s+(Maya\\s+)?session", "(?i)session_key", "(?i)requires\\s+a\\s+session"]},
         {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
-        {"id": "boundary_targets_named", "why": "names sibling tools — vs scene_checkpoint (write a new checkpoint) / scene_rollback (open one and rebind the scene)", "all": ["scene_checkpoint", "scene_rollback"]}
+        {"id": "boundary_targets_named", "why": "names sibling tools — vs scene_checkpoint (save a new checkpoint) / scene_rollback (open one and point the scene at it)", "all": ["scene_checkpoint", "scene_rollback"]}
       ]
     },
     "scene_rollback": {
@@ -336,7 +336,7 @@
       "required_elements": [
         {"id": "session_prerequisite", "why": "requires a live/connected session before use", "any": ["(?i)(active|connected|open|live|established)\\s+(Maya\\s+)?session", "(?i)session_key", "(?i)requires\\s+a\\s+session"]},
         {"id": "boundary_line", "why": "one-way disambiguation marker", "any": ["Boundary:"]},
-        {"id": "boundary_targets_named", "why": "names sibling tools — vs scene_checkpoint (write a checkpoint) / scene_checkpoint_list (enumerate the ones already written)", "all": ["scene_checkpoint", "scene_checkpoint_list"]}
+        {"id": "boundary_targets_named", "why": "names sibling tools — vs scene_checkpoint (save a checkpoint) / scene_checkpoint_list (list the ones already written)", "all": ["scene_checkpoint", "scene_checkpoint_list"]}
       ]
     },
     "scene_export": {

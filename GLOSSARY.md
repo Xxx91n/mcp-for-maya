@@ -1,103 +1,163 @@
 # GLOSSARY — Maya MCP Server
 
-Domain vocabulary. Each entry is a term and a definition of at most two sentences.
+术语表。每个词条写三件事：这个词、一句人话解释、`_Avoid_` 后面列出的旧词。
+写文档、写注释、写报错时别再用 `_Avoid_` 里的说法。
 
 ## 工作流
 
-**ICEV**: Inspect → Compute → Execute → Verify 四步强制工作流；任何场景修改必须先快照感知、再计算、执行、验证。
+**ICEV**: 先看场景、再算方案、再动手改、最后复查；四步按顺序走。
+_Avoid_: 强制工作流、四步强制工作流、Inspect → Compute → Execute → Verify
 
-**视觉闭环 (Visual Loop)**: 把视口/渲染图像回传给多模态 Agent 的验证手段；scene_viewport_snapshot 高频便宜，scene_render_preview 低分辨按需，headless 会话返回显式能力错误。
+**看图复查**: 把视口截图或渲染图发给 AI 看一眼，确认改得对不对；只有 GUI 会话能用。
+_Avoid_: 视觉闭环、Visual Loop、回传图像、视觉验证
 
 ## 场景认知
 
-**场景快照 (scene_snapshot)**: 一次批量查询返回的全场景空间状态（名字/类型/位置/BBox/父子），是 Agent 场景心智模型的来源。
+**scene_snapshot**: 一次调用拿到场景里物体的名字、类型、位置、大小和父子关系；超大场景的默认列表会截断。
+_Avoid_: 场景快照、场景心智模型、心智模型
 
-**CoS (Chain-of-Symbol)**: 场景数据的紧凑记号化输出格式，用于压缩 token。
+**CoS**: 把场景数据写成很短的一行行文字，省下发给 AI 的字数。
+_Avoid_: Chain-of-Symbol 记号化、token 压缩格式、CoS 格式
 
-**Zone**: 按命名规则映射的功能分区，内置九组 GRP_shell / entrance / display / ip_core / furniture / lighting / path / decor / service。
+**Zone**: 按物体名字里的关键词分区域；`get_zone_map()` 实际认 7 组，`scene_plan` 另用 8 个名字。
+_Avoid_: 九组、nine zones、9 zones、功能分区、分区
 
-**命名约定**: 生产命名前缀 GRP_/GEO_/MAT_/CAM_/LGT_（key/fill/rim/accent）/LOC_；禁用 pCube1、group1 等 Maya 默认名。
+**命名规则**: 物体名要用 GRP_/GEO_/MAT_/CAM_/LGT_/LOC_ 前缀，别用 pCube1、group1 这类 Maya 默认名。
+_Avoid_: 命名约定、naming convention、生产命名规范
 
 ## 验证与事务
 
-**scene_review**: 确定性场景审计；内置检查固定写在注入模块里，不可增删，其 0–100 分不含任何自定义权重。自定义 validator 的异常记 check_error 且不中断整轮。
+**scene_review**: 按 11 项固定规则检查整场景并给 0–100 分；内置项不能加也不能删。
+_Avoid_: 确定性场景审计、deterministic audit、场景审计
 
-**自定义 validator**: 会话内经 `register_validator(name, predicate, severity, weight, family, message)` 注册的受信扩展机制，不是插件生态；结果单列于 `custom` 段并自带分数，不动内置 0–100。同名覆盖，模块重注入或 Maya 重启即清空，重连后必须重新注册。
+**自定义检查项**: 用 `register_validator(...)` 在本次会话里加检查；分数单列在 `custom` 里，不动内置 0–100；重连后要重新加。
+_Avoid_: 自定义 validator、custom validator、受信扩展机制、插件生态
 
-**checkpoint（真快照）**: 对导出时刻内存态的自包含序列化快照（exportAll，references 默认展平），落 checkpoints/，不含 undo 历史。
+**场景存档（checkpoint）**: 把当前场景导出成磁盘上的 `.ma` 文件，放在 `checkpoints/`，不含撤销历史。
+_Avoid_: checkpoint（真快照）、内存快照、内存态快照、in-memory snapshot、真快照
 
-**rollback**: 打开快照并显式重建场景身份；任何覆盖路径名操作前，被覆盖内容必须已有内存态快照。
+**读档（rollback）**: 打开一个存档，并把场景重新绑回原来的文件路径。
+_Avoid_: 回滚、显式重建场景身份、rebind、重绑
 
-**ad-hoc 快照**: untitled 场景经显式 name 产出的标记性快照；不参与 S2 回滚语义，rollback 后停留快照路径并返回 scene_rebound_to=null。
-
-**脏场景守卫 (dirty-scene guard)**: 场景变更前的只读探针；发现未保存改动即停手交回用户三选一，因为 force 会挂死 UI、不 force 会丢工作。
+**临时存档**: 没保存过的新场景要先起个名字才能存；这种存档没有原文件路径，读档后仍停在存档里。
+_Avoid_: ad-hoc 快照、ad-hoc snapshot、标记性快照
 
 ## 连接与注入
 
-**引导通道 (bootstrap channel)**: commandPort（默认 :7001），只用于发现会话与注入 helper，不承载工作流量。
+**入口端口**: Maya 的 commandPort（默认 7001），只用来找会话和注入 helper，不跑正常工作。
+_Avoid_: 引导通道、bootstrap channel
 
-**工作通道 (working channel)**: bootstrap 后创建的专用通道；默认是自研 Qt TCP server，headless 回退到 native commandPort。
+**工作端口**: 注入完成后专门收发命令的连接；默认是自带的 Qt TCP 服务，headless 时退回 Maya 原生 commandPort。
+_Avoid_: 工作通道、working channel、专用通道
 
-**temp-file 注入**: 大模块落盘临时文件再由 Maya 读取；GUI 会话已由分帧协议取代，仅 headless 回退保留。
+**临时文件注入**: 大段代码先写成临时文件，再让 Maya 去读；现在只有 headless 会话还走这个办法。
+_Avoid_: temp-file 注入、temp-file、落盘、分帧协议
 
-**薄集成 (thin integration)**: 只接低成本外部源（首片 Poly Haven，CC0 API），不做自建资产库或爬虫。
+**asset_descriptor**: 下载素材和导入 Maya 之间的一张交接单：本地路径、来源网址、许可证、依赖清单。
+_Avoid_: 受验证交接对象、handoff contract
 
-**asset_descriptor**: 宿主下载与 Maya 导入之间的受验证交接对象（本地路径+源 URL+license+依赖清单）；URL 不直接递给 Maya 侧。
+**新模块的三条门槛**: 要新开一个 Maya 侧模块，得同时满足：有自己的注入时机、有自己的 API、坏了不影响别的模块。
+_Avoid_: 注入模块准入判据、独立注入时机/独立 API 面/独立失败域、admission criteria
 
-**注入模块准入判据**: 新建 Maya 侧注入模块须同时满足独立注入时机、独立 API 面、独立失败域；否则进既有模块，目标为巨石时用同注入单元独立文件。
-
-**同注入单元独立文件**: 能力归既有注入域，但源码驻独立宿主侧文件经装配进入该单元；不得借此绕开准入判据。
+**同一个注入模块里的单独文件**: 功能仍归原来那个注入模块，代码可以放另一个文件，装配时一起注入；不能拿它绕开上面三条门槛。
+_Avoid_: 同注入单元独立文件、SAME injection unit、fragment
 
 ## 安全姿态
 
-**受信方**: 威胁模型信任 MCP client/agent；防线不承诺遏制恶意 client。
+**可信调用方**: 威胁模型假定 MCP 客户端和 agent 不会故意作恶。
+_Avoid_: 受信方、trusted party
 
-**安全网 (safety net)**: pattern 扫描/限流/校验等防误操作机制，与安全边界严格区分。
+**防手滑措施**: 参数校验、限流、危险写法扫描这些防止手滑的措施；它们不是安全边界，挡不住故意作恶的人。
+_Avoid_: 安全网、safety net、护栏、guardrail
 
-**审计日志 (audit log)**: 每次工具调用一行 JSONL 的独立记录流；outcome 含 rejected，审计写失败不阻断执行。
+**调用记录**: 每调用一次工具就写一行 JSON，单独存一个文件；写失败不影响工具执行。
+_Avoid_: 审计日志、audit log、审计轨迹
 
-**标记块 (marker block)**: userSetup.py 中 `# >>> mcp-for-maya >>>` … `# <<< mcp-for-maya <<<` 的幂等合并单元；不提供整文件覆写，写入前留时间戳备份。
+**自动维护的代码块**: userSetup.py 里用 `# >>> mcp-for-maya >>>` 和 `# <<< mcp-for-maya <<<` 圈起来的一段；工具只改这一段，改前先备份。
+_Avoid_: 标记块、marker block、幂等合并单元
 
-**模块卸载协议**: create_module 被 overwrite 前调用旧模块的 `_mcp_teardown`，由归属方释放 socket/Qt server/线程；钩子须幂等。
+**模块清理约定**: 覆盖一个已加载模块前，先调用它的 `_mcp_teardown`，让它关掉自己的 socket、Qt 服务和线程；这个清理可以重复调用。
+_Avoid_: 模块卸载协议、teardown protocol、钩子须幂等
 
-**双语判别探针**: 用 `eval("1/2")` 区分 MEL（0）与 Python3（0.5）的零副作用端口探测载荷。
+**端口类型探测**: 往端口发 `eval("1/2")`：回 0 是 MEL，回 0.5 是 Python；不改对方状态。
+_Avoid_: 双语判别探针、bilingual probe、零副作用载荷
 
-**端口豁免集**: 已判定非 Python 的端口入会话级永久豁免，端口从 LISTEN 消失才解禁，避免周期重探。
+**免探测端口名单**: 确认过不是 Python 的端口，本次会话不再反复探测；等它不再监听时移出名单。
+_Avoid_: 端口豁免集、exemption set、permanent exemption
 
-**safe_mode**: opt-in 收紧模式（`MAYA_MCP_SAFE_MODE`，默认关）：对 execute_code/write_module 的代码载荷做允许清单式 AST 判定后放行；拒绝报 `safe_mode_rejected` 并带 rule id，成功响应带 `mode:"safe"`；安全网非安全边界，Maya 内语言级沙盒仍是 won't-fix。
+**safe_mode**: 可选的收紧开关（`MAYA_MCP_SAFE_MODE`，默认关）；打开后 `execute_code` 和 `write_module` 的代码要先过允许清单，不通过就报 `safe_mode_rejected`。
+_Avoid_: 收紧模式、opt-in gate、AST 门
+
+**影响范围**: 一次误操作最多能弄坏多大一片。
+_Avoid_: blast radius、爆炸半径
+
+**被带偏的代理**: agent 被外部内容骗着去干用户没让它干的事。
+_Avoid_: confused-deputy、confused deputy
 
 ## 工程词汇
 
-**绞杀者 (strangler)**: 先建 stub 测试脚手架，修复带回归测试落地，拆分随修复触及区域增量进行。
+**边修边拆**: 哪里出问题就在哪里加测试、顺手把那一块拆小，不搞一次性大重构。
+_Avoid_: 绞杀者、strangler、增量拆分
 
-**stub 层**: CI 上替代 maya.cmds/OpenMaya 的自建假实现，数学语义必须正确；定位为契约测试层，像素/行为正确性归 mayapy 档。
+**假 Maya 测试层（stub）**: CI 里用来代替 Maya 的假实现；数学要对，画面对不对不归它管。
+_Avoid_: stub 层、stub tier、契约测试层、contract layer
 
-**mayapy 档**: 可选的真机 Maya 测试层，本地手动跑、文档化、不卡 CI，禁与 stub 层混跑。
+**真机 Maya 测试（mayapy）**: 装了 Maya 的机器上手动跑的可选测试；不在 CI 里跑，别和假 Maya 层混在一起。
+_Avoid_: mayapy 档、mayapy tier、Tier-2、真机层
 
-**净零副作用 (net-zero side effect)**: 工具可瞬时改变宿主状态，但必须 try/finally 恢复到入前快照；readOnlyHint:true 以此为前提。
+**改完复原**: 工具可以临时改 Maya 状态，但结束时必须用 try/finally 恢复原样；`readOnlyHint:true` 靠这个才成立。
+_Avoid_: 净零副作用、net-zero side effect、净零纪律
 
-**双层错误契约**: 宿主侧失败经 MCP isError 上报；Maya 域结果经 `{error:{code,message,suggestion?}}` 返回。
+**两种出错返回**: 宿主这边出错走 MCP 的 `isError`；Maya 那边的错误放在 `{error:{code,message,suggestion?}}` 里。
+_Avoid_: 双层错误契约、two-layer error contract、error contract
 
-**三层命名**: dist 名=mcp-for-maya、import 名=maya_mcp_server、script 名=mcp-for-maya；dist 与 import 分叉是 PyPA 惯例。
+**三个名字**: 分发名 `mcp-for-maya`、导入名 `maya_mcp_server`、命令名 `mcp-for-maya`；分发名和导入名不同是 Python 打包惯例。
+_Avoid_: 三层命名、three-layer naming
 
-**人工确认门**: repo 改名、push main、建 tag/Release、PyPI 发布、改 secret 须用户执行或逐条批准；低风险可逆动作 agent 自主。
+**需要人确认的事**: 改仓库名、推 main、打 tag/发版、发 PyPI、改 secret，要用户自己做或逐条点头；低风险且能撤销的 agent 可以自己来。
+_Avoid_: 人工确认门、human gate、人工门
 
-**冻结预算 (frozen budget)**: lint/类型错误计数预算入库冻结、只降不升。
+**只降不升的预算**: 把 lint 和类型错误的条数记进仓库，只许减不许加。
+_Avoid_: 冻结预算、frozen budget
 
-**棘爪 (ratchet pawl)**: 冻结预算之外的防侵蚀机制，堵住「抑制项只增不减」的侧门，例如 warn_unused_ignores 与 noqa 审计。
+**只减不增的检查**: 除了固定预算，还要防止抑制标记只增不减，比如没用到的 ignore 和 noqa 必须马上删。
+_Avoid_: 棘爪、ratchet pawl、ratchet
 
-**休眠代码 (dormant code)**: 有明确复用排期但当前零生产引用的代码；须机器可见标注，其测试不得算进生产覆盖率。
+**暂时没接上的代码**: 已经排好要用、但现在还没有生产调用的代码；要标出来，它的测试不算生产覆盖率。
+_Avoid_: 休眠代码、dormant code、dormant
 
-**human_verify 骨架测试**: 人眼验收项的版本化形态，test 标 human_verify、只打印步骤不写 assert，进版本库但不制造假红假绿。
+**人工验收清单**: 人眼才能确认的测试项：标 `human_verify`，只打印步骤、不写断言，永远跳过。
+_Avoid_: human_verify 骨架测试、skeleton test、骨架测试
 
-**presence 基线**: 真机会话内采集 cmds.* 实际调用面生成的 JSON 清单+allowlist，用于 stub↔runtime 漂移检测；只覆盖存在性。
+**真机 cmds 清单**: 在真 Maya 会话里记下实际有哪些 `cmds.*`，存成 JSON 加白名单，用来检查假 Maya 层少了或多了什么。
+_Avoid_: presence 基线、presence baseline、漂移检测、调用面
 
-**双环境包 (dual-runtime package)**: 宿主 requires-python 与 Maya 内嵌解释器支持 floor 分开声明，注入代码做版本+能力双层守卫。
+**两套 Python 环境**: 宿主 Python 和 Maya 内置 Python 的支持版本分开写；注入的代码要同时检查版本和能力。
+_Avoid_: 双环境包、dual-runtime package、双层守卫
 
-**便利性镜像 (convenience mirror)**: 英文 README.md 是唯一 source-of-truth，README.zh-CN.md 是可滞后但不许分叉的镜像。
+**中文译本**: 英文 README 是唯一准稿，中文版可以晚一点更新，但不能各写各的。
+_Avoid_: 便利性镜像、convenience mirror、source-of-truth、镜像
 
-**TDQS**: Glama 对工具定义质量的第三方评分；本仓以字母档 A、逐件 min ≥3.0、零 contradiction 旗标为验收，不以分数驱动 API breaking。
+**TDQS**: Glama 给工具说明打的第三方质量分；本仓库看字母档 A、每个工具至少 3.0、没有矛盾旗标，不为分数改坏 API。
+_Avoid_: Glama 评分、tool description score
 
-**Boundary: 行**: 每件工具描述内嵌一句单向 `Boundary:`，点名 1~3 个兄弟分工，用于消歧。
+**Boundary: 一句**: 每个工具说明里加一句 `Boundary:`，点名 1–3 个相近工具，告诉调用方该用哪个。
+_Avoid_: Boundary: 行、boundary line、单向消歧
 
-**只加不删资产目录**: `.github/assets/` 被绝对 URL 引用，条目只增不删不改名，否则历史 PyPI 页面永久裂图。
+**资产目录只增不删**: `.github/assets/` 里的图片被旧版 PyPI 页面用固定网址引用，所以只加新文件，不删不改名。
+_Avoid_: 只加不删资产目录、append-only、只增不删
+
+**单文件大模块**: `maya_scene_module.py` 这个很大的单文件，行数有上限；新功能另开文件，和它一起注入。
+_Avoid_: monolith、巨石、主模块
+
+**统一入口**: 所有工具调用都必须经过的同一个地方。
+_Avoid_: choke point、唯一入口
+
+## 已删除的说法
+
+这两条旧词条删掉了，不是词条、也不用再解释一遍：
+脏场景守卫在代码里没有实现（见 #185）；薄集成只是词表自己造的说法，
+素材来源这件事 README 的素材那行和 `polyhaven.py` 都只提 Poly Haven。
+下面这行只是不许再用的说法，检查脚本照样会拦：
+
+_Avoid_: 脏场景守卫、dirty-scene guard、薄集成、thin integration

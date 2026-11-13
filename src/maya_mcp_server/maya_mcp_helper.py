@@ -11,7 +11,7 @@ from collections import deque
 from typing import Any
 
 
-# Dual-runtime floor (upstream #3): this module is injected into
+# Two Python environments (upstream #3): this module is injected into
 # Maya's own interpreter - Maya >= 2023 ships Python >= 3.9. Refuse early
 # with an actionable message instead of dying later inside ast.unparse.
 if sys.version_info < (3, 9):  # noqa: UP036 - injected side runs Maya's own interpreter, not the host's
@@ -259,7 +259,8 @@ def execute(code: str, result_type: str = "NONE") -> str:
     error = None
     # Dedicated exec namespace for result capture. NOT a security boundary:
     # __builtins__ is fully present and code runs with Maya's privileges —
-    # the safety net is host-side (pattern scan, rate limit, audit).
+    # the guards against slips live on the host side (pattern scan, rate
+    # limit, call record).
     import sys
 
     context = {"__builtins__": __builtins__, "__name__": "__mcp_exec__", "__doc__": None}
@@ -489,8 +490,8 @@ class ClientChannel:
 
 
 class QtCommandServer:
-    """Qt-based TCP command server for Maya MCP (the primary working
-    channel; the native command port is bootstrap/headless fallback only).
+    """Qt-based TCP command server for Maya MCP (the main working port;
+    the native command port is only the bootstrap and headless fallback).
 
     Runs on Maya's main thread inside the Qt event loop. readyRead is
     event-driven (no polling timer); each connection owns a ClientChannel
@@ -656,10 +657,10 @@ def get_qt_server_port() -> str:
 
 
 def _mcp_teardown() -> str:
-    """Idempotent module teardown (upstream issue #4).
+    """Module cleanup, safe to call twice (upstream issue #4).
 
-    create_module(overwrite=True) invokes this hook on the OLD module
-    object before evicting it from sys.modules. Every resource is released
+    create_module(overwrite=True) calls this on the OLD module object
+    before evicting it from sys.modules. Each resource is released
     inside its own try/except so one failure cannot skip the rest; calling
     it twice is a no-op.
     """

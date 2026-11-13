@@ -1,7 +1,7 @@
-"""Maya stub package — fake maya.cmds + maya.api.OpenMaya.
+"""Maya fake package — stands in for maya.cmds + maya.api.OpenMaya.
 
-Purpose (D-004 stub tier): run maya_scene_module.py logic in pytest
-WITHOUT a real Maya install. The stub implements a real DAG scene graph,
+Purpose (D-004 fake Maya layer): run maya_scene_module.py logic in pytest
+WITHOUT a real Maya install. The fake implements a real DAG scene graph,
 row-major matrix math, and 8-corner world-bbox transforms — semantically
 correct, so tests catch real math bugs (e.g. min*M/max*M shortcuts).
 
@@ -11,12 +11,12 @@ Usage in tests:
         maya_env.scene.add_mesh("GEO_box", t=(10, 0, 0))
         result = maya_env.module.measure("GEO_box", "GEO_other", "bbox")
 
-The fixture installs stub modules into sys.modules, imports
-maya_scene_module bound to the stub, and cleans up afterwards.
+The fixture installs the fake modules into sys.modules, imports
+maya_scene_module bound to them, and cleans up afterwards.
 
 NOT a Maya replacement: it models just enough cmds/OpenMaya surface used
-by the scene module. Real-Maya verification stays on the mayapy tier
-(docs/testing.md — manual, local-only, never in CI).
+by the scene module. Real-Maya verification stays on the real interpreter
+run (docs/testing.md — manual, local-only, never in CI).
 """
 
 from __future__ import annotations
@@ -105,14 +105,15 @@ def uninstall():
 
 
 def load_scene_module():
-    """Load the _mcp_scene injection unit fresh, bound to the stub.
+    """Load the _mcp_scene module fresh, bound to the stub.
 
     Mirrors the production payload assembly (D-095): maya_scene_module.py
     + introspect_module.py + validator_module.py + zone_geometry_module.py
     concatenated into ONE module namespace - the same bytes the host ships
-    via write_module/mkstemp. A __future__ import or syntax slip in a fragment
-    fails here exactly like it would inside Maya. __mcp_payload__ is test-only
-    metadata so the assembly test can compare those bytes with the host write.
+    via write_module/mkstemp. A __future__ import or syntax slip in any of
+    these files fails here exactly like it would inside Maya. __mcp_payload__
+    is test-only metadata so the assembly test can compare those bytes with
+    the host write.
     """
     sys.modules.pop("maya_mcp_server.maya_scene_module", None)
     for _frag in ("introspect_module", "validator_module", "zone_geometry_module"):
@@ -120,7 +121,7 @@ def load_scene_module():
     src_dir = Path(__file__).resolve().parents[2] / "src" / "maya_mcp_server"
     source = (src_dir / "maya_scene_module.py").read_text(encoding="utf-8")
     # No exists() guard: the host reads these unconditionally, so a missing or
-    # renamed fragment must fail here, not silently shrink the payload.
+    # renamed file must fail here, not silently shrink the payload.
     for frag_name in ("introspect_module.py", "validator_module.py", "zone_geometry_module.py"):
         source += "\n\n" + (src_dir / frag_name).read_text(encoding="utf-8")
     mod = types.ModuleType("maya_mcp_server.maya_scene_module")

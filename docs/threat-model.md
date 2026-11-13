@@ -2,23 +2,23 @@
 
 > Status: current (D-008/D-017/D-018/D-019; tool-surface rows D-075/
 > D-092/D-094/D-110; CVE citation D-132, 2026-09-28). Source of truth
-> for what this project's safety machinery does and does not claim.
+> for what the guards against slips in this project do and do not claim.
 
 ## 1. Explicit threat model
 
-**Trusted party**: the MCP client/agent (Codex, Claude, …) and the local
+**Trusted caller**: the MCP client/agent (Codex, Claude, …) and the local
 user who runs this server.
 
-**Risk addressed**: confused-deputy — an agent that receives injected or
-misunderstood instructions and drives this server's capabilities toward
-outcomes the user did not intend. Also plain accidents: runaway loops,
-bad filenames, oversized payloads.
+**Risk addressed**: an agent that gets talked into trouble — it receives
+injected or misunderstood instructions and drives this server's
+capabilities toward outcomes the user did not intend. Also plain
+accidents: runaway loops, bad filenames, oversized payloads.
 
 **Risk explicitly NOT addressed**: a malicious client. Any MCP client can
 send arbitrary tool calls; nothing here can or does try to contain a
 hostile one. If the client is the attacker, the game is already over —
-the controls below are a safety net for accidents and confused deputies,
-not a boundary.
+the controls below catch slips and agents talked into trouble, and they
+are not a boundary.
 
 ## 2. Boundary declaration
 
@@ -28,68 +28,68 @@ The following are **not** security boundaries:
   bypassable and we say so. Detection, not containment.
 - Input validation. It rejects malformed inputs, not malicious intent.
 - Rate limiting. It slows accidents, not adversaries.
-- The audit log. It records what happened; it prevents nothing.
-- The `userSetup.py` marker block. It protects *your* file from
+- The call record. It records what happened; it prevents nothing.
+- The `userSetup.py` managed block. It protects *your* file from
   being overwritten; it does not protect Maya from the block.
 - Anything Maya-side (`maya_mcp_helper.py`, `_mcp_scene`).
   Code reaching Maya runs with Maya's full privileges — __builtins__ is
   fully present in the exec namespace by design.
 - The strict policy flags (`MAYA_MCP_DISABLE_EXECUTE`,
   `MAYA_MCP_DISABLE_WRITE_MODULE`, `MAYA_MCP_DISABLE_ARBITRARY`,
-  D-207 1). These are **misuse guardrails, not a hostile-agent
+  D-207 1). These **guard against misuse, they are not a hostile-agent
   boundary**, and the distinction is load-bearing: an agent that can
   still reach `execute_code` is inside the trust boundary already and
-  no flag moves that. What they buy is the *other* direction — an
-  operator, a demo, or a CI sandbox can shrink the blast radius of a
-  mistake without trusting every caller to pass sensible arguments.
+  no flag moves that. What they help with is the *other* direction — an
+  operator, a demo, or a CI sandbox can make one mistake do less damage
+  without trusting every caller to pass sensible arguments.
   They are config, not a jail, and must never be described as one.
 - `safe_mode` (`MAYA_MCP_SAFE_MODE=1`, implemented, opt-in, default
-  off). Same misuse-guardrail class as the DISABLE flags: while the
-  two code-bearing tools stay listed, the AST gate narrows their
+  off). Same class as the DISABLE flags: while the
+  two code-bearing tools stay listed, the code allowlist narrows their
   `code` payloads to a v1 allowlist and rejections raise
   `safe_mode_rejected` (a host `isError` failure) with the triggering
-  rule id. It slows
-  confused-deputy payloads; it does not contain a hostile caller —
+  rule id. It slows an agent that was talked into trouble; it does not
+  contain a hostile caller —
   the client stays trusted, and successful calls disclose
   `mode: "safe"` rather than claim a boundary. Config, not a jail.
 
 We deliberately avoid the words "sandbox" and "secure" for these
-mechanisms. `safe_mode` (the implemented opt-in AST allowlist,
-roadmap P2) is a hallucination-slowing net, not a jail —
+mechanisms. `safe_mode` (the implemented opt-in code allowlist,
+roadmap P2) is a net that slows a hallucinating agent down, not a jail —
 language-level confinement of Python inside Maya is a known-won't-fix
 problem.
 
-## 3. Defense inventory (the actual safety net)
+## 3. Defense inventory (what actually guards against slips)
 
 | Layer | What it does | Where |
 |-------|--------------|-------|
 | Input validation | size caps, session-key format, module-name rules | security.py |
 | Rate limiting | per-session token buckets: ~20 writes/60s, ~100 reads/60s | security.py |
-| Pattern scan | exact-match blocks (`../` traversal in filenames, `os.system`/`subprocess`/`eval(` in code); everything else warn-only into audit | security.py |
-| Audit log | append-only JSONL, every tool call recorded incl. rejections | security.py |
-| Error contract | host failures raise coded exceptions (isError); Maya-domain failures return `{error:{code,message,suggestion?}}` | pipeline.py, maya_scene_module.py |
-| Checkpoint/rollback | exportAll memory snapshots, auto safety snapshot before rollback, S2 rebind | maya_scene_module.py |
-| userSetup.py merge | marker-block upsert, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
+| Pattern scan | exact-match blocks (`../` traversal in filenames, `os.system`/`subprocess`/`eval(` in code); everything else warn-only into the call record | security.py |
+| Call record | append-only JSONL, every tool call recorded incl. rejections | security.py |
+| Two error paths | host failures raise coded exceptions (isError); Maya-side failures return `{error:{code,message,suggestion?}}` | pipeline.py, maya_scene_module.py |
+| Checkpoint/rollback | writes the scene to a `.ma` file on disk under `checkpoints/`, takes a safety save before reading one back, points the scene at its original path again | maya_scene_module.py |
+| userSetup.py merge | upsert of the managed block, confirm-gated, .bak backup, symmetric uninstall | connection_guide.py |
 | Tool annotations | readOnlyHint/destructiveHint/idempotentHint/openWorldHint on all 25 tools | pipeline.py |
-| Strict policy mode | `MAYA_MCP_DISABLE_*{EXECUTE,WRITE_MODULE,ARBITRARY}` remove the named tools from `tools/list` and deny the call with `[policy_disabled]`, audited as `rejected`; one choke point in the pipeline, none in the tool bodies | pipeline.py (POLICY_ENV_FLAGS, on_list_tools, on_call_tool) |
-| `safe_mode` AST gate | opt-in (`MAYA_MCP_SAFE_MODE=1`, default off); deny-by-default allowlist over `execute_code`/`write_module` `code` payloads — v1 import roots (maya/math/json/re/collections/itertools/functools/dataclasses/typing) + node allowlist, denied builtin names rejected on any reference (not just calls)/`__builtins__`/dunder access rejected, unparseable input rejects ("cannot decide ⇒ deny"); raises `[safe_mode_rejected]` + rule id, audited `rejected`; success responses carry `mode:"safe"`, tools/list gains a Boundary line | security.py (SAFE_* tables, scan_safe_mode_code), pipeline.py (on_call_tool stage 4, _with_safe_mode_field, _with_boundary_line) |
+| Strict policy mode | `MAYA_MCP_DISABLE_*{EXECUTE,WRITE_MODULE,ARBITRARY}` remove the named tools from `tools/list` and deny the call with `[policy_disabled]`, recorded as `rejected` in the call record; one single place in the pipeline, none in the tool bodies | pipeline.py (POLICY_ENV_FLAGS, on_list_tools, on_call_tool) |
+| `safe_mode` code allowlist | opt-in (`MAYA_MCP_SAFE_MODE=1`, default off); deny-by-default allowlist over `execute_code`/`write_module` `code` payloads — v1 import roots (maya/math/json/re/collections/itertools/functools/dataclasses/typing) + node allowlist, denied builtin names rejected on any reference (not just calls)/`__builtins__`/dunder access rejected, unparseable input rejects ("cannot decide ⇒ deny"); raises `[safe_mode_rejected]` + rule id, recorded as `rejected`; success responses carry `mode:"safe"`, tools/list gains one more `Boundary:` line | security.py (SAFE_* tables, scan_safe_mode_code), pipeline.py (on_call_tool stage 4, _with_safe_mode_field, _with_boundary_line) |
 | Asset egress whitelist | asset_search/asset_import reach https only on api.polyhaven.com + dl.polyhaven.org/.com, mandatory User-Agent, size+timeout caps, per-file md5 verify, platformdirs cache | polyhaven.py |
 
 All 25 tools pass through one FastMCP middleware pipeline:
 policy-disabled check (MAYA_MCP_DISABLE_* removes the tool from
 tools/list and denies calls) → validate → rate-limit → pattern-scan →
-safe_mode gate (opt-in; `execute_code`/`write_module` only) →
-dispatch → disclosure (a successful gated call gains `mode:"safe"`)
-→ audit.
+safe_mode code allowlist (opt-in; `execute_code`/`write_module` only) →
+dispatch → disclosure (a successful call under the allowlist gains `mode:"safe"`)
+→ call record.
 
 ## 4. Port and network exposure
 
 - The MCP server speaks stdio/SSE to its client; the Maya channel is a
-  localhost TCP command port (default `:7001`, sourceType=python) used for
-  discovery/bootstrap, plus a Qt TCP working channel (localhost-only,
-  length-prefixed frames, 16 MiB cap, ports 50000-60000) created during
-  bootstrap. Headless Maya (no Qt event loop) keeps a dedicated commandPort
-  as the minimal working channel.
+  localhost TCP command port (default `:7001`, sourceType=python) used to
+  find the session and inject the helper, plus a Qt TCP working port
+  (localhost-only, length-prefixed frames, 16 MiB cap, ports
+  50000-60000) created once the helper is injected. Headless Maya (no Qt
+  event loop) keeps a dedicated commandPort as the fallback working port.
 - The command port binds localhost only; `allow_remote_connections`
   defaults to False and there is no remote path today.
 - Anyone who can reach the command port can run Python inside Maya —
@@ -97,13 +97,13 @@ dispatch → disclosure (a successful gated call gains `mode:"safe"`)
   Keep it localhost; do not port-forward it.
 - The two `maya://sessions/*/info|output` MCP **resources** are read-only
   lookups served from the session registry; they do not pass through the
-  tool pipeline (no rate limit, no audit row). They execute no Maya code.
+  tool pipeline (no rate limit, no call-record row). They execute no Maya code.
 - `asset_search`/`asset_import` (D-075) make OUTBOUND https requests
   from the MCP host to api.polyhaven.com + dl.polyhaven.org/.com only
   (scheme + host whitelist enforced in polyhaven.py; mandatory UA;
   per-file md5 + size caps). Maya itself stays zero-network: it only
-  ever sees host-local file paths. The whitelist is a safety net for
-  accidents/confused deputies, not a boundary.
+  ever sees host-local file paths. The whitelist catches slips and
+  agents talked into trouble; it is not a boundary.
 - The attack class these controls exist against is documented in the
   wild, not hypothetical: a peer download-and-import MCP tool shipped a
   CWE-22 path traversal where API-supplied `include` keys were joined
@@ -145,7 +145,7 @@ authoritative and this table must match it row for row:
 | readOnly=F, destructive=F, idempotent=T, openWorld=T | `asset_import` |
 
 - scene_review keeps readOnly=T: reading the scene is what it does, and a
-  custom validator (#79) inherits no privilege it did not already have —
+  check you register (#79) inherits no privilege it did not already have —
   registering one goes through `execute_code`, which is already
   destructive=T. What does change is repeatability of its **output**: the
   `custom` section reflects the session registry at call time, so a rule
@@ -171,11 +171,11 @@ authoritative and this table must match it row for row:
   modal dialog can hang the channel. Residuals registered honestly: no
   realpath/symlink resolution (a symlinked parent is followed silently)
   and no per-directory allowlist (any path the Maya process can write
-  is writable). `safe_mode` narrows nothing here — it gates `code`
-  payloads only, and `path` stays an informed-acceptance string; both
+  is writable). `safe_mode` narrows nothing here — it only checks `code`
+  payloads, and `path` stays an informed-acceptance string; both
   residuals are acknowledged, not fixed.
 - `scene_viewport_snapshot` / `scene_render_preview` are readOnly
-  under the net-zero side-effect discipline (camera/current-time
+  because they put back whatever they changed (camera/current-time
   restored on every path, D-026) - the visible transient is documented
   in the tool docstrings.
 - `scene_describe` / `scene_nodes` (D-094) are pure read queries and
@@ -200,7 +200,7 @@ authoritative and this table must match it row for row:
   not perform auto_fix mutations (unlike `scene_plan` which can mutate
   scene organization).
 
-## 6. Audit log schema and replay
+## 6. Call record schema and replay
 
 One JSON object per line (JSONL), at
 `platformdirs.user_log_dir("mcp-for-maya")/audit.jsonl`:
@@ -218,7 +218,7 @@ One JSON object per line (JSONL), at
   names, short values, size+sha for large strings; credential-shaped
   param names (token/secret/password/api_key) are redacted.
 - `outcome=rejected` is always recorded — probing is the first
-  signal of a confused deputy.
+  sign that an agent is being pushed somewhere the user never asked for.
 
 Replay:
 
@@ -236,9 +236,9 @@ See [SECURITY.md](../SECURITY.md).
 
 - Multi-user or remote access → the model breaks; don't do it without a
   redesign.
-- `safe_mode` AST allowlist — implemented (roadmap P2): opt-in,
+- `safe_mode` code allowlist — implemented (roadmap P2): opt-in,
   default off, successful responses carry a `mode` field, and every
-  surface keeps the "safety net, not a boundary" wording (§2/§3
-  above). The model itself is unchanged: trusted parties stay
+  surface keeps the "guards against slips, not a boundary" wording (§2/§3
+  above). The model itself is unchanged: trusted callers stay
   trusted, and the "not a boundary" list gains a member, nothing
   moves sides.

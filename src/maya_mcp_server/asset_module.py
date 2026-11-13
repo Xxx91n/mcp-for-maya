@@ -331,7 +331,7 @@ def _wire_map(file_node: str, role: str, mat: str, sg: str | None) -> bool:
         # shape (Maya 2024 probe, docs/evidence/probes/probe-displacement.json)
         # —
         # but "connection established" is not render semantics; visual
-        # proof stays on the gui/human_verify tier.
+        # proof stays with the human-run checklist.
         disp = None
         try:
             disp = cmds.shadingNode("displacementShader", asUtility=True, name=file_node + "_disp")
@@ -539,7 +539,8 @@ def import_asset(
             return _err(
                 "polycount_exceeded",
                 f"{faces} faces exceeds the {int(max_polycount)} default limit",
-                "pass allow_high_polycount=True to keep the import (decision is audited)",
+                "pass allow_high_polycount=True to keep the import "
+                "(the decision is written to the call record)",
             )
 
         wiring = _wire_textures(descriptor.get("texture_parts") or {}, new_nodes, meshes, asset_id)

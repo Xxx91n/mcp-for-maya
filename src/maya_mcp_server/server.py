@@ -70,12 +70,12 @@ mcp = FastMCP(
         "- maya_setup_guide: Diagnose connection, install userSetup.py, get fallback instructions\n"
         "  Actions: diagnose | install | guide | uninstall\n"
         "  Use when list_sessions returns empty or on first-time setup.\n\n"
-        "## Spatial Awareness (ICEV Workflow)\n"
-        "1. INSPECT: scene_snapshot() for spatial overview\n"
-        "2. COMPUTE: Use spatial data to plan changes\n"
-        "3. EXECUTE: execute_code() to apply changes\n"
-        "4. VERIFY: scene_assert() to confirm results;\n"
-        "   scene_viewport_snapshot() for visual confirmation (GUI)\n\n"
+        "## Spatial Awareness (ICEV: look, work out, change, check)\n"
+        "1. LOOK: scene_snapshot() for a spatial overview\n"
+        "2. WORK OUT: Use the spatial data to plan the change\n"
+        "3. CHANGE: execute_code() to apply it\n"
+        "4. CHECK: scene_assert() to confirm the result;\n"
+        "   scene_viewport_snapshot() to look at it (GUI)\n\n"
         "## Scene Tools\n"
         "- scene_snapshot: Full scene spatial overview\n"
         "- scene_inspect: Deep inspection of object/zone\n"
@@ -95,36 +95,37 @@ mcp = FastMCP(
         "## Constraint & Safety Tools\n"
         "- scene_validate: Read-only spatial constraint validation (clearance,\n"
         "  overlap, height); without auto_fix mutations (automated repair belongs\n"
-        "  to scene_plan); disambiguated from scene_review (heuristic audit) and\n"
+        "  to scene_plan); disambiguated from scene_review (heuristic checks) and\n"
         "  scene_assert (boolean gate checks)\n"
-        "- scene_checkpoint: exportAll snapshot of in-memory state into checkpoints/\n"
-        "  (name whitelist, ad-hoc for untitled scenes)\n"
+        "- scene_checkpoint: writes the current scene to a .ma file on disk under\n"
+        "  checkpoints/ (name whitelist; a scene never saved to disk gets a\n"
+        "  temporary checkpoint instead)\n"
         "- scene_checkpoint_list: List saved checkpoints\n"
-        "- scene_rollback: Open a checkpoint, rebind scene to original path\n"
-        "  (auto safety snapshot first)\n\n"
+        "- scene_rollback: Open a checkpoint file and point the scene back at its\n"
+        "  original path (saves the current scene first)\n\n"
         "## Camera & Shot Tools\n"
         "- camera_create: Create camera with shot type (wide/medium/close/etc)\n"
         "- camera_orbit: Create orbiting camera with animation (orbit/turntable;\n"
         "  static shot-type framing belongs to camera_create)\n\n"
-        "## Visual Loop (GUI sessions only)\n"
+        "## Check by looking (GUI sessions only)\n"
         "- scene_viewport_snapshot: WYSIWYG viewport capture\n"
         "  (HUD/selection included - what the artist sees)\n"
         "- scene_render_preview: clean single-frame playblast\n"
-        "  (camera optional; net-zero side effect)\n\n"
-        "## Aesthetic Analysis (5 Professional Dimensions)\n"
-        "- scene_aesthetics: Professional-grade analysis with 5 dimensions:\n"
+        "  (camera optional; state restored afterwards)\n\n"
+        "## Look Quality (5 Dimensions)\n"
+        "- scene_aesthetics: Scores the scene's look on 5 dimensions:\n"
         "  1. Color Theory: 60-30-10 rule, temperature, harmony, saturation, contrast\n"
         "  2. Spatial Composition: golden ratio, rule-of-thirds, visual weight balance\n"
         "  3. Proportion & Scale: human ergonomics, size hierarchy (hero/secondary/tertiary)\n"
         "  4. Lighting Quality: layer composition, color temperature consistency\n"
         "  5. Visual Flow: sight lines, circulation clarity, visual rhythm\n"
         "  Returns: overall score (0-100), grade (S/A/B/C/D/F), improvement suggestions\n"
-        "- scene_review: Comprehensive audit after operations (score 0-100)\n"
+        "- scene_review: Checks the whole scene after operations (score 0-100)\n"
         "  Checks: spatial, overlaps, zones, aesthetics, constraints, orphans, naming,\n"
         "  components, conflicts, lighting, organization\n\n"
         "## Scene Planning\n"
-        "- scene_plan: Holistic scene planning with organization validation,\n"
-        "  layout optimization, conflict prevention\n\n"
+        "- scene_plan: Plans a scene layout; checks organization,\n"
+        "  suggests layout changes, warns about conflicts\n\n"
         "## Asset Tools (Poly Haven CC0)\n"
         "- asset_search: Search the Poly Haven index (host-side; no session)\n"
         "- asset_import: Download (https whitelist + md5 + cache) and\n"
@@ -147,9 +148,9 @@ mcp = FastMCP(
         "Best practices:\n"
         "- Call scene_snapshot() before modifications\n"
         "- Use scene_checkpoint() before risky operations\n"
-        "- Snapshots carry no undo history; after scene_rollback call "
+        "- A checkpoint file carries no undo history; after scene_rollback call "
         "scene_snapshot to rebuild context\n"
-        "- Snapshots are self-contained (references flattened, no write-back)\n"
+        "- A checkpoint file is self-contained (references flattened, no write-back)\n"
         "  one scene file per session assumed\n"
         "- Use scene_validate() to check constraints after changes\n"
         "- Cache auto-invalidates after execute_code/write_module"
@@ -160,7 +161,7 @@ mcp = FastMCP(
 register_scene_tools(mcp)
 register_visual_tools(mcp)
 
-# One AuditLogger shared by the pipeline (per-call events) and the
+# One AuditLogger shared by the pipeline (per-call entries) and the
 # asset tools (result-side download detail: URL/size/files_hash).
 _audit_logger = (
     AuditLogger(Path(_security_config.audit_log_path) if _security_config.audit_log_path else None)
@@ -172,7 +173,8 @@ register_export_tools(mcp)
 register_introspect_tools(mcp)
 
 # Unified security pipeline: every tool call passes through validation,
-# rate limiting, pattern scanning, the safe_mode gate, and audit logging.
+# rate limiting, pattern scanning, the safe_mode code allowlist, and the
+# call record.
 mcp.add_middleware(SecurityPipeline(config=_security_config, audit=_audit_logger))
 
 # Global session manager - initialized when server starts
@@ -247,20 +249,20 @@ async def maya_setup_guide(
     Args:
         action: What to do:
             - "diagnose": Run connection diagnostics and return status
-            - "install": Merge the managed marker block into userSetup.py.
+            - "install": Merge the managed block into userSetup.py.
               Existing files without the block require a second call with
               confirm=True (the first call returns the proposed block).
             - "guide": Get full step-by-step connection guide
-            - "uninstall": Remove the managed marker block from userSetup.py
+            - "uninstall": Remove the managed block from userSetup.py
         port: Maya command port number (default: 7001)
         target_version: Specific Maya version (e.g., "2024").
             If None, targets all detected versions.
         confirm: Required to write into an existing userSetup.py that has
-            no mcp-for-maya marker block (first install call is dry-run).
+            no mcp-for-maya managed block (first install call is dry-run).
         dry_run: Preview the install: return the proposed block without
             writing anything.
         remove_empty_file: On uninstall, delete the file when it only
-            contained the marker block.
+            contained the managed block.
 
     Returns:
         Dict with diagnostics, installation results, or guide text
@@ -312,15 +314,15 @@ async def write_module(
     Requires an active Maya session.
 
     Under safe_mode (MAYA_MCP_SAFE_MODE, opt-in, default off) this code
-    payload passes the same deny-by-default AST allowlist as execute_code:
+    payload passes the same deny-by-default allowlist as execute_code:
     non-allowlisted imports, denied builtin names (any reference, not
     just calls), __builtins__ references,
     dunder attribute access, and unparseable input are rejected with
     safe_mode_rejected naming the triggering rule id. Successful
-    responses carry mode: "safe" on their structured payload. Gated
-    execute_code payloads can only import the v1 allowlisted roots, so a
-    module defined here whose root is not one of those roots is not
-    importable by name from gated code.
+    responses carry mode: "safe" on their structured payload. Under the
+    code allowlist, execute_code payloads can only import the v1 allowlisted
+    roots, so a module defined here whose root is not one of those roots
+    is not importable by name from allowlisted code.
 
     Boundary: Use write_module to define reusable libraries and helper functions;
     use execute_code for one-shot imperative execution or expression evaluation.
@@ -376,7 +378,8 @@ async def execute_code(
     Requires an established Maya session (discoverable via list_sessions).
 
     Under safe_mode (MAYA_MCP_SAFE_MODE, opt-in, default off) the code
-    payload passes a deny-by-default AST allowlist before dispatch:
+    payload passes a deny-by-default allowlist checked on the parsed code
+    before dispatch:
     imports outside the v1 roots (maya/math/json/re/collections/
     itertools/functools/dataclasses/typing), denied builtins
     (eval/exec/open/__import__/getattr/setattr/...), __builtins__
@@ -384,7 +387,7 @@ async def execute_code(
     dunder attribute access, and unparseable input are
     rejected with safe_mode_rejected naming the triggering rule id.
     Successful responses carry mode: "safe" on their structured payload.
-    The gate is a misuse guardrail, not a sandbox — code that passes
+    This catches slips, it is not a sandbox — code that passes
     still runs with full session privileges.
 
     Args:

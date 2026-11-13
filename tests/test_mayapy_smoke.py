@@ -1,12 +1,12 @@
-"""Real-Maya smoke tests — mayapy tier only.
+"""Real-Maya smoke tests — real interpreter only.
 
 Run inside a real Maya interpreter:
 
     set PYTHONPATH=<repo>/src;<repo>/tests
     mayapy -m pytest tests/ -m mayapy
 
-Under vanilla python (or the stub) these skip — they exist so docs/testing.md
-describes a real tier, not a hypothetical one.
+Under vanilla python (or the fake) these skip — they exist so docs/testing.md
+describes a real run, not a hypothetical one.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ pytestmark = pytest.mark.mayapy
 def _maya_standalone_init():
     """mayapy hard-crashes (Windows access violation) if maya.api.OpenMaya
     is imported before maya.standalone.initialize() — initialize once per
-    tier run. Under vanilla python / the stub the import fails and this
+    tier run. Under vanilla python / the fake the import fails and this
     is a no-op; the real_maya fixture still gates the tests."""
     try:
         import maya.standalone
@@ -35,7 +35,7 @@ def real_maya():
     cmds = pytest.importorskip("maya.cmds", reason="requires real Maya (mayapy)")
     f = getattr(cmds, "__file__", "") or ""
     if "maya_stub" in f or "tests" in f.replace("\\", "/"):
-        pytest.skip("maya stub is installed — mayapy tier needs a real interpreter")
+        pytest.skip("the Maya fake is installed — the real interpreter is needed")
     return cmds
 
 
@@ -59,9 +59,9 @@ def test_measure_roundtrip_in_real_maya(real_maya):
 
 
 def test_checkpoint_rollback_reference_edit_roundtrip(real_maya, tmp_path):
-    """D-007: checkpoint->rollback roundtrip on a true exportAll snapshot of a
-    reference edit. exportAll flattens references into a self-contained
-    snapshot; rollback must restore that state and rebind to the original
+    """D-007: save a checkpoint of a reference edit, then read it back. The
+    .ma file flattens references into a self-contained copy; reading it back
+    must restore that state and point the scene at the original
     scene path (S2). Manual tier — never CI.
     """
     import maya_mcp_server.maya_scene_module as m
@@ -120,7 +120,7 @@ def test_visual_module_batch_gate_in_real_maya(real_maya):
 
 # ---------------------------------------------------------------------------
 # D-056② call-form bookings — viewport-independent shapes asserted on a
-# healthy mayapy. Env-blocked on the current box; dormant, not claimed.
+# healthy mayapy. Env-blocked on the current box; not wired in yet, not claimed.
 # ---------------------------------------------------------------------------
 
 
@@ -173,10 +173,10 @@ def test_callform_about_batch_is_true(real_maya):
 
 
 def _injection_unit():
-    """Exec the real _mcp_scene payload shape in mayapy: monolith source
-    + all three fragments concatenated into one namespace - the same bytes
+    """Exec the real _mcp_scene payload shape in mayapy: the big file's source
+    plus all three extra files concatenated into one namespace - the same bytes
     the host ships via write_module (D-095). A __future__ slip or py-unsafe
-    syntax in a fragment fails here exactly as in Maya. __mcp_payload__ is
+    syntax in any of them fails here exactly as in Maya. __mcp_payload__ is
     test-only metadata for the byte-parity check."""
     import sys
     import types
@@ -184,7 +184,7 @@ def _injection_unit():
 
     src_dir = Path(__file__).resolve().parents[1] / "src" / "maya_mcp_server"
     source = (src_dir / "maya_scene_module.py").read_text(encoding="utf-8")
-    # No exists() guard: the host reads the fragments unconditionally, so a
+    # No exists() guard: the host reads these files unconditionally, so a
     # missing one has to fail here rather than silently shrink this payload
     # below the shipped one.
     for frag_name in ("introspect_module.py", "validator_module.py", "zone_geometry_module.py"):
@@ -224,7 +224,7 @@ def test_list_nodes_in_real_maya(real_maya):
 
 
 def test_zone_geometry_in_real_maya(real_maya):
-    """Issue #176: the appended fragment runs inside the assembled unit."""
+    """Issue #176: the appended file runs inside the assembled module."""
     m = _injection_unit()
     real_maya.polyCube(name="GEO_shelf_probe", width=2, height=1, depth=3)
     res = m.get_zone_geometry()

@@ -50,7 +50,7 @@ Verdicts:
 | 26 | `img.setRGBA(True)` | `setRGBA(bool)` -> self — channel-order MARKER, not a rearranger | match | same as #20 | 2024 | 2026-09-22 |
 | 27 | `img.verticalFlip()` | `verticalFlip()` -> bool | match | same as #20 | 2024 | 2026-09-22 |
 | 28 | `img.writeToFile(path, 'png')` | `writeToFile(pathname, outputFormat=iff)` -> self | match | same as #20 | 2024 | 2026-09-22 |
-| 29 | `MImage.convertPixelFormat` | NOT in the Python API 2.0 member list (2023 + 2024 refs checked; C++ API only) | absent-in-python — removed from stub and module (D-056⑤) | same as #20 | 2024 | 2026-09-22 |
+| 29 | `MImage.convertPixelFormat` | NOT in the Python API 2.0 member list (2023 + 2024 refs checked; C++ API only) | absent-in-python — removed from the fake and the module (D-056⑤) | same as #20 | 2024 | 2026-09-22 |
 
 \* The Maya 2024 M3dView py_ref page returned 404 during research; the
 2023 page was read verbatim and the member list was cross-checked
@@ -59,19 +59,19 @@ against the 2025/2027 indexes.
 ## omui.MImage dual-location
 
 Real `MImage` lives in `maya.api.OpenMaya` on Maya <=2024 and moves to
-`OpenMayaUI` in 2025+. The stub deliberately models BOTH locations so
+`OpenMayaUI` in 2025+. The fake deliberately models BOTH locations so
 `visual_module._MImage` dual-resolution can be exercised against either
 layout (a test deletes `omui.MImage` to simulate 2024).
 
-Verdict: **stub-only dual-location — justified, converged via
+Verdict: **fake-only dual-location — justified, converged via
 dual-resolution.** Anchored here from `presence-allowlist.json`.
 
 ## VP2 direction probe (D-082d)
 
 Added 2026-09-24 for the per-session runtime orientation probe in
 `visual_module._probe_vp2_direction`. These call forms are standard
-maya.cmds built-ins per the CommandsPython reference; live presence
-re-collection into `presence-baseline.json` landed 2026-09-24
+maya.cmds built-ins per the CommandsPython reference; a fresh live-Maya
+collection into `presence-baseline.json` landed 2026-09-24
 (T-22/D-085③): `cmds.polyCube` and `cmds.undoInfo` probed
 exists+callable on Maya 2024 and the provisional allowlist entries
 were removed.
@@ -80,19 +80,20 @@ were removed.
 |---|---|---|
 | `cmds.polyCube(w, h, d, name=..., constructionHistory=False)` | returns `[transform]`; `-ch` flag suppresses the history node | disposable red marker cube |
 | `cmds.undoInfo(stateWithoutFlush=False/True)` | suspends undo recording without flushing the queue | keeps probe nodes out of Ctrl-Z |
-| `cmds.file(query=True, modified=True)` / `cmds.file(modified=bool)` | scene dirty flag get/set | net-zero dirty-flag restore |
+| `cmds.file(query=True, modified=True)` / `cmds.file(modified=bool)` | scene dirty flag get/set | dirty flag put back |
 | `cmds.ls(selection=True)` | selected node names | selection save/restore |
 | `cmds.camera(name=...)` | `[transform, shape]`; `setAttr` on `orthographic`/`orthoWidth`/clip planes | disposable ortho probe camera |
 | `cmds.sets(cube, edit=True, forceElement=sg)` | assigns the shape to a shadingEngine | pure-red surfaceShader assignment |
 | `cmds.shadingNode("surfaceShader", asShader=True)` + `setAttr .outColor` | unlit flat color (light-independent) | marker paint |
 | `cmds.move(x, y, z, obj, absolute=True)` | absolute world placement | camera-space top-left placement |
 | `cmds.delete`, `cmds.objExists`, `cmds.listRelatives(.., shapes=True)` | subtree/attr membership | teardown of every created node |
-| `cmds.select(list)` / `cmds.select(clear=True)` | selection restore | net-zero selection |
+| `cmds.select(list)` / `cmds.select(clear=True)` | selection restore | selection put back |
 
-Net-zero discipline: undo suspended without flushing, selection /
-panel camera / scene-dirty flag all restored, every created node
-deleted on every path; repaint `cmds.refresh(force=True)` runs after
-teardown so the probe frame cannot leak into the caller's capture.
+Everything the probe changes is put back afterwards: undo suspended
+without flushing, selection / panel camera / scene-dirty flag all
+restored, every created node deleted on every path; repaint
+`cmds.refresh(force=True)` runs after teardown so the probe frame
+cannot leak into the caller's capture.
 
 ## Sources (atomcode research, serialized single run, 2026-09-22)
 
@@ -112,28 +113,28 @@ teardown so the probe frame cannot leak into the caller's capture.
 ## Introspection call sites (D-094)
 
 Scope: every cmds.* call site in `src/maya_mcp_server/introspect_module.py`
-(concatenated into the `_mcp_scene` injection unit, D-095) plus the stub
+(concatenated into the `_mcp_scene` module, D-095) plus the fake
 surface added to `tests/maya_stub/cmds.py`. All rows verified verbatim
 against the official Maya 2024 CommandsPython pages on 2026-09-25.
 
 | # | Call site | Official signature / return | Verdict | URL | Version | Date |
 |---|---|---|---|---|---|---|
 | 1 | `cmds.attributeQuery(attr, node=node, <flag>=True)` | `attributeQuery(attr, node=name, <flag>=bool[,...])` -> bool/list; flags used: exists, readable, writable, connectable, keyable, multi, hidden, storable, indexMatters, listChildren, listEnum, enum, minExists, minimum, maxExists, maximum, softMinExists, softMin, softMaxExists, softMax | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/attributeQuery.html | 2024 | 2026-09-25 |
-| 2 | `cmds.listAttr(node)` | `listAttr(objects)` -> string[]; filter flags modeled in stub: keyable/channelBox/connectable/multi/locked/visible/userDefined/settable/attributeType/string | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/listAttr.html | 2024 | 2026-09-25 |
+| 2 | `cmds.listAttr(node)` | `listAttr(objects)` -> string[]; filter flags modeled in the fake: keyable/channelBox/connectable/multi/locked/visible/userDefined/settable/attributeType/string | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/listAttr.html | 2024 | 2026-09-25 |
 | 3 | `cmds.getAttr(node.attr, type=True)` | `getAttr(attribute, type=bool)` -> attr type string; also `lock`/`keyable`/`settable`/`channelBox` bool flags | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/getAttr.html | 2024 | 2026-09-25 |
 | 4 | `cmds.listConnections(node, plugs=True, connections=True, source=X, destination=Y)` | flags: connections(c) returns (plug-on-object, connected-plug) pairs - "the one on the specified object is given first"; plugs(p) plug names; source/destination direction filters | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/listConnections.html | 2024 | 2026-09-25 |
 | 5 | `cmds.ls(pattern, long=True, type=t / exactType=t, dagObjects=True)` | `ls` flags: long, type (inheritance-aware), exactType (exact only), dagObjects, dependencyNodes; returns string[] | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/ls.html | 2024 | 2026-09-25 |
 | 6 | `cmds.objectType(node, isAType=t)` / `cmds.nodeType(node)` | `objectType` isAType checks the full inheritance chain; nodeType returns exact type | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/objectType.html | 2024 | 2026-09-25 |
 | 7 | `cmds.objExists(node)` | `objExists(string)` -> bool | match | https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Tech-Docs/CommandsPython/objExists.html | 2024 | 2026-09-25 |
 
-Stub-side notes: the stub models a bounded, real-shaped subset of the
+Fake-side notes: the fake models a bounded, real-shaped subset of the
 attribute metadata space (transform trs compounds, light ranges,
 rotateOrder/decayRate enums, message attrs on shadingEngines) - enough
 to pin the contract, not a census. `ls(long=True)` on DG nodes returns
 the short name (no DAG path exists) - the earlier "|<name>" quirk was
 corrected in the same change (test_asset_module assertions updated).
 Response budget (D-110): the caps live in introspect_module.py
-(_DESCRIBE_SOFT_CAP/_DESCRIBE_HARD_CAP), not in the stub surface —
+(_DESCRIBE_SOFT_CAP/_DESCRIBE_HARD_CAP), not in the fake's surface —
 listAttr/listConnections return full lists and describe_node applies
 the 200-item soft cap / 1000 hard cap at response assembly with
 *_truncated + totals disclosure.

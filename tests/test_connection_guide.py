@@ -1,4 +1,4 @@
-"""Tests for connection_guide module \u2014 incl. D-017 A' marker-block semantics."""
+"""Tests for connection_guide module \u2014 incl. D-017 A' managed-block semantics."""
 
 from __future__ import annotations
 
@@ -220,7 +220,7 @@ class TestInstallMarkerBlock:
 
 
 class TestUninstallMarkerBlock:
-    """uninstall_user_setup strips only the marker region."""
+    """uninstall_user_setup strips only the managed region."""
 
     def test_not_installed(self, tmp_path):
         fake = _install(tmp_path)

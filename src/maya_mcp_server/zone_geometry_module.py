@@ -1,4 +1,4 @@
-# --- _mcp_scene zone geometry fragment (issue #176): own file, same injection unit ---
+# --- _mcp_scene zone geometry file (issue #176): own file, one injected module ---
 #
 # scene_tools._ensure_module_injected appends this file after
 # validator_module.py and injects the whole assembly as _mcp_scene.
@@ -7,11 +7,11 @@
 # reuses them so zone membership and the eight-corner world bbox stay the
 # same as the existing scene queries.
 #
-# Dormant until #177 wires the host helper into the recommendation pass.
-# scene_plan does not call this fragment, so its default output stays unchanged.
+# Not wired up yet: #177 connects the host helper to the recommendation pass.
+# scene_plan does not call this file, so its default output stays unchanged.
 #
 # Runtime floor: Maya >=2023 (Python 3.9). No __future__ import here: it would
-# land mid-file in the assembled payload. The monolith's future import makes
+# land mid-file in the assembled payload. The big module's future import makes
 # the annotations below lazy. Do not import this file standalone on py3.9.
 
 import math

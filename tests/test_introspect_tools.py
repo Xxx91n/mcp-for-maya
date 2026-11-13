@@ -1,7 +1,7 @@
 """T-24b host-tool tests: scene_describe / scene_nodes (D-094/D-095).
 
-ExecClient runs generated code against the stub-bound _mcp_scene
-assembly (monolith + fragments) via the REAL
+ExecClient runs generated code against the fake-bound _mcp_scene
+assembly (the big file plus the extra files) via the REAL
 result-capture transform - same chain as test_scene_tools_json.py and
 test_export_tools.py. Covers injection lifecycle, dual channels,
 domain-error passthrough, input validation, and annotations.
@@ -23,7 +23,7 @@ from maya_mcp_server.types import CommandResponse, OutputBuffer, ResultType
 
 
 class ExecClient:
-    """Fake framed-channel client: runs generated code on the stub module."""
+    """Fake framed-channel client: runs generated code on the fake module."""
 
     framed_channel = True
 
@@ -211,15 +211,15 @@ async def _fresh_tools(maya_env, monkeypatch, client_cls):
 
 async def test_injection_carries_fragment_in_one_unit(maya_env, monkeypatch):
     """First call writes ONE module named _mcp_scene whose source
-    concatenates the monolith AND the introspection fragment (D-095)."""
+    concatenates the big file AND the introspection file (D-095)."""
     fns, client = await _fresh_tools(maya_env, monkeypatch, ExecClient)
     maya_env.scene.add_mesh("GEO_a")
     await fns["scene_describe"]("GEO_a")
     assert len(client.written) == 1
     name, source = client.written[0]
     assert name == "_mcp_scene"
-    assert "def get_scene_graph" in source  # monolith half
-    assert "def describe_node" in source  # fragment half
+    assert "def get_scene_graph" in source  # big-file half
+    assert "def describe_node" in source  # extra-file half
     assert "_mcp_introspect" not in source
 
 
@@ -233,7 +233,7 @@ async def test_injection_once_per_session(maya_env, monkeypatch):
 
 async def test_native_channel_staged_injection(maya_env, monkeypatch):
     """Native (headless) channel: source staged via mkstemp + exec
-    into sys.modules; the fragment still lands in _mcp_scene."""
+    into sys.modules; the extra file still lands in _mcp_scene."""
     fns, client = await _fresh_tools(maya_env, monkeypatch, NativeClient)
     maya_env.scene.add_mesh("GEO_a")
     out = json.loads(await fns["scene_describe"]("GEO_a"))

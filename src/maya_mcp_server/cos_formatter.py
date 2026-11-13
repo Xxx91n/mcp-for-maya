@@ -1,6 +1,7 @@
-"""Chain-of-Symbol (CoS) formatter for scene data.
+"""CoS formatter for scene data.
 
-Converts scene JSON into compact symbolic notation optimized for LLM spatial reasoning.
+CoS (Chain-of-Symbol) writes scene data as very short one-line-per-object
+text, which saves the number of tokens sent to the AI.
 Research shows CoS yields +60.8% accuracy on spatial tasks while reducing tokens by 65.8%.
 
 Reference: Hu et al., COLM 2023 - Chain-of-Symbol Prompting
@@ -16,7 +17,7 @@ def format_scene_cos(
     zones: list[dict[str, Any]] | None = None,
     max_objects: int = 200,
 ) -> str:
-    """Format scene data as Chain-of-Symbol notation.
+    """Format scene data as CoS text: short one-line-per-object notation.
 
     Args:
         scene_data: Scene graph data with 'objects', 'stats', 'unit', 'up_axis'.

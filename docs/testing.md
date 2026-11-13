@@ -10,9 +10,9 @@ Two test tiers exist. They are deliberately separate.
 | Injected helper (inside Maya) | Maya >= 2023 i.e. Python >= 3.9 — the `ast.unparse` floor is enforced with a friendly refusal at injection time |
 | Empirically verified | Maya 2024 GUI (Tier 3) |
 
-Multi-instance note (D-060): each Maya instance binds its own `commandPort` on a distinct port — a second instance on the same port fails to bind. The scanner probes all listening ports; MEL commandPorts are positively identified by the bilingual `eval("1/2")` probe and permanently exempted while they keep LISTENing (upstream issue #1). Bound or exclude probe targets via `MAYA_MCP_INCLUDE_PORTS` / `MAYA_MCP_EXCLUDE_PORTS` (comma-separated ports or `a-b` ranges).
+Multi-instance note (D-060): each Maya instance binds its own `commandPort` on a distinct port — a second instance on the same port fails to bind. The scanner probes all listening ports; a port that answers the port-type `eval("1/2")` probe as non-Python goes on this session's do-not-probe list and is not probed again while it keeps LISTENing (upstream issue #1). Bound or exclude probe targets via `MAYA_MCP_INCLUDE_PORTS` / `MAYA_MCP_EXCLUDE_PORTS` (comma-separated ports or `a-b` ranges).
 
-## Tier 1 — stub tests (CI-safe, no Maya needed)
+## Tier 1 — fake Maya tests (CI-safe, no Maya needed)
 
 ```bash
 python -m pytest tests/ -q
@@ -21,18 +21,18 @@ python -m pytest tests/ -q
 `tests/maya_stub/` provides semantic fakes for `maya.cmds` and
 `maya.api.OpenMaya`: a real DAG scene graph, row-major matrix math,
 and correct 8-corner world-bbox transforms. The `maya_env` fixture
-(conftest.py) installs the stub into `sys.modules` and imports
+(conftest.py) installs the fake into `sys.modules` and imports
 `maya_scene_module` bound to it.
 
-The stub is NOT a Maya replacement — it models only the cmds/OpenMaya
+The fake is NOT a Maya replacement — it models only the cmds/OpenMaya
 surface the scene module uses. Its math is self-verified in
-`test_maya_stub.py`; if the stub lies, product tests lie, so keep
+`test_maya_stub.py`; if the fake lies, product tests lie, so keep
 `math3d.py` honest (row-vector convention, translation in M[12..14]).
 
-## Tier 2 — real Maya via mayapy (manual, local-only, NEVER in CI)
+## Tier 2 — real Maya through mayapy (manual, local-only, NEVER in CI)
 
-Run the scene module inside a real Maya interpreter to catch stub drift
-and real API behavior differences:
+Run the scene module inside a real Maya interpreter to catch drift
+between the fake and real API:
 
 ```bash
 # Point mayapy at the repo so maya_mcp_server + tests import cleanly
@@ -43,8 +43,8 @@ set PYTHONPATH=D:\Aworker\maya\maya-mcp-server\src;D:\Aworker\maya\maya-mcp-serv
 Tests marked `@pytest.mark.mayapy` exercise real `maya.cmds`/
 `maya.api.OpenMaya` against `maya_scene_module` — they are skipped
 unless the `mayapy` marker is explicitly selected. They are the
-reference tier: if a stub test and a mayapy test disagree, the stub is
-wrong.
+reference tier: if a fake-Maya test and a real-Maya test disagree, the
+fake is wrong.
 
 The tier auto-initializes `maya.standalone` once per session
 (`tests/test_mayapy_smoke.py::_maya_standalone_init`) — bare mayapy
@@ -54,8 +54,8 @@ crashes hard on `import maya.api.OpenMaya` without it.
 Verified blocked on at least one dev box (Maya 2024, Windows):
 `import maya.standalone` raises a native access violation
 (0xC0000005) inside module creation and `maya.exe -batch` hangs — the
-whole tier is unrunnable there. On such a box, run the Tier-2
-substance (checkpoint/rollback roundtrip, reference-edit case,
+whole tier is unrunnable there. On such a box, run the real-Maya
+checks (checkpoint/read-back roundtrip, reference-edit case,
 signature collection) through a live GUI session instead — see
 `docs/reference/gui_verify.py` for the reference
 implementation. Launch mayapy from PowerShell/cmd, never Git Bash
@@ -65,12 +65,12 @@ Pending: the mayapy/batch run must also cover the `gui_session_required`
 headless gate (visual tools must return the structured error, not
 crash) — queued until a healthy headless Maya env exists.
 
-### Call-form items booked to mayapy (env-blocked on this box)
+### Call-form items booked to the real interpreter (env-blocked on this box)
 
 Viewport-independent call forms whose real-return shape must be
-asserted on a healthy mayapy (skeleton tests in
-`tests/test_mayapy_smoke.py` — they run when the tier is available,
-skip honestly otherwise). Evidence table:
+asserted on a healthy real Maya interpreter (the tests in
+`tests/test_mayapy_smoke.py` run when one is available and skip honestly
+otherwise). Evidence table:
 `docs/visual-callform-matrix.md`.
 
 - `cmds.camera(name=X)` -> `[transform, shape]` list (X1 rename authority)
@@ -94,13 +94,13 @@ _mcp_scene.get_scene_graph()
 
 ## Tier 3 — live Maya GUI session (`gui` + `human_verify` markers, D-049a)
 
-Two markers split the live-GUI tier by assertability — the HIL layer of
-the SIL(stub)/PIL(mayapy)/HIL(live GUI) mapping:
+Two markers split the live-GUI tier by assertability — the third layer of
+the fake(CI) / real-interpreter / live-GUI split:
 
 ```bash
 # machine-checkable items — real asserts against a live session
-# (probes MAYA_MCP_GUI_ADDR=host:port, default 127.0.0.1:7001 bootstrap
-# commandPort; skips cleanly when no session is up)
+# (probes MAYA_MCP_GUI_ADDR=host:port, default 127.0.0.1:7001 entry
+# port; skips cleanly when no session is up)
 python -m pytest tests/ -m gui
 
 # human-eye checklist — tests exist, print manual steps, always skip
@@ -108,9 +108,9 @@ python -m pytest tests/ -m gui
 python -m pytest tests/ -m human_verify -s
 ```
 
-`gui` covers: framed-channel bootstrap (PySide2/Qt real session),
+`gui` covers: the framed-channel setup after injection (PySide2/Qt real session),
 str `result_type` over the real wire (D-046), viewport_snapshot PNG
-contract, render_preview net-zero side effects (panel camera +
+contract, render_preview leaving the viewport as it found it (panel camera +
 currentTime restored), returned-metadata `width/height` matching
 reality, and the camera_not_found domain error.
 
@@ -152,7 +152,7 @@ Machine-assertable (gui):
 - `hasattr(om.MImage, 'convertPixelFormat')` -> False on 2024 Python
   (C++-only API — evidence print in the VP2 gui test, not a gate)
 
-Human-eye (human_verify skeleton):
+Human-eye (human_verify manual checklist):
 
 - asymmetric pure-color probe (top-left red block) lands top-left AND
   red — the flip + channel-order pin on real VP2; also machine-asserted

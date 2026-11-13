@@ -342,7 +342,7 @@ class Scene:
         self.fbx_fixture = None  # {"meshes":[...], "materials":[...]}
         self.fbx_fixture_error = None  # truthy => import raises this
 
-        # ---- session-state surface (D-082d: VP2 probe net-zero proof) ----
+        # ---- session-state surface (D-082d: VP2 probe puts it all back) ----
         # cmds.file(q, modified) / file(modified=v): scene-dirty flag.
         # add_node/delete mark it like real Maya; file(open)/file(save)
         # clear it. cmds.undoInfo state flags land in undo_calls.
