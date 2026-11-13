@@ -29,7 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a clean scene take the same path, and the copy written before the switch is
   unchanged with its path still in `safety_snapshot`. The one new failure is Maya
   refusing to answer that question: the call then errors with nothing opened,
-  rather than printing a made-up "clean". Evidence:
+  rather than printing a made-up "clean". The read is its own round trip, so when
+  two rollbacks for one session overlap, the value describes the scene as the
+  call found it, which may be a scene the other call already replaced; the
+  rollback itself takes the same steps either way. Evidence:
   `tests/test_scene_tools_json.py::TestRollbackSceneModifiedBefore::test_changed_scene_reports_true_and_writes_the_copy`,
   `tests/test_scene_tools_json.py::TestRollbackSceneModifiedBefore::test_clean_scene_reports_false`,
   `tests/test_scene_tools_json.py::TestRollbackSceneModifiedBefore::test_the_object_cache_never_hides_a_later_change`,

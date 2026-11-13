@@ -717,6 +717,14 @@ result
         the call then errors, with nothing opened yet, instead of printing a
         made-up "clean".
 
+        That read is its own round trip, so it is worth saying what it covers
+        when calls overlap: two scene_rollback calls for one session can each
+        run their own read and their own switch. The value then describes the
+        scene as this call found it, which may be a scene the other call has
+        already replaced. Nothing is gated by that difference, and
+        scene_name_before still names the scene the rollback itself read (empty
+        when the scene was never saved).
+
         Args:
             filename: Checkpoint filename from scene_checkpoint_list
                 (cp_*.ma or prev_*.ma).
