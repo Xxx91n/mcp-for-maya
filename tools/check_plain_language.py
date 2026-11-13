@@ -64,6 +64,9 @@ Scope limits, disclosed rather than papered over:
   prose, and a two-space continuation paragraph under a list item may be read
   as prose too. Both cost false positives, never a silent pass on a plain
   paragraph.
+* A fenced block that never closes by the end of the file is read as prose.
+  A wrong guess about where a block ends then shows up as noise, not as a
+  silent pass over the rest of the file.
 * ``docs/reference/real-maya-runbook.md`` is skipped whole, including the
   plain summary #192 added above its body.
 
@@ -250,6 +253,7 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
     out: list[tuple[int, str]] = []
     fence: str | None = None
     fence_indent = 0
+    fence_lines: list[tuple[int, str]] = []
     list_indent: int | None = None
     for number, line in enumerate(text.splitlines(), 1):
         body = line.lstrip(" ")
@@ -267,6 +271,9 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
                 and indent <= fence_indent + 3
             ):
                 fence = None
+                fence_lines.clear()
+            else:
+                fence_lines.append((number, line))
             continue
         if indent >= 4 and list_indent is None:
             continue
@@ -285,6 +292,11 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
         elif list_indent is not None and body.strip() and indent <= list_indent:
             list_indent = None
         out.append((number, strip_code_spans(line)))
+    if fence is not None:
+        # A block still open at the end of the file is not proof that the tail
+        # was code. Read its body as prose, so a bad fence cannot hide the rest
+        # of the file from the scan.
+        out.extend((number, strip_code_spans(line)) for number, line in fence_lines)
     return out
 
 
