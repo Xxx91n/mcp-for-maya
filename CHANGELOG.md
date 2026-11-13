@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Key CI jobs have a wiring check** — missing, skipped or non-blocking
+  lint/mypy/pytest jobs and broken `ci` summary wiring now fail a local check.
+  Limits and local commands: `docs/ci-wiring.md`. Evidence:
+  `tests/test_check_ci_wiring.py::test_a_missing_mypy_and_its_aggregate_need_is_red`,
+  `tests/test_check_ci_wiring.py::test_findings_are_blocking_with_no_opt_out`.
+
 - **Unsaved changes are visible in `scene_snapshot`** — the CoS header now always
   ends with `MODIFIED=y|n`, and `scene_snapshot(format="json")` reports the same
   fact as the top-level `scene_modified` field. The value is Maya's own flag for
