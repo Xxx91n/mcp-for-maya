@@ -423,6 +423,58 @@ class TestSamplingDisclosure:
         assert res["sampling"]["skipped"] == 10
 
 
+class TestAestheticsColorMath:
+    """Pin the color_theory dimension, which is the widest path through the
+    small color helpers (RGB->HSL, hue, color temperature in Kelvin, WCAG
+    luminance). A change in that math then shows up as a changed score
+    instead of a number nobody reads.
+
+    The entry is analyze_aesthetics(), the module function the scene_aesthetics
+    tool calls. Two things this test does NOT cover: the other call sites of
+    those same helpers (_color_temp_k in _score_lighting_quality, _rgb_to_hsl
+    in _analyze_style_consistency), and any band the fixture below does not
+    land in.
+
+    The fixture is picked so every expected value can be derived by hand:
+    - object counts 6/3/1 of a 10-object total are exactly 60/30/10;
+    - red (1,0,0) and green (0,1,0) estimate as 3000K and cyan (0,1,1) as
+      10000K, so 7 objects land warm and 3 cool;
+    - all three are fully saturated, so the saturation spread is zero;
+    - red is hue 0 and cyan is hue 180, exactly complementary;
+    - WCAG luminance is 0.2126 red, 0.7874 cyan, 0.7152 green, so the
+      contrast ratio is (0.7874+0.05)/(0.2126+0.05) = 3.19.
+    """
+
+    def test_known_material_colors_score_as_expected(self, maya_env):
+        reds = [f"GEO_red{i}" for i in range(6)]
+        cyans = [f"GEO_cyan{i}" for i in range(3)]
+        for i, name in enumerate(reds + cyans):
+            maya_env.scene.add_mesh(name, t=(i * 200, 0, 0))
+        maya_env.scene.add_mesh("GEO_green", t=(2000, 0, 0))
+
+        maya_env.scene.add_material("MAT_red", color=(1.0, 0.0, 0.0), assign_to=reds)
+        maya_env.scene.add_material("MAT_cyan", color=(0.0, 1.0, 1.0), assign_to=cyans)
+        maya_env.scene.add_material("MAT_green", color=(0.0, 1.0, 0.0), assign_to=["GEO_green"])
+
+        res = maya_env.module.analyze_aesthetics()
+
+        color = res["detail"]["color_theory"]
+        # Every value is pinned exactly because _score_color_theory rounds
+        # them all to one decimal: 100 = no 60/30/10 deviation, 60 = 40 units
+        # of warm/cool imbalance, 40 = spread 0 falls in the 40 band,
+        # 90 = complementary hues, 65 = contrast ratio in 3-4.5.
+        assert color["sub_scores"] == {
+            "60_30_10": 100.0,
+            "temperature": 60.0,
+            "saturation": 40.0,
+            "harmony": 90.0,
+            "contrast": 65.0,
+        }
+        # 0.20*100 + 0.15*60 + 0.15*40 + 0.25*90 + 0.25*65 = 73.75, which the
+        # function rounds to 73.8 — so exact equality is the honest assertion.
+        assert color["score"] == 73.8
+
+
 # ------------------------------------------------------------
 # P0-6: camera_orbit must constrain to a center locator
 # ------------------------------------------------------------

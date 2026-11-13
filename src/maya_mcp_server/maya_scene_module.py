@@ -2007,7 +2007,7 @@ def _compute_full_aesthetic_score(materials, objects, scene_bounds, lights, zone
     }
 
 
-def _rgb_to_hsl(r, g, b):
+def _rgb_to_hsl(r: float, g: float, b: float) -> tuple[float, float, float]:
     """RGB [0-1] to HSL (H:0-360, S:0-1, L:0-1)."""
     mx = max(r, g, b)
     mn = min(r, g, b)
@@ -2025,12 +2025,12 @@ def _rgb_to_hsl(r, g, b):
     return (h % 360, s, l)
 
 
-def _rgb_to_hue(rgb):
+def _rgb_to_hue(rgb: list[float]) -> float:
     """Extract hue (0-360) from RGB [0-1]."""
     return _rgb_to_hsl(rgb[0], rgb[1], rgb[2])[0]
 
 
-def _color_temp_k(r, g, b):
+def _color_temp_k(r: float, g: float, b: float) -> float:
     """Estimate color temperature in Kelvin."""
     if r + g + b < 0.01:
         return 6500.0
@@ -2043,10 +2043,10 @@ def _color_temp_k(r, g, b):
         return max(1000, min(12000, 6500 + (1 - ratio) * 3500))
 
 
-def _wcag_luminance(r, g, b):
+def _wcag_luminance(r: float, g: float, b: float) -> float:
     """WCAG 2.0 relative luminance."""
 
-    def linearize(v):
+    def linearize(v: float) -> float:
         return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
 
     return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
