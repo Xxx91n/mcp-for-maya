@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -479,3 +480,75 @@ class TestSceneModifiedFlag:
 
         with pytest.raises(RuntimeError, match="unsaved-changes flag"):
             await tools.fns["scene_snapshot"](format="json")
+
+
+class TestRollbackSceneModifiedBefore:
+    """scene_rollback reports the state from before the scene was switched,
+    and the copy written just before the switch is still a real file."""
+
+    async def _scene_with_one_checkpoint(self, tools, tmp_path):
+        """Real .ma on disk, plus a scene that has moved on since."""
+        tools.env.scene.scene_path = str(tmp_path / "shot.ma")
+        tools.env.scene.add_mesh("GEO_a")
+        saved = json.loads(await tools.fns["scene_checkpoint"](name="v1"))
+        assert "error" not in saved, saved
+
+    async def test_clean_scene_reports_false(self, tools, tmp_path):
+        await self._scene_with_one_checkpoint(tools, tmp_path)
+        tools.env.scene.modified = False  # what a save would leave behind
+
+        res = json.loads(await tools.fns["scene_rollback"](filename="cp_v1.ma"))
+
+        assert res["success"] is True, res
+        assert res["scene_modified_before"] is False
+
+    async def test_changed_scene_reports_true_and_writes_the_copy(self, tools, tmp_path):
+        await self._scene_with_one_checkpoint(tools, tmp_path)
+        tools.env.scene.add_mesh("GEO_wip")
+
+        res = json.loads(await tools.fns["scene_rollback"](filename="cp_v1.ma"))
+
+        assert res["success"] is True, res
+        assert res["scene_modified_before"] is True
+        assert os.path.exists(res["safety_snapshot"]), (
+            f"the copy taken before the switch must be on disk: {res['safety_snapshot']}"
+        )
+
+    async def test_the_object_cache_never_hides_a_later_change(self, tools, tmp_path):
+        await self._scene_with_one_checkpoint(tools, tmp_path)
+        tools.env.scene.modified = False
+        await tools.fns["scene_snapshot"](format="json")  # fills the scene caches
+
+        tools.env.scene.modified = True
+        res = json.loads(await tools.fns["scene_rollback"](filename="cp_v1.ma"))
+
+        assert res["scene_modified_before"] is True
+
+    async def test_discard_flag_does_not_move_the_reported_state(self, tools, tmp_path):
+        await self._scene_with_one_checkpoint(tools, tmp_path)
+        tools.env.scene.add_mesh("GEO_wip")
+
+        res = json.loads(
+            await tools.fns["scene_rollback"](filename="cp_v1.ma", discard_current_state=True)
+        )
+
+        assert res["success"] is True, res
+        assert res["scene_modified_before"] is True
+        assert res["safety_snapshot"] != "skipped_by_user", (
+            "discard_current_state keeps its old meaning: the save still happens"
+        )
+        assert "warning" in res
+
+    async def test_an_unreadable_flag_stops_before_anything_opens(self, tools, monkeypatch):
+        opened = []
+        monkeypatch.setattr(
+            tools.env.module,
+            "rollback_to_checkpoint",
+            lambda *args, **kwargs: opened.append(args) or {"success": True},
+        )
+        monkeypatch.setattr(tools.env.module, "get_scene_modified", lambda: {})
+
+        with pytest.raises(RuntimeError, match="unsaved-changes flag"):
+            await tools.fns["scene_rollback"](filename="cp_x.ma")
+
+        assert opened == [], "a flag nobody could read must not be guessed at, and must stop first"

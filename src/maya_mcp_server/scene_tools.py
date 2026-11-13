@@ -113,6 +113,27 @@ async def _execute_scene_code(
     return await fetch()
 
 
+async def _read_scene_modified(client: Any, session_key: str | None, caller: str) -> bool:
+    """Read Maya's unsaved-changes flag, fresh, through the _mcp_scene unit.
+
+    One read for scene_snapshot and scene_rollback: never cached, because a
+    change made one second ago has to show up, and one error message when
+    Maya cannot answer. The caller's name goes into that message so a reader
+    knows which tool failed. Nothing here turns the flag into a decision —
+    it is reported, never acted on.
+    """
+    reply = await _execute_scene_code(
+        client,
+        module_call("_mcp_scene", "get_scene_modified"),
+        session_key,
+        use_cache=False,
+    )
+    scene_modified = reply.get("scene_modified")
+    if not isinstance(scene_modified, bool):
+        raise RuntimeError(f"{caller} could not read the unsaved-changes flag: {reply!r}")
+    return scene_modified
+
+
 # not wired up yet: #177 is the first planned production caller. Keep this helper out
 # of scene_plan until the recommendation opt-in lands; default output is frozen.
 async def get_zone_geometry(  # pragma: no cover
@@ -242,17 +263,7 @@ def register_scene_tools(mcp: Any) -> None:
         # Read the unsaved-changes flag fresh on every call. The object list
         # above may come from the cache; this fact may not. Nothing caches it,
         # so a change made after the previous call shows up right away.
-        scene_state = await _execute_scene_code(
-            client,
-            module_call("_mcp_scene", "get_scene_modified"),
-            session_key,
-            use_cache=False,
-        )
-        scene_modified = scene_state.get("scene_modified")
-        if not isinstance(scene_modified, bool):
-            raise RuntimeError(
-                f"scene_snapshot could not read the unsaved-changes flag: {scene_state!r}"
-            )
+        scene_modified = await _read_scene_modified(client, session_key, "scene_snapshot")
 
         # Auto-adjust token budget
         obj_count = scene_data.get("stats", {}).get("total", 0)
@@ -694,6 +705,18 @@ result
         The checkpoint file carries no undo history \u2014 call scene_snapshot
         afterwards to rebuild context.
 
+        The result also says scene_modified_before: whether the scene still had
+        changes that were never saved at the moment this call started. It comes
+        from the same Maya flag scene_snapshot reports, read once before the
+        file is opened \u2014 after that, the flag describes the checkpoint, not
+        the scene being replaced. The value never changes what this tool does: a
+        changed scene and a clean scene take the same path, and the copy written
+        before the switch behaves exactly as before (safety_snapshot reports
+        "skipped_by_user" only when discard_current_state lets a failed save
+        through). The one new failure is Maya refusing to answer that question:
+        the call then errors, with nothing opened yet, instead of printing a
+        made-up "clean".
+
         Args:
             filename: Checkpoint filename from scene_checkpoint_list
                 (cp_*.ma or prev_*.ma).
@@ -703,13 +726,18 @@ result
 
         Returns:
             Structured result: success, scene_name_before/after,
-            original_file_status, scene_rebound_to, safety_snapshot.
+            original_file_status, scene_rebound_to, safety_snapshot,
+            scene_modified_before.
         """
         from maya_mcp_server.server import get_session_manager
 
         manager = get_session_manager()
         client = await manager.get_client(session_key)
         await _ensure_module_injected(client, session_key)
+
+        # Read the unsaved-changes flag while the scene is still the one being
+        # replaced. After the open it would describe the checkpoint instead.
+        scene_modified_before = await _read_scene_modified(client, session_key, "scene_rollback")
 
         code = module_call(
             "_mcp_scene",
@@ -719,6 +747,7 @@ result
         )
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
         mark_dirty(session_key)
+        result["scene_modified_before"] = scene_modified_before
         return json.dumps(result, indent=2)
 
     @mcp.tool(annotations=TOOL_ANNOTATIONS["scene_checkpoint_list"])

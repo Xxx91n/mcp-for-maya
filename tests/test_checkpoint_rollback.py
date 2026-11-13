@@ -362,6 +362,27 @@ class TestRollback:
         assert saved_scene.scene.exists("GEO_v1")
         assert not saved_scene.scene.exists("GEO_v2")
 
+    def test_the_unsaved_flag_never_gates_a_read_back(self, saved_scene):
+        """#207: the unsaved-changes flag is reported, never acted on.
+
+        Both states must take the same path: the copy is written first either
+        way. Which value gets reported is pinned at the tool layer
+        (test_scene_tools_json.TestRollbackSceneModifiedBefore), because the
+        read lives in scene_tools and this module never sees the flag.
+        """
+        saved_scene.scene.add_mesh("GEO_a")
+        assert "error" not in saved_scene.module.save_checkpoint("v1")
+
+        saved_scene.scene.modified = False
+        clean = saved_scene.module.rollback_to_checkpoint("cp_v1.ma")
+        saved_scene.scene.modified = True
+        changed = saved_scene.module.rollback_to_checkpoint("cp_v1.ma")
+
+        assert clean["success"] is True and changed["success"] is True
+        assert sorted(clean) == sorted(changed), "the flag must not change the result shape"
+        for res in (clean, changed):
+            assert os.path.exists(res["safety_snapshot"]), res
+
 
 # ------------------------------------------------------------
 # list_checkpoints

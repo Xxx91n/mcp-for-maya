@@ -214,6 +214,9 @@ scene_checkpoint_list()
 
 # 读档（先自动存一份当前场景，再把场景名指回原文件；没保存过的场景没有原文件，读档后就停在这个存档里；读档后请用 scene_snapshot 重建认知）
 # 边界：每个存档都自包含——references 默认展平不回写；假定单场景文件单会话
+# 读档结果里还有 scene_modified_before：换场景之前有没有没保存的改动。
+# 这个字段不拦任何操作；副本照旧写，路径在 safety_snapshot 里
+# （只有 discard_current_state 能在写失败时把它变成 skipped_by_user）。
 scene_rollback(filename="cp_before_renovation.ma")
 ```
 
