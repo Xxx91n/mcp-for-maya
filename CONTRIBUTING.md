@@ -108,9 +108,11 @@ PR body, which is how the three asset fixes before this cleanup landed.
 - CI gates (`.github/workflows/ci.yml`): `pytest` must be green on ubuntu + windows; the ruff budget
   (`.github/ruff-baseline.json`) may only go down — above budget fails, and a lower count may be
   budgeted down in the same PR commit with the reason stated. `mypy` is baseline-gated in CI
-  (`mypy-baseline.txt`; 184 errors in 2 files as of the D-124 removal of the code that was not wired up —
-  baseline counts are sensitive to the fake Maya environment; drift trail 221→223→212→223→184 across formatter,
-  fake-Maya-environment changes and removal of code that was not wired up): the type-check row in
+  (`mypy-baseline.txt`; 168 errors in 1 file as of the scene_tools annotation batch —
+  baseline counts are sensitive to the fake Maya environment; drift trail
+  221→223→212→223→184→168 across formatter, fake-Maya-environment changes,
+  D-124's removal of the code that was not wired up and the first local
+  annotation batch): the type-check row in
   Development setup above is that gate — the filter fails only on NEW errors,
   and the wrapper keeps a mypy crash (raw exit above 1) red.
   After resolving errors, regenerate the baseline from the same guarded report —

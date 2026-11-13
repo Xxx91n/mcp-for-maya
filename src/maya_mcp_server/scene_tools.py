@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from maya_mcp_server.client import ensure_module_injected, exec_module_code, module_call
 from maya_mcp_server.cos_formatter import (
@@ -22,6 +22,10 @@ from maya_mcp_server.cos_formatter import (
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS
 from maya_mcp_server.scene_cache import SceneCache
 from maya_mcp_server.security import InputValidationError
+
+
+if TYPE_CHECKING:
+    from fastmcp import FastMCP
 
 
 logger = logging.getLogger(__name__)
@@ -105,7 +109,10 @@ async def _execute_scene_code(
         Parsed result.
     """
 
-    async def fetch():
+    # The decoded reply is whatever JSON Maya sent back, so it stays Any:
+    # exec_module_code already declares -> Any and no narrower type can be
+    # proven at this layer.
+    async def fetch() -> Any:
         return await exec_module_code(client, code)
 
     if use_cache and cache_key:
@@ -157,10 +164,16 @@ async def get_zone_geometry(  # pragma: no cover
 # --- Token Budget Management ---
 
 
+class _BudgetEntry(TypedDict):
+    max_tokens: int
+    detail: str
+    max_objects: int
+
+
 class TokenBudget:
     """Auto-adjust detail level based on scene size."""
 
-    BUDGETS = {
+    BUDGETS: dict[str, _BudgetEntry] = {
         "small": {"max_tokens": 2000, "detail": "compact", "max_objects": 50},
         "medium": {"max_tokens": 5000, "detail": "compact", "max_objects": 200},
         "large": {"max_tokens": 10000, "detail": "summary", "max_objects": 500},
@@ -186,7 +199,7 @@ class TokenBudget:
 # --- MCP Tool Registration ---
 
 
-def register_scene_tools(mcp: Any) -> None:
+def register_scene_tools(mcp: FastMCP) -> None:
     """Register scene tools on the FastMCP instance.
 
     Args:
