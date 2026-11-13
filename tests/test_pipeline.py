@@ -114,12 +114,21 @@ class TestToolAnnotations:
     def test_all_25_tools_covered(self):
         assert set(TOOL_ANNOTATIONS) == self.EXPECTED
 
+    def test_scene_plan_stays_write_class_with_open_world(self):
+        """scene_plan keeps its mutation class; only the open-world hint
+        turns true (its opt-in recommend_assets path reaches the network)."""
+        ann = TOOL_ANNOTATIONS["scene_plan"]
+        assert ann.read_only_hint is False
+        assert ann.destructive_hint is False
+        assert ann.idempotent_hint is False
+        assert ann.open_world_hint is True
+
     def test_four_hints_all_set(self):
         for name, ann in TOOL_ANNOTATIONS.items():
             assert ann.read_only_hint is not None, name
             assert ann.destructive_hint is not None, name
             assert ann.idempotent_hint is not None, name
-            if name in ("asset_search", "asset_import"):
+            if name in ("asset_search", "asset_import", "scene_plan"):
                 assert ann.open_world_hint is True, name
             else:
                 assert ann.open_world_hint is False, name

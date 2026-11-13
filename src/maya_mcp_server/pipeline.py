@@ -71,6 +71,16 @@ _WRITE_SAFE = mt.ToolAnnotations(
     idempotent_hint=False,
     open_world_hint=False,
 )
+# scene_plan with its opt-in recommend_assets path: same write class as
+# _WRITE_SAFE, but the recommendation pass may reach the Poly Haven search
+# index on the host (search only — no download, no import), so open-world
+# must be honest (Q4 of #31).
+_WRITE_SAFE_NET = mt.ToolAnnotations(
+    read_only_hint=False,
+    destructive_hint=False,
+    idempotent_hint=False,
+    open_world_hint=True,
+)
 _WRITE_DESTRUCTIVE = mt.ToolAnnotations(
     read_only_hint=False,
     destructive_hint=True,
@@ -111,7 +121,9 @@ TOOL_ANNOTATIONS: dict[str, mt.ToolAnnotations] = {
     # mutation-class tools: scene/filesystem effects, not destructive (7)
     "scene_checkpoint": _WRITE_SAFE,
     "scene_rollback": _WRITE_SAFE,
-    "scene_plan": _WRITE_SAFE,
+    # scene_plan mutates with auto_fix and, only when recommend_assets=True,
+    # queries the Poly Haven index host-side: write class + openWorld
+    "scene_plan": _WRITE_SAFE_NET,
     "camera_create": _WRITE_SAFE,
     "camera_orbit": _WRITE_SAFE,
     "add_session": _WRITE_SAFE,

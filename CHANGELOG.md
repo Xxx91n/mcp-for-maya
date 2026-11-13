@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`scene_plan` can recommend Poly Haven models for the furniture zone** —
+  the new opt-in `recommend_assets=True` flag reads fresh zone geometry,
+  searches the models index for "chair", and screens the hits against the
+  zone's world-axis bounding box as an upper size limit only (no clearance
+  or collision claims). The plan itself never changes: a search or network
+  failure becomes a structured `offline` note, empty or unmeasurable zones
+  are skipped without a request, and an asset without usable dimensions
+  lands in `unverified_candidates` instead of passing. The search runs on
+  the host — on the calling loop for now; the worker thread and the
+  5-second soft budget land together with T4 — and sends nothing but the
+  query word plus index parameters — no objective, object names, DAG paths,
+  or sizes; and nothing is downloaded or imported. With the flag off (the
+  default), JSON
+  and CoS output are byte-identical and nothing extra is fetched. The
+  annotation matrix gains an honest openWorld hint for `scene_plan`; the
+  tool count stays at 25. T1 scope: the furniture zone with the single
+  query "chair" (#217); the other zones, dedup, and full ordering are T2.
+  Evidence:
+  `tests/test_scene_tools_json.py::TestRecommendAssets::test_enabled_json_attaches_recommendations_and_keeps_the_plan`,
+  `tests/test_scene_tools_json.py::TestRecommendAssets::test_search_failure_reports_offline_and_keeps_the_plan`,
+  `tests/test_scene_tools_json.py::TestRecommendAssets::test_default_call_never_searches_and_omits_the_section`,
+  `tests/test_asset_recommendation.py::TestSearchContract::test_search_gets_the_t1_query_and_limit_only`,
+  `tests/test_asset_recommendation.py::TestCapsAndOrder::test_per_zone_cap_is_three_with_output_truncation`,
+  `tests/test_pipeline.py::TestToolAnnotations::test_scene_plan_stays_write_class_with_open_world`.
 - **Unsaved changes are visible in `scene_snapshot`** — the CoS header now always
   ends with `MODIFIED=y|n`, and `scene_snapshot(format="json")` reports the same
   fact as the top-level `scene_modified` field. The value is Maya's own flag for
