@@ -706,21 +706,21 @@ result
         afterwards to rebuild context.
 
         The result also says scene_modified_before: whether the scene still had
-        changes that were never saved at the moment this call started. It comes
-        from the same Maya flag scene_snapshot reports, read once before the
-        file is opened \u2014 after that, the flag describes the checkpoint, not
-        the scene being replaced. The value never changes what this tool does: a
-        changed scene and a clean scene take the same path, and the copy written
-        before the switch behaves exactly as before (safety_snapshot reports
-        "skipped_by_user" only when discard_current_state lets a failed save
-        through). The one new failure is Maya refusing to answer that question:
-        the call then errors, with nothing opened yet, instead of printing a
-        made-up "clean".
+        changes that were never saved at the moment this call read the flag \u2014
+        a read of its own, just before the rollback request and before any file
+        is opened. It is the same Maya flag scene_snapshot reports; after the
+        open, that flag describes the checkpoint, not the scene being replaced.
+        The value never changes what this tool does: a changed scene and a clean
+        scene take the same path, and the copy written before the switch behaves
+        exactly as before (safety_snapshot reports "skipped_by_user" only when
+        discard_current_state lets a failed save through). The one new failure
+        is Maya refusing to answer that question: the call then errors, with
+        nothing opened yet, instead of printing a made-up "clean".
 
         That read is its own round trip, so it is worth saying what it covers
         when calls overlap: two scene_rollback calls for one session can each
         run their own read and their own switch. The value then describes the
-        scene as this call found it, which may be a scene the other call has
+        scene as it was at that read, which may be a scene the other call has
         already replaced. Nothing is gated by that difference, and
         scene_name_before still names the scene the rollback itself read (empty
         when the scene was never saved).
