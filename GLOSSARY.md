@@ -42,6 +42,9 @@ _Avoid_: 回滚、显式重建场景身份、rebind、重绑
 **临时存档**: 没保存过的新场景要先起个名字才能存；这种存档没有原文件路径，读档后仍停在存档里。
 _Avoid_: ad-hoc 快照、ad-hoc snapshot、标记性快照
 
+**未保存改动检查**: 读档前先看一眼有没有没保存的东西；结果跟着读档的返回一起给调用方，读档不会因此停下。
+_Avoid_: 脏场景守卫、dirty-scene guard
+
 ## 连接与注入
 
 **入口端口**: Maya 的 commandPort（默认 7001），只用来找会话和注入 helper，不跑正常工作。
@@ -155,9 +158,8 @@ _Avoid_: choke point、唯一入口
 
 ## 已删除的说法
 
-这两条旧词条删掉了，不是词条、也不用再解释一遍：
-脏场景守卫在代码里没有实现（见 #185）；薄集成只是词表自己造的说法，
-素材来源这件事 README 的素材那行和 `polyhaven.py` 都只提 Poly Haven。
+薄集成这条旧词条删掉了，只是词表自己造的说法，不是词条、也不用再解释一遍。
+素材来源这件事，README 的素材那行和 `polyhaven.py` 都只提 Poly Haven。
 下面这行只是不许再用的说法，检查脚本照样会拦：
 
-_Avoid_: 脏场景守卫、dirty-scene guard、薄集成、thin integration
+_Avoid_: 薄集成、thin integration
