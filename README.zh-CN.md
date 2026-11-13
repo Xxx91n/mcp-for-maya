@@ -263,13 +263,15 @@ scene_render_preview(camera="CAM_hero", width=640, height=360)
 默认输出使用 **CoS**（Chain-of-Symbol）格式：把场景数据写成很短的一行行文字，省下发给 AI 的字数。该格式论文报告在其演示场景上较 JSON 节省约 65% token（arXiv:2305.10276，-65.8%）。
 
 ```
-SCENE[164obj, 5zones] UNIT=cm UP=y
+SCENE[164obj, 5zones] UNIT=cm UP=y MODIFIED=n
 shell (23obj) @(-11.8,178.8,145.7)
   GRP_floor[mesh]@(0,0,0) 1121.5x20x1530.5
   pasted__arch_wall[mesh]@(0,0,0) 100x300x10
 entrance (6obj) @(157.3,162.6,-111.6)
   GRP_workshopFront[group]@(1162,-17,103) 227.4x200.9x193.3
 ```
+
+第一行末尾固定带 `MODIFIED=y|n`：`y` 表示场景里有没保存的改动，`n` 表示没有。这是 Maya 自己记的「改过没有」开关，管的是整个场景。通过 MCP 工具做的改动也算在内，所以这个标记只说有没有变过，不说谁改的。`scene_snapshot(format="json")` 用顶层 `scene_modified` 字段报同一件事，而且每次调用都现读，不走对象列表的缓存。
 
 ## Agent Skills
 

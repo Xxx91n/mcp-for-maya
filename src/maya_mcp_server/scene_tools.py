@@ -28,13 +28,14 @@ logger = logging.getLogger(__name__)
 
 # Module source paths for _mcp_scene. The separate files are concatenated
 # into the SAME injected module in this order: introspection, checks you
-# register, zone geometry. One module name, one trigger; a syntax or
-# import-time error in any of them stops the whole module from loading.
+# register, zone geometry, scene state. One module name, one trigger; a syntax
+# or import-time error in any of them stops the whole module from loading.
 # The host-side files are still maintained separately.
 _MODULE_SOURCE = Path(__file__).parent / "maya_scene_module.py"
 _INTROSPECT_FRAGMENT = Path(__file__).parent / "introspect_module.py"
 _VALIDATOR_FRAGMENT = Path(__file__).parent / "validator_module.py"
 _ZONE_GEOMETRY_FRAGMENT = Path(__file__).parent / "zone_geometry_module.py"
+_SCENE_STATE_FRAGMENT = Path(__file__).parent / "scene_state_module.py"
 
 # Global cache per session (keyed by session_key)
 _caches: dict[str, SceneCache] = {}
@@ -79,6 +80,7 @@ async def _ensure_module_injected(client: Any, session_key: str | None) -> None:
             _INTROSPECT_FRAGMENT,
             _VALIDATOR_FRAGMENT,
             _ZONE_GEOMETRY_FRAGMENT,
+            _SCENE_STATE_FRAGMENT,
         ],
     )
 
@@ -181,6 +183,15 @@ def register_scene_tools(mcp: Any) -> None:
         Returns a structured description of ALL objects with positions, sizes, and types.
         Call this once at the start of each task to see the whole scene before changing it.
 
+        The first line ends with MODIFIED=y or MODIFIED=n. y means the scene
+        has changes that were never saved; n means it has none. This is
+        Maya's own flag for the whole scene, so it says nothing about which
+        object changed. Changes made through this server's own tools count
+        too, so y does not mean a person edited the scene. JSON output
+        carries the same fact as the top-level scene_modified field. The flag
+        is read again on every call and never comes from the cache, while the
+        object list may be a few seconds old.
+
         Boundary: Disambiguated from scene_inspect (deep-dive inspection of
         specific objects or zones) and scene_nodes (granular DAG/DG node
         name discovery with pagination).
@@ -193,13 +204,14 @@ def register_scene_tools(mcp: Any) -> None:
             session_key: Maya session key (auto-selected if only one session).
 
         Returns:
-            CoS-formatted scene description (default) or JSON.
+            CoS-formatted scene description (default) or JSON, either with
+            the unsaved-changes flag.
 
         Performance: 100 objects < 50ms, 1000 objects < 200ms.
 
         Example:
-            scene_snapshot() → SCENE[100obj, 3zones] UNIT=cm UP=y\\nENTRANCE: ...
-            scene_snapshot(detail="standard", format="json") → {"objects": [...]}
+            scene_snapshot() → SCENE[100obj, 3zones] UNIT=cm UP=y MODIFIED=n\\nENTRANCE: ...
+            scene_snapshot(format="json") → {"scene": {...}, "scene_modified": false}
         """
         from maya_mcp_server.server import get_session_manager
 
@@ -227,6 +239,21 @@ def register_scene_tools(mcp: Any) -> None:
             cache_key="zone_map",
         )
 
+        # Read the unsaved-changes flag fresh on every call. The object list
+        # above may come from the cache; this fact may not. Nothing caches it,
+        # so a change made after the previous call shows up right away.
+        scene_state = await _execute_scene_code(
+            client,
+            module_call("_mcp_scene", "get_scene_modified"),
+            session_key,
+            use_cache=False,
+        )
+        scene_modified = scene_state.get("scene_modified")
+        if not isinstance(scene_modified, bool):
+            raise RuntimeError(
+                f"scene_snapshot could not read the unsaved-changes flag: {scene_state!r}"
+            )
+
         # Auto-adjust token budget
         obj_count = scene_data.get("stats", {}).get("total", 0)
         budget_level = TokenBudget.auto_select_level(obj_count)
@@ -239,6 +266,7 @@ def register_scene_tools(mcp: Any) -> None:
                 "zones": zone_data.get("zones", []),
                 "budget": budget_level,
                 "object_count": obj_count,
+                "scene_modified": scene_modified,
             }
             output = json.dumps(result, indent=2)
         else:
@@ -246,6 +274,7 @@ def register_scene_tools(mcp: Any) -> None:
                 scene_data,
                 zones=zone_data.get("zones", []),
                 max_objects=max_objects,
+                scene_modified=scene_modified,
             )
 
         return output

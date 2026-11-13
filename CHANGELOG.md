@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Unsaved changes are visible in `scene_snapshot`** — the CoS header now always
+  ends with `MODIFIED=y|n`, and `scene_snapshot(format="json")` reports the same
+  fact as the top-level `scene_modified` field. The value is Maya's own flag for
+  the whole scene, read again on every call rather than taken from the
+  object-list cache; changes made through this server's own tools count too, so
+  it says whether anything changed, never who changed it. No tool refuses to run
+  because of the flag's value; if Maya cannot report it, the call errors instead
+  of claiming a clean scene. Evidence:
+  `tests/test_scene_tools_json.py::TestSceneModifiedFlag::test_cached_object_list_does_not_hide_a_later_change`,
+  `tests/test_scene_tools_json.py::TestSceneModifiedFlag::test_cos_header_writes_the_flag_in_both_states`,
+  `tests/test_cos_formatter.py::TestFormatSceneCos::test_modified_flag_reads_y_when_the_scene_changed`.
 - **Plain-language glossary plus a local checker for the words it retires** —
   `GLOSSARY.md` now gives every term one plain sentence and an `_Avoid_:` line
   naming the words it replaced, and `tools/check_plain_language.py` reads those

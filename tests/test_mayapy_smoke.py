@@ -174,7 +174,7 @@ def test_callform_about_batch_is_true(real_maya):
 
 def _injection_unit():
     """Exec the real _mcp_scene payload shape in mayapy: the big file's source
-    plus all three extra files concatenated into one namespace - the same bytes
+    plus all four extra files concatenated into one namespace - the same bytes
     the host ships via write_module (D-095). A __future__ slip or py-unsafe
     syntax in any of them fails here exactly as in Maya. __mcp_payload__ is
     test-only metadata for the byte-parity check."""
@@ -187,7 +187,12 @@ def _injection_unit():
     # No exists() guard: the host reads these files unconditionally, so a
     # missing one has to fail here rather than silently shrink this payload
     # below the shipped one.
-    for frag_name in ("introspect_module.py", "validator_module.py", "zone_geometry_module.py"):
+    for frag_name in (
+        "introspect_module.py",
+        "validator_module.py",
+        "zone_geometry_module.py",
+        "scene_state_module.py",
+    ):
         source += "\n\n" + (src_dir / frag_name).read_text(encoding="utf-8")
     mod = types.ModuleType("_mcp_scene")
     mod.__file__ = str(src_dir / "maya_scene_module.py")
