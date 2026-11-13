@@ -1,6 +1,6 @@
 # Maya MCP Server — v1.0.0 真机验证窗执行手册 (Runbook)
 
-> **这份文件是什么（白话摘要）**：2026 年 9 月那轮"在真 Maya 上跑一遍"的验证手册，留作历史记录，正文不改。它讲的是怎么在一台装好 Maya 2024 的机器上，按三条车道（mayapy 无界面、桌面脚本、GUI 界面）把十项检查逐项跑完并记下结果。真正的结果表在 `docs/evidence/real-maya-window-2026-09-30.md`，本文只是当时的操作步骤。文中 `D-xxx` 是已退役决策账本的编号，原文用 `git show '1c5befe^:docs/decision-ledger.md'` 取；`.scratch/` 下的草稿不入仓。第 5 步提到的「脏场景守卫」只在文档里写过，代码里没有实现（#185）。
+> **这份文件是什么（白话摘要）**：2026 年 9 月那轮"在真 Maya 上跑一遍"的验证手册，留作历史记录，正文不改。它讲的是怎么在一台装好 Maya 2024 的机器上，按三条车道（mayapy 无界面、桌面脚本、GUI 界面）把十项检查逐项跑完并记下结果。真正的结果表在 `docs/evidence/real-maya-window-2026-09-30.md`，本文只是当时的操作步骤。文中 `D-xxx` 是已退役决策账本的编号，原文用 `git show '1c5befe^:docs/decision-ledger.md'` 取；`.scratch/` 下的草稿不入仓。第 5 步那个"换场景前先看有没有未保存改动"的检查，现在工具返回里看得见：`scene_snapshot` 和 `scene_rollback` 都会报，但只报不拦，第 5 步的人工检查照旧。词表里它现在叫「未保存改动检查」，旧的「脏场景守卫」不再用；下文和页眉里还写着旧名字，查词表请找「未保存改动检查」。
 
 > **文档标识**：docs/reference/real-maya-runbook.md（原工作副本 `.scratch/t32/runbook.md`，rev 1.1 返工修订版；`.scratch/` 已不入仓）
 > **修订日期**：2026-09-29
