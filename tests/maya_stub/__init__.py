@@ -109,6 +109,7 @@ def load_scene_module():
 
     Mirrors the production payload assembly (D-095): maya_scene_module.py
     + introspect_module.py + validator_module.py + zone_geometry_module.py
+    + scene_state_module.py
     concatenated into ONE module namespace - the same bytes the host ships
     via write_module/mkstemp. A __future__ import or syntax slip in any of
     these files fails here exactly like it would inside Maya. __mcp_payload__
@@ -116,13 +117,23 @@ def load_scene_module():
     the host write.
     """
     sys.modules.pop("maya_mcp_server.maya_scene_module", None)
-    for _frag in ("introspect_module", "validator_module", "zone_geometry_module"):
+    for _frag in (
+        "introspect_module",
+        "validator_module",
+        "zone_geometry_module",
+        "scene_state_module",
+    ):
         sys.modules.pop(f"maya_mcp_server.{_frag}", None)
     src_dir = Path(__file__).resolve().parents[2] / "src" / "maya_mcp_server"
     source = (src_dir / "maya_scene_module.py").read_text(encoding="utf-8")
     # No exists() guard: the host reads these unconditionally, so a missing or
     # renamed file must fail here, not silently shrink the payload.
-    for frag_name in ("introspect_module.py", "validator_module.py", "zone_geometry_module.py"):
+    for frag_name in (
+        "introspect_module.py",
+        "validator_module.py",
+        "zone_geometry_module.py",
+        "scene_state_module.py",
+    ):
         source += "\n\n" + (src_dir / frag_name).read_text(encoding="utf-8")
     mod = types.ModuleType("maya_mcp_server.maya_scene_module")
     mod.__file__ = str(src_dir / "maya_scene_module.py")

@@ -215,9 +215,11 @@ class TestFragmentAssembly:
                 scene_tools._INTROSPECT_FRAGMENT,
                 scene_tools._VALIDATOR_FRAGMENT,
                 scene_tools._ZONE_GEOMETRY_FRAGMENT,
+                scene_tools._SCENE_STATE_FRAGMENT,
             )
         )
         assert shipped == expected
         assert shipped.index("def get_scene_graph") < shipped.index("def describe_node")
         assert shipped.index("def describe_node") < shipped.index("def register_validator")
         assert shipped.index("def register_validator") < shipped.index("def get_zone_geometry")
+        assert shipped.index("def get_zone_geometry") < shipped.index("def get_scene_modified")

@@ -26,10 +26,20 @@ class TestFormatSceneCos:
             "unit": "cm",
             "up_axis": "y",
         }
-        result = format_scene_cos(scene)
+        result = format_scene_cos(scene, scene_modified=False)
         assert "SCENE[1obj, 0zones]" in result
         assert "UNIT=cm UP=y" in result
         assert "wall_n[mesh]" in result
+
+    def test_modified_flag_reads_y_when_the_scene_changed(self):
+        """The header marker follows the flag, in both states, every time."""
+        scene = {"objects": [], "stats": {}, "unit": "cm", "up_axis": "y"}
+
+        clean = format_scene_cos(scene, scene_modified=False)
+        changed = format_scene_cos(scene, scene_modified=True)
+
+        assert clean.splitlines()[0].endswith("MODIFIED=n")
+        assert changed.splitlines()[0].endswith("MODIFIED=y")
 
     def test_with_zones(self):
         """Objects grouped by zones."""
@@ -46,7 +56,7 @@ class TestFormatSceneCos:
             {"name": "shell", "objects": ["wall_1"], "center": [50, 50, 50], "object_count": 1},
             {"name": "display", "objects": ["shelf_1"], "center": [250, 25, 25], "object_count": 1},
         ]
-        result = format_scene_cos(scene, zones=zones)
+        result = format_scene_cos(scene, zones=zones, scene_modified=False)
         assert "SHELL" in result
         assert "DISPLAY" in result
 
@@ -57,7 +67,7 @@ class TestFormatSceneCos:
             for i in range(100)
         ]
         scene = {"objects": objects, "stats": {"total": 100}, "unit": "cm", "up_axis": "y"}
-        result = format_scene_cos(scene, max_objects=10)
+        result = format_scene_cos(scene, max_objects=10, scene_modified=False)
         assert "90 more objects" in result
 
     def test_bbox_dimensions(self):
@@ -70,7 +80,7 @@ class TestFormatSceneCos:
             "unit": "cm",
             "up_axis": "y",
         }
-        result = format_scene_cos(scene)
+        result = format_scene_cos(scene, scene_modified=False)
         assert "200x300x100" in result
 
     def test_child_count(self):
@@ -83,7 +93,7 @@ class TestFormatSceneCos:
             "unit": "cm",
             "up_axis": "y",
         }
-        result = format_scene_cos(scene)
+        result = format_scene_cos(scene, scene_modified=False)
         assert "[5ch]" in result
 
 

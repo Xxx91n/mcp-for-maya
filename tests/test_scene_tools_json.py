@@ -416,3 +416,66 @@ class TestZoneGeometryHostHelper:
         assert actual.encode("utf-8") == expected.encode("utf-8")
         assert "get_zone_geometry" not in tools.client.calls[-1]
         assert "scene_plan" in tools.client.calls[-1]
+
+
+# ------------------------------------------------------------
+# Issue #206: the unsaved-changes flag is reported, read fresh, never cached
+# ------------------------------------------------------------
+
+
+class TestSceneModifiedFlag:
+    """Tool-facing contract only: the field exists, its value is right, and
+    the object-list cache can never hide a later change."""
+
+    async def test_json_flag_is_false_on_a_clean_scene(self, tools):
+        tools.env.scene.add_mesh("GEO_a")
+        tools.env.scene.modified = False  # a save would clear it in real Maya
+
+        out = await tools.fns["scene_snapshot"](format="json")
+
+        assert json.loads(out)["scene_modified"] is False
+
+    async def test_json_flag_is_true_after_the_scene_changes(self, tools):
+        tools.env.scene.modified = False
+        await tools.fns["scene_snapshot"](format="json")
+        tools.env.scene.modified = True
+
+        out = await tools.fns["scene_snapshot"](format="json")
+
+        assert json.loads(out)["scene_modified"] is True
+
+    async def test_cos_header_writes_the_flag_in_both_states(self, tools):
+        tools.env.scene.modified = False
+        clean = await tools.fns["scene_snapshot"]()
+        tools.env.scene.modified = True
+        changed = await tools.fns["scene_snapshot"]()
+
+        assert clean.splitlines()[0].endswith("MODIFIED=n")
+        assert changed.splitlines()[0].endswith("MODIFIED=y")
+
+    async def test_cached_object_list_does_not_hide_a_later_change(self, tools):
+        tools.env.scene.add_mesh("GEO_a")
+        tools.env.scene.modified = False
+        await tools.fns["scene_snapshot"](format="json")  # object list now cached
+
+        tools.env.scene.modified = True
+        out = await tools.fns["scene_snapshot"](format="json")
+
+        assert json.loads(out)["scene_modified"] is True
+        graph_calls = [code for code in tools.client.calls if "get_scene_graph" in code]
+        assert len(graph_calls) == 1, "the object list should still come from the cache"
+
+    async def test_an_unreadable_flag_is_not_reported_as_clean(self, tools, monkeypatch):
+        def unreadable():
+            raise RuntimeError("flag unreadable")
+
+        monkeypatch.setattr(tools.env.module, "get_scene_modified", unreadable)
+
+        with pytest.raises(RuntimeError, match="flag unreadable"):
+            await tools.fns["scene_snapshot"](format="json")
+
+    async def test_a_payload_without_the_flag_is_not_reported_as_clean(self, tools, monkeypatch):
+        monkeypatch.setattr(tools.env.module, "get_scene_modified", lambda: {})
+
+        with pytest.raises(RuntimeError, match="unsaved-changes flag"):
+            await tools.fns["scene_snapshot"](format="json")

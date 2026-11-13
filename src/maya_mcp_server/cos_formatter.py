@@ -16,6 +16,8 @@ def format_scene_cos(
     scene_data: dict[str, Any],
     zones: list[dict[str, Any]] | None = None,
     max_objects: int = 200,
+    *,
+    scene_modified: bool,
 ) -> str:
     """Format scene data as CoS text: short one-line-per-object notation.
 
@@ -23,6 +25,9 @@ def format_scene_cos(
         scene_data: Scene graph data with 'objects', 'stats', 'unit', 'up_axis'.
         zones: Optional zone map data.
         max_objects: Maximum objects to include (token budget control).
+        scene_modified: Maya's unsaved-changes flag for the open scene. The
+            header always writes it as MODIFIED=y or MODIFIED=n, so a caller
+            never has to test whether the marker is there.
 
     Returns:
         CoS-formatted string.
@@ -37,7 +42,11 @@ def format_scene_cos(
     # Header: scene summary
     obj_count = len(objects)
     zone_count = len(zones) if zones else 0
-    lines.append(f"SCENE[{obj_count}obj, {zone_count}zones] UNIT={unit} UP={up_axis}")
+    modified_flag = "y" if scene_modified else "n"
+    lines.append(
+        f"SCENE[{obj_count}obj, {zone_count}zones] UNIT={unit} UP={up_axis} "
+        f"MODIFIED={modified_flag}"
+    )
 
     # If zones provided, group objects by zone
     if zones:

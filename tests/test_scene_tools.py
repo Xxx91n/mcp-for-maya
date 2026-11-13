@@ -253,7 +253,7 @@ class TestCosFormatterIntegration:
             {"name": "entrance", "objects": ["entrance_door"], "center": [0, 0, 500]},
             {"name": "ip_core", "objects": ["kitty_figure"], "center": [0, 0, 300]},
         ]
-        result = format_scene_cos(scene, zones=zones)
+        result = format_scene_cos(scene, zones=zones, scene_modified=False)
         assert "SCENE[3obj, 3zones]" in result
         assert "store_shell" in result
         assert "kitty_figure" in result

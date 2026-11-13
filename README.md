@@ -265,13 +265,15 @@ scene_render_preview(camera="CAM_hero", width=640, height=360)
 Default output uses **CoS** (Chain-of-Symbol) notation: scene data written as very short lines of text, which saves the number of tokens sent to the AI. The original research paper reports roughly 65% token savings compared to JSON on demo scenes (arXiv:2305.10276, -65.8%).
 
 ```
-SCENE[164obj, 5zones] UNIT=cm UP=y
+SCENE[164obj, 5zones] UNIT=cm UP=y MODIFIED=n
 shell (23obj) @(-11.8,178.8,145.7)
   GRP_floor[mesh]@(0,0,0) 1121.5x20x1530.5
   pasted__arch_wall[mesh]@(0,0,0) 100x300x10
 entrance (6obj) @(157.3,162.6,-111.6)
   GRP_workshopFront[group]@(1162,-17,103) 227.4x200.9x193.3
 ```
+
+The first line always ends with `MODIFIED=y|n`: `y` means the scene has changes that were never saved, `n` means it has none. This is Maya's own flag for the whole scene. Changes made through the MCP tools count too, so the marker says whether anything changed, not who changed it. `scene_snapshot(format="json")` reports the same fact as the top-level `scene_modified` field, and it is read fresh on every call instead of coming from the object-list cache.
 
 ## Agent skills
 
