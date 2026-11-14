@@ -4,38 +4,50 @@ With ``scene_plan(recommend_assets=True)`` the plan gains a
 ``recommendations`` section. Everything here runs on the host: the Maya
 side never goes online. The module reads the zone geometry the
 ``_mcp_scene`` module reports (through the ``get_zone_geometry`` host
-helper in scene_tools), identifies the target per zone in deterministic
+helper in scene_tools), identifies each zone's target in deterministic
 order (explicit full DAG path -> unique short name -> unique measurable
 zone object -> zone bbox fallback), searches the Poly Haven models index
-via ``polyhaven.search_assets``, and screens candidates in metres
-(three-axis 0.5x-1.5x tolerance for an object target; upper-limit-only
-for a zone bbox fallback).
+for each zone's mapped query words via ``polyhaven.search_assets``,
+filters hits with a normalized word-level check, deduplicates across
+keywords, screens candidates in metres (three-axis 0.5x-1.5x tolerance
+for an object target; upper-limit-only for a zone bbox fallback), sorts
+by rank band and size difference, and caps results per zone and for the
+whole scene.
 
 Advisory only: recommendations name candidates and say why; nothing is
 downloaded, imported, or placed, and a search failure never changes the
 plan itself.
 
-T1 scope (#217): the furniture zone with the single query ``chair``.
+T1 scope (#217): furniture zone with ``chair``.
+T2 scope (#218): all 7 built-in zones, normalized word-level check,
+cross-keyword dedup, rank-band + size-difference sorting, and the
+3-per-zone / 12-per-scene caps.
 T3 scope (#219): target resolution, ambiguity/fallback reporting, unit
 conversion, and three-axis 0.5x-1.5x size screening.
-The remaining zones, cross-keyword dedup, and rank-band sorting are T2;
-the soft time budget and whole-scene candidate cap are T4.
+The soft time budget is T4 (#220).
 """
 
 from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, TypeGuard
 
 
-# Q13's zone -> query-word table, T1 slice: furniture only. Zones missing
-# from the table get no recommendations and no search traffic. T2 extends
-# the table; nothing else in this file may invent a second mapping.
-ZONE_SEARCH_QUERIES: dict[str, list[str]] = {
-    "furniture": ["chair"],
+# Q13's 7-zone -> query-word table. Zones mapped to () get no search
+# traffic and no recommendations; nothing else in this file may invent
+# a second mapping or alter zone detection.
+ZONE_SEARCH_QUERIES: dict[str, tuple[str, ...]] = {
+    "shell": (),
+    "entrance": ("door", "sign"),
+    "display": ("shelf", "counter", "showcase", "podium"),
+    "ip_core": (),
+    "furniture": ("chair", "table", "sofa", "bench"),
+    "lighting": ("lamp", "light"),
+    "path": (),
 }
 
 # Q5: only the first 20 index hits per query are examined; the search
@@ -43,10 +55,10 @@ ZONE_SEARCH_QUERIES: dict[str, list[str]] = {
 SEARCH_LIMIT = 20
 SEARCH_ASSET_TYPE = "models"
 
-# Q9: at most 3 candidates per zone (eligible first, then unverified;
-# both kinds share one limit). The 12-per-scene cap arrives with T2,
-# when more than one zone can recommend.
+# Q9: at most 3 candidates per zone and 12 across the whole scene
+# (eligible first, then unverified; both kinds share the cap).
 MAX_PER_ZONE = 3
+MAX_PER_SCENE = 12
 
 # Q7: explicit or unique object targets screen sorted axes against
 # 0.5x-1.5x of the target's sorted axes; zone_bbox fallback stays
@@ -76,6 +88,12 @@ _OBJECT_TOLERANCE_NOTE = (
     "Screening compares sorted world-AABB axis extents against the target "
     "object within a 0.5x-1.5x per-axis tolerance; clearance, collision, "
     "and placement are not verified."
+)
+_MIXED_POLICY_NOTE = (
+    "Screening uses 0.5x-1.5x sorted-axis tolerance for identified target "
+    "objects and upper-limit-only screening for zone_bbox fallbacks; "
+    "clearance, collision, and placement are not verified, and a partially "
+    "measured zone only bounds what was measured."
 )
 
 _DAG_REF_RE = re.compile(r"\|[A-Za-z0-9_:|]+")
@@ -157,18 +175,71 @@ def _fits_three_axis_tolerance(model: list[float], target: list[float]) -> bool:
     return True
 
 
-def _word_hit(entry: dict[str, Any], query: str) -> bool:
-    """The query word appears in the asset's own text fields.
+_WORD_BOUNDARY_RE = re.compile(
+    r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|(?<=[A-Za-z])(?=[0-9])|(?<=[0-9])(?=[A-Za-z])"
+)
+_WORD_TOKEN_RE = re.compile(r"[a-z0-9]+")
 
-    Same substring semantics the index search uses; with the real
-    search_assets this always passes, so it only guards a substitute
-    search callable from slipping unrelated assets in.
+
+def _normalize_word(token: str) -> str:
+    """Fold basic plurals and Poly Haven's ``lighting`` category to ``light``."""
+    if token == "lighting":
+        return "light"
+    if token == "shelves":
+        return "shelf"
+    if (
+        len(token) > 3
+        and token.endswith("es")
+        and token.endswith(("ches", "shes", "xes", "zes", "sses"))
+    ):
+        return token[:-2]
+    if len(token) > 3 and token.endswith("s") and not token.endswith("ss"):
+        return token[:-1]
+    return token
+
+
+def _tokenize_words(text: str) -> set[str]:
+    norm = _WORD_BOUNDARY_RE.sub(" ", unicodedata.normalize("NFKC", text))
+    return {_normalize_word(tok) for tok in _WORD_TOKEN_RE.findall(norm.lower())}
+
+
+def _word_hit(entry: dict[str, Any], query: str) -> bool:
+    """Normalized word-level match on id, name, tags, and categories.
+
+    Rejects substring false positives such as ``sign`` matching ``design``
+    or ``door`` matching ``outdoor``. Purely a filter on the returned hit;
+    never creates assets outside the search result.
     """
-    q = query.lower()
-    texts = [entry.get("id", ""), entry.get("name", "")]
+    q_tokens = _tokenize_words(query)
+    if not q_tokens:
+        return False
+    texts = [str(entry.get("id") or ""), str(entry.get("name") or "")]
     texts += [str(t) for t in entry.get("tags") or []]
     texts += [str(c) for c in entry.get("categories") or []]
-    return any(q in str(t).lower() for t in texts)
+    asset_tokens: set[str] = set()
+    for text in texts:
+        asset_tokens |= _tokenize_words(text)
+    return q_tokens.issubset(asset_tokens)
+
+
+def _rank_band(rank: int) -> int:
+    """Bucket source rank into 1-5, 6-10, 11-20 (Q9)."""
+    if rank <= 5:
+        return 0
+    if rank <= 10:
+        return 1
+    if rank <= 20:
+        return 2
+    return 3
+
+
+def _size_error(model: list[float], envelope: list[float]) -> float:
+    """Mean-scaled relative axis difference on sorted extents (lower is closer)."""
+    m = sorted(model, reverse=True)
+    z = sorted(envelope, reverse=True)
+    if any(zz <= 0 for zz in z):
+        return float("inf")
+    return round(sum(abs(mm - zz) / zz for mm, zz in zip(m, z)), 9)
 
 
 def _candidate(entry: dict[str, Any], query: str, rank: int) -> dict[str, Any]:
@@ -194,6 +265,26 @@ def _valid_dimensions(dims: Any) -> TypeGuard[list[float] | tuple[float, ...]]:
         not isinstance(v, bool) and isinstance(v, (int, float)) and math.isfinite(v) and v > 0
         for v in dims
     )
+
+
+@dataclass
+class _ScoredHit:
+    """Candidate paired with its precomputed zone-fit error for sorting."""
+
+    candidate: dict[str, Any]
+    size_error: float
+
+    def sort_key(self) -> tuple[bool, int, float, int, str]:
+        # Size-eligible candidates win the cap before unverified ones,
+        # then rank band (1-5 / 6-10 / 11-20), size difference, best rank, id.
+        cand = self.candidate
+        return (
+            cand["size_status"] != "pass",
+            _rank_band(int(cand["best_source_rank"])),
+            self.size_error,
+            int(cand["best_source_rank"]),
+            str(cand["asset_id"]),
+        )
 
 
 def _unverified_reason(dims: Any) -> tuple[str, str]:
@@ -227,16 +318,16 @@ def _screen(
     query: str,
     target_m: list[float],
     screening_mode: str = "zone_envelope",
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Split one query's hits into size-eligible and unverified candidates.
+) -> list[_ScoredHit]:
+    """Filter one query's hits into scored candidates.
 
-    Assets the index returned but whose text fields do not carry the query
-    word are dropped (word-level check); assets that fail the size screen
-    are dropped too. Neither shows up as a candidate — only assets that
-    pass, and assets whose size could not be checked.
+    Drops hits that fail the normalized word-level check or cannot fit
+    the target size screen (three-axis tolerance for an object target;
+    upper-limit-only for a zone_bbox fallback). Assets without usable
+    dimensions stay in the returned list with ``size_status="unverified"``
+    and ``size_error=0.0``.
     """
-    eligible: list[dict[str, Any]] = []
-    unverified: list[dict[str, Any]] = []
+    screened: list[_ScoredHit] = []
     for rank, entry in enumerate(results, start=1):
         if not isinstance(entry, dict) or not entry.get("id"):
             continue
@@ -249,7 +340,7 @@ def _screen(
             code, reason = _unverified_reason(dims)
             cand["reason_code"] = code
             cand["match_reason"] = reason
-            unverified.append(cand)
+            screened.append(_ScoredHit(cand, 0.0))
             continue
         model_m = [float(v) for v in dims]
         if screening_mode == "three_axis_tolerance":
@@ -265,7 +356,7 @@ def _screen(
                     f"{_fmt_dims(t_sorted)} m (ratios {ratios}; "
                     "world AABB, clearance and collision not verified)"
                 )
-                eligible.append(cand)
+                screened.append(_ScoredHit(cand, _size_error(model_m, target_m)))
         elif _fits_envelope(model_m, target_m):
             largest = max(model_m)
             zone_largest = max(target_m)
@@ -276,8 +367,8 @@ def _screen(
                 f"largest side {zone_largest:g} m (world AABB upper limit, "
                 "per sorted axis)"
             )
-            eligible.append(cand)
-    return eligible, unverified
+            screened.append(_ScoredHit(cand, _size_error(model_m, target_m)))
+    return screened
 
 
 def _searched_query(query: str, total_matches: int | None) -> dict[str, Any]:
@@ -303,6 +394,7 @@ def _match_zone_object(
     unmeasured: Any,
     factor: float,
     objective: str,
+    scene_refs: set[str] | None = None,
 ) -> tuple[dict[str, Any] | None, str | None, _FallbackNote | None]:
     """Run Q6 target matching: DAG path -> short name -> unique zone object."""
     dag_matches = [obj for obj in valid_objects if _token_in_objective(objective, obj["name"])]
@@ -345,8 +437,9 @@ def _match_zone_object(
             m.group(0) for pat in (_DAG_REF_RE, _PREFIX_REF_RE) for m in pat.finditer(objective)
         )
     )
-    if explicit_refs:
-        refs_text = ", ".join(explicit_refs)
+    missing_refs = [ref for ref in explicit_refs if scene_refs is None or ref not in scene_refs]
+    if missing_refs:
+        refs_text = ", ".join(missing_refs)
         return (
             None,
             None,
@@ -470,7 +563,10 @@ def _build_zone_fallback_target(
 
 
 def _resolve_target(
-    zone: dict[str, Any], factor: float, objective: str
+    zone: dict[str, Any],
+    factor: float,
+    objective: str,
+    scene_refs: set[str] | None = None,
 ) -> tuple[dict[str, Any], list[float] | None, str | None]:
     """Identify the zone's sizing target in Q6 deterministic order.
 
@@ -493,7 +589,7 @@ def _resolve_target(
         if isinstance(obj, dict) and isinstance(obj.get("name"), str) and obj["name"]
     ]
     matched_obj, match_source, fallback = _match_zone_object(
-        name, valid_objects, obj_count, unmeasured, factor, objective
+        name, valid_objects, obj_count, unmeasured, factor, objective, scene_refs=scene_refs
     )
     if matched_obj is not None and match_source is not None:
         obj_display_m, obj_screen_m = _measurable_size_m(matched_obj.get("size"), factor)
@@ -528,19 +624,97 @@ def _resolve_target(
     return fallback_target, (None if skip_reason else zone_screen_m), skip_reason
 
 
+def _merge_hits(seen: dict[str, _ScoredHit], screened: list[_ScoredHit]) -> None:
+    """Deduplicate hits by asset_id, keeping all matched_queries and best rank."""
+    for hit in screened:
+        cand = hit.candidate
+        aid = str(cand["asset_id"])
+        hit_record = cand["matched_queries"][0]
+        existing_hit = seen.get(aid)
+        if existing_hit is None:
+            seen[aid] = hit
+            continue
+        existing = existing_hit.candidate
+        if hit_record not in existing["matched_queries"]:
+            existing["matched_queries"].append(hit_record)
+        if int(cand["best_source_rank"]) < int(existing["best_source_rank"]):
+            existing["best_source_rank"] = cand["best_source_rank"]
+        if existing["size_status"] != "pass" and cand["size_status"] == "pass":
+            cand["matched_queries"] = existing["matched_queries"]
+            cand["best_source_rank"] = existing["best_source_rank"]
+            seen[aid] = hit
+
+
+def _zone_candidates(entry: dict[str, Any]) -> list[dict[str, Any]]:
+    return [*entry.get("candidates", []), *entry.get("unverified_candidates", [])]
+
+
+def _assign_zone_candidates(entry: dict[str, Any], ordered_hits: list[_ScoredHit]) -> None:
+    cands = [hit.candidate for hit in ordered_hits]
+    shown_eligible = [c for c in cands if c["size_status"] == "pass"]
+    shown_unverified = [c for c in cands if c["size_status"] != "pass"]
+    entry["candidates"] = shown_eligible
+    entry["unverified_candidates"] = shown_unverified
+    entry["eligible_count"] = len(shown_eligible)
+    entry["unverified_count"] = len(shown_unverified)
+
+
+def _refresh_zone_status(entry: dict[str, Any], *, failed: int = 0, succeeded: int = 0) -> None:
+    if failed > 0 and succeeded == 0:
+        entry["status"] = "skipped"
+        entry["skip_reason"] = "search_failed"
+    elif failed > 0:
+        entry["status"] = "partial"
+    elif entry["status"] not in ("skipped", "partial"):
+        entry["status"] = "ok" if entry["eligible_count"] > 0 else "empty"
+
+
 def _process_zone(
     zone: dict[str, Any],
-    queries: list[str],
+    queries: tuple[str, ...],
     factor: float,
     search_fn: Callable[..., dict[str, Any]],
     errors: list[dict[str, str]],
     truncation: dict[str, bool],
     objective: str = "",
-) -> dict[str, Any]:
-    """Build one zone's recommendation entry, searching only when measurable."""
+    scene_refs: set[str] | None = None,
+) -> tuple[dict[str, Any], list[_ScoredHit], int, int]:
+    """Build one zone's recommendation entry, searching only when enabled & measurable."""
     name = zone.get("name", "")
     scope = f"recommendations:{name}"
-    target, size_screen, skip_reason = _resolve_target(zone, factor, objective)
+    if not queries:
+        disabled_target: dict[str, Any] = {
+            "source": "zone_bbox",
+            "screening_mode": "none",
+            "geometry": "world_aabb",
+            "name": name,
+            "object_count": zone.get("object_count"),
+            "unmeasured_count": zone.get("unmeasured_count"),
+            "size_m": _to_metres(zone.get("size"), factor),
+            "bbox_min_m": _to_metres(zone.get("bbox_min"), factor),
+            "bbox_max_m": _to_metres(zone.get("bbox_max"), factor),
+            "measurement": "disabled",
+        }
+        return (
+            {
+                "zone": name,
+                "status": "skipped",
+                "skip_reason": "recommendations_disabled",
+                "target": disabled_target,
+                "queries": [],
+                "eligible_count": 0,
+                "unverified_count": 0,
+                "candidates": [],
+                "unverified_candidates": [],
+            },
+            [],
+            0,
+            0,
+        )
+
+    target, size_screen, skip_reason = _resolve_target(
+        zone, factor, objective, scene_refs=scene_refs
+    )
     entry: dict[str, Any] = {
         "zone": name,
         "status": "empty",
@@ -555,11 +729,12 @@ def _process_zone(
         entry["status"] = "skipped"
         entry["skip_reason"] = skip_reason or "unmeasurable_target"
         entry["queries"] = [_unsearched_query(q) for q in queries]
-        return entry
+        return entry, [], 0, 0
 
     screening_mode = str(target.get("screening_mode", "zone_envelope"))
-    eligible: list[dict[str, Any]] = []
-    unverified: list[dict[str, Any]] = []
+    seen: dict[str, _ScoredHit] = {}
+    succeeded = 0
+    failed = 0
     for query in queries:
         try:
             data = search_fn(query=query, asset_type=SEARCH_ASSET_TYPE, limit=SEARCH_LIMIT)
@@ -576,41 +751,46 @@ def _process_zone(
                     f"{type(e).__name__}: {e}",
                 )
             )
-            entry["status"] = "skipped"
-            entry["skip_reason"] = "search_failed"
+            failed += 1
             entry["queries"].append(_unsearched_query(query))
             continue
+        succeeded += 1
         total_int = total if isinstance(total, int) else None
         entry["queries"].append(_searched_query(query, total_int))
         if total_int is not None and total_int > len(results):
             truncation["search"] = True
-        fits, unverified_hits = _screen(results, query, size_screen, screening_mode=screening_mode)
-        eligible.extend(fits)
-        unverified.extend(unverified_hits)
+        _merge_hits(seen, _screen(results, query, size_screen, screening_mode=screening_mode))
 
-    ordered = sorted(
-        eligible + unverified,
-        # Q9: size-eligible candidates win the cap before unverified ones,
-        # so three dimension-less hits early in the search cannot starve a
-        # fitting model that ranked below them.
-        key=lambda c: (
-            c["size_status"] != "pass",
-            c["best_source_rank"],
-            str(c["asset_id"]),
-        ),
-    )
-    if len(ordered) > MAX_PER_ZONE:
+    ordered_hits = sorted(seen.values(), key=lambda hit: hit.sort_key())
+    if len(ordered_hits) > MAX_PER_ZONE:
         truncation["output"] = True
-        ordered = ordered[:MAX_PER_ZONE]
-    shown_eligible = [c for c in ordered if c["size_status"] == "pass"]
-    shown_unverified = [c for c in ordered if c["size_status"] != "pass"]
-    entry["candidates"] = shown_eligible
-    entry["unverified_candidates"] = shown_unverified
-    entry["eligible_count"] = len(shown_eligible)
-    entry["unverified_count"] = len(shown_unverified)
-    if entry["status"] != "skipped":  # a failed query already set skip_reason
-        entry["status"] = "ok" if shown_eligible else "empty"
-    return entry
+        ordered_hits = ordered_hits[:MAX_PER_ZONE]
+    _assign_zone_candidates(entry, ordered_hits)
+    _refresh_zone_status(entry, failed=failed, succeeded=succeeded)
+    return entry, ordered_hits, succeeded, failed
+
+
+def _apply_scene_cap(
+    zone_results: list[tuple[dict[str, Any], list[_ScoredHit]]],
+    truncation: dict[str, bool],
+) -> None:
+    """Enforce MAX_PER_SCENE across all zones, keeping top-ranked candidates."""
+    pooled = [
+        (*hit.sort_key(), zone_idx, hit)
+        for zone_idx, (_, hits) in enumerate(zone_results)
+        for hit in hits
+    ]
+    if len(pooled) <= MAX_PER_SCENE:
+        return
+    truncation["output"] = True
+    pooled.sort(key=lambda item: item[:-1])
+    kept_by_zone: dict[int, list[_ScoredHit]] = {}
+    for *_, zone_idx, hit in pooled[:MAX_PER_SCENE]:
+        kept_by_zone.setdefault(zone_idx, []).append(hit)
+    for zone_idx, (zone_rec, _) in enumerate(zone_results):
+        kept = sorted(kept_by_zone.get(zone_idx, []), key=lambda hit: hit.sort_key())
+        _assign_zone_candidates(zone_rec, kept)
+        _refresh_zone_status(zone_rec)
 
 
 def _build_policy(zones_recs: list[dict[str, Any]]) -> dict[str, Any]:
@@ -619,7 +799,8 @@ def _build_policy(zones_recs: list[dict[str, Any]]) -> dict[str, Any]:
         for z in zones_recs
         if z.get("status") != "skipped"
     }
-    if "three_axis_tolerance" in modes:
+    modes.discard(None)
+    if modes == {"three_axis_tolerance"}:
         return {
             "mode": "object_tolerance",
             "geometry": "world_aabb",
@@ -628,6 +809,16 @@ def _build_policy(zones_recs: list[dict[str, Any]]) -> dict[str, Any]:
             "clearance_verified": False,
             "collision_verified": False,
             "note": _OBJECT_TOLERANCE_NOTE,
+        }
+    if modes == {"three_axis_tolerance", "zone_envelope"}:
+        return {
+            "mode": "mixed",
+            "geometry": "world_aabb",
+            "upper_limit_only": False,
+            "tolerance_band": [MIN_SIZE_RATIO, MAX_SIZE_RATIO],
+            "clearance_verified": False,
+            "collision_verified": False,
+            "note": _MIXED_POLICY_NOTE,
         }
     return {
         "mode": "zone_envelope",
@@ -644,7 +835,7 @@ def gather_recommendations(
     search_fn: Callable[..., dict[str, Any]],
     objective: str = "",
 ) -> dict[str, Any]:
-    """Compose the ``recommendations`` section from geometry + search.
+    """Compose the ``recommendations`` section from geometry + searches.
 
     ``zone_geometry`` is whatever the ``get_zone_geometry`` host helper
     returned (a dict with ``unit``/``zones``, or ``{"error": ...}``).
@@ -697,28 +888,48 @@ def gather_recommendations(
         recs["status"] = "partial"
         return recs
 
-    any_eligible = False
-    search_failed = False
+    scene_refs: set[str] = set()
+    for z in zones_list:
+        raw_objs = z.get("objects") if isinstance(z, dict) else None
+        if not isinstance(raw_objs, list):
+            continue
+        for obj in raw_objs:
+            if isinstance(obj, dict) and isinstance(obj.get("name"), str) and obj["name"]:
+                scene_refs.add(obj["name"])
+                scene_refs.add(obj["name"].rsplit("|", 1)[-1])
+
+    zone_results: list[tuple[dict[str, Any], list[_ScoredHit]]] = []
+    total_succeeded = 0
+    total_failed = 0
     for zone_name, queries in ZONE_SEARCH_QUERIES.items():
         zone = next(
             (z for z in zones_list if isinstance(z, dict) and z.get("name") == zone_name),
             None,
         )
         if zone is None:
-            continue  # no such zone in this scene: nothing to search
-        zone_rec = _process_zone(
-            zone, queries, factor, search_fn, errors, truncation, objective=objective_text
+            continue  # no such zone in this scene: nothing to report or search
+        zone_rec, ordered_hits, succeeded, failed = _process_zone(
+            zone,
+            queries,
+            factor,
+            search_fn,
+            errors,
+            truncation,
+            objective=objective_text,
+            scene_refs=scene_refs,
         )
         recs["zones"].append(zone_rec)
-        if zone_rec["eligible_count"] > 0:
-            any_eligible = True
-        if zone_rec.get("skip_reason") == "search_failed":
-            search_failed = True
+        zone_results.append((zone_rec, ordered_hits))
+        total_succeeded += succeeded
+        total_failed += failed
 
+    _apply_scene_cap(zone_results, truncation)
     recs["policy"] = _build_policy(recs["zones"])
-    if search_failed:
+    any_eligible = any(z["eligible_count"] > 0 for z in recs["zones"])
+
+    if total_failed > 0 and total_succeeded == 0:
         recs["status"] = "offline"
-    elif any(e["scope"] == "zone_geometry" for e in errors):
+    elif total_failed > 0 or any(e["scope"] == "zone_geometry" for e in errors):
         recs["status"] = "partial"
     elif any_eligible:
         recs["status"] = "ok"
@@ -749,14 +960,17 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
 
     Carries the status, the target and its size basis (including
     completeness and any ambiguity/fallback reason), the candidate ids
-    with sizes and match/unverified reasons, and the truncation note.
-    Indented to sit under scene_plan's existing sections.
+    with matched queries, sizes, and match/unverified reasons, and the
+    truncation note. Indented to sit under scene_plan's existing
+    sections.
     """
     policy = recs.get("policy", {})
     mode = policy.get("mode", "zone_envelope")
     geom = policy.get("geometry", "world_aabb")
     if mode == "object_tolerance":
         policy_label = f"object_tolerance({geom} {MIN_SIZE_RATIO:g}-{MAX_SIZE_RATIO:g}x)"
+    elif mode == "mixed":
+        policy_label = f"mixed({geom} {MIN_SIZE_RATIO:g}-{MAX_SIZE_RATIO:g}x/upper-limit)"
     else:
         policy_label = f"{mode}({geom} upper-limit)"
     lines = [
@@ -770,9 +984,12 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
             for e in errors:
                 lines.append(f"    error: {e.get('scope')} {e.get('code')}")
         else:
-            lines.append("    no furniture zone in this scene")
+            lines.append("    no zones in this scene")
     for zone in zones:
         if zone.get("status") == "skipped":
+            if zone.get("skip_reason") == "recommendations_disabled":
+                lines.append(f"    {zone.get('zone')}: skipped (recommendations_disabled)")
+                continue
             target = zone.get("target", {})
             line = f"    {zone.get('zone')}: skipped ({zone.get('skip_reason')})"
             obj_count = target.get("object_count")
@@ -792,30 +1009,33 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
         target = zone.get("target", {})
         source = target.get("source", "zone_bbox")
         complete_yn = "y" if target.get("measurement_complete", True) else "n"
+        q_names = ",".join(str(q.get("query")) for q in zone.get("queries", []))
+        counts = (
+            f"queries={q_names} ({zone.get('eligible_count', 0)} eligible, "
+            f"{zone.get('unverified_count', 0)} unverified)"
+        )
         if source == "zone_bbox":
             target_line = (
                 f"    {zone.get('zone')}: target=zone_bbox "
                 f"{_fmt_dims(target.get('size_m'))}m meas={target.get('measurement')} "
-                f"complete={complete_yn}{_fallback_suffix(target)}"
+                f"{counts} complete={complete_yn}{_fallback_suffix(target)}"
             )
         else:
             target_line = (
                 f"    {zone.get('zone')}: target={source}({target.get('name')}) "
                 f"{_fmt_dims(target.get('size_m'))}m tol={MIN_SIZE_RATIO:g}-{MAX_SIZE_RATIO:g}x "
-                f"meas={target.get('measurement')} complete={complete_yn}"
+                f"meas={target.get('measurement')} {counts} complete={complete_yn}"
             )
         lines.append(target_line)
-        for q in zone.get("queries", []):
-            lines.append(
-                f"    {q.get('query')}: {zone.get('eligible_count', 0)} eligible, "
-                f"{zone.get('unverified_count', 0)} unverified"
-            )
         n = 0
-        for cand in zone.get("candidates", []) + zone.get("unverified_candidates", []):
+        for cand in _zone_candidates(zone):
             n += 1
+            via = ",".join(
+                f"{m.get('query')}@{m.get('rank')}" for m in cand.get("matched_queries", [])
+            )
             lines.append(
                 f"      {n}. {cand.get('asset_id')} rank={cand.get('best_source_rank')} "
-                f"{_fmt_dims(cand.get('dimensions_m'))}m {cand.get('reason_code')} "
+                f"via=[{via}] {_fmt_dims(cand.get('dimensions_m'))}m {cand.get('reason_code')} "
                 f"status={cand.get('size_status')}"
             )
 

@@ -1107,16 +1107,19 @@ result
         - Conflict prevention: predicts near-miss collisions
         - Action plan: prioritized step-by-step execution guide
 
-        With recommend_assets=True, also recommends Poly Haven models for the
-        furniture zone: reads fresh zone geometry, resolves a target object
-        from objective (full DAG path, unique short name, or single measurable
-        zone object; otherwise falls back to the zone's world-axis bounding
-        box), searches the models index for "chair", and screens candidates in
-        metres (0.5x-1.5x per sorted axis for an object target; upper limit
-        only for zone_bbox). Recommendations are advisory references — search
-        only, no download and no import — and a search or network failure
-        never changes the plan itself. Clearances and collisions are not
-        verified.
+        With recommend_assets=True, also recommends Poly Haven models across
+        the built-in scene zones (entrance, display, furniture, lighting;
+        shell, ip_core, and path are skipped with no search): reads fresh
+        zone geometry, resolves a target object per zone from objective
+        (full DAG path, unique short name, or single measurable zone object;
+        otherwise falls back to the zone's world-axis bounding box), searches
+        the models index with each zone's fixed query words (word-level
+        checked and deduplicated per zone, capped at 3 per zone and 12 total),
+        and screens candidates in metres (0.5x-1.5x per sorted axis for an
+        object target; upper limit only for zone_bbox). Recommendations are
+        advisory references — search only, no download and no import — and
+        a search or network failure never changes the plan itself. Clearances
+        and collisions are not verified.
 
         Blockout first: check organization and proportions
         before committing to detailed modeling. Accepts a plain-language objective.
@@ -1133,9 +1136,11 @@ result
             format: Output format - "json" (default) or "cos".
             session_key: Maya session key.
             recommend_assets: If True, attach advisory Poly Haven model
-                recommendations (furniture zone, query "chair") to the plan.
-                This reaches the Poly Haven search index over the network;
-                default False keeps the output byte-identical and fully offline.
+                recommendations across the mapped built-in zones (entrance,
+                display, furniture, lighting; shell/ip_core/path skipped)
+                to the plan. This reaches the Poly Haven search index over
+                the network; default False keeps the output byte-identical
+                and fully offline.
 
         Returns:
             Scene health report with organization status, zone analysis,

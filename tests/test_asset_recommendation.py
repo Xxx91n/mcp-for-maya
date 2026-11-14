@@ -1,4 +1,4 @@
-"""Unit tests for the host-side recommendation pass (#217, T1).
+"""Unit tests for the host-side recommendation pass (#217 T1, #218 T2).
 
 The module is pure: zone geometry and search results are plain dicts and
 the search callable is a fake, so nothing here touches the network or
@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from maya_mcp_server.asset_recommendation import (
+    MAX_PER_SCENE,
     SEARCH_ASSET_TYPE,
     SEARCH_LIMIT,
     ZONE_SEARCH_QUERIES,
@@ -57,6 +58,24 @@ def chair_hit(asset_id: str = "chair_henry", dims: list | None = [0.55, 0.6, 0.9
     }
 
 
+def _search_response(
+    results: list,
+    *,
+    query: str = "",
+    asset_type: str = "models",
+    limit: int = 20,
+    total: int | None = None,
+) -> dict:
+    return {
+        "results": results,
+        "total_count": total if total is not None else len(results),
+        "limit": limit,
+        "query": query,
+        "asset_type": asset_type,
+        "source": "api.polyhaven.com",
+    }
+
+
 def make_search(results: list, total: int | None = None, error: Exception | None = None):
     calls: list[dict] = []
 
@@ -64,14 +83,9 @@ def make_search(results: list, total: int | None = None, error: Exception | None
         calls.append({"query": query, "asset_type": asset_type, "limit": limit})
         if error is not None:
             raise error
-        return {
-            "results": results,
-            "total_count": total if total is not None else len(results),
-            "limit": limit,
-            "query": query,
-            "asset_type": asset_type,
-            "source": "api.polyhaven.com",
-        }
+        return _search_response(
+            results, query=query, asset_type=asset_type, limit=limit, total=total
+        )
 
     return search, calls
 
@@ -90,25 +104,96 @@ def gather(
 
 
 # ------------------------------------------------------------
-# the T1 mapping table: furniture only, one query
+# the 7-zone mapping table
 # ------------------------------------------------------------
 
 
 class TestZoneTable:
-    def test_t1_maps_only_the_furniture_zone_to_chair(self):
-        assert ZONE_SEARCH_QUERIES == {"furniture": ["chair"]}
+    def test_maps_all_seven_built_in_zones(self):
+        assert ZONE_SEARCH_QUERIES == {
+            "shell": (),
+            "entrance": ("door", "sign"),
+            "display": ("shelf", "counter", "showcase", "podium"),
+            "ip_core": (),
+            "furniture": ("chair", "table", "sofa", "bench"),
+            "lighting": ("lamp", "light"),
+            "path": (),
+        }
 
-    def test_a_scene_without_the_zone_is_never_searched(self):
+    def test_a_scene_without_zones_is_never_searched(self):
         recs, calls = gather(make_geometry())
         assert calls == []
         assert recs["zones"] == []
         assert recs["status"] == "empty"
 
-    def test_non_table_zones_are_ignored(self):
-        display = dict(FURNITURE_ZONE, name="display")
-        recs, calls = gather(make_geometry(zones=[display]))
+    def test_disabled_zones_never_search_and_produce_no_recommendations(self):
+        disabled = [dict(FURNITURE_ZONE, name=n) for n in ("shell", "ip_core", "path")]
+        recs, calls = gather(make_geometry(zones=disabled))
+        assert calls == []
+        assert recs["status"] == "empty"
+        assert [z["zone"] for z in recs["zones"]] == ["shell", "ip_core", "path"]
+        for zone_rec in recs["zones"]:
+            assert zone_rec["status"] == "skipped"
+            assert zone_rec["skip_reason"] == "recommendations_disabled"
+            assert zone_rec["queries"] == []
+            assert zone_rec["candidates"] == []
+            assert zone_rec["unverified_candidates"] == []
+            assert zone_rec["eligible_count"] == 0
+            assert zone_rec["unverified_count"] == 0
+
+    def test_unknown_zones_are_ignored(self):
+        decor = dict(FURNITURE_ZONE, name="decor")
+        recs, calls = gather(make_geometry(zones=[decor]))
         assert calls == []
         assert recs["zones"] == []
+
+    def test_all_four_recommendable_zones_search_their_mapped_queries(self):
+        zones = [
+            dict(FURNITURE_ZONE, name=name)
+            for name in ("shell", "entrance", "display", "ip_core", "furniture", "lighting", "path")
+        ]
+
+        def by_query(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
+            hit = {
+                "id": f"{query}_01",
+                "name": f"{query.title()} 01",
+                "categories": [query],
+                "tags": [query],
+                "dimensions": [0.5, 0.5, 0.5],
+                "polycount": 500,
+            }
+            return _search_response([hit], query=query, asset_type=asset_type, limit=limit)
+
+        calls: list[str] = []
+
+        def recording(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
+            calls.append(query)
+            return by_query(query, asset_type, limit)
+
+        recs = gather_recommendations(make_geometry(zones=zones), recording)
+        assert calls == [
+            "door",
+            "sign",
+            "shelf",
+            "counter",
+            "showcase",
+            "podium",
+            "chair",
+            "table",
+            "sofa",
+            "bench",
+            "lamp",
+            "light",
+        ]
+        assert recs["status"] == "ok"
+        by_name = {z["zone"]: z for z in recs["zones"]}
+        assert by_name["entrance"]["status"] == "ok"
+        assert by_name["display"]["status"] == "ok"
+        assert by_name["furniture"]["status"] == "ok"
+        assert by_name["lighting"]["status"] == "ok"
+        assert by_name["shell"]["skip_reason"] == "recommendations_disabled"
+        assert by_name["ip_core"]["skip_reason"] == "recommendations_disabled"
+        assert by_name["path"]["skip_reason"] == "recommendations_disabled"
 
 
 # ------------------------------------------------------------
@@ -117,12 +202,15 @@ class TestZoneTable:
 
 
 class TestSearchContract:
-    def test_search_gets_the_t1_query_and_limit_only(self):
+    def test_search_gets_the_mapped_queries_and_limit_only(self):
         _, calls = gather(make_geometry(zones=[FURNITURE_ZONE]))
-        assert calls == [{"query": "chair", "asset_type": SEARCH_ASSET_TYPE, "limit": SEARCH_LIMIT}]
+        assert calls == [
+            {"query": q, "asset_type": SEARCH_ASSET_TYPE, "limit": SEARCH_LIMIT}
+            for q in ("chair", "table", "sofa", "bench")
+        ]
         # no scene data ever crosses the seam: no objective, no DAG path,
-        # no bbox — only the query word and the fixed index parameters
-        sent = "".join(str(v) for v in calls[0].values())
+        # no bbox — only the query words and the fixed index parameters
+        sent = "".join(str(v) for c in calls for v in c.values())
         assert "furniture" not in sent and "GEO_" not in sent and "3.2" not in sent
 
 
@@ -205,6 +293,87 @@ class TestUnitsAndScreening:
         assert recs["zones"][0]["candidates"] == []
         assert recs["zones"][0]["unverified_candidates"] == []
 
+    @pytest.mark.parametrize(
+        "zone_name, query, hit_id, hit_name, tags, categories, should_match",
+        [
+            # substring false positives must be rejected
+            ("entrance", "sign", "design_poster", "Design Poster", ["design"], ["decor"], False),
+            (
+                "entrance",
+                "sign",
+                "designer_desk",
+                "Signature Lamp",
+                ["signature"],
+                ["props"],
+                False,
+            ),
+            (
+                "entrance",
+                "door",
+                "outdoor_bench",
+                "Outdoor Bench",
+                ["outdoor", "indoor"],
+                ["props"],
+                False,
+            ),
+            (
+                "furniture",
+                "table",
+                "portable_grill",
+                "Comfortable Set",
+                ["portable", "vegetable"],
+                ["props"],
+                False,
+            ),
+            ("lighting", "lamp", "bench_clamp", "Clamp Tool", ["clamp"], ["tools"], False),
+            (
+                "lighting",
+                "light",
+                "daylight_panel",
+                "Lightweight Box",
+                ["slight", "daylight"],
+                ["props"],
+                False,
+            ),
+            # normalized word hits (case, separators, camelCase, digit boundary, plurals, lighting)
+            ("entrance", "sign", "StreetSign01", "Street Sign", [], ["props"], True),
+            ("entrance", "door", "wooden_doors_02", "Wooden Doors", [], ["architecture"], True),
+            ("display", "shelf", "wall_rack_01", "Wall Rack", ["shelves"], ["furniture"], True),
+            ("display", "showcase", "glass_case_01", "Glass Showcases", [], ["furniture"], True),
+            ("display", "counter", "bar_unit_01", "Bar Counters", [], ["furniture"], True),
+            ("display", "podium", "award_stand_01", "Award Podiums", [], ["furniture"], True),
+            ("furniture", "table", "oak_stand_01", "Oak Tables", [], ["furniture"], True),
+            ("furniture", "sofa", "velvet_couch_01", "Velvet Sofas", [], ["furniture"], True),
+            ("furniture", "bench", "park_seat_01", "Park Benches", [], ["furniture"], True),
+            ("lighting", "lamp", "desk_fixture_01", "Desk Lamps", [], ["lighting"], True),
+            ("lighting", "light", "brass_pendant", "Brass Pendant", [], ["lighting"], True),
+        ],
+    )
+    def test_word_level_check_rejects_substring_false_positives(
+        self, zone_name, query, hit_id, hit_name, tags, categories, should_match
+    ):
+        zone = dict(FURNITURE_ZONE, name=zone_name)
+        hit = {
+            "id": hit_id,
+            "name": hit_name,
+            "categories": categories,
+            "tags": tags,
+            "dimensions": [0.4, 0.4, 0.4],
+            "polycount": 200,
+        }
+
+        def search_one(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
+            hits = [hit] if query == target_query else []
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
+
+        target_query = query
+        recs = gather_recommendations(make_geometry(zones=[zone]), search_one)
+        cands = recs["zones"][0]["candidates"]
+        if should_match:
+            assert [c["asset_id"] for c in cands] == [hit_id]
+        else:
+            assert cands == []
+
 
 # ------------------------------------------------------------
 # zone states that skip the search
@@ -220,13 +389,16 @@ class TestSkippedZones:
         assert zone["status"] == "skipped"
         assert zone["skip_reason"] == "unmeasurable_target"
         assert zone["target"]["measurement"] == "unmeasurable_target"
-        assert zone["queries"] == [{"query": "chair", "searched": False, "total_matches": None}]
+        assert zone["queries"] == [
+            {"query": q, "searched": False, "total_matches": None}
+            for q in ("chair", "table", "sofa", "bench")
+        ]
         assert recs["status"] == "empty"
 
     def test_partially_measured_zone_still_searches_but_flags_it(self):
         partial_zone = dict(FURNITURE_ZONE, unmeasured_count=1)
         recs, calls = gather(make_geometry(zones=[partial_zone]))
-        assert len(calls) == 1
+        assert len(calls) == 4
         assert recs["zones"][0]["target"]["measurement"] == "partial_zone_envelope"
         assert recs["zones"][0]["status"] == "ok"
 
@@ -277,10 +449,183 @@ class TestSearchFailureIsolation:
         assert recs["status"] == "offline"
         assert recs["errors"][0]["code"] == "search_failed"
 
+    def test_partial_query_failure_keeps_succeeded_results_and_reports_partial(self):
+        def flaky(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
+            if query == "table":
+                raise AssetError("network_unavailable", "timeout on table")
+            results = [chair_hit("chair_ok")] if query == "chair" else []
+            return _search_response(results, query=query, asset_type=asset_type, limit=limit)
+
+        recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE]), flaky)
+        assert recs["status"] == "partial"
+        zone = recs["zones"][0]
+        assert zone["status"] == "partial"
+        assert [c["asset_id"] for c in zone["candidates"]] == ["chair_ok"]
+        assert recs["errors"][0]["code"] == "network_unavailable"
+        assert [q["searched"] for q in zone["queries"]] == [True, False, True, True]
+
 
 # ------------------------------------------------------------
-# caps, truncation, and deterministic order
+# caps, truncation, dedup, and deterministic order
 # ------------------------------------------------------------
+
+
+class TestDedupAndOrdering:
+    def test_same_asset_across_queries_is_deduped_keeping_all_matched_queries(self):
+        shared_in_chair = {
+            "id": "dining_set_01",
+            "name": "Dining Chair Table Set",
+            "categories": ["furniture"],
+            "tags": ["chair", "table"],
+            "dimensions": [0.6, 0.6, 0.9],
+            "polycount": 1500,
+        }
+        other_chair = chair_hit("chair_only")
+        other_table = {
+            "id": "table_only",
+            "name": "Table Only",
+            "categories": ["furniture"],
+            "tags": ["table"],
+            "dimensions": [0.8, 0.8, 0.75],
+            "polycount": 900,
+        }
+
+        def multi_search(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
+            if query == "chair":
+                # dining_set_01 is rank 4
+                hits = [
+                    chair_hit("chair_a"),
+                    chair_hit("chair_b"),
+                    other_chair,
+                    shared_in_chair,
+                ]
+            elif query == "table":
+                # dining_set_01 is rank 1 here
+                hits = [shared_in_chair, other_table]
+            else:
+                hits = []
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
+
+        recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE]), multi_search)
+        zone = recs["zones"][0]
+        all_ids = [c["asset_id"] for c in zone["candidates"] + zone["unverified_candidates"]]
+        assert all_ids.count("dining_set_01") == 1
+        shared_cand = next(c for c in zone["candidates"] if c["asset_id"] == "dining_set_01")
+        assert shared_cand["matched_queries"] == [
+            {"query": "chair", "rank": 4},
+            {"query": "table", "rank": 1},
+        ]
+        assert shared_cand["best_source_rank"] == 1
+
+    def test_sort_order_rank_band_then_size_diff_then_best_rank_then_id(self):
+        # Zone envelope is 3.2 x 2.6 x 2.5 m (sorted: [3.2, 2.6, 2.5]).
+        # Ranks 1..5 share band 0: closer-to-zone-size rank 4 beats small rank 1;
+        # rank 6 is band 1 so it stays behind band 0 even if its size matches closely;
+        # equal band + equal size diff breaks tie by best_source_rank then asset_id.
+        band0_small_r1 = chair_hit("chair_small_r1", dims=[0.5, 0.5, 0.8])
+        band0_mid_r2 = chair_hit("chair_mid_r2", dims=[1.0, 1.0, 1.0])
+        band0_mid_r3 = chair_hit("chair_mid_r3", dims=[1.0, 1.0, 1.0])
+        band0_close_r4 = chair_hit("chair_close_r4", dims=[3.0, 2.4, 2.3])
+        band0_filler_r5 = chair_hit("chair_filler_r5", dims=[0.4, 0.4, 0.4])
+        band1_perfect_r6 = chair_hit("chair_perfect_r6", dims=[3.2, 2.6, 2.5])
+
+        hits = [
+            band0_small_r1,
+            band0_mid_r2,
+            band0_mid_r3,
+            band0_close_r4,
+            band0_filler_r5,
+            band1_perfect_r6,
+        ]
+        recs, _ = gather(make_geometry(zones=[FURNITURE_ZONE]), results=hits)
+        zone = recs["zones"][0]
+        assert [c["asset_id"] for c in zone["candidates"]] == [
+            "chair_close_r4",
+            "chair_mid_r2",
+            "chair_mid_r3",
+        ]
+
+    def test_band_six_to_ten_beats_eleven_to_twenty_even_if_smaller_size_diff(self):
+        hits = (
+            [
+                chair_hit("chair_unfit_1", dims=[9.0, 9.0, 9.0]),
+                chair_hit("chair_unfit_2", dims=[9.0, 9.0, 9.0]),
+                chair_hit("chair_unfit_3", dims=[9.0, 9.0, 9.0]),
+                chair_hit("chair_unfit_4", dims=[9.0, 9.0, 9.0]),
+                chair_hit("chair_unfit_5", dims=[9.0, 9.0, 9.0]),
+                chair_hit("chair_band1_r6", dims=[0.5, 0.5, 0.8]),
+            ]
+            + [chair_hit(f"chair_unfit_{i}", dims=[9.0, 9.0, 9.0]) for i in range(7, 11)]
+            + [
+                chair_hit("chair_band2_r11", dims=[3.2, 2.6, 2.5]),
+            ]
+        )
+        recs, _ = gather(make_geometry(zones=[FURNITURE_ZONE]), results=hits)
+        assert [c["asset_id"] for c in recs["zones"][0]["candidates"]] == [
+            "chair_band1_r6",
+            "chair_band2_r11",
+        ]
+
+    def test_tie_breaks_deterministically_by_asset_id(self):
+        def same_rank_across_queries(
+            query: str = "", asset_type: str = "models", limit: int = 20
+        ) -> dict:
+            if query == "chair":
+                hits = [chair_hit("b_chair", dims=[1.0, 1.0, 1.0])]
+            elif query == "table":
+                hits = [
+                    {
+                        "id": "a_table",
+                        "name": "A Table",
+                        "categories": ["furniture"],
+                        "tags": ["table"],
+                        "dimensions": [1.0, 1.0, 1.0],
+                        "polycount": 100,
+                    }
+                ]
+            else:
+                hits = []
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
+
+        recs = gather_recommendations(
+            make_geometry(zones=[FURNITURE_ZONE]), same_rank_across_queries
+        )
+        assert [c["asset_id"] for c in recs["zones"][0]["candidates"]] == [
+            "a_table",
+            "b_chair",
+        ]
+
+    def test_whole_scene_cap_of_twelve_across_all_zones(self, monkeypatch):
+        # Default 4 recommendable zones * 3 per zone == 12; raise per-zone cap
+        # temporarily to verify the 12-per-scene cap enforces truncation["output"].
+        monkeypatch.setattr("maya_mcp_server.asset_recommendation.MAX_PER_ZONE", 5)
+        assert MAX_PER_SCENE == 12
+        zones = [
+            dict(FURNITURE_ZONE, name=name)
+            for name in ("entrance", "display", "furniture", "lighting")
+        ]
+
+        def four_per_zone(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
+            if query in ("door", "shelf", "chair", "lamp"):
+                hits = [
+                    {
+                        "id": f"{query}_{i}",
+                        "name": f"{query.title()} {i}",
+                        "categories": [query],
+                        "tags": [query],
+                        "dimensions": [0.5, 0.5, 0.8],
+                        "polycount": 300,
+                    }
+                    for i in range(4)
+                ]
+            else:
+                hits = []
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
+
+        recs = gather_recommendations(make_geometry(zones=zones), four_per_zone)
+        total_kept = sum(z["eligible_count"] + z["unverified_count"] for z in recs["zones"])
+        assert total_kept == 12
+        assert recs["truncation"]["output"] is True
 
 
 class TestCapsAndOrder:
@@ -410,10 +755,18 @@ class TestRecommendCos:
         block = format_recommend_cos(recs)
         assert "RECOMMEND: status=ok provider=poly_haven unit=m " in block
         assert "policy=zone_envelope(world_aabb upper-limit)" in block
-        assert "furniture: target=zone_bbox 3.2x2.6x2.5m meas=complete" in block
-        assert "chair: 1 eligible, 0 unverified" in block
-        assert "1. chair_henry rank=1 0.55x0.6x0.95m fits_zone_envelope" in block
+        assert (
+            "furniture: target=zone_bbox 3.2x2.6x2.5m meas=complete "
+            "queries=chair,table,sofa,bench (1 eligible, 0 unverified)" in block
+        )
+        assert "1. chair_henry rank=1 via=[chair@1] 0.55x0.6x0.95m fits_zone_envelope" in block
         assert "truncation: search=n output=n budget=n errors=0" in block
+
+    def test_disabled_zone_is_shown_as_skipped_without_queries(self):
+        shell_zone = dict(FURNITURE_ZONE, name="shell")
+        recs, _ = gather(make_geometry(zones=[shell_zone]))
+        block = format_recommend_cos(recs)
+        assert "shell: skipped (recommendations_disabled)" in block
 
     def test_skipped_zone_names_the_reason(self):
         dead_zone = dict(FURNITURE_ZONE, size=None, bbox_min=None, bbox_max=None)
@@ -428,13 +781,13 @@ class TestRecommendCos:
         )
         block = format_recommend_cos(recs)
         assert "RECOMMEND: status=offline" in block
-        assert "truncation: search=n output=n budget=n errors=1 (network_unavailable)" in block
+        assert "truncation: search=n output=n budget=n errors=4 (network_unavailable)" in block
 
     def test_empty_scene_block_says_so(self):
         recs, _ = gather(make_geometry())
         block = format_recommend_cos(recs)
         assert "RECOMMEND: status=empty" in block
-        assert "no furniture zone in this scene" in block
+        assert "no zones in this scene" in block
 
     def test_partial_block_lists_the_geometry_error(self):
         recs, _ = gather({"error": {"code": "query_failed", "message": "bbox unreadable"}})
@@ -484,7 +837,7 @@ class TestTargetResolution:
             search,
             objective="replace |GRP_left|GEO_chair",
         )
-        assert len(calls) == 1
+        assert len(calls) == len(ZONE_SEARCH_QUERIES["furniture"])
         target = recs["zones"][0]["target"]
         assert target["source"] == "dag_path"
         assert target["name"] == "|GRP_left|GEO_chair"
@@ -846,7 +1199,10 @@ class TestThreeAxisScreening:
             search,
             objective="replace |GRP_a|GEO_chair_target",
         )
-        assert calls == [{"query": "chair", "asset_type": SEARCH_ASSET_TYPE, "limit": SEARCH_LIMIT}]
+        assert calls == [
+            {"query": q, "asset_type": SEARCH_ASSET_TYPE, "limit": SEARCH_LIMIT}
+            for q in ZONE_SEARCH_QUERIES["furniture"]
+        ]
 
     def test_object_tolerance_policy_and_cos_show_target_basis(self):
         search, _ = make_search(
@@ -968,3 +1324,44 @@ class TestThreeAxisScreening:
             "fallback=ambiguous_short_name(|GRP_l|GEO_chair,|GRP_r|GEO_chair)"
             in format_recommend_cos(recs_dead_dup)
         )
+
+    def test_cross_zone_objective_ref_does_not_mark_other_zones_not_found(self):
+        furniture_zone = dict(
+            FURNITURE_ZONE,
+            objects=[
+                {"name": "|GRP_left|GEO_chair", "size": [60, 80, 60]},
+                {"name": "|GRP_right|GEO_chair", "size": [60, 80, 60]},
+            ],
+        )
+        lighting_zone = {
+            "name": "lighting",
+            "bbox_min": [0, 0, 0],
+            "bbox_max": [300, 220, 300],
+            "size": [300, 220, 300],
+            "object_count": 2,
+            "unmeasured_count": 0,
+            "objects": [
+                {"name": "|GRP_light|GEO_lamp_a", "size": [60, 120, 60]},
+                {"name": "|GRP_light|GEO_lamp_b", "size": [80, 140, 80]},
+            ],
+        }
+        search, _ = make_search([chair_hit("chair_m", dims=[0.6, 0.8, 0.6])])
+
+        recs_cross = gather_recommendations(
+            make_geometry(zones=[furniture_zone, lighting_zone]),
+            search,
+            objective="replace |GRP_left|GEO_chair",
+        )
+        by_zone = {z["zone"]: z for z in recs_cross["zones"]}
+        assert by_zone["furniture"]["target"]["source"] == "dag_path"
+        assert by_zone["lighting"]["target"]["source"] == "zone_bbox"
+        assert by_zone["lighting"]["target"]["fallback_reason"] == "multiple_zone_objects"
+
+        recs_missing = gather_recommendations(
+            make_geometry(zones=[furniture_zone, lighting_zone]),
+            search,
+            objective="replace |GRP_missing|GEO_ghost",
+        )
+        by_zone_missing = {z["zone"]: z for z in recs_missing["zones"]}
+        assert by_zone_missing["furniture"]["target"]["fallback_reason"] == "target_not_found"
+        assert by_zone_missing["lighting"]["target"]["fallback_reason"] == "target_not_found"

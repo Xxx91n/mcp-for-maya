@@ -164,7 +164,7 @@ authoritative and this table must match it row for row:
   the enforcement - the whitelist is. CVE-2026-66004 (§4) is the
   wild-documented attack class this chain exists against.
 - scene_plan recommendations are advisory and send nothing about the
-  scene: the only outbound data is the fixed query word plus index
+  scene: the only outbound data is the fixed query words plus index
   parameters — objective, object names, DAG paths, and sizes never
   leave the host. A recommendation imports nothing; placing a model
   stays an explicit `asset_import` call, and a failed search degrades
