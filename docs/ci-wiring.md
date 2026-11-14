@@ -289,7 +289,18 @@ on a version bump, so they are left to the aggregate. The scheduled `drift` /
 
 ### Protection change made here (API, 2026-11-14)
 
-The only setting this section changed. Same command a maintainer can re-run;
+The only setting this section changed. The block below is the historical
+record of that write, not a cut-and-paste recipe: this endpoint REPLACES the
+whole required-status-checks object, so re-running it later would also put
+`strict` back to `false` and quietly weaken a protection a maintainer had
+raised since. Read the current values first, then send only the fields that
+should change:
+
+```sh
+gh api repos/Xxx91n/mcp-for-maya/branches/main/protection/required_status_checks
+```
+
+What was sent on 2026-11-14:
 
 ```sh
 cat > required-checks.json <<'JSON'
