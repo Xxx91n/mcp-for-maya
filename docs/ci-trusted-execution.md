@@ -6,7 +6,7 @@
 
 **建议方向：由独立 GitHub App 在 PR 的代码上运行检查，并用这个 App 的专属状态作为必需检查。**检查程序和策略应由 App 一侧维护，不能从待检查 PR 里读取执行命令。这样普通 PR 改不了检查程序；有权更改分支规则、卸载 App 或绕过规则的管理员仍能改变结果，这不在防护范围内。
 
-这只是当前最贴近个人账号仓库的可行路线，不代表 App 已有、已部署或已验收。仓库的完整保护配置 API 目前读不到；本票要求的假绿 PR 实验也没有获准推送和建 PR。因此，**独立执行来源尚未落地，端到端验收未通过**。
+这只是当前最贴近个人账号仓库的可行路线，不代表 App 已有、已部署或已验收。#261 的假绿实验已实测：原有检查名称都报成功，GitHub 仍把 PR 标为可合并。**独立执行来源尚未落地，端到端防护未通过。**完整保护配置 API 仍读不到，当前必需检查设置需要 owner 复核。
 
 ## 开工核对
 
@@ -57,15 +57,15 @@ GitHub 文档：[Ruleset 可用规则](https://docs.github.com/en/enterprise-clo
 
 这只能检查“当前工作流看起来有没有接线”，不能构成独立执行来源。能一起改 workflow 和自检的 PR，也能一起改掉两者。#223/#226 仍有价值，继续保留；但它们不是本票要找的根防线。
 
-## 尚未完成：一次性假绿 PR
+## 假绿 PR 实测（2026-11-14）
 
-按本票要求，这个实验必须在独立、可销毁的 PR 上进行，且不能触碰 `main`。实验应保留 `ci`、`ruff budget gate`、`mypy baseline gate` 三个状态名，让 lint、mypy、pytest 的实际步骤直接返回成功，同时在实验副本里停用会先拦住这类改动的仓库内自检。然后记录：
+- PR：[PR #261](https://github.com/Xxx91n/mcp-for-maya/pull/261)，探针提交 `cede1ecb3535f9fd1058035a26a50db7e650dc5d`。该提交保留 `ci`、`ruff budget gate`、`mypy baseline gate` 和四个 pytest 矩阵名称，把 ruff、mypy、pytest 实际步骤换成 `echo PASS`，并在这次实验里停掉会先识别该改动的 gate-registry、ci-wiring 和 pre-commit 步骤。聚合 `ci` 仍照常读取 lint/mypy/test 的结果。
+- GitHub Actions run [43599203981](https://github.com/Xxx91n/mcp-for-maya/actions/runs/43599203981)：`ruff budget gate`、`mypy baseline gate`、`ci` 和四个 pytest 矩阵项全部 `SUCCESS`，来源都是 Actions app `15368`。这些成功只表示 `echo PASS` 返回成功，不表示相应工具运行过。
+- 同一提交的 Coverage run [43599203979](https://github.com/Xxx91n/mcp-for-maya/actions/runs/43599203979) 为 `FAILURE`。GitHub 注解指出测试发现 `gate_class_not_wired` 和 `tool_not_executed`。这是这次实验改坏真实工作流后的预期结果；不把它当作独立保护有效的证据，也没有为让 Coverage 变绿而改测试或测试范围。
+- 解决两条 CodeRabbit 评审线程后，GitHub 对 PR API 的实际读数是 `mergeStateStatus: UNSTABLE`、`mergeable: MERGEABLE`、`reviewDecision` 为空。尽管 Coverage 失败，GitHub 仍认为 PR 可以合并。实验 PR 没有合并。完整保护配置仍返回 403，所以不能据此填写当前完整的 required-check 列表；但这次合并判定已直接证明，**保留原检查名并把实际工具换成成功空操作，没有被独立检查挡住**。
+- PR 上的 CodeRabbit 两条意见都已逐项判断：Coverage 失败原因属实，但不拿它当作外部阻断证据；“本次没有执行”的文档内容确实过时，本报告已更新。Coverage 相关建议没有照做，因为本次要测的是现有真实合并路径；另改测试夹具会改变实验条件。
 
-1. 实验提交的完整 SHA、PR URL 和每个状态检查的名称、来源 App、结果；
-2. GitHub 对 PR 的实际 `mergeStateStatus` / `mergeable`，先解决评审线程等无关阻塞，不能把它们误当成检查的结果；
-3. 清理前后的分支规则读数；关闭 PR 并删除临时分支，确认没有改动 `main` 或保护设置。
-
-**本次没有执行。**当前会话不允许未经明确授权推送或创建 PR；已有成功运行和静态阅读都不能代替这个实验。不要据此宣称“假绿已被挡住”。
+本次实验使用了当前会话指定的分支，而不是另建临时分支；这是为了遵守“只能使用当前分支”的约束。收尾会恢复工作流、关闭 PR、不合并，也不会改 `main` 或分支保护。当前分支本身会保留，不会删除。
 
 ## Owner 下一步
 
@@ -74,5 +74,5 @@ GitHub 文档：[Ruleset 可用规则](https://docs.github.com/en/enterprise-clo
    - `gh api repos/Xxx91n/mcp-for-maya/rules/branches/main`
    - `gh api repos/Xxx91n/mcp-for-maya/actions/permissions`
 2. 选路线一或路线二。若选路线一，先确定 App/服务、执行策略的可信存放位置、费用、维护人、事件覆盖（含 merge queue，如适用）和失败时如何拒绝合并。若选路线二，先确认组织迁移和计划条件；不要仅因仓库规则集 API 返回空就假设组织级规则不存在。
-3. 明确授权建立并推送一次性实验分支/PR。只在该 PR 上做假绿变更，不合并；实验前后读回规则，完成后关 PR、删分支。
+3. #261 的假绿结果已经量到。PR 不合并；恢复工作流并关闭该 PR。因本会话只能保留指定分支，不能删除当前分支。
 4. 只有 App 或组织规则能从独立来源重新运行真实检查，且假绿实验确实被该来源判红并阻止合并，才可以把本票的端到端验收标为通过。若不能部署，记录明确阻塞项，保持父规格 #221 开放。
