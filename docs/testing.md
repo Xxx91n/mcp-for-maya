@@ -37,12 +37,11 @@ between the fake and real API:
 ```bash
 # Point mayapy at the repo so maya_mcp_server + tests import cleanly
 set PYTHONPATH=D:\Aworker\maya\maya-mcp-server\src;D:\Aworker\maya\maya-mcp-server\tests
-"D:\maya2024\Maya2024\bin\mayapy.exe" -m pytest tests/ -q -m mayapy
+"<MayaInstallDir>\bin\mayapy.exe" -m pytest tests/ -q -m mayapy
 ```
 
-The install path differs per machine (`<MayaInstallDir>\bin\mayapy.exe`);
-on the box that last tried it the interpreter lived under
-`D:\maya2024\Maya2024`, not under `C:\Program Files\Autodesk`.
+The install path differs per machine. The box that last tried it kept Maya
+under `D:\maya2024\Maya2024`, not under `C:\Program Files\Autodesk`.
 
 Tests marked `@pytest.mark.mayapy` exercise real `maya.cmds`/
 `maya.api.OpenMaya` against `maya_scene_module` — they are skipped
@@ -105,8 +104,8 @@ crash) — queued until a healthy headless Maya env exists.
 
 `docs/reference/six_callform_gui_driver.py` runs `#229`'s six
 stub-disagreement call forms inside a real GUI session, and reports one
-pass/fail row per form. It is the honest substitute for the mayapy lane
-on a box where that lane cannot start. Run it in a throwaway instance:
+pass/fail row per form. It is the honest substitute for the mayapy run
+on a box where that run cannot start. Launch it in a throwaway instance:
 
 ```mel
 int $rc = catch(python("exec(open(r'<repo>/docs/reference/six_callform_gui_driver.py', encoding='utf-8').read())"));
@@ -115,20 +114,25 @@ evalDeferred "quit -f";
 ```
 
 launched as `"<MayaInstallDir>\bin\maya.exe" -script "<the mel file above>"`.
-The driver forces a new empty scene, writes one JSON file (path in
-`MAYA253_OUT`), and refuses to replace a scene that has a file on disk
-unless `MAYA253_FORCE=1` is set on purpose. Every node it makes is
-deleted in a `finally`, playback is restored, and a deliberate raising
-probe checks that the failure path cleans up too.
+The driver forces a new empty scene, refuses to replace a scene that has
+a file on disk or unsaved changes unless `MAYA253_FORCE=1` is set on
+purpose, and writes one JSON file. Three environment variables steer it:
+`MAYA253_REPO` (repo root, default is the path this repo was measured
+at), `MAYA253_OUT` (the JSON path) and `MAYA253_FORCE`. Every node it
+makes is deleted in a `finally`, playback and selection are restored,
+and a deliberate raising probe checks that the failure path cleans up
+too.
 
 Measured on Maya 2024 (24.0.0.4640), Windows 11, Maya-side Python
 3.10.8: all six forms pass (xform `q/ws/t/ro`, `rename` returning the
-new name, `keyTangent itt/ott`, `playbackOptions min/max`,
-`aimConstraint` with three-number lists, `MFnMesh.getPoint` with
-`MSpace.kWorld`), the shipped
-`tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms`
-passes against real `maya.cmds`, and the scene returns to its starting
-node count and playback range. Artifact:
+new name, `keyTangent itt/ott` read back as the non-default
+`linear`/`step`, `playbackOptions min/max`, `aimConstraint` with
+three-number lists, `MFnMesh.getPoint` with `MSpace.kWorld`). The shipped
+`tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms` also
+passes when the driver hands it real `maya.cmds` — as a plain function
+call, so the mayapy marker and its fixtures are not exercised by that
+run. The scene returns to its starting node count, playback range and
+selection. Artifact:
 `docs/evidence/probes/probe-253-six-callforms-gui-maya2024.json`.
 
 What this does not prove: Maya 2025/2026, and anything batch-only

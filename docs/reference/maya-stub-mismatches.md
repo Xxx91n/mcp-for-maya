@@ -116,8 +116,9 @@ one, and the `mypy-baseline.txt` diff is the in-repo record of what left.
 The `# type: ignore[...]` comments fail the build if the stub starts accepting
 the call (`warn_unused_ignores = true`). The `cast(...)` sites do not — remove
 each one by hand once the stub declares the shape above, then delete the row
-here. Keep the `getPoint` cast until `MSpace.kWorld` is declared as the enum
-the parameter expects.
+here. Keep the `getPoint` cast until the stub's `getPoint` parameter accepts
+the `int` that `MSpace.kWorld` really is (the live run below shows the constant
+is a plain `int`, so waiting for it to be declared an enum would wait forever).
 
 ## Live results (2026-11-15, issue #253)
 
@@ -130,7 +131,7 @@ instance with an empty scene. Artifact:
 |---|---|---|
 | `xform` `q/ws/t/ro` | pass | world translation `[10.0, 0.0, 0.0]`, rotation `[0.0, 0.0, 0.0]` |
 | `rename` | pass | returns `str`: `GEO_cf253_renamed1`; the existing node kept its name |
-| `keyTangent` `itt/ott` | pass | accepted; the key's in-tangent type reads back `auto` |
+| `keyTangent` `itt/ott` | pass | set to `linear`/`step` (not the default `auto`) and read back as exactly those two |
 | `playbackOptions` `min/max` | pass | playback range went `1.0-120.0` to `1.0-12.0`, and the query agreed |
 | `aimConstraint` lists | pass | returned `['GEO_cf253_aimed_aimConstraint1']`, the constraint exists |
 | `MFnMesh.getPoint` `MSpace.kWorld` | pass | world `[9.5, -0.5, 0.5, 1.0]` vs object `[-0.5, -0.5, 0.5, 1.0]`, a 10.0 gap |
@@ -145,6 +146,6 @@ Two details worth carrying into a future stub upgrade:
   not delete the node that held it first. Code must use the returned string,
   never the name it asked for.
 
-The mayapy lane is still open: `cmds.about(batch=True)` and any batch-only
+Running under mayapy is still open: `cmds.about(batch=True)` and any batch-only
 behaviour cannot be checked from a GUI session, and this box's mayapy fails at
 `import maya.standalone`. Nothing here covers Maya 2025 or 2026.
