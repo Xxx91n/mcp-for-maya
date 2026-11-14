@@ -6,13 +6,19 @@ Each tool auto-injects the _mcp_scene module into Maya on first call.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from maya_mcp_server import polyhaven
-from maya_mcp_server.asset_recommendation import format_recommend_cos, gather_recommendations
+from maya_mcp_server.asset_recommendation import (
+    DEFAULT_RECOMMEND_BUDGET_S,
+    format_recommend_cos,
+    gather_recommendations,
+)
 from maya_mcp_server.client import ensure_module_injected, exec_module_code, module_call
 from maya_mcp_server.cos_formatter import (
     format_assert_cos,
@@ -162,23 +168,34 @@ async def get_zone_geometry(client: Any, session_key: str | None = None) -> Any:
 
 
 async def _recommend_for_plan(
-    client: Any, session_key: str | None, objective: str = ""
+    client: Any,
+    session_key: str | None,
+    objective: str = "",
+    *,
+    budget_s: float = DEFAULT_RECOMMEND_BUDGET_S,
 ) -> dict[str, Any]:
     """Compose scene_plan's recommendations section; search and geometry
     failures never break the plan.
 
-    The Maya-side geometry read is wrapped into the same error-dict shape the
-    Maya side already reports, so gather_recommendations stays the single
-    place that turns problems into structured errors. The search runs on the
-    calling loop for now: the worker thread arrives together with the soft
-    time budget in T4 (Q8 of #31), which owns the timeout machinery.
+    Starts a monotonic soft deadline before reading geometry and runs the
+    synchronous index search in a worker thread (`asyncio.to_thread`) so
+    the MCP event loop keeps serving other requests; an in-flight call
+    finishes naturally inside its socket timeout rather than being forcibly
+    killed, and no new searches start once the soft budget runs out.
     """
+    deadline = time.monotonic() + max(0.0, budget_s)
     geometry: Any
     try:
         geometry = await get_zone_geometry(client, session_key)
     except Exception as e:  # transport-level failure; the Maya side has its own
         geometry = {"error": {"code": "query_failed", "message": f"{type(e).__name__}: {e}"}}
-    return gather_recommendations(geometry, polyhaven.search_assets, objective=objective)
+    return await asyncio.to_thread(
+        gather_recommendations,
+        geometry,
+        polyhaven.search_assets,
+        objective=objective,
+        deadline=deadline,
+    )
 
 
 # --- Token Budget Management ---
@@ -1110,15 +1127,17 @@ result
         With recommend_assets=True, also recommends Poly Haven models across
         the built-in scene zones (entrance, display, furniture, lighting;
         shell, ip_core, and path are skipped with no search): reads fresh
-        zone geometry, resolves a target object per zone from objective
-        (full DAG path, unique short name, or single measurable zone object;
-        otherwise falls back to the zone's world-axis bounding box), searches
-        the models index with each zone's fixed query words (word-level
-        checked and deduplicated per zone, capped at 3 per zone and 12 total),
-        and screens candidates in metres (0.5x-1.5x per sorted axis for an
-        object target; upper limit only for zone_bbox). Recommendations are
-        advisory references — search only, no download and no import — and
-        a search or network failure never changes the plan itself. Clearances
+        zone geometry (after auto_fix completes when auto_fix=True), resolves
+        a target object per zone from objective (full DAG path, unique short
+        name, or single measurable zone object; otherwise falls back to the
+        zone's world-axis bounding box), searches the models index in a
+        worker thread under a 5s soft time budget reusing the 300s models
+        index cache, checks words, deduplicates (capped at 3 per zone and 12
+        total), and screens candidates in metres (0.5x-1.5x per sorted axis
+        for an object target; upper limit only for zone_bbox). Recommendations
+        are advisory references — search only, no download and no import — and
+        a search timeout, network failure (returning partial/offline status),
+        or corrupt metadata never drops or changes the plan itself. Clearances
         and collisions are not verified.
 
         Blockout first: check organization and proportions

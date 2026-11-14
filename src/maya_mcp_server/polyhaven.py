@@ -291,13 +291,27 @@ def search_assets(
         _index_cache[str(asset_type)] = (time.monotonic(), data)
 
     tokens = [t for t in re.split(r"\s+", str(query).strip().lower()) if t]
-    scored: list[tuple[int, str, dict[str, Any]]] = []
+    scored: list[tuple[int, str, dict[str, Any], list[Any], list[Any]]] = []
     for asset_id, meta in data.items():
-        if not isinstance(meta, dict):
+        if not isinstance(asset_id, str) or not isinstance(meta, dict):
             continue
-        hay_name = f"{asset_id} {meta.get('name', '')}".lower()
-        hay_tags = [str(t).lower() for t in meta.get("tags") or []]
-        hay_cats = [str(c).lower() for c in meta.get("categories") or []]
+        raw_name = meta.get("name", asset_id)
+        name_text = raw_name if isinstance(raw_name, str) else str(raw_name or asset_id)
+        hay_name = f"{asset_id} {name_text}".lower()
+        raw_tags = meta.get("tags")
+        tags_list = (
+            list(raw_tags)
+            if isinstance(raw_tags, (list, tuple))
+            else ([raw_tags] if isinstance(raw_tags, str) else [])
+        )
+        raw_cats = meta.get("categories")
+        cats_list = (
+            list(raw_cats)
+            if isinstance(raw_cats, (list, tuple))
+            else ([raw_cats] if isinstance(raw_cats, str) else [])
+        )
+        hay_tags = [str(t).lower() for t in tags_list]
+        hay_cats = [str(c).lower() for c in cats_list]
         score = 0
         matched = True
         for tok in tokens:
@@ -309,19 +323,19 @@ def search_assets(
                 matched = False
                 break
         if matched:
-            scored.append((score, asset_id, meta))
+            scored.append((score, asset_id, meta, cats_list, tags_list))
     scored.sort(key=lambda m: (-m[0], m[1]))
 
     results = [
         {
             "id": aid,
-            "name": m.get("name", aid),
-            "categories": m.get("categories", []),
-            "tags": (m.get("tags") or [])[:10],
+            "name": m.get("name", aid) if isinstance(m.get("name"), str) else aid,
+            "categories": cats,
+            "tags": tags[:10],
             "dimensions": _project_dimensions(m.get("dimensions")),
             "polycount": _project_polycount(m.get("polycount")),
         }
-        for _s, aid, m in scored[:limit]
+        for _s, aid, m, cats, tags in scored[:limit]
     ]
     return {
         "results": results,

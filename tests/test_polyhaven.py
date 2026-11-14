@@ -264,6 +264,35 @@ class TestSearch:
         polyhaven.search_assets(query="sofa")
         assert [r["url"] for r in record] == ["https://api.polyhaven.com/assets?t=models"]
 
+    def test_corrupt_tags_categories_and_asset_ids_never_crash_search(self, monkeypatch):
+        """#220 T4: non-string ids, non-dict entries, and non-list tags are tolerated."""
+        assets = {
+            "Chair_Good": {
+                "name": "Chair Good",
+                "categories": "not-a-list",
+                "tags": 42,
+                "dimensions": [600, 800, 600],
+                "polycount": 500,
+            },
+            "Chair_DictCats": {
+                "name": "Chair Dict Cats",
+                "categories": {"bad": 1},
+                "tags": "chair",
+                "dimensions": [600, 800, 600],
+                "polycount": 500,
+            },
+            "Broken_Row": "not-a-dict",
+        }
+        routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
+        monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes))
+        out = polyhaven.search_assets(query="chair")
+        assert [r["id"] for r in out["results"]] == ["Chair_DictCats", "Chair_Good"]
+        by_id = {r["id"]: r for r in out["results"]}
+        assert by_id["Chair_Good"]["categories"] == ["not-a-list"]
+        assert by_id["Chair_Good"]["tags"] == []
+        assert by_id["Chair_DictCats"]["categories"] == []
+        assert by_id["Chair_DictCats"]["tags"] == ["chair"]
+
 
 # ------------------------------------------------------------------
 # guards against slips

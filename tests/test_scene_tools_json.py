@@ -557,7 +557,7 @@ class TestRecommendAssets:
 
         out = await tools.fns["scene_plan"](format="cos", recommend_assets=True)
         assert "RECOMMEND: status=offline" in out
-        assert "errors=4 (network_unavailable)" in out
+        assert "errors=1 (network_unavailable)" in out
 
     async def test_seven_zones_dedup_word_filter_and_cos_through_scene_plan(
         self, tools, monkeypatch
@@ -967,6 +967,352 @@ class TestRecommendAssetsTargetAndSizing:
         assert "furniture: target=dag_path(|GRP_left|GEO_chair)" in cos
         assert "lighting: target=zone_bbox" in cos
         assert "fallback=multiple_zone_objects" in cos
+
+    @staticmethod
+    def _mock_urlopen(routes_or_exc, record=None):
+        import io
+        from urllib.error import URLError
+
+        class _Resp:
+            def __init__(self, body: bytes, url: str):
+                self._buf = io.BytesIO(body)
+                self._url = url
+                self.headers = {"Content-Length": str(len(body))}
+
+            def geturl(self) -> str:
+                return self._url
+
+            def read(self, n: int = -1) -> bytes:
+                return self._buf.read(n)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        def fake_open(req, timeout=None):
+            url = req.full_url if hasattr(req, "full_url") else str(req)
+            if record is not None:
+                record.append({"url": url, "timeout": timeout})
+            if isinstance(routes_or_exc, Exception):
+                raise routes_or_exc
+            if callable(routes_or_exc):
+                body = routes_or_exc(url, timeout)
+                return _Resp(body, url)
+            if url not in routes_or_exc:
+                raise URLError(f"unmocked url: {url}")
+            val = routes_or_exc[url]
+            if isinstance(val, Exception):
+                raise val
+            return _Resp(val, url)
+
+        return fake_open
+
+    async def test_search_runs_in_worker_thread_without_blocking_event_loop(
+        self, tools, monkeypatch
+    ):
+        import asyncio
+        import threading
+        import time
+
+        tools.env.scene.add_mesh("GEO_chair_main", bbox_min=(0, 0, 0), bbox_max=(80, 100, 80))
+
+        main_thread = threading.current_thread()
+        worker_threads: list[threading.Thread] = []
+        ticks = 0
+        stop = asyncio.Event()
+
+        async def ticker():
+            nonlocal ticks
+            while not stop.is_set():
+                ticks += 1
+                await asyncio.sleep(0.005)
+
+        def slow_search(query="", asset_type="models", limit=20, timeout=5.0):
+            worker_threads.append(threading.current_thread())
+            if query == "chair":
+                time.sleep(0.08)
+            return {
+                "results": [self._chair("chair_fit", [0.8, 1.0, 0.8])] if query == "chair" else [],
+                "total_count": 1 if query == "chair" else 0,
+                "limit": limit,
+            }
+
+        monkeypatch.setattr("maya_mcp_server.polyhaven.search_assets", slow_search)
+        task = asyncio.create_task(ticker())
+        try:
+            out = await tools.fns["scene_plan"](format="json", recommend_assets=True)
+        finally:
+            stop.set()
+            await task
+
+        assert ticks >= 3, "blocking index search must run off the asyncio event loop"
+        assert len(worker_threads) == 4
+        assert all(t is not main_thread for t in worker_threads)
+        res = json.loads(out)
+        assert res["recommendations"]["status"] == "ok"
+        assert "zone_analysis" in res and "action_plan" in res
+
+    async def test_index_cache_cold_vs_hot_and_offline_via_real_polyhaven(self, tools, monkeypatch):
+        from urllib.error import URLError
+
+        from maya_mcp_server import polyhaven
+
+        polyhaven._index_cache.clear()
+        try:
+            tools.env.scene.add_mesh("GEO_wall_main", bbox_min=(0, 0, 0), bbox_max=(800, 300, 800))
+            tools.env.scene.add_mesh("GEO_door_main", bbox_min=(0, 0, 0), bbox_max=(120, 220, 40))
+            tools.env.scene.add_mesh("GEO_chair_main", bbox_min=(0, 0, 0), bbox_max=(80, 100, 80))
+
+            assets = {
+                "wooden_chair_01": {
+                    "name": "Wooden Chair",
+                    "categories": ["furniture"],
+                    "tags": ["chair"],
+                    "dimensions": [600, 800, 600],
+                    "polycount": 900,
+                },
+                "front_door_01": {
+                    "name": "Front Door",
+                    "categories": ["architecture"],
+                    "tags": ["door"],
+                    "dimensions": [1000, 2100, 200],
+                    "polycount": 1200,
+                },
+            }
+            payload = json.dumps(assets).encode()
+            calls: list[dict] = []
+            monkeypatch.setattr(
+                polyhaven,
+                "_urlopen",
+                self._mock_urlopen(
+                    {"https://api.polyhaven.com/assets?t=models": payload},
+                    record=calls,
+                ),
+            )
+
+            # Cold cache: 6 queries across entrance + furniture make only ONE HTTP fetch.
+            res1 = json.loads(
+                await tools.fns["scene_plan"](
+                    objective="plan room with |GRP_furniture|GEO_chair_main",
+                    format="json",
+                    recommend_assets=True,
+                )
+            )
+            assert [c["url"] for c in calls] == ["https://api.polyhaven.com/assets?t=models"]
+            assert 0 < calls[0]["timeout"] <= 5.0
+            assert "/files" not in calls[0]["url"]
+            assert "GEO_chair_main" not in calls[0]["url"]
+            assert res1["recommendations"]["status"] == "ok"
+
+            # Hot cache while offline: ZERO network calls and still status=ok.
+            offline_calls: list[dict] = []
+            monkeypatch.setattr(
+                polyhaven,
+                "_urlopen",
+                self._mock_urlopen(URLError("network down"), record=offline_calls),
+            )
+            res2 = json.loads(await tools.fns["scene_plan"](format="json", recommend_assets=True))
+            assert offline_calls == []
+            assert res2["recommendations"]["status"] == "ok"
+
+            # Expired/cold cache while offline: circuit-breaks after 1 attempt, status=offline.
+            polyhaven._index_cache.clear()
+            res3 = json.loads(await tools.fns["scene_plan"](format="json", recommend_assets=True))
+            assert [c["url"] for c in offline_calls] == [
+                "https://api.polyhaven.com/assets?t=models"
+            ]
+            assert res3["recommendations"]["status"] == "offline"
+            assert res3["recommendations"]["errors"][0]["code"] == "network_unavailable"
+            for key in (
+                "organization_status",
+                "zone_analysis",
+                "layout_suggestions",
+                "conflict_prevention",
+                "action_plan",
+            ):
+                assert key in res3
+        finally:
+            polyhaven._index_cache.clear()
+
+    async def test_corrupt_index_json_and_budget_exhausted_keep_plan(self, tools, monkeypatch):
+        from maya_mcp_server import polyhaven
+
+        polyhaven._index_cache.clear()
+        try:
+            tools.env.scene.add_mesh("GEO_chair_main", bbox_min=(0, 0, 0), bbox_max=(80, 100, 80))
+            monkeypatch.setattr(
+                polyhaven,
+                "_urlopen",
+                self._mock_urlopen(
+                    {"https://api.polyhaven.com/assets?t=models": b"{not-valid-json"}
+                ),
+            )
+            res_bad = json.loads(
+                await tools.fns["scene_plan"](format="json", recommend_assets=True)
+            )
+            assert res_bad["recommendations"]["status"] == "offline"
+            assert res_bad["recommendations"]["errors"][0]["code"] == "bad_response"
+            assert "zone_analysis" in res_bad and "action_plan" in res_bad
+
+            # Soft budget exhaustion (monotonic clock crosses deadline after 1st query).
+            monkeypatch.setattr(
+                polyhaven,
+                "search_assets",
+                lambda **kw: {"results": [], "total_count": 0, "limit": 20},
+            )
+            tick = [1000.0]
+
+            def jumping_monotonic():
+                tick[0] += 3.0
+                return tick[0]
+
+            monkeypatch.setattr("maya_mcp_server.scene_tools.time.monotonic", jumping_monotonic)
+            monkeypatch.setattr(
+                "maya_mcp_server.asset_recommendation.time.monotonic", jumping_monotonic
+            )
+            res_budget = json.loads(
+                await tools.fns["scene_plan"](format="json", recommend_assets=True)
+            )
+            assert res_budget["recommendations"]["truncation"]["budget"] is True
+            assert res_budget["recommendations"]["status"] == "partial"
+            assert res_budget["recommendations"]["errors"][0]["code"] == "budget_exhausted"
+            assert "zone_analysis" in res_budget and "action_plan" in res_budget
+        finally:
+            polyhaven._index_cache.clear()
+
+    async def test_auto_fix_runs_before_zone_geometry_read_and_screens_post_fix(
+        self, tools, monkeypatch
+    ):
+        # Verify auto_fix=True with recommend_assets=False is byte-identical
+        # to omitting the flag and never calls get_zone_geometry.
+        grp = tools.env.scene.add_group("GRP_furniture")
+        tools.env.scene.add_mesh(
+            "GEO_chair_grouped", bbox_min=(0, 0, 0), bbox_max=(60, 80, 60), parent=grp
+        )
+        order: list[str] = []
+        orig_plan = tools.env.module.scene_plan
+        orig_geom = tools.env.module.get_zone_geometry
+
+        def tracked_geom():
+            order.append("get_zone_geometry")
+            return orig_geom()
+
+        monkeypatch.setattr(tools.env.module, "get_zone_geometry", tracked_geom)
+
+        expected_off = await tools.fns["scene_plan"](auto_fix=True, format="json")
+        actual_off = await tools.fns["scene_plan"](
+            auto_fix=True, format="json", recommend_assets=False
+        )
+        assert order == []
+        assert actual_off.encode("utf-8") == expected_off.encode("utf-8")
+
+        # Now install tracked auto_fix hook and run auto_fix=True + recommend_assets=True.
+        def tracked_plan(objective="", auto_fix=False):
+            order.append(f"scene_plan:{auto_fix}")
+            out = orig_plan(objective, auto_fix)
+            if auto_fix:
+                # Simulate layout fix adding an object before geometry read.
+                tools.env.scene.add_mesh(
+                    "GEO_table_postfix", bbox_min=(0, 0, 0), bbox_max=(140, 75, 80)
+                )
+            return out
+
+        monkeypatch.setattr(tools.env.module, "scene_plan", tracked_plan)
+        tools.env.scene.add_group("GRP_unused")
+
+        def fake_search(query="", asset_type="models", limit=20, timeout=5.0):
+            if query == "table":
+                hits = [
+                    {
+                        "id": "dining_table_post",
+                        "name": "Dining Table",
+                        "categories": ["furniture"],
+                        "tags": ["table"],
+                        "dimensions": [1.4, 0.75, 0.8],
+                        "polycount": 1000,
+                    }
+                ]
+            else:
+                hits = []
+            return {"results": hits, "total_count": len(hits), "limit": limit}
+
+        monkeypatch.setattr("maya_mcp_server.polyhaven.search_assets", fake_search)
+
+        out = await tools.fns["scene_plan"](
+            objective="replace GEO_table_postfix",
+            auto_fix=True,
+            format="json",
+            recommend_assets=True,
+        )
+        res = json.loads(out)
+        assert order == ["scene_plan:True", "get_zone_geometry"]
+        assert "GRP_unused" not in tools.env.scene.nodes
+        zone = res["recommendations"]["zones"][0]
+        assert zone["target"]["name"] == "|GEO_table_postfix"
+        assert zone["target"]["size_m"] == [1.4, 0.75, 0.8]
+        assert [c["asset_id"] for c in zone["candidates"]] == ["dining_table_post"]
+
+    async def test_security_pipeline_audit_envelope_and_no_download_import(
+        self, tools, monkeypatch, tmp_path
+    ):
+        from mcp.types import TextContent
+
+        from maya_mcp_server import polyhaven
+        from maya_mcp_server.pipeline import SecurityConfig, SecurityPipeline
+        from maya_mcp_server.security import AuditLogger
+
+        tools.env.scene.add_mesh("GEO_chair_main", bbox_min=(0, 0, 0), bbox_max=(80, 90, 80))
+
+        def forbid(*args, **kwargs):
+            raise AssertionError("asset download/import must never run during scene_plan")
+
+        monkeypatch.setattr(polyhaven, "download_asset", forbid)
+        polyhaven._index_cache.clear()
+        try:
+            urls: list[dict] = []
+            assets = {
+                "chair_01": {
+                    "name": "Chair",
+                    "categories": ["furniture"],
+                    "tags": ["chair"],
+                    "dimensions": [600, 800, 600],
+                    "polycount": 500,
+                }
+            }
+            monkeypatch.setattr(
+                polyhaven,
+                "_urlopen",
+                self._mock_urlopen(
+                    {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()},
+                    record=urls,
+                ),
+            )
+
+            audit = AuditLogger(tmp_path / "audit.jsonl")
+            pipe = SecurityPipeline(config=SecurityConfig(), audit=audit)
+            ctx = SimpleNamespace(
+                message=SimpleNamespace(
+                    name="scene_plan",
+                    arguments={"format": "json", "recommend_assets": True},
+                )
+            )
+
+            async def call_next(_ctx):
+                text = await tools.fns["scene_plan"](format="json", recommend_assets=True)
+                return [TextContent(type="text", text=text)]
+
+            result = await pipe.on_call_tool(ctx, call_next)
+            payload = json.loads(result[0].text)
+            assert payload["recommendations"]["status"] == "ok"
+            assert [u["url"] for u in urls] == ["https://api.polyhaven.com/assets?t=models"]
+            lines = (tmp_path / "audit.jsonl").read_text(encoding="utf-8").strip().splitlines()
+            ev = json.loads(lines[-1])
+            assert ev["tool_name"] == "scene_plan"
+            assert ev["outcome"] == "success"
+        finally:
+            polyhaven._index_cache.clear()
 
 
 # ------------------------------------------------------------
