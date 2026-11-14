@@ -77,6 +77,20 @@ def _playback_range(cmds):
     ]
 
 
+def _exc_text(exc):
+    """One-line description of an exception, for the JSON rows."""
+    return "".join(traceback.format_exception_only(type(exc), exc)).strip()
+
+
+def _reset_playback(cmds, start_range):
+    """Put playback back where the run found it; return a problem or None."""
+    try:
+        cmds.playbackOptions(min=start_range[0], max=start_range[1])
+    except Exception as exc:  # noqa: BLE001
+        return f"playback restore failed: {exc}"
+    return None
+
+
 def _record(rows, name, fn, created):
     """Run one probe, keep its verdict, never let its exception escape."""
     row = {"form": name, "status": "fail", "detail": None}
@@ -84,7 +98,7 @@ def _record(rows, name, fn, created):
         row["detail"] = fn(created)
         row["status"] = "pass"
     except Exception as exc:  # noqa: BLE001 - the evidence is the reason, not a crash
-        row["detail"] = "".join(traceback.format_exception_only(type(exc), exc)).strip()
+        row["detail"] = _exc_text(exc)
         row["traceback"] = traceback.format_exc()
     rows.append(row)
     return row
@@ -325,7 +339,7 @@ def run():
             result["shipped_test"] = {
                 "status": "fail",
                 "test": "tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms",
-                "detail": "".join(traceback.format_exception_only(type(exc), exc)).strip(),
+                "detail": _exc_text(exc),
                 "traceback": traceback.format_exc(),
             }
 
@@ -333,18 +347,18 @@ def run():
             form_created = []
             _record(result["forms"], name, fn, form_created)
             created.extend(form_created)
-            try:
-                cmds.playbackOptions(min=start_range[0], max=start_range[1])
-            except Exception:  # noqa: BLE001
-                pass
+            _reset_playback(cmds, start_range)
 
         result["failure_cleanup"] = _failure_cleanup_self_check(cmds)
     finally:
         problems = _delete_all(created, cmds)
+        playback_problem = _reset_playback(cmds, start_range)
+        if playback_problem:
+            problems.append(playback_problem)
         try:
-            cmds.playbackOptions(min=start_range[0], max=start_range[1])
+            cmds.select(selection_at_start, replace=True)
         except Exception as exc:  # noqa: BLE001
-            problems.append(f"playback restore failed: {exc}")
+            problems.append(f"selection restore failed: {exc}")
         try:
             cmds.select(selection_at_start, replace=True)
         except Exception as exc:  # noqa: BLE001

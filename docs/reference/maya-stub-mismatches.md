@@ -8,10 +8,11 @@ Maya interpreter still has to confirm. It is the list to read the next time
 `types-maya-strict` is upgraded.
 
 **What it is not:** proof of live Maya behaviour *from the batch alone*. No
-Maya session was run for that batch: the mayapy tier is unrunnable on the box
-that measured it (`docs/testing.md` Tier 2 records the native access violation
-when `maya.standalone` is imported and the `maya.exe -batch` hang), so every
-live cell below was open at the time. The fake Maya test layer
+Maya session was run for that batch: running the tests under mayapy was not
+possible on the box that measured it (`docs/testing.md`, the real-Maya
+section, records the native access violation when `maya.standalone` is
+imported and the `maya.exe -batch` hang), so every live cell below was open
+at the time. The fake Maya test layer
 (`tests/maya_stub/`) accepts these same calls, but that proves the calls match
 the fake, not the real command; the real-interpreter test
 (`tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms`) is what
@@ -124,8 +125,14 @@ is a plain `int`, so waiting for it to be declared an enum would wait forever).
 
 Run inside a real Maya 2024 GUI session (24.0.0.4640, Windows 11, Maya-side
 Python 3.10.8) with `docs/reference/six_callform_gui_driver.py`, in a fresh
-instance with an empty scene. Artifact:
+instance with an empty scene. No row is blocked: each one below is a measured
+value, not a skip. Artifact:
 `docs/evidence/probes/probe-253-six-callforms-gui-maya2024.json`.
+
+The shipped test was tightened in the same pass: it now sets
+`linear`/`step` and reads both back, because `auto` — which it used
+before — is Maya's own default and would read the same on a call that did
+nothing.
 
 | Spot | Live result | What Maya actually returned |
 |---|---|---|

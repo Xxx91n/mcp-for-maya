@@ -217,7 +217,14 @@ def test_callform_stub_disagreement_forms(real_maya):
         # keyTangent takes itt/ott, the documented short names
         real_maya.setKeyframe(renamed, attribute="translateX")
         real_maya.select(renamed)
-        real_maya.keyTangent(edit=True, itt="auto", ott="auto")
+        # Non-default types on purpose: `auto` is Maya's default, so a call
+        # that silently did nothing would still read back as `auto`. These
+        # two values can only appear if the flags were applied (#253).
+        real_maya.keyTangent(edit=True, itt="linear", ott="step")
+        in_types = real_maya.keyTangent(renamed, q=True, itt=True)
+        out_types = real_maya.keyTangent(renamed, q=True, ott=True)
+        assert in_types == ["linear"], in_types
+        assert out_types == ["step"], out_types
 
         # playbackOptions takes min/max, the documented short names
         real_maya.playbackOptions(min=1, max=12)

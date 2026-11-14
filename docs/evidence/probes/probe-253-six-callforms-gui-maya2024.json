@@ -5,7 +5,7 @@
     "parent": "#222 (spec), #229 (the six call forms and their stub record)",
     "env": "Autodesk Maya 2024 (24.0.0.4640) GUI, fresh throwaway instance launched with maya.exe -script; empty untitled scene; Windows 11 IoT Enterprise LTSC 10.0.26100 x64; Maya-side Python 3.10.8; host Python 3.13.13 (uv env)",
     "purpose": "Turn #229's six 'static check passed but real Maya never ran' call forms into measured pass/fail rows on a real Maya 2024 session.",
-    "verdict": "6/6 call forms pass on Maya 2024; the shipped pytest function tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms passes when called with real maya.cmds; a probe that raises after creating nodes leaves no node behind; the scene returns to its starting node count, playback range and selection.",
+    "verdict": "6/6 call forms pass on Maya 2024; the shipped pytest function tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms passes when called with real maya.cmds, and it now asserts non-default tangent types instead of Maya's default; a probe that raises after creating nodes leaves no node behind; the scene returns to its starting node count, playback range and selection.",
     "claim_boundary": "Proves these six call forms work on Maya 2024 on Windows (GUI batch=False session). It does NOT prove Maya 2025/2026, and it does not prove the mayapy/standalone batch lane - mayapy cannot import maya.standalone on this box (DLL initialisation failure), so batch-only behaviour such as cmds.about(batch=True) stays unverified here. The shipped test was called as a plain function, not through pytest, so the mayapy marker and its fixtures are not exercised by this run. Values are one run per form; the shipped test is the durable check.",
     "mayapy_blocker": {
       "command": "mayapy.exe probe_env.py  (import maya.standalone; maya.standalone.initialize(); print version)",
@@ -53,19 +53,58 @@
         "exit_code": 0
       },
       {
-        "what": "Six-form run (fresh GUI, PID 5592)",
+        "what": "Six-form run (fresh GUI, PID 13616)",
         "command": "maya.exe -script six_forms.mel   # MEL: catch(python(exec(driver))); evalDeferred \"quit -f\"",
         "output": "JSON written to the Temp path; the process exited on its own after the deferred quit (Get-Process showed only the pre-existing Maya PID 4664 afterwards)",
         "exit_code": 0
       }
     ],
     "entry_command": "maya.exe -script C:\\Users\\Administrator\\AppData\\Local\\Temp\\maya253\\six_forms.mel  # the MEL file execs docs/reference/six_callform_gui_driver.py, then evalDeferred 'quit -f'",
+    "supersedes": {
+      "why": "The first two runs of this driver were admitted on this branch before review. The artifact is regenerated from a later run, and this block keeps what the earlier ones recorded so the trail is not lost: the review found the keyTangent read-back useless (it set Maya's default 'auto'), the selection unmeasured, and the scene guard blind to an unsaved untitled scene.",
+      "earlier_runs": [
+        {
+          "session_pid": 11572,
+          "keyTangent_read_back": [
+            "auto"
+          ],
+          "cleanup_tracked": [
+            "nodes",
+            "playback"
+          ]
+        },
+        {
+          "session_pid": 21704,
+          "driver_sha256": "5c42d2e5f6411956c627bc3e8bdd2130a051fb5ff3b62a658e954af40c97851b",
+          "keyTangent_read_back": [
+            "auto"
+          ],
+          "cleanup_tracked": [
+            "nodes",
+            "playback"
+          ]
+        },
+        {
+          "session_pid": 5592,
+          "driver_sha256": "6cadfa19d776bc753992766dae06dc28b647e48695ab01a64ff909950b50453d",
+          "keyTangent_read_back": [
+            "linear"
+          ],
+          "cleanup_tracked": [
+            "nodes",
+            "playback",
+            "selection"
+          ],
+          "note": "Same verdicts as the run kept below; replaced because the shipped test it calls still set the default tangent type."
+        }
+      ]
+    },
     "provenance": {
-      "session_pid": 5592,
+      "session_pid": 13616,
       "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
       "driver": "docs/reference/six_callform_gui_driver.py",
-      "driver_sha256": "6cadfa19d776bc753992766dae06dc28b647e48695ab01a64ff909950b50453d",
-      "repo_commit_at_run": "451ffc11893f40bd6f0ce7c388b93f0a47528489 + working-tree driver edits",
+      "driver_sha256": "f0c4cc2012cddff3c723e41ae644d6cae25ae4eadf4ed3860572bf88be781575",
+      "driver_sha256_note": "These bytes are what ran, and they are the driver committed on this branch; the sha256 is the anchor, not a commit id.",
       "ticket_start_sha": "8cec2c0d9e4a8f7f3ef17e773c395ef4e3cdc374",
       "base_main": "95a95a582718691a51231fef6eac38d1ceb8381d",
       "host_python": "3.13.13"
@@ -81,11 +120,13 @@
     "shipped pytest function in real maya.cmds": "pass",
     "failure-path cleanup self-check": "pass"
   },
+  "blocked_items": [],
+  "blocked_note": "No form is blocked. Nothing needed a second machine or an unavailable step; the only open lane is batch mode under mayapy (see claim_boundary).",
   "notes": {
     "kWorld_type": "Maya's om2.MSpace.kWorld is a plain int; getPoint accepts it. So the stub's parameter type (MSpace) is the wrong half, not the constant: the constant is int, exactly as the stub declares.",
     "keyTangent_evidence": "The probe sets linear/step, not Maya's default auto, and reads both back; a call that was silently ignored could not produce those two values.",
     "rename_clash": "Maya returns GEO_cf253_renamed1 for the second node wanting that name and keeps the first node alive, so the return value must be used, not the requested name.",
-    "shipped_test_selection": "The shipped test ends with cmds.select(<node>) and then deletes its nodes, so it leaves a selection pointing at a deleted node. Harmless in a throwaway instance, but it is why this driver restores the selection it found and records the post-cleanup selection (empty here).",
+    "shipped_test_selection": "Maya leaves a newly made node selected, so a probe that reads the selection after it creates its node records its own node. The driver reads the selection first, restores it after the probe, and the post-cleanup selection matches the starting one (both empty).",
     "scene_state": "Node count 51 before and after; playback 1.0-120.0 before and after; selection empty before and after; no GEO_cf253*/GEO_stub* node left. The instance was a fresh throwaway GUI and quit itself, so no user scene was involved at any point."
   },
   "raw_run": {
@@ -97,7 +138,7 @@
       "operating_system": "win64",
       "maya_python": "3.10.8",
       "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
-      "session_pid": 5592,
+      "session_pid": 13616,
       "driver_file": "<exec>",
       "repo_root": "D:\\Aworker\\maya\\maya-mcp-server",
       "out_json": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\maya253\\six_forms_result.json",
