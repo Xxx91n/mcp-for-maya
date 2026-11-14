@@ -484,3 +484,7 @@ commands behind them are swapped for ones that only succeed. That needs
 maintainer-side work (checks that run the tools outside the workflow, or a
 ruleset), not another in-workflow guard, so it is stated as a known limit
 rather than claimed as closed.
+
+The follow-up investigation for the "same names, fake-green commands" case,
+including current API reads, route trade-offs, and the still-unrun disposable
+PR experiment, is recorded in [#250: independent trusted execution](ci-trusted-execution.md).
