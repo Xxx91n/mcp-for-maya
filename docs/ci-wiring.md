@@ -124,3 +124,15 @@ as a shell command.
 After these fixes: 42 wiring tests passed; full locked suite 1349 passed,
 27 skipped. Ruff budget, mypy (zero new errors), governance checks and all
 pre-commit hooks passed locally. The monolith's spare-line notice is unchanged.
+
+## Colon boundary regression
+
+The next review found that whole-step matching lost the old detection of
+`|| :` at the end of a line when another command followed. This is a valid
+finding. The swallow regex now uses multiline boundaries while retaining
+cross-line matching. A regression matrix covers all five listed swallow forms
+in tool and summary steps, both on one line and after a newline, with a later
+successful command. Before the fix this test failed on the colon case;
+after the fix all 43 wiring tests and the full suite (1350 passed, 27 skipped)
+passed locally. Ruff budget, mypy zero-new-error check, governance scripts and
+pre-commit were rerun for the repair.

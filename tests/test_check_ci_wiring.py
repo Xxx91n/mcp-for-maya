@@ -573,3 +573,24 @@ def test_backslash_continued_swallow_is_red(tmp_path):
         "run: |\n          uv run python -m pytest -q || \\\n            true",
     )
     assert any("test: failure_swallowed" in f for f in _check(tmp_path, text))
+
+
+def test_swallow_forms_before_later_commands_are_red(tmp_path):
+    for job_name in ("test", "ci"):
+        for swallow in ("true", ":", ":; echo ignored", "echo ignored", "exit 0"):
+            for separator in (" ", "\n            "):
+                command = "false ||" + separator + swallow + "\n          echo done\n"
+                if job_name == "test":
+                    text = VALID.replace(
+                        "run: uv run python -m pytest -q",
+                        "run: |\n          uv run python -m pytest -q\n          " + command,
+                    )
+                else:
+                    text = VALID + "          " + command
+                findings = _check(tmp_path, text)
+                assert any(f"{job_name}: failure_swallowed" in f for f in findings), (
+                    job_name,
+                    swallow,
+                    separator,
+                    findings,
+                )

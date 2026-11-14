@@ -79,7 +79,9 @@ _ALLOWED_IF = ("always()", "success()")
 
 # Swallow shapes in shell run text. ``|| rc=$?`` (capture the code and check
 # it) and ``|| cat ...; exit`` (print and re-raise) do not match these.
-_SWALLOW = re.compile(r"\|\|\s*(true\b|:\s*(;|$)|\bexit\s+0\b|\becho\b)")
+# MULTILINE keeps a bare colon at a shell line boundary detectable even
+# when a later command follows in the same step.
+_SWALLOW = re.compile(r"\|\|\s*(true\b|:\s*(;|$)|\bexit\s+0\b|\becho\b)", re.MULTILINE)
 
 _JOB_NAME = re.compile(r"^([A-Za-z0-9_-]+):\s*(#.*)?$")
 
