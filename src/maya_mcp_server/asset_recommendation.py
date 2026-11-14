@@ -4,32 +4,44 @@ With ``scene_plan(recommend_assets=True)`` the plan gains a
 ``recommendations`` section. Everything here runs on the host: the Maya
 side never goes online. The module reads the zone geometry the
 ``_mcp_scene`` module reports (through the ``get_zone_geometry`` host
-helper in scene_tools), searches the Poly Haven models index for the
-zone's query words via ``polyhaven.search_assets``, and screens the hits
-against the zone's world-axis bounding box as a plain upper size limit.
+helper in scene_tools), searches the Poly Haven models index for each
+zone's mapped query words via ``polyhaven.search_assets``, filters hits
+with a normalized word-level check, deduplicates across keywords, sorts
+by rank band and size difference, and caps results per zone and for the
+whole scene.
 
 Advisory only: recommendations name candidates and say why; nothing is
 downloaded, imported, or placed, and a search failure never changes the
 plan itself.
 
-T1 scope (#217): the furniture zone with the single query ``chair``.
-The remaining zones, cross-keyword dedup, and rank-band sorting are T2;
-explicit target objects and the three-axis tolerance band are T3; the
-soft time budget and whole-scene candidate cap are T4.
+T1 scope (#217): furniture zone with ``chair``.
+T2 scope (#218): all 7 built-in zones, normalized word-level check,
+cross-keyword dedup, rank-band + size-difference sorting, and the
+3-per-zone / 12-per-scene caps.
+Explicit target objects and the three-axis tolerance band are T3 (#219);
+the soft time budget is T4 (#220).
 """
 
 from __future__ import annotations
 
 import math
+import re
+import unicodedata
 from collections.abc import Callable
 from typing import Any, TypeGuard
 
 
-# Q13's zone -> query-word table, T1 slice: furniture only. Zones missing
-# from the table get no recommendations and no search traffic. T2 extends
-# the table; nothing else in this file may invent a second mapping.
-ZONE_SEARCH_QUERIES: dict[str, list[str]] = {
-    "furniture": ["chair"],
+# Q13's 7-zone -> query-word table. Zones mapped to () get no search
+# traffic and no recommendations; nothing else in this file may invent
+# a second mapping or alter zone detection.
+ZONE_SEARCH_QUERIES: dict[str, tuple[str, ...]] = {
+    "shell": (),
+    "entrance": ("door", "sign"),
+    "display": ("shelf", "counter", "showcase", "podium"),
+    "ip_core": (),
+    "furniture": ("chair", "table", "sofa", "bench"),
+    "lighting": ("lamp", "light"),
+    "path": (),
 }
 
 # Q5: only the first 20 index hits per query are examined; the search
@@ -37,10 +49,10 @@ ZONE_SEARCH_QUERIES: dict[str, list[str]] = {
 SEARCH_LIMIT = 20
 SEARCH_ASSET_TYPE = "models"
 
-# Q9: at most 3 candidates per zone (eligible first, then unverified;
-# both kinds share one limit). The 12-per-scene cap arrives with T2,
-# when more than one zone can recommend.
+# Q9: at most 3 candidates per zone and 12 across the whole scene
+# (eligible first, then unverified; both kinds share the cap).
 MAX_PER_ZONE = 3
+MAX_PER_SCENE = 12
 
 # Maya linear unit -> metres. get_unit_info() reports the scene's linear
 # unit; a unit outside this table is a measurement failure, never a guess.
@@ -111,18 +123,71 @@ def _fits_envelope(model: list[float], envelope: list[float]) -> bool:
     return all(mm <= zz for mm, zz in zip(m, z))
 
 
-def _word_hit(entry: dict[str, Any], query: str) -> bool:
-    """The query word appears in the asset's own text fields.
+_WORD_BOUNDARY_RE = re.compile(
+    r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|(?<=[A-Za-z])(?=[0-9])|(?<=[0-9])(?=[A-Za-z])"
+)
+_WORD_TOKEN_RE = re.compile(r"[a-z0-9]+")
 
-    Same substring semantics the index search uses; with the real
-    search_assets this always passes, so it only guards a substitute
-    search callable from slipping unrelated assets in.
+
+def _normalize_word(token: str) -> str:
+    """Fold basic plurals and Poly Haven's ``lighting`` category to ``light``."""
+    if token == "lighting":
+        return "light"
+    if token == "shelves":
+        return "shelf"
+    if (
+        len(token) > 3
+        and token.endswith("es")
+        and token.endswith(("ches", "shes", "xes", "zes", "ses"))
+    ):
+        return token[:-2]
+    if len(token) > 3 and token.endswith("s") and not token.endswith("ss"):
+        return token[:-1]
+    return token
+
+
+def _tokenize_words(text: str) -> set[str]:
+    norm = _WORD_BOUNDARY_RE.sub(" ", unicodedata.normalize("NFKC", text))
+    return {_normalize_word(tok) for tok in _WORD_TOKEN_RE.findall(norm.lower())}
+
+
+def _word_hit(entry: dict[str, Any], query: str) -> bool:
+    """Normalized word-level match on id, name, tags, and categories.
+
+    Rejects substring false positives such as ``sign`` matching ``design``
+    or ``door`` matching ``outdoor``. Purely a filter on the returned hit;
+    never creates assets outside the search result.
     """
-    q = query.lower()
-    texts = [entry.get("id", ""), entry.get("name", "")]
+    q_tokens = _tokenize_words(query)
+    if not q_tokens:
+        return False
+    texts = [str(entry.get("id") or ""), str(entry.get("name") or "")]
     texts += [str(t) for t in entry.get("tags") or []]
     texts += [str(c) for c in entry.get("categories") or []]
-    return any(q in str(t).lower() for t in texts)
+    asset_tokens: set[str] = set()
+    for text in texts:
+        asset_tokens |= _tokenize_words(text)
+    return q_tokens.issubset(asset_tokens)
+
+
+def _rank_band(rank: int) -> int:
+    """Bucket source rank into 1-5, 6-10, 11-20 (Q9)."""
+    if rank <= 5:
+        return 0
+    if rank <= 10:
+        return 1
+    if rank <= 20:
+        return 2
+    return 3
+
+
+def _size_error(model: list[float], envelope: list[float]) -> float:
+    """Mean-scaled relative axis difference on sorted extents (lower is closer)."""
+    m = sorted(model, reverse=True)
+    z = sorted(envelope, reverse=True)
+    if any(zz <= 0 for zz in z):
+        return float("inf")
+    return round(sum(abs(mm - zz) / zz for mm, zz in zip(m, z)), 9)
 
 
 def _candidate(entry: dict[str, Any], query: str, rank: int) -> dict[str, Any]:
@@ -152,16 +217,14 @@ def _valid_dimensions(dims: Any) -> TypeGuard[list[float]]:
 
 def _screen(
     results: list[Any], query: str, envelope_m: list[float]
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Split one query's hits into size-eligible and unverified candidates.
+) -> list[tuple[dict[str, Any], float]]:
+    """Filter one query's hits into (candidate, size_error) pairs.
 
-    Assets the index returned but whose text fields do not carry the query
-    word are dropped (word-level check); assets that clearly cannot fit
-    the zone envelope are dropped too. Neither shows up as a candidate —
-    only assets that fit, and assets whose size could not be checked.
+    Drops hits that fail the normalized word-level check or cannot fit
+    the zone envelope. Assets without usable dimensions stay in the
+    returned list with ``size_status="unverified"`` and ``size_error=0.0``.
     """
-    eligible: list[dict[str, Any]] = []
-    unverified: list[dict[str, Any]] = []
+    screened: list[tuple[dict[str, Any], float]] = []
     for rank, entry in enumerate(results, start=1):
         if not isinstance(entry, dict) or not entry.get("id"):
             continue
@@ -175,10 +238,11 @@ def _screen(
                 "Poly Haven publishes no usable dimensions for this asset; "
                 "size screening was not performed"
             )
-            unverified.append(cand)
+            screened.append((cand, 0.0))
             continue
-        if _fits_envelope([float(v) for v in dims], envelope_m):
-            largest = max(float(v) for v in dims)
+        dims_f = [float(v) for v in dims]
+        if _fits_envelope(dims_f, envelope_m):
+            largest = max(dims_f)
             zone_largest = max(envelope_m)
             cand["size_status"] = "pass"
             cand["reason_code"] = "fits_zone_envelope"
@@ -187,8 +251,8 @@ def _screen(
                 f"largest side {zone_largest:g} m (world AABB upper limit, "
                 "per sorted axis)"
             )
-            eligible.append(cand)
-    return eligible, unverified
+            screened.append((cand, _size_error(dims_f, envelope_m)))
+    return screened
 
 
 def _searched_query(query: str, total_matches: int | None) -> dict[str, Any]:
@@ -199,15 +263,61 @@ def _unsearched_query(query: str) -> dict[str, Any]:
     return {"query": query, "searched": False, "total_matches": None}
 
 
+def _sort_key(cand: dict[str, Any], size_error: float) -> tuple[bool, int, float, int, str]:
+    # Q9: size-eligible candidates win the cap before unverified ones,
+    # then rank band (1-5 / 6-10 / 11-20), size difference, best rank, id.
+    return (
+        cand["size_status"] != "pass",
+        _rank_band(int(cand["best_source_rank"])),
+        size_error,
+        int(cand["best_source_rank"]),
+        str(cand["asset_id"]),
+    )
+
+
+def _merge_hits(
+    seen: dict[str, dict[str, Any]],
+    size_errors: dict[str, float],
+    screened: list[tuple[dict[str, Any], float]],
+) -> None:
+    """Deduplicate hits by asset_id, keeping all matched_queries and best rank."""
+    for cand, err in screened:
+        aid = str(cand["asset_id"])
+        hit_record = cand["matched_queries"][0]
+        existing = seen.get(aid)
+        if existing is None:
+            seen[aid] = cand
+            size_errors[aid] = err
+            continue
+        if hit_record not in existing["matched_queries"]:
+            existing["matched_queries"].append(hit_record)
+        if int(cand["best_source_rank"]) < int(existing["best_source_rank"]):
+            existing["best_source_rank"] = cand["best_source_rank"]
+        if existing["size_status"] != "pass" and cand["size_status"] == "pass":
+            cand["matched_queries"] = existing["matched_queries"]
+            cand["best_source_rank"] = existing["best_source_rank"]
+            seen[aid] = cand
+            size_errors[aid] = err
+
+
+def _assign_zone_candidates(entry: dict[str, Any], ordered: list[dict[str, Any]]) -> None:
+    shown_eligible = [c for c in ordered if c["size_status"] == "pass"]
+    shown_unverified = [c for c in ordered if c["size_status"] != "pass"]
+    entry["candidates"] = shown_eligible
+    entry["unverified_candidates"] = shown_unverified
+    entry["eligible_count"] = len(shown_eligible)
+    entry["unverified_count"] = len(shown_unverified)
+
+
 def _process_zone(
     zone: dict[str, Any],
-    queries: list[str],
+    queries: tuple[str, ...],
     factor: float,
     search_fn: Callable[..., dict[str, Any]],
     errors: list[dict[str, str]],
     truncation: dict[str, bool],
-) -> dict[str, Any]:
-    """Build one zone's recommendation entry, searching only when measurable."""
+) -> tuple[dict[str, Any], dict[str, float], int, int]:
+    """Build one zone's recommendation entry, searching only when enabled & measurable."""
     name = zone.get("name", "")
     scope = f"recommendations:{name}"
     size_m = _to_metres(zone.get("size"), factor)
@@ -241,14 +351,23 @@ def _process_zone(
         "candidates": [],
         "unverified_candidates": [],
     }
+    if not queries:
+        entry["status"] = "skipped"
+        entry["skip_reason"] = "recommendations_disabled"
+        return entry, {}, 0, 0
+    if zone.get("object_count") == 0:
+        entry["queries"] = [_unsearched_query(q) for q in queries]
+        return entry, {}, 0, 0
     if size_screen is None:  # same condition that set measurement above
         entry["status"] = "skipped"
         entry["skip_reason"] = "unmeasurable_target"
         entry["queries"] = [_unsearched_query(q) for q in queries]
-        return entry
+        return entry, {}, 0, 0
 
-    eligible: list[dict[str, Any]] = []
-    unverified: list[dict[str, Any]] = []
+    seen: dict[str, dict[str, Any]] = {}
+    size_errors: dict[str, float] = {}
+    succeeded = 0
+    failed = 0
     for query in queries:
         try:
             data = search_fn(query=query, asset_type=SEARCH_ASSET_TYPE, limit=SEARCH_LIMIT)
@@ -265,47 +384,69 @@ def _process_zone(
                     f"{type(e).__name__}: {e}",
                 )
             )
-            entry["status"] = "skipped"
-            entry["skip_reason"] = "search_failed"
+            failed += 1
             entry["queries"].append(_unsearched_query(query))
             continue
+        succeeded += 1
         total_int = total if isinstance(total, int) else None
         entry["queries"].append(_searched_query(query, total_int))
         if total_int is not None and total_int > len(results):
             truncation["search"] = True
-        fits, unverified_hits = _screen(results, query, size_screen)
-        eligible.extend(fits)
-        unverified.extend(unverified_hits)
+        _merge_hits(seen, size_errors, _screen(results, query, size_screen))
 
     ordered = sorted(
-        eligible + unverified,
-        # Q9: size-eligible candidates win the cap before unverified ones,
-        # so three dimension-less hits early in the search cannot starve a
-        # fitting model that ranked below them.
-        key=lambda c: (
-            c["size_status"] != "pass",
-            c["best_source_rank"],
-            str(c["asset_id"]),
-        ),
+        seen.values(),
+        key=lambda c: _sort_key(c, size_errors.get(str(c["asset_id"]), 0.0)),
     )
     if len(ordered) > MAX_PER_ZONE:
         truncation["output"] = True
         ordered = ordered[:MAX_PER_ZONE]
-    shown_eligible = [c for c in ordered if c["size_status"] == "pass"]
-    shown_unverified = [c for c in ordered if c["size_status"] != "pass"]
-    entry["candidates"] = shown_eligible
-    entry["unverified_candidates"] = shown_unverified
-    entry["eligible_count"] = len(shown_eligible)
-    entry["unverified_count"] = len(shown_unverified)
-    if entry["status"] != "skipped":  # a failed query already set skip_reason
-        entry["status"] = "ok" if shown_eligible else "empty"
-    return entry
+    _assign_zone_candidates(entry, ordered)
+    if failed > 0 and succeeded == 0:
+        entry["status"] = "skipped"
+        entry["skip_reason"] = "search_failed"
+    elif failed > 0:
+        entry["status"] = "partial"
+    else:
+        entry["status"] = "ok" if entry["eligible_count"] > 0 else "empty"
+    return entry, size_errors, succeeded, failed
+
+
+def _apply_scene_cap(
+    zones: list[dict[str, Any]],
+    size_errors_by_zone: list[dict[str, float]],
+    truncation: dict[str, bool],
+) -> None:
+    """Enforce MAX_PER_SCENE across all zones, keeping top-ranked candidates."""
+    pooled: list[tuple[tuple[bool, int, float, int, str, int], int, dict[str, Any]]] = []
+    for zone_idx, (zone_rec, size_errors) in enumerate(zip(zones, size_errors_by_zone)):
+        for cand in zone_rec["candidates"] + zone_rec["unverified_candidates"]:
+            aid = str(cand["asset_id"])
+            key = (*_sort_key(cand, size_errors.get(aid, 0.0)), zone_idx)
+            pooled.append((key, zone_idx, cand))
+    if len(pooled) <= MAX_PER_SCENE:
+        return
+    truncation["output"] = True
+    pooled.sort(key=lambda item: item[0])
+    kept_ids_by_zone: dict[int, set[int]] = {}
+    for _, zone_idx, cand in pooled[:MAX_PER_SCENE]:
+        kept_ids_by_zone.setdefault(zone_idx, set()).add(id(cand))
+    for zone_idx, zone_rec in enumerate(zones):
+        kept_ptrs = kept_ids_by_zone.get(zone_idx, set())
+        ordered = [
+            c
+            for c in zone_rec["candidates"] + zone_rec["unverified_candidates"]
+            if id(c) in kept_ptrs
+        ]
+        _assign_zone_candidates(zone_rec, ordered)
+        if zone_rec["status"] not in ("skipped", "partial"):
+            zone_rec["status"] = "ok" if zone_rec["eligible_count"] > 0 else "empty"
 
 
 def gather_recommendations(
     zone_geometry: Any, search_fn: Callable[..., dict[str, Any]]
 ) -> dict[str, Any]:
-    """Compose the ``recommendations`` section from geometry + one search.
+    """Compose the ``recommendations`` section from geometry + searches.
 
     ``zone_geometry`` is whatever the ``get_zone_geometry`` host helper
     returned (a dict with ``unit``/``zones``, or ``{"error": ...}``).
@@ -355,25 +496,30 @@ def gather_recommendations(
         recs["status"] = "partial"
         return recs
 
-    any_eligible = False
-    search_failed = False
+    size_errors_by_zone: list[dict[str, float]] = []
+    total_succeeded = 0
+    total_failed = 0
     for zone_name, queries in ZONE_SEARCH_QUERIES.items():
         zone = next(
             (z for z in zones_list if isinstance(z, dict) and z.get("name") == zone_name),
             None,
         )
         if zone is None:
-            continue  # no such zone in this scene: nothing to search
-        zone_rec = _process_zone(zone, queries, factor, search_fn, errors, truncation)
+            continue  # no such zone in this scene: nothing to report or search
+        zone_rec, size_errors, succeeded, failed = _process_zone(
+            zone, queries, factor, search_fn, errors, truncation
+        )
         recs["zones"].append(zone_rec)
-        if zone_rec["eligible_count"] > 0:
-            any_eligible = True
-        if zone_rec.get("skip_reason") == "search_failed":
-            search_failed = True
+        size_errors_by_zone.append(size_errors)
+        total_succeeded += succeeded
+        total_failed += failed
 
-    if search_failed:
+    _apply_scene_cap(recs["zones"], size_errors_by_zone, truncation)
+    any_eligible = any(z["eligible_count"] > 0 for z in recs["zones"])
+
+    if total_failed > 0 and total_succeeded == 0:
         recs["status"] = "offline"
-    elif any(e["scope"] == "zone_geometry" for e in errors):
+    elif total_failed > 0 or any(e["scope"] == "zone_geometry" for e in errors):
         recs["status"] = "partial"
     elif any_eligible:
         recs["status"] = "ok"
@@ -392,8 +538,9 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
     """Short RECOMMEND block for scene_plan's CoS output (opt-in only).
 
     Carries the four things the contract asks for: the status, the target
-    and its size basis, the candidate ids with sizes, and the truncation
-    note. Indented to sit under scene_plan's existing sections.
+    and its size basis, the candidate ids with matched queries and sizes,
+    and the truncation note. Indented to sit under scene_plan's existing
+    sections.
     """
     policy = recs.get("policy", {})
     lines = [
@@ -407,27 +554,28 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
             for e in errors:
                 lines.append(f"    error: {e.get('scope')} {e.get('code')}")
         else:
-            lines.append("    no furniture zone in this scene")
+            lines.append("    no zones in this scene")
     for zone in zones:
         if zone.get("status") == "skipped":
             lines.append(f"    {zone.get('zone')}: skipped ({zone.get('skip_reason')})")
             continue
         target = zone.get("target", {})
+        q_names = ",".join(str(q.get("query")) for q in zone.get("queries", []))
         lines.append(
             f"    {zone.get('zone')}: target=zone_bbox "
-            f"{_fmt_dims(target.get('size_m'))}m meas={target.get('measurement')}"
+            f"{_fmt_dims(target.get('size_m'))}m meas={target.get('measurement')} "
+            f"queries={q_names} ({zone.get('eligible_count', 0)} eligible, "
+            f"{zone.get('unverified_count', 0)} unverified)"
         )
-        for q in zone.get("queries", []):
-            lines.append(
-                f"    {q.get('query')}: {zone.get('eligible_count', 0)} eligible, "
-                f"{zone.get('unverified_count', 0)} unverified"
-            )
         n = 0
         for cand in zone.get("candidates", []) + zone.get("unverified_candidates", []):
             n += 1
+            via = ",".join(
+                f"{m.get('query')}@{m.get('rank')}" for m in cand.get("matched_queries", [])
+            )
             lines.append(
                 f"      {n}. {cand.get('asset_id')} rank={cand.get('best_source_rank')} "
-                f"{_fmt_dims(cand.get('dimensions_m'))}m {cand.get('reason_code')}"
+                f"via=[{via}] {_fmt_dims(cand.get('dimensions_m'))}m {cand.get('reason_code')}"
             )
 
     def _yn(value: Any) -> str:

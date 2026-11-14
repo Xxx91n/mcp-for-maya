@@ -497,7 +497,10 @@ class TestRecommendAssets:
         assert zone["zone"] == "furniture"
         assert zone["target"]["size_m"] == [3.2, 2.6, 2.5]
         assert zone["target"]["measurement"] == "complete"
-        assert zone["queries"] == [{"query": "chair", "searched": True, "total_matches": 1}]
+        assert zone["queries"] == [
+            {"query": q, "searched": True, "total_matches": 1}
+            for q in ("chair", "table", "sofa", "bench")
+        ]
         cand = zone["candidates"][0]
         assert cand["asset_id"] == "chair_henry"
         assert cand["dimensions_m"] == [0.55, 0.6, 0.95]
@@ -526,8 +529,11 @@ class TestRecommendAssets:
         out = await tools.fns["scene_plan"](format="cos", recommend_assets=True)
         assert out.startswith("SCENE_PLAN[")
         assert "  RECOMMEND: status=ok provider=poly_haven unit=m" in out
-        assert "furniture: target=zone_bbox 3.2x2.6x2.5m meas=complete" in out
-        assert "1. chair_henry rank=1 0.55x0.6x0.95m fits_zone_envelope" in out
+        assert (
+            "furniture: target=zone_bbox 3.2x2.6x2.5m meas=complete "
+            "queries=chair,table,sofa,bench (1 eligible, 0 unverified)" in out
+        )
+        assert "1. chair_henry rank=1 via=[chair@1] 0.55x0.6x0.95m fits_zone_envelope" in out
         assert "truncation: search=n output=n budget=n errors=0" in out
 
     async def test_search_failure_reports_offline_and_keeps_the_plan(self, tools, monkeypatch):
@@ -551,7 +557,131 @@ class TestRecommendAssets:
 
         out = await tools.fns["scene_plan"](format="cos", recommend_assets=True)
         assert "RECOMMEND: status=offline" in out
-        assert "errors=1 (network_unavailable)" in out
+        assert "errors=4 (network_unavailable)" in out
+
+    async def test_seven_zones_dedup_word_filter_and_cos_through_scene_plan(
+        self, tools, monkeypatch
+    ):
+        # Populate Maya fake scene with all 7 built-in zones (using real get_zone_geometry).
+        tools.env.scene.add_mesh("GEO_wall_main", bbox_min=(0, 0, 0), bbox_max=(1000, 300, 1000))
+        tools.env.scene.add_mesh("GEO_door_front", bbox_min=(0, 0, 0), bbox_max=(150, 250, 50))
+        tools.env.scene.add_mesh("GEO_shelf_a", bbox_min=(0, 0, 0), bbox_max=(200, 200, 80))
+        tools.env.scene.add_mesh("GEO_mascot_hero", bbox_min=(0, 0, 0), bbox_max=(100, 150, 100))
+        tools.env.scene.add_mesh("GEO_chair_main", bbox_min=(0, 0, 0), bbox_max=(300, 200, 300))
+        tools.env.scene.add_mesh("GEO_lamp_main", bbox_min=(0, 0, 0), bbox_max=(100, 200, 100))
+        tools.env.scene.add_mesh("GEO_path_aisle", bbox_min=(0, 0, 0), bbox_max=(500, 10, 200))
+
+        seen_queries: list[str] = []
+
+        def fake_search(query="", asset_type="models", limit=20):
+            seen_queries.append(query)
+            if query == "sign":
+                hits = [
+                    {
+                        "id": "design_book",
+                        "name": "Design Book",
+                        "categories": ["books"],
+                        "tags": ["design"],
+                        "dimensions": [0.3, 0.2, 0.1],
+                        "polycount": 50,
+                    },
+                    {
+                        "id": "street_sign_01",
+                        "name": "Street Sign",
+                        "categories": ["props"],
+                        "tags": ["sign"],
+                        "dimensions": [0.4, 1.2, 0.2],
+                        "polycount": 300,
+                    },
+                ]
+            elif query in ("lamp", "light"):
+                hits = [
+                    {
+                        "id": "shared_pendant_lamp",
+                        "name": "Shared Pendant Lamp",
+                        "categories": ["lighting"],
+                        "tags": ["lamp", "light"],
+                        "dimensions": [0.4, 0.5, 0.4],
+                        "polycount": 800,
+                    }
+                ]
+            else:
+                hits = [
+                    {
+                        "id": f"{query}_asset",
+                        "name": f"{query.title()} Asset",
+                        "categories": [query],
+                        "tags": [query],
+                        "dimensions": [0.5, 0.5, 0.5],
+                        "polycount": 400,
+                    }
+                ]
+            return {
+                "results": hits,
+                "total_count": len(hits),
+                "limit": limit,
+                "query": query,
+                "asset_type": asset_type,
+                "source": "api.polyhaven.com",
+            }
+
+        monkeypatch.setattr("maya_mcp_server.polyhaven.search_assets", fake_search)
+
+        res = json.loads(await tools.fns["scene_plan"](format="json", recommend_assets=True))
+        recs = res["recommendations"]
+        assert recs["status"] == "ok"
+        assert seen_queries == [
+            "door",
+            "sign",
+            "shelf",
+            "counter",
+            "showcase",
+            "podium",
+            "chair",
+            "table",
+            "sofa",
+            "bench",
+            "lamp",
+            "light",
+        ]
+        by_zone = {z["zone"]: z for z in recs["zones"]}
+        assert list(by_zone) == [
+            "shell",
+            "entrance",
+            "display",
+            "ip_core",
+            "furniture",
+            "lighting",
+            "path",
+        ]
+        for disabled in ("shell", "ip_core", "path"):
+            assert by_zone[disabled]["status"] == "skipped"
+            assert by_zone[disabled]["skip_reason"] == "recommendations_disabled"
+            assert by_zone[disabled]["candidates"] == []
+
+        entrance_ids = [c["asset_id"] for c in by_zone["entrance"]["candidates"]]
+        assert "design_book" not in entrance_ids
+        assert "street_sign_01" in entrance_ids
+
+        # Display had 4 queries -> 4 eligible hits capped to 3 with output truncation.
+        assert by_zone["display"]["eligible_count"] == 3
+        assert recs["truncation"]["output"] is True
+
+        # Lighting lamp+light both hit shared_pendant_lamp -> deduped to 1 entry.
+        lighting_cands = by_zone["lighting"]["candidates"]
+        assert len(lighting_cands) == 1
+        assert lighting_cands[0]["asset_id"] == "shared_pendant_lamp"
+        assert lighting_cands[0]["matched_queries"] == [
+            {"query": "lamp", "rank": 1},
+            {"query": "light", "rank": 1},
+        ]
+
+        cos = await tools.fns["scene_plan"](format="cos", recommend_assets=True)
+        assert "shell: skipped (recommendations_disabled)" in cos
+        assert "entrance: target=zone_bbox" in cos
+        assert "display: target=zone_bbox" in cos
+        assert "lighting: target=zone_bbox" in cos
+        assert "via=[lamp@1,light@1]" in cos
 
     async def test_geometry_error_gives_partial_with_the_plan_intact(self, tools, monkeypatch):
         monkeypatch.setattr(

@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`scene_plan` recommendations cover all 7 built-in zones with word-level filtering, dedup, and rank-band ordering (#218)** —
+  `ZONE_SEARCH_QUERIES` now maps `entrance` (`door`, `sign`), `display`
+  (`shelf`, `counter`, `showcase`, `podium`), `furniture` (`chair`, `table`,
+  `sofa`, `bench`), and `lighting` (`lamp`, `light`), while `shell`, `ip_core`,
+  and `path` stay disabled with zero search calls. Hits pass a normalized
+  word-level check across id, name, tags, and categories (excluding substring
+  false positives such as `sign` matching `design`), deduplicate per zone
+  keeping all `matched_queries` and `best_source_rank`, and sort eligible
+  candidates ahead of `unverified_candidates` by rank band (`1–5`, `6–10`,
+  `11–20`), size difference, `best_source_rank`, and `asset_id`. Output caps at
+  3 per zone and 12 per scene with `search` / `output` truncation flags in
+  both JSON and CoS, while `recommend_assets=False` remains byte-identical.
+  Evidence:
+  `tests/test_asset_recommendation.py::TestZoneTable::test_all_four_recommendable_zones_search_their_mapped_queries`,
+  `tests/test_asset_recommendation.py::TestUnitsAndScreening::test_word_level_check_rejects_substring_false_positives`,
+  `tests/test_asset_recommendation.py::TestDedupAndOrdering::test_same_asset_across_queries_is_deduped_keeping_all_matched_queries`,
+  `tests/test_asset_recommendation.py::TestDedupAndOrdering::test_sort_order_rank_band_then_size_diff_then_best_rank_then_id`,
+  `tests/test_asset_recommendation.py::TestDedupAndOrdering::test_whole_scene_cap_of_twelve_across_all_zones`,
+  `tests/test_scene_tools_json.py::TestRecommendAssets::test_seven_zones_dedup_word_filter_and_cos_through_scene_plan`.
+
 - **Key CI jobs have a wiring check** — missing, skipped or non-blocking
   lint/mypy/pytest jobs and broken `ci` summary wiring now fail a local check.
   Limits and local commands: `docs/ci-wiring.md`. Evidence:
@@ -36,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_scene_tools_json.py::TestRecommendAssets::test_enabled_json_attaches_recommendations_and_keeps_the_plan`,
   `tests/test_scene_tools_json.py::TestRecommendAssets::test_search_failure_reports_offline_and_keeps_the_plan`,
   `tests/test_scene_tools_json.py::TestRecommendAssets::test_default_call_never_searches_and_omits_the_section`,
-  `tests/test_asset_recommendation.py::TestSearchContract::test_search_gets_the_t1_query_and_limit_only`,
+  `tests/test_asset_recommendation.py::TestSearchContract::test_search_gets_the_mapped_queries_and_limit_only`,
   `tests/test_asset_recommendation.py::TestCapsAndOrder::test_per_zone_cap_is_three_with_output_truncation`,
   `tests/test_pipeline.py::TestToolAnnotations::test_scene_plan_stays_write_class_with_open_world`.
 - **Unsaved changes are visible in `scene_snapshot`** — the CoS header now always
