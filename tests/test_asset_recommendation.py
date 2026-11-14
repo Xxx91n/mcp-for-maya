@@ -423,6 +423,54 @@ class TestSkippedZones:
 
 
 # ------------------------------------------------------------
+# #262: partially measured zone envelope keeps oversized candidates
+# ------------------------------------------------------------
+
+
+class TestPartialZoneEnvelopeCandidates:
+    """A partial zone bbox must never silently drop a too-large-looking model."""
+
+    def test_partial_zone_keeps_model_larger_than_measured_bbox_as_unverified(self):
+        # FURNITURE_ZONE measures 3.2 x 2.6 x 2.5 m; the largest side of this
+        # model (3.5 m) exceeds it, but one zone object was never measured,
+        # so the real zone extent is unknown.
+        partial_zone = dict(FURNITURE_ZONE, unmeasured_count=1)
+        oversized = chair_hit("podium_big", dims=[3.5, 0.6, 0.95])
+        recs, calls = gather(make_geometry(zones=[partial_zone]), results=[oversized])
+        assert len(calls) == 4
+        zone = recs["zones"][0]
+        assert zone["target"]["measurement"] == "partial_zone_envelope"
+        assert zone["candidates"] == []
+        assert zone["eligible_count"] == 0
+        assert [c["asset_id"] for c in zone["unverified_candidates"]] == ["podium_big"]
+        unverified = zone["unverified_candidates"][0]
+        assert unverified["size_status"] == "unverified"
+        assert unverified["reason_code"] == "zone_envelope_incomplete"
+        assert "partially measured" in unverified["match_reason"]
+
+    def test_complete_zone_still_excludes_model_larger_than_bbox(self):
+        oversized = chair_hit("podium_big", dims=[3.5, 0.6, 0.95])
+        recs, _ = gather(make_geometry(zones=[FURNITURE_ZONE]), results=[oversized])
+        zone = recs["zones"][0]
+        assert zone["target"]["measurement"] == "complete"
+        assert zone["candidates"] == []
+        assert zone["unverified_candidates"] == []
+
+    def test_partial_zone_fitting_model_passes_without_claiming_full_space(self):
+        partial_zone = dict(FURNITURE_ZONE, unmeasured_count=1)
+        fitting = chair_hit()  # 0.55 x 0.6 x 0.95 m fits the measured bbox
+        recs, _ = gather(make_geometry(zones=[partial_zone]), results=[fitting])
+        zone = recs["zones"][0]
+        assert [c["asset_id"] for c in zone["candidates"]] == ["chair_henry"]
+        cand = zone["candidates"][0]
+        assert cand["size_status"] == "pass"
+        assert "partially measured" in cand["match_reason"]
+        assert recs["policy"]["clearance_verified"] is False
+        assert recs["policy"]["collision_verified"] is False
+        assert "only bounds what was measured" in recs["policy"]["note"]
+
+
+# ------------------------------------------------------------
 # error isolation: a broken search never raises
 # ------------------------------------------------------------
 
