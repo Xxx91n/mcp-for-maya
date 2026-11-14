@@ -119,9 +119,9 @@ a file on disk or unsaved changes unless `MAYA253_FORCE=1` is set on
 purpose, and writes one JSON file. Three environment variables steer it:
 `MAYA253_REPO` (repo root, default is the path this repo was measured
 at), `MAYA253_OUT` (the JSON path) and `MAYA253_FORCE`. Every node it
-makes is deleted in a `finally`, playback and selection are restored,
-and a deliberate raising probe checks that the failure path cleans up
-too.
+makes is deleted in a `finally`, playback and selection are restored and
+then compared with the values the run started from, and a deliberate
+raising probe checks that the failure path cleans up too.
 
 Measured on Maya 2024 (24.0.0.4640), Windows 11, Maya-side Python
 3.10.8: all six forms pass (xform `q/ws/t/ro`, `rename` returning the
@@ -140,6 +140,9 @@ range and selection. Artifact:
 
 What this does not prove: Maya 2025/2026, and anything batch-only
 (`cmds.about(batch=True)` needs a real batch session, not a GUI one).
+That batch-only gap stays open, and it has no owner action until a Maya
+install whose `mayapy` can import `maya.standalone` exists — there is no
+result to report from this box, only the blocker.
 
 ### Call-form items booked to the real interpreter
 

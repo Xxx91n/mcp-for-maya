@@ -6,7 +6,7 @@
     "env": "Autodesk Maya 2024 (24.0.0.4640) GUI, fresh throwaway instance launched with maya.exe -script; empty untitled scene; Windows 11 IoT Enterprise LTSC 10.0.26100 x64; Maya-side Python 3.10.8; host Python 3.13.13 (uv env)",
     "purpose": "Turn #229's six 'static check passed but real Maya never ran' call forms into measured pass/fail rows on a real Maya 2024 session.",
     "verdict": "6/6 call forms pass on Maya 2024; the shipped pytest function tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms passes when called with real maya.cmds, and it now asserts non-default tangent types instead of Maya's default; a probe that raises after creating nodes leaves no node behind; the scene returns to its starting node count, playback range and selection.",
-    "claim_boundary": "Proves these six call forms work on Maya 2024 on Windows (GUI batch=False session). It does NOT prove Maya 2025/2026, and it does not prove the mayapy/standalone batch lane - mayapy cannot import maya.standalone on this box (DLL initialisation failure), so batch-only behaviour such as cmds.about(batch=True) stays unverified here. The shipped test was called as a plain function, not through pytest, so the mayapy marker and its fixtures are not exercised by this run. Values are one run per form; the shipped test is the durable check.",
+    "claim_boundary": "Proves these six call forms work on Maya 2024 on Windows (GUI batch=False session). It does NOT prove Maya 2025/2026, and it does not prove the mayapy/standalone batch lane - mayapy cannot import maya.standalone on this box (DLL initialisation failure), so batch-only behaviour such as cmds.about(batch=True) stays unverified here. The shipped test was called as a plain function, not through pytest, so the mayapy marker and its fixtures are not exercised by this run. Values are one run per form; the shipped test is the durable check. The failure path that is measured is the driver's own deliberate probe: a mid-way failure inside the shipped test's finally block is not exercised here.",
     "mayapy_blocker": {
       "command": "mayapy.exe probe_env.py  (import maya.standalone; maya.standalone.initialize(); print version)",
       "exit_code": 1,
@@ -53,7 +53,7 @@
         "exit_code": 0
       },
       {
-        "what": "Six-form run (fresh GUI, PID 16956)",
+        "what": "Six-form run (fresh GUI, PID 15592)",
         "command": "maya.exe -script six_forms.mel   # MEL: catch(python(exec(driver))); evalDeferred \"quit -f\"",
         "output": "JSON written to the Temp path; the process exited on its own after the deferred quit (Get-Process showed only the pre-existing Maya PID 4664 afterwards)",
         "exit_code": 0
@@ -63,6 +63,7 @@
     "supersedes": {
       "why": "An earlier version of this artifact was admitted on this branch before the second and third review rounds. docs/evidence/README.md asks for the old file to be kept and marked superseded rather than rewritten, so that version stays as its own file and this one records the run that exercised the tightened driver and test.",
       "superseded_file": "docs/evidence/probes/probe-253-six-callforms-gui-maya2024-v1.json",
+      "not_kept_as_files": "The two versions between v1 and this one were admitted on this branch and then replaced in place, which docs/evidence/README.md does not like. Their runs are listed below, and their bytes are still in this branch's history at commits 69064dd, dd4ef91 and 5aef440; they were not frozen as separate files.",
       "earlier_runs": [
         {
           "session_pid": 11572,
@@ -114,10 +115,10 @@
       ]
     },
     "provenance": {
-      "session_pid": 16956,
+      "session_pid": 15592,
       "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
       "driver": "docs/reference/six_callform_gui_driver.py",
-      "driver_sha256": "03145ad2fe0a5adce7c2a6b11e2d90013eb010b1398e5228fda4146e0a36b7fd",
+      "driver_sha256": "28fd9781276d691ef977c894379790e0d09bc2d9abb9a268cc6b97f79637ebcb",
       "driver_sha256_note": "These bytes are what ran, and they are the driver committed on this branch; the sha256 is the anchor, not a commit id.",
       "ticket_start_sha": "8cec2c0d9e4a8f7f3ef17e773c395ef4e3cdc374",
       "base_main": "95a95a582718691a51231fef6eac38d1ceb8381d",
@@ -139,8 +140,9 @@
   "notes": {
     "kWorld_type": "Maya's om2.MSpace.kWorld is a plain int; getPoint accepts it. So the stub's parameter type (MSpace) is the wrong half, not the constant: the constant is int, exactly as the stub declares.",
     "keyTangent_evidence": "The probe sets linear/step, not Maya's default auto, and reads both back; a call that was silently ignored could not produce those two values.",
-    "rename_clash": "Maya returns GEO_cf253_renamed1 for the second node wanting that name and keeps the first node alive, so the return value must be used, not the requested name.",
+    "rename_clash": "Maya returns a numbered name (GEO_cf253_name_holder1 here) for the second node wanting a taken name, and the node that already held it stays alive. Code must use the returned string, never the name it asked for.",
     "shipped_test_selection": "Maya leaves a newly made node selected, so a probe that reads the selection after it creates its node records its own node. The driver reads the selection first, restores it after the probe, and the post-cleanup selection matches the starting one (both empty).",
+    "cleanup_check": "Cleanup is compared, not just attempted: playback range and selection are read after the restore and compared with the values the run started with, so a restore that silently put back the wrong values would be recorded as a problem.",
     "scene_state": "Node count 51 before and after; playback 1.0-120.0 before and after; selection empty before and after; no GEO_cf253*/GEO_stub* node left. The instance was a fresh throwaway GUI and quit itself, so no user scene was involved at any point."
   },
   "raw_driver_output": {
@@ -152,7 +154,7 @@
       "operating_system": "win64",
       "maya_python": "3.10.8",
       "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
-      "session_pid": 16956,
+      "session_pid": 15592,
       "driver_file": "<exec>",
       "repo_root": "D:\\Aworker\\maya\\maya-mcp-server",
       "out_json": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\maya253\\six_forms_result.json",
@@ -267,6 +269,7 @@
       "leftovers": [],
       "status": "pass"
     },
+    "form_reset_problems": [],
     "cleanup": {
       "deleted_names": [
         "GEO_cf253_xform",

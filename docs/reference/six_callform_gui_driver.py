@@ -359,11 +359,15 @@ def run():
                 "traceback": traceback.format_exc(),
             }
 
+        form_problems = []
         for name, fn in FORMS:
             form_created = []
             _record(result["forms"], name, fn, form_created)
             created.extend(form_created)
-            _reset_playback(cmds, start_range)
+            problem = _reset_playback(cmds, start_range)
+            if problem:
+                form_problems.append(f"{name}: {problem}")
+        result["form_reset_problems"] = form_problems
 
         result["failure_cleanup"] = _failure_cleanup_self_check(cmds)
     finally:
@@ -374,6 +378,16 @@ def run():
         selection_problem = _restore_selection(cmds, selection_at_start)
         if selection_problem:
             problems.append(selection_problem)
+        # A restore that "succeeded" but put back the wrong values counts as
+        # a problem too: compare against what the run started with.
+        final_range = _playback_range(cmds)
+        if final_range != start_range:
+            problems.append(f"playback range came back as {final_range}, started at {start_range}")
+        final_selection = cmds.ls(sl=True) or []
+        if final_selection != selection_at_start:
+            problems.append(
+                f"selection came back as {final_selection}, started at {selection_at_start}"
+            )
         result["cleanup"] = {
             "deleted_names": created,
             "problems": problems,
@@ -381,8 +395,8 @@ def run():
                 n for n in (cmds.ls(f"{NODE_PREFIX}*") or []) + (cmds.ls(f"{STUB_PREFIX}*") or [])
             ],
             "nodes_after_cleanup": len(cmds.ls() or []),
-            "playback_range_after_cleanup": _playback_range(cmds),
-            "selection_after_cleanup": cmds.ls(sl=True) or [],
+            "playback_range_after_cleanup": final_range,
+            "selection_after_cleanup": final_selection,
             "scene_after_cleanup": cmds.file(q=True, sceneName=True),
         }
 
@@ -401,6 +415,8 @@ def _overall_verdict(result):
     if result.get("shipped_test", {}).get("status") != "pass":
         return "fail"
     if result.get("failure_cleanup", {}).get("status") != "pass":
+        return "fail"
+    if result.get("form_reset_problems"):
         return "fail"
     cleanup = result.get("cleanup", {})
     if cleanup.get("problems") or cleanup.get("leftover_nodes"):
