@@ -8,12 +8,15 @@ Maya interpreter still has to confirm. It is the list to read the next time
 `types-maya-strict` is upgraded.
 
 **What it is not:** proof of live Maya behaviour. No Maya session was run for
-this batch — `mayapy` is unreachable on the box that measured it — so every
-live cell below is still open. The fake Maya test layer (`tests/maya_stub/`)
-accepts these same calls, but that proves the calls match the fake, not the
-real command; the real-interpreter test
+this batch: `mayapy` cannot start on the box that measured it
+(`docs/testing.md` Tier 2 records the native crash on `maya.standalone` and
+the `-batch` hang), so every live cell below is still open. The fake Maya test
+layer (`tests/maya_stub/`) accepts these same calls, but that proves the calls
+match the fake, not the real command; the real-interpreter test
 (`tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms`) is what
-turns a cell into a result, and it skips honestly on this box.
+turns a cell into a result, and it skips honestly on this box. None of the six
+forms needs GUI eyes — all six are assertable in batch, which is why the live
+column says `mayapy` everywhere.
 
 **Measured environment:** `types-maya-strict==2025.0.6`, `mypy==2.3.1`,
 `mypy-baseline==0.7.4`, Python from `uv sync --frozen`, base commit `1ece725`
@@ -73,8 +76,12 @@ uv run python -m mypy src/ > mypy-report.txt 2>&1   # exit 1, both runs
 | `var-annotated` | 1 | 1 |
 
 The two reports were compared as multisets of `(file, message, code)`, not by
-total: 18 entries removed, 0 added, so no new finding hid behind an old
-message. `uv run mypy-baseline sync < mypy-report.txt` regenerated
+total: 18 entries removed, 0 message counts added, so no new finding hid
+behind an old message. The baseline diff also shows one identical
+`no-untyped-def` line changing position — the sync tool rewrites the file in
+error order, and an identical neighbouring line shifted into its place; the
+source diff adds and removes no function definition, so that is a move, not a
+finding. `uv run mypy-baseline sync < mypy-report.txt` regenerated
 `mypy-baseline.txt` (100 lines -> 67); `mypy-baseline filter` then reported
 `new 0`, `fixed 0`, exit 0.
 
