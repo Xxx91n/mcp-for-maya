@@ -475,6 +475,108 @@ class TestAestheticsColorMath:
         assert color["score"] == 73.8
 
 
+class TestAestheticsScoreContract:
+    """Pin the whole 5-dimension result, not just the color dimension.
+
+    The annotations added to this call chain must not move a single number.
+    The expected values below were measured on the commit before that change
+    and again after it, with this exact fixture; the two JSON dumps were
+    byte-identical. The assertions pin the total, all five dimension scores,
+    every dimension's sub_scores, the full output of three research helpers,
+    and the silhouette average plus one sampled detail row. Deliberately not
+    pinned: the remaining per-object silhouette rows and the top_colors and
+    issues lists. No hand-derived expectation covers those, so a change there
+    would pass this test.
+    """
+
+    def test_same_fixture_keeps_every_dimension_and_total(self, maya_env):
+        reds = [f"GEO_red{i}" for i in range(6)]
+        cyans = [f"GEO_cyan{i}" for i in range(3)]
+        for i, name in enumerate(reds + cyans):
+            maya_env.scene.add_mesh(name, t=(i * 200, 0, 0))
+        maya_env.scene.add_mesh("GEO_green", t=(2000, 0, 0))
+        maya_env.scene.add_material("MAT_red", color=(1.0, 0.0, 0.0), assign_to=reds)
+        maya_env.scene.add_material("MAT_cyan", color=(0.0, 1.0, 1.0), assign_to=cyans)
+        maya_env.scene.add_material("MAT_green", color=(0.0, 1.0, 0.0), assign_to=["GEO_green"])
+
+        res = maya_env.module.analyze_aesthetics()
+
+        assert res["overall_score"] == 53.0
+        assert res["grade"] == "D"
+        assert res["dimensions"] == {
+            "color_theory": 73.8,
+            "spatial_composition": 29.0,
+            "proportion_scale": 85.0,
+            "lighting_quality": 0,
+            "visual_flow": 69.0,
+        }
+        detail = res["detail"]
+        # color_theory's sub_scores are also pinned by TestAestheticsColorMath;
+        # repeating them here keeps this contract readable on its own.
+        assert detail["color_theory"]["sub_scores"] == {
+            "60_30_10": 100.0,
+            "temperature": 60.0,
+            "saturation": 40.0,
+            "harmony": 90.0,
+            "contrast": 65.0,
+        }
+        assert detail["spatial_composition"]["sub_scores"] == {
+            "golden_ratio": 50.0,
+            "rule_of_thirds": 40.0,
+            "visual_balance": 0,
+        }
+        assert detail["proportion_scale"]["sub_scores"] == {
+            "human_scale": 100,
+            "hierarchy": 70,
+        }
+        assert detail["lighting_quality"]["detail"] == "no_lights"
+        assert detail["lighting_quality"]["sub_scores"] == {
+            "layers": 0,
+            "three_point": 0,
+            "fill_ratio": 0,
+            "shadow_quality": 0,
+            "temperature": 0,
+            "coverage": 0,
+            "decay": 0,
+            "intensity_dist": 0,
+        }
+        assert detail["visual_flow"]["sub_scores"] == {
+            "sight_lines": 100.0,
+            "circulation": 40,
+            "rhythm": 60,
+        }
+        # The research-based analyses land in the dimension detail dicts. The
+        # three small helper results are pinned whole; silhouette is pinned by
+        # its average and one sampled row (its detail list is per object).
+        assert detail["color_theory"]["style_consistency"] == {
+            "score": 79.0,
+            "form_consistency": 100.0,
+            "size_hierarchy": 50,
+            "material_consistency": 80,
+        }
+        assert detail["proportion_scale"]["curvature"] == {
+            "score": 40,
+            "size_cv": 0.0,
+            "avg_size": 100.0,
+            "interpretation": "monotonous",
+        }
+        assert detail["visual_flow"]["rhythm_enhanced"] == {
+            "score": 50,
+            "repeating_groups": 1,
+            "patterns_found": 1,
+        }
+        silhouette = detail["proportion_scale"]["silhouette"]
+        assert silhouette["avg_clarity"] == 58.0
+        assert len(silhouette["details"]) == 5
+        assert silhouette["details"][0] == {
+            "name": "GEO_red0",
+            "aspect_ratio": 1.0,
+            "compactness": 0.55,
+            "clarity_score": 58.0,
+        }
+        assert res["sampling"]["checked"] == 10
+
+
 # ------------------------------------------------------------
 # P0-6: camera_orbit must constrain to a center locator
 # ------------------------------------------------------------
