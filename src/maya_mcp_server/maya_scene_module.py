@@ -25,9 +25,9 @@ import maya.cmds as cmds
 # --- Internal helpers ---
 
 
-def _err(code: str, message: str, suggestion: str | None = None) -> dict:
+def _err(code: str, message: str, suggestion: str | None = None) -> dict[str, Any]:
     """Maya-domain error result: {"error": {code, message, suggestion?}}."""
-    err: dict = {"code": code, "message": message}
+    err: dict[str, str] = {"code": code, "message": message}
     if suggestion:
         err["suggestion"] = suggestion
     return {"error": err}
@@ -192,7 +192,7 @@ def _world_bbox(dag: om2.MDagPath) -> om2.MBoundingBox:
 # --- Public API ---
 
 
-def get_scene_graph(detail_level="compact") -> dict:
+def get_scene_graph(detail_level="compact") -> dict[str, Any]:
     """Return complete scene spatial description in one call.
 
     Args:
@@ -201,7 +201,7 @@ def get_scene_graph(detail_level="compact") -> dict:
     Returns:
         JSON string with objects list, stats, unit, up_axis.
     """
-    result = {"objects": [], "stats": {}, "unit": "cm", "up_axis": "y"}
+    result: dict[str, Any] = {"objects": [], "stats": {}, "unit": "cm", "up_axis": "y"}
 
     # Get scene unit
     try:
@@ -310,7 +310,7 @@ def get_scene_graph(detail_level="compact") -> dict:
         result["objects"].append(obj)
 
     # Stats
-    type_counts = defaultdict(int)
+    type_counts: defaultdict[str, int] = defaultdict(int)
     for obj in result["objects"]:
         type_counts[obj["t"]] += 1
     result["stats"] = {
@@ -321,7 +321,7 @@ def get_scene_graph(detail_level="compact") -> dict:
     return result
 
 
-def get_zone_map(patterns=None) -> dict:
+def get_zone_map(patterns=None) -> dict[str, Any]:
     """Group objects into zones by name keywords; 7 built-in zones.
     Args:
         patterns: dict of zone_name -> regex_pattern. If None, uses the
@@ -416,7 +416,7 @@ def get_zone_map(patterns=None) -> dict:
     }
 
 
-def get_spatial_index(max_neighbors=8, max_distance=None) -> dict:
+def get_spatial_index(max_neighbors=8, max_distance=None) -> dict[str, Any]:
     """Build spatial index with neighbor relationships.
 
     Args:
@@ -520,7 +520,7 @@ def get_spatial_index(max_neighbors=8, max_distance=None) -> dict:
     return {"pairs": pairs, "objects": names, "threshold": _round3(max_distance), "count": n}
 
 
-def measure(obj_a, obj_b, mode="center") -> dict:
+def measure(obj_a, obj_b, mode="center") -> dict[str, Any]:
     """Measure spatial relationship between two objects.
 
     Args:
@@ -651,7 +651,7 @@ def measure(obj_a, obj_b, mode="center") -> dict:
     return result
 
 
-def get_material_map() -> dict:
+def get_material_map() -> dict[str, Any]:
     """Get material-to-object mapping with color information.
 
     Returns:
@@ -700,7 +700,7 @@ def get_material_map() -> dict:
     return {"materials": list(materials.values()), "total": len(materials)}
 
 
-def get_unit_info() -> dict:
+def get_unit_info() -> dict[str, Any]:
     """Get scene unit and axis information.
 
     Returns:
@@ -726,7 +726,7 @@ def get_unit_info() -> dict:
     return info
 
 
-def assert_scene_state(expectations_json) -> dict:
+def assert_scene_state(expectations_json) -> dict[str, Any]:
     """Verify scene state matches expectations.
 
     Args:
@@ -2931,7 +2931,7 @@ def scene_review(checks=None):
             "organization",
         ]
 
-    result = {"checks": {}, "issues": [], "score": 0}
+    result: dict[str, Any] = {"checks": {}, "issues": [], "score": 0}
     total_score = 0
     max_score = 0
 
@@ -3064,7 +3064,7 @@ def scene_review(checks=None):
         conflicts = []
 
         sample = transforms[:_SAMPLE_CONFLICTS]
-        obj_bounds = {}
+        obj_bounds: dict[str, dict[str, Any]] = {}
         for t in sample:
             try:
                 sel = om2.MSelectionList()
@@ -3535,7 +3535,7 @@ def scene_review(checks=None):
         max_score += 10
         pts = 10
 
-        org_issues = []
+        org_issues: list[dict[str, Any]] = []
 
         # Check 1: Objects with meaningless names in wrong positions
         # Detect objects like GRP_left_arch2 that are placed at world center
@@ -3603,7 +3603,7 @@ def scene_review(checks=None):
                 )
 
         # Check 4: Naming consistency (are objects using consistent prefixes?)
-        prefix_counts = {}
+        prefix_counts: dict[str, int] = {}
         for t in transforms:
             short = t.split("|")[-1]
             parts = short.split("_")
@@ -3703,7 +3703,7 @@ def scene_plan(objective=None, auto_fix=False):
         - conflict_prevention: potential issues before they happen
         - action_plan: step-by-step execution plan
     """
-    result = {
+    result: dict[str, Any] = {
         "organization_status": {},
         "zone_analysis": {},
         "layout_suggestions": [],
@@ -4211,7 +4211,7 @@ def _analyze_group_layout(transforms):
                 )
 
     # Check zone compliance
-    zone_compliance = {}
+    zone_compliance: dict[str, list[str]] = {}
     for g in group_list:
         hint = g["zone_hint"]
         if hint not in zone_compliance:
@@ -4384,7 +4384,7 @@ def _analyze_zone_balance(zone_data):
 
 def _suggest_layout(transforms, zone_data):
     """Suggest layout improvements based on current scene state."""
-    suggestions = []
+    suggestions: list[dict[str, Any]] = []
 
     # Find objects and their positions
     objects = []
@@ -4457,7 +4457,7 @@ def _predict_conflicts(transforms):
     conflicts = []
 
     # Get bounds for all objects (world-space via 8-corner transform)
-    obj_bounds = {}
+    obj_bounds: dict[str, dict[str, Any]] = {}
     for t in transforms[:_SAMPLE_CONFLICTS]:
         try:
             sel = om2.MSelectionList()
