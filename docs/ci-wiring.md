@@ -82,3 +82,20 @@ budget. The existing mypy + mypy-baseline command reported zero new errors.
 Registry, doc-claims and the other local lint-job scripts passed; the monolith
 check only noted its existing spare line. These are local results, not a claim
 that the GitHub Actions Linux/Windows matrix has run on this branch.
+
+## PR #232 review follow-up
+
+The review correctly found that a default-success job can be skipped through
+its `needs` chain even without its own `if`. The checker now follows direct
+and transitive dependencies, reports skip-capable conditions, missing jobs and
+cycles, and stops following skip propagation at `if: always()`. Conditions
+outside the small existing allowlist remain conservatively rejected; arbitrary
+expressions are not evaluated. Tests cover the reported case plus transitive,
+unconditional, always(), missing-dependency and cycle cases.
+
+The main-branch changelog conflict was resolved by retaining both additions;
+no upstream application changes were rewritten as part of this repair.
+
+After the review repair and merge of main (`b81a29b`): 34 wiring tests passed;
+full locked suite 1341 passed, 27 skipped. Ruff budget, mypy baseline (zero new
+errors), governance checks and all pre-commit hooks passed locally.

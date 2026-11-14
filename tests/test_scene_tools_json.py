@@ -409,7 +409,7 @@ class TestZoneGeometryHostHelper:
         expected = await tools.fns["scene_plan"](format=format)
 
         def should_not_run():
-            raise AssertionError("scene_plan must not call a helper that is not wired up yet")
+            raise AssertionError("scene_plan's default path must not read zone geometry")
 
         monkeypatch.setattr(tools.env.module, "get_zone_geometry", should_not_run)
         actual = await tools.fns["scene_plan"](format=format)
@@ -417,6 +417,179 @@ class TestZoneGeometryHostHelper:
         assert actual.encode("utf-8") == expected.encode("utf-8")
         assert "get_zone_geometry" not in tools.client.calls[-1]
         assert "scene_plan" in tools.client.calls[-1]
+
+
+# ------------------------------------------------------------
+# Issue #217: opt-in recommend_assets on scene_plan
+# ------------------------------------------------------------
+
+
+class TestRecommendAssets:
+    """The opt-in recommendation pass: JSON and CoS gain a recommendations
+    section only when asked, search/geometry failures never break the plan,
+    and the default path stays byte-identical and offline."""
+
+    FURNITURE_GEOMETRY = {
+        "unit": "cm",
+        "up_axis": "y",
+        "zones": [
+            {
+                "name": "furniture",
+                "bbox_min": [0, 0, 0],
+                "bbox_max": [320, 260, 250],
+                "size": [320, 260, 250],
+                "object_count": 3,
+                "unmeasured_count": 0,
+                "objects": [{"name": "|GEO_chair_a", "size": [50, 50, 90]}],
+            }
+        ],
+        "unassigned_count": 0,
+        "total_objects": 3,
+    }
+
+    @staticmethod
+    def _fake_search(results, total=None):
+        def search(query="", asset_type="models", limit=20):
+            return {
+                "results": results,
+                "total_count": total if total is not None else len(results),
+                "limit": limit,
+                "query": query,
+                "asset_type": asset_type,
+                "source": "api.polyhaven.com",
+            }
+
+        return search
+
+    @staticmethod
+    def _chair_hit(asset_id="chair_henry"):
+        return {
+            "id": asset_id,
+            "name": "Henry Chair",
+            "categories": ["furniture"],
+            "tags": ["chair"],
+            "dimensions": [0.55, 0.6, 0.95],
+            "polycount": 1200,
+        }
+
+    async def test_enabled_json_attaches_recommendations_and_keeps_the_plan(
+        self, tools, monkeypatch
+    ):
+        monkeypatch.setattr(
+            tools.env.module, "get_zone_geometry", lambda: dict(self.FURNITURE_GEOMETRY)
+        )
+        monkeypatch.setattr(
+            "maya_mcp_server.polyhaven.search_assets",
+            self._fake_search([self._chair_hit()]),
+        )
+
+        out = await tools.fns["scene_plan"](format="json", recommend_assets=True)
+        res = json.loads(out)
+        recs = res["recommendations"]
+        assert recs["status"] == "ok"
+        assert recs["provider"] == "poly_haven"
+        assert recs["unit"] == "m"
+        assert recs["policy"]["mode"] == "zone_envelope"
+        assert recs["policy"]["geometry"] == "world_aabb"
+        assert recs["policy"]["clearance_verified"] is False
+        assert recs["truncation"] == {"search": False, "output": False, "budget": False}
+        zone = recs["zones"][0]
+        assert zone["zone"] == "furniture"
+        assert zone["target"]["size_m"] == [3.2, 2.6, 2.5]
+        assert zone["target"]["measurement"] == "complete"
+        assert zone["queries"] == [{"query": "chair", "searched": True, "total_matches": 1}]
+        cand = zone["candidates"][0]
+        assert cand["asset_id"] == "chair_henry"
+        assert cand["dimensions_m"] == [0.55, 0.6, 0.95]
+        assert cand["matched_queries"] == [{"query": "chair", "rank": 1}]
+        assert cand["size_status"] == "pass"
+        assert zone["eligible_count"] == 1
+        # the plan itself is untouched
+        for key in (
+            "overall_health",
+            "grade",
+            "organization_status",
+            "zone_analysis",
+            "action_plan",
+        ):
+            assert key in res
+
+    async def test_enabled_cos_appends_the_recommend_block(self, tools, monkeypatch):
+        monkeypatch.setattr(
+            tools.env.module, "get_zone_geometry", lambda: dict(self.FURNITURE_GEOMETRY)
+        )
+        monkeypatch.setattr(
+            "maya_mcp_server.polyhaven.search_assets",
+            self._fake_search([self._chair_hit()]),
+        )
+
+        out = await tools.fns["scene_plan"](format="cos", recommend_assets=True)
+        assert out.startswith("SCENE_PLAN[")
+        assert "  RECOMMEND: status=ok provider=poly_haven unit=m" in out
+        assert "furniture: target=zone_bbox 3.2x2.6x2.5m meas=complete" in out
+        assert "1. chair_henry rank=1 0.55x0.6x0.95m fits_zone_envelope" in out
+        assert "truncation: search=n output=n budget=n errors=0" in out
+
+    async def test_search_failure_reports_offline_and_keeps_the_plan(self, tools, monkeypatch):
+        from maya_mcp_server.polyhaven import AssetError
+
+        monkeypatch.setattr(
+            tools.env.module, "get_zone_geometry", lambda: dict(self.FURNITURE_GEOMETRY)
+        )
+
+        def boom(query="", asset_type="models", limit=20):
+            raise AssetError("network_unavailable", "cannot reach api.polyhaven.com")
+
+        monkeypatch.setattr("maya_mcp_server.polyhaven.search_assets", boom)
+
+        out = await tools.fns["scene_plan"](format="json", recommend_assets=True)
+        res = json.loads(out)
+        assert res["recommendations"]["status"] == "offline"
+        assert res["recommendations"]["zones"][0]["skip_reason"] == "search_failed"
+        assert res["recommendations"]["errors"][0]["code"] == "network_unavailable"
+        assert "zone_analysis" in res and "action_plan" in res
+
+        out = await tools.fns["scene_plan"](format="cos", recommend_assets=True)
+        assert "RECOMMEND: status=offline" in out
+        assert "errors=1 (network_unavailable)" in out
+
+    async def test_geometry_error_gives_partial_with_the_plan_intact(self, tools, monkeypatch):
+        monkeypatch.setattr(
+            tools.env.module,
+            "get_zone_geometry",
+            lambda: {"error": {"code": "query_failed", "message": "bbox unreadable"}},
+        )
+
+        out = await tools.fns["scene_plan"](format="json", recommend_assets=True)
+        res = json.loads(out)
+        assert res["recommendations"]["status"] == "partial"
+        assert res["recommendations"]["zones"] == []
+        assert res["recommendations"]["errors"][0]["scope"] == "zone_geometry"
+        assert "zone_analysis" in res
+
+    async def test_geometry_transport_failure_is_isolated(self, tools, monkeypatch):
+        def kaboom():
+            raise RuntimeError("session gone")
+
+        monkeypatch.setattr(tools.env.module, "get_zone_geometry", kaboom)
+
+        out = await tools.fns["scene_plan"](format="json", recommend_assets=True)
+        res = json.loads(out)
+        assert res["recommendations"]["status"] == "partial"
+        assert res["recommendations"]["errors"][0]["code"] == "query_failed"
+        assert "zone_analysis" in res
+
+    async def test_default_call_never_searches_and_omits_the_section(self, tools, monkeypatch):
+        tools.env.scene.add_mesh("GEO_chair_a", t=(0, 0, 0))
+
+        def no_search(query="", asset_type="models", limit=20):
+            raise AssertionError("search must not run with recommend_assets=False")
+
+        monkeypatch.setattr("maya_mcp_server.polyhaven.search_assets", no_search)
+
+        res = json.loads(await tools.fns["scene_plan"](format="json"))
+        assert "recommendations" not in res
+        assert "RECOMMEND" not in await tools.fns["scene_plan"](format="cos")
 
 
 # ------------------------------------------------------------

@@ -11,6 +11,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from maya_mcp_server import polyhaven
+from maya_mcp_server.asset_recommendation import format_recommend_cos, gather_recommendations
 from maya_mcp_server.client import ensure_module_injected, exec_module_code, module_call
 from maya_mcp_server.cos_formatter import (
     format_assert_cos,
@@ -134,16 +136,14 @@ async def _read_scene_modified(client: Any, session_key: str | None, caller: str
     return scene_modified
 
 
-# not wired up yet: #177 is the first planned production caller. Keep this helper out
-# of scene_plan until the recommendation opt-in lands; default output is frozen.
-async def get_zone_geometry(  # pragma: no cover
-    client: Any, session_key: str | None = None
-) -> Any:
+# Wired to scene_plan's opt-in recommend_assets (#177/#217): the helper stays
+# out of the default path, so default output remains byte-identical.
+async def get_zone_geometry(client: Any, session_key: str | None = None) -> Any:
     """Read fresh zone boxes and object sizes through the _mcp_scene unit.
 
     Internal host-side seam, not an MCP tool. Geometry is never cached here:
-    a moved object must be measured again on the next call. #177 will compose
-    this with the scene plan and asset search.
+    a moved object must be measured again on the next call. scene_plan's
+    recommendation pass composes this with the host-side asset search.
     """
     await _ensure_module_injected(client, session_key)
     return await _execute_scene_code(
@@ -152,6 +152,24 @@ async def get_zone_geometry(  # pragma: no cover
         session_key,
         use_cache=False,
     )
+
+
+async def _recommend_for_plan(client: Any, session_key: str | None) -> dict[str, Any]:
+    """Compose scene_plan's recommendations section; search and geometry
+    failures never break the plan.
+
+    The Maya-side geometry read is wrapped into the same error-dict shape the
+    Maya side already reports, so gather_recommendations stays the single
+    place that turns problems into structured errors. The search runs on the
+    calling loop for now: the worker thread arrives together with the soft
+    time budget in T4 (Q8 of #31), which owns the timeout machinery.
+    """
+    geometry: Any
+    try:
+        geometry = await get_zone_geometry(client, session_key)
+    except Exception as e:  # transport-level failure; the Maya side has its own
+        geometry = {"error": {"code": "query_failed", "message": f"{type(e).__name__}: {e}"}}
+    return gather_recommendations(geometry, polyhaven.search_assets)
 
 
 # --- Token Budget Management ---
@@ -1063,6 +1081,7 @@ result
         auto_fix: bool = False,
         format: str = "json",
         session_key: str | None = None,
+        recommend_assets: bool = False,
     ) -> str:
         """Plan a scene layout: organization checks plus layout suggestions.
 
@@ -1072,6 +1091,14 @@ result
         - Layout suggestions: spacing, overlap, and clustering detection
         - Conflict prevention: predicts near-miss collisions
         - Action plan: prioritized step-by-step execution guide
+
+        With recommend_assets=True, also recommends Poly Haven models for the
+        furniture zone: reads fresh zone geometry, searches the models index
+        for "chair", and screens candidates against the zone's world-axis
+        bounding box as an upper size limit only. Recommendations are advisory
+        references — search only, no download and no import — and a search or
+        network failure never changes the plan itself. Clearances and collisions
+        are not verified.
 
         Blockout first: check organization and proportions
         before committing to detailed modeling. Accepts a plain-language objective.
@@ -1087,10 +1114,16 @@ result
             auto_fix: If True, auto-fix safe issues (remove empty groups, reparent orphans).
             format: Output format - "json" (default) or "cos".
             session_key: Maya session key.
+            recommend_assets: If True, attach advisory Poly Haven model
+                recommendations (furniture zone, query "chair") to the plan.
+                This reaches the Poly Haven search index over the network;
+                default False keeps the output byte-identical and fully offline.
 
         Returns:
             Scene health report with organization status, zone analysis,
-            layout suggestions, conflict predictions, and action plan.
+            layout suggestions, conflict predictions, and action plan. With
+            recommend_assets=True, also a "recommendations" section (JSON)
+            or a RECOMMEND block (CoS).
         """
         from maya_mcp_server.server import get_session_manager
 
@@ -1102,6 +1135,9 @@ result
             "_mcp_scene", "scene_plan", objective=objective or None, auto_fix=auto_fix
         )
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
+
+        if recommend_assets:
+            result["recommendations"] = await _recommend_for_plan(client, session_key)
 
         if format == "json":
             return json.dumps(result, indent=2)
@@ -1128,5 +1164,8 @@ result
                 for a in actions[:5]:
                     pri = a.get("priority", "?").upper()
                     out.append(f"    {a['step']}. [{pri}] {a.get('description', '')}")
+
+            if "recommendations" in result:
+                out.append(format_recommend_cos(result["recommendations"]))
 
             return "\n".join(out)

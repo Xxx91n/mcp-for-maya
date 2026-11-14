@@ -153,7 +153,7 @@ AI 会调用 `scene_snapshot()` 看一遍场景，然后建模，再用 `scene_r
 | 🎨 **画面质量** | `scene_aesthetics` | 5 维分析：色彩理论(60-30-10)、空间构成(黄金比例/三分法)、比例尺度(人体工学)、光照质量(三点照明/填充比/色温/衰减)、视觉动线 |
 | 🎬 **相机** | `camera_create` `camera_orbit` | 8 种内置镜头类型 + 环绕动画 |
 | 🛡️ **存档与读档** | `scene_checkpoint` `scene_rollback` `scene_checkpoint_list` | 把场景导出成磁盘上的 `.ma` 文件，放在 `checkpoints/`；读档时打开这个文件，再把场景指回原路径 |
-| 🧠 **场景规划** | `scene_plan` | 组织健康检查、区域平衡、布局优化建议、冲突预防、自然语言规划 |
+| 🧠 **场景规划** | `scene_plan` | 组织健康检查、区域平衡、布局优化建议、冲突预防、自然语言规划。开 `recommend_assets=True` 后还会按家具区包围盒做尺寸粗筛并附上 Poly Haven 模型候选——只是尺寸上限初筛，没有验证净空或碰撞；只搜索，不下载不导入；默认关闭，关闭时输出逐字节不变 |
 | 📋 **场景检查** | `scene_review` `scene_validate` `scene_assert` | 11 项固定检查（0-100 分）+ 自定义约束检查 + 状态断言 |
 | ⚡ **代码执行** | `execute_code` `write_module` | 在 Maya 中执行任意 Python 代码 / 注入可复用模块 |
 | 👁️ **看图复查** | `scene_viewport_snapshot` `scene_render_preview` | 截一张视口图，看到的就是美术看到的那一帧（含 HUD 和选中高亮），另有单帧 playblast 预览，让 AI 看一眼改得对不对（仅 GUI 会话） |

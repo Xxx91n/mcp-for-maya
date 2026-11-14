@@ -345,6 +345,23 @@ def _tool_missing(job_name: str, run_text: str) -> str | None:
     return None
 
 
+def _dependency_risks(job_name: str, jobs: dict, trail: tuple[str, ...] = ()) -> list[str]:
+    """Follow default-success needs edges; always() breaks skip propagation."""
+    if job_name in trail:
+        return ["dependency cycle: " + " -> ".join((*trail, job_name))]
+    job = jobs.get(job_name)
+    if job is None:
+        return [f"missing dependency: {job_name}"]
+    if _if_can_skip(job["if"]):
+        return [f"dependency {job_name} has a condition that can skip it"]
+    if _clean_if(job["if"] or "") == "always()":
+        return []
+    risks = []
+    for dependency in job["needs"]:
+        risks.extend(_dependency_risks(dependency, jobs, (*trail, job_name)))
+    return risks
+
+
 def check(root: Path, workflow_path: Path | None = None) -> list[str]:
     """Return findings, one string per violation. Empty list == wired."""
     path = workflow_path or (root / ".github" / "workflows" / "ci.yml")
@@ -404,6 +421,10 @@ def check(root: Path, workflow_path: Path | None = None) -> list[str]:
                 f"{job_name}: job_skipped -- the job carries an if: that can "
                 "skip it; remove the condition so it runs on every pull request"
             )
+        if _clean_if(job["if"] or "") != "always()":
+            for dependency in job["needs"]:
+                for risk in _dependency_risks(dependency, jobs, (job_name,)):
+                    findings.append(f"{job_name}: job_skipped -- {risk}")
         if job["continue_on_error"]:
             findings.append(
                 f"{job_name}: failure_swallowed -- the job sets "

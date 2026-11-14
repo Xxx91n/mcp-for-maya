@@ -22,6 +22,9 @@ _Avoid_: Chain-of-Symbol 记号化、token 压缩格式、CoS 格式
 **Zone**: 按物体名字里的关键词分区域；`get_zone_map()` 实际认 7 组，`scene_plan` 另用 8 个名字。
 _Avoid_: 九组、nine zones、9 zones、功能分区、分区
 
+**模型推荐**: `scene_plan(recommend_assets=True)` 在规划结果里附上 Poly Haven 的椅子推荐：先读家具区的真实尺寸，再按区域包围盒做尺寸上限筛选；只是参考，不下载、不导入。
+_Avoid_: 智能推荐、AI 推荐、推荐引擎
+
 **命名规则**: 物体名要用 GRP_/GEO_/MAT_/CAM_/LGT_/LOC_ 前缀，别用 pCube1、group1 这类 Maya 默认名。
 _Avoid_: 命名约定、naming convention、生产命名规范
 

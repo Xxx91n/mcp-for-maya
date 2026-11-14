@@ -444,3 +444,40 @@ def test_registered_script_only_in_comment_is_red(tmp_path):
     )
     findings = _check(tmp_path, text)
     assert any("check_ruff_budget: tool_not_executed" in f for f in findings)
+
+
+def test_skipped_dependency_blocks_mypy(tmp_path):
+    text = VALID.replace("  mypy:\n", "  mypy:\n    needs: drift-notify\n").replace(
+        "  drift-notify:\n", "  drift-notify:\n    if: false\n"
+    )
+    assert any("mypy: job_skipped" in f for f in _check(tmp_path, text))
+
+
+def test_transitive_skipped_dependency_blocks_mypy(tmp_path):
+    text = VALID.replace("  mypy:\n", "  mypy:\n    needs: bridge\n")
+    text += "\n  bridge:\n    needs: drift-notify\n    runs-on: ubuntu-latest\n"
+    text = text.replace("  drift-notify:\n", "  drift-notify:\n    if: false\n")
+    assert any("mypy: job_skipped" in f for f in _check(tmp_path, text))
+
+
+def test_always_breaks_dependency_skip_chain(tmp_path):
+    text = VALID.replace("  mypy:\n", "  mypy:\n    if: always()\n    needs: drift-notify\n")
+    text = text.replace("  drift-notify:\n", "  drift-notify:\n    if: false\n")
+    assert _check(tmp_path, text) == []
+
+
+def test_unconditional_dependency_is_allowed(tmp_path):
+    text = VALID.replace("  mypy:\n", "  mypy:\n    needs: drift-notify\n")
+    assert _check(tmp_path, text) == []
+
+
+def test_missing_dependency_is_red(tmp_path):
+    text = VALID.replace("  mypy:\n", "  mypy:\n    needs: missing\n")
+    assert any("missing dependency" in f for f in _check(tmp_path, text))
+
+
+def test_dependency_cycle_is_red(tmp_path):
+    text = VALID.replace("  mypy:\n", "  mypy:\n    needs: test\n").replace(
+        "  test:\n", "  test:\n    needs: mypy\n"
+    )
+    assert any("dependency cycle" in f for f in _check(tmp_path, text))
