@@ -16,7 +16,7 @@ import json
 import math
 import re
 from collections import defaultdict
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import maya.api.OpenMaya as om2  # noqa: N813
 import maya.cmds as cmds
@@ -1704,6 +1704,11 @@ def create_orbit_camera(center, radius=500, frames=120, name="CAM_orbit"):
 # P1: Aesthetic Analysis (Enhanced Professional Engine)
 # ============================================================
 
+if TYPE_CHECKING:  # type-only aliases; annotations stay lazy strings at Maya runtime
+    _Objs = list[dict[str, Any]]
+    _Bounds = dict[str, list[float]]
+    _Zones = dict[str, Any]
+
 # Maya production standards (unified, no duplicates)
 _MAYA_STANDARDS = {
     # Naming
@@ -1751,7 +1756,7 @@ _MAYA_STANDARDS = {
 }
 
 
-def analyze_aesthetics():
+def analyze_aesthetics() -> dict[str, Any]:
     """Score the scene's look on 5 design dimensions.
 
     Dimensions:
@@ -1942,7 +1947,9 @@ def analyze_aesthetics():
     return result
 
 
-def _compute_full_aesthetic_score(materials, objects, scene_bounds, lights, zone_map):
+def _compute_full_aesthetic_score(
+    materials: _Objs, objects: _Objs, scene_bounds: _Bounds, lights: _Objs, zone_map: _Zones | None
+) -> dict[str, Any]:
     """Compute comprehensive aesthetic score across 5 dimensions."""
     PHI = 1.618033988749895
 
@@ -2052,7 +2059,7 @@ def _wcag_luminance(r: float, g: float, b: float) -> float:
     return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
 
 
-def _score_color_theory(materials):
+def _score_color_theory(materials: _Objs) -> dict[str, Any]:
     """Dimension 1: Color Theory analysis."""
     active = [m for m in materials if m.get("object_count", 0) > 0]
     if not active:
@@ -2150,7 +2157,7 @@ def _score_color_theory(materials):
     }
 
 
-def _score_spatial_composition(objects, scene_bounds, PHI):
+def _score_spatial_composition(objects: _Objs, scene_bounds: _Bounds, PHI: float) -> dict[str, Any]:
     """Dimension 2: Spatial Composition analysis."""
     sub_scores = {}
     bmin = scene_bounds["min"]
@@ -2230,7 +2237,7 @@ def _score_spatial_composition(objects, scene_bounds, PHI):
     }
 
 
-def _score_proportion_scale(objects):
+def _score_proportion_scale(objects: _Objs) -> dict[str, Any]:
     """Dimension 3: Proportion & Scale analysis."""
     HUMAN_EYE_HEIGHT = 150.0
     HUMAN_REACH_HEIGHT = 200.0
@@ -2282,7 +2289,7 @@ def _score_proportion_scale(objects):
     }
 
 
-def _score_lighting_quality(lights):
+def _score_lighting_quality(lights: _Objs) -> dict[str, Any]:
     """Dimension 4: Professional Lighting Quality Analysis.
 
     Sub-analyses:
@@ -2296,7 +2303,7 @@ def _score_lighting_quality(lights):
     - Decay rate correctness (physically plausible)
     - Coverage analysis (spatial distribution)
     """
-    sub_scores = {}
+    sub_scores: dict[str, float] = {}
 
     if not lights:
         return {
@@ -2315,7 +2322,7 @@ def _score_lighting_quality(lights):
         }
 
     # --- Layer classification ---
-    layers = {"key": [], "fill": [], "rim": [], "accent": [], "other": []}
+    layers: dict[str, _Objs] = {"key": [], "fill": [], "rim": [], "accent": [], "other": []}
     for light in lights:
         name_l = light["name"].lower()
         if any(kw in name_l for kw in ["key", "main", "primary", "hero"]):
@@ -2533,7 +2540,7 @@ def _score_lighting_quality(lights):
     }
 
 
-def _score_visual_flow(objects, zone_map):
+def _score_visual_flow(objects: _Objs, zone_map: _Zones | None) -> dict[str, Any]:
     """Dimension 5: Visual Flow analysis."""
     sub_scores = {}
 
@@ -2642,7 +2649,7 @@ def _score_visual_flow(objects, zone_map):
 # ============================================================
 
 
-def _analyze_silhouette_quality(objects):
+def _analyze_silhouette_quality(objects: _Objs) -> dict[str, Any]:
     """Analyze silhouette quality of objects.
 
     Research basis: Aesthetic3D (ACM 2026) shows that silhouette recognition
@@ -2700,7 +2707,7 @@ def _analyze_silhouette_quality(objects):
     }
 
 
-def _analyze_curvature_distribution(objects):
+def _analyze_curvature_distribution(objects: _Objs) -> dict[str, Any]:
     """Analyze geometric curvature distribution for aesthetic quality.
 
     Research basis: "A Perceptual Aesthetics Measure for 3D Shapes" (arXiv 2016)
@@ -2741,7 +2748,7 @@ def _analyze_curvature_distribution(objects):
     }
 
 
-def _analyze_spatial_rhythm_enhanced(objects):
+def _analyze_spatial_rhythm_enhanced(objects: _Objs) -> dict[str, Any]:
     """Enhanced spatial rhythm analysis with compression/release patterns.
 
     Research basis: "Narrative Through Level Design" (2025) and
@@ -2827,7 +2834,7 @@ def _analyze_spatial_rhythm_enhanced(objects):
     }
 
 
-def _analyze_style_consistency(objects, materials):
+def _analyze_style_consistency(objects: _Objs, materials: _Objs) -> dict[str, Any]:
     """Analyze style consistency across the scene.
 
     Research basis: Tripo3D "Smart Mesh Building" guide emphasizes that

@@ -109,12 +109,13 @@ PR body, which is how the three asset fixes before this cleanup landed.
 - CI gates (`.github/workflows/ci.yml`): `pytest` must be green on ubuntu + windows; the ruff budget
   (`.github/ruff-baseline.json`) may only go down — above budget fails, and a lower count may be
   budgeted down in the same PR commit with the reason stated. `mypy` is baseline-gated in CI
-  (`mypy-baseline.txt`; 67 errors in 1 file as of the Maya-stub-mismatch batch (#229),
-  down from 184 after three added-annotation batches (#225, #230, #227) and this
-  stub-mismatch batch; every remaining entry is an annotation or
+  (`mypy-baseline.txt`; 20 errors in 1 file as of the aesthetic-chain typing batch (#251),
+  down from 184 after three added-annotation batches (#225, #230, #227), the
+  stub-mismatch batch, the scene_plan organization batch (#252), and the
+  aesthetic-chain batch; every remaining entry is an annotation or
   container-inference gap, not a stub dispute —
   baseline counts are sensitive to the fake Maya environment;
-  drift trail 221→223→212→223→184→168→152→85→67 across formatter, fake-Maya-environment changes,
+  drift trail 221→223→212→223→184→168→152→85→67→45→20 across formatter, fake-Maya-environment changes,
   D-124's removal of the code that was not wired up, and the annotation/stub batches):
   the type-check row in
   Development setup above is that gate — `run_mypy_gate.py` runs mypy and the
