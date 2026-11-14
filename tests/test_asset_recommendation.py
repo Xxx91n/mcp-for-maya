@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from maya_mcp_server.asset_recommendation import (
+    DEFAULT_RECOMMEND_BUDGET_S,
     MAX_PER_SCENE,
     SEARCH_ASSET_TYPE,
     SEARCH_LIMIT,
@@ -452,7 +453,7 @@ class TestSearchFailureIsolation:
     def test_partial_query_failure_keeps_succeeded_results_and_reports_partial(self):
         def flaky(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
             if query == "table":
-                raise AssetError("network_unavailable", "timeout on table")
+                raise RuntimeError("transient error on table")
             results = [chair_hit("chair_ok")] if query == "chair" else []
             return _search_response(results, query=query, asset_type=asset_type, limit=limit)
 
@@ -461,7 +462,7 @@ class TestSearchFailureIsolation:
         zone = recs["zones"][0]
         assert zone["status"] == "partial"
         assert [c["asset_id"] for c in zone["candidates"]] == ["chair_ok"]
-        assert recs["errors"][0]["code"] == "network_unavailable"
+        assert recs["errors"][0]["code"] == "search_failed"
         assert [q["searched"] for q in zone["queries"]] == [True, False, True, True]
 
 
@@ -706,8 +707,9 @@ class TestCapsAndOrder:
         second, _ = gather(make_geometry(zones=[FURNITURE_ZONE]), results=hits)
         assert first == second
 
-    def test_budget_truncation_is_reserved_for_t4(self):
+    def test_default_budget_stays_untruncated_when_fast(self):
         recs, _ = gather(make_geometry(zones=[FURNITURE_ZONE]))
+        assert DEFAULT_RECOMMEND_BUDGET_S == 5.0
         assert recs["truncation"]["budget"] is False
 
 
@@ -775,13 +777,17 @@ class TestRecommendCos:
         assert "furniture: skipped (unmeasurable_target)" in block
 
     def test_offline_block_names_the_first_error_code(self):
-        recs, _ = gather(
-            make_geometry(zones=[FURNITURE_ZONE]),
-            error=AssetError("network_unavailable", "cannot reach api.polyhaven.com"),
-        )
+        calls: list[str] = []
+
+        def boom(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
+            calls.append(query)
+            raise AssetError("network_unavailable", "cannot reach api.polyhaven.com")
+
+        recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE]), boom)
         block = format_recommend_cos(recs)
+        assert calls == ["chair"]
         assert "RECOMMEND: status=offline" in block
-        assert "truncation: search=n output=n budget=n errors=4 (network_unavailable)" in block
+        assert "truncation: search=n output=n budget=n errors=1 (network_unavailable)" in block
 
     def test_empty_scene_block_says_so(self):
         recs, _ = gather(make_geometry())
@@ -1395,3 +1401,184 @@ class TestThreeAxisScreening:
         by_zone_missing = {z["zone"]: z for z in recs_missing["zones"]}
         assert by_zone_missing["furniture"]["target"]["fallback_reason"] == "target_not_found"
         assert by_zone_missing["lighting"]["target"]["fallback_reason"] == "target_not_found"
+
+
+# ------------------------------------------------------------
+# T4: soft time budget, offline circuit-breaker, corrupt metadata
+# ------------------------------------------------------------
+
+
+class TestBudgetCircuitBreakerAndCorruptMetadata:
+    def test_timeout_forwards_remaining_budget_and_stops_when_exhausted(self):
+        now = [100.0]
+        calls: list[tuple[str, float]] = []
+
+        def clock() -> float:
+            return now[0]
+
+        def timed_search(
+            query: str = "", asset_type: str = "models", limit: int = 20, timeout: float = 15.0
+        ) -> dict:
+            calls.append((query, round(timeout, 2)))
+            now[0] += 3.0  # first two queries spend 6s > 5s budget
+            hits = [chair_hit("chair_fast")] if query == "chair" else []
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
+
+        lighting_zone = {
+            "name": "lighting",
+            "bbox_min": [0, 0, 0],
+            "bbox_max": [300, 220, 300],
+            "size": [300, 220, 300],
+            "object_count": 2,
+            "unmeasured_count": 0,
+        }
+        recs = gather_recommendations(
+            make_geometry(zones=[FURNITURE_ZONE, lighting_zone]),
+            timed_search,
+            deadline=105.0,
+            clock=clock,
+        )
+        assert calls == [("chair", 5.0), ("table", 2.0)]
+        assert recs["status"] == "partial"
+        assert recs["truncation"]["budget"] is True
+        assert [e["code"] for e in recs["errors"]] == ["budget_exhausted"]
+
+        by_zone = {z["zone"]: z for z in recs["zones"]}
+        assert by_zone["furniture"]["status"] == "partial"
+        assert [c["asset_id"] for c in by_zone["furniture"]["candidates"]] == ["chair_fast"]
+        assert [q["searched"] for q in by_zone["furniture"]["queries"]] == [
+            True,
+            True,
+            False,
+            False,
+        ]
+        assert by_zone["lighting"]["status"] == "skipped"
+        assert by_zone["lighting"]["skip_reason"] == "budget_exhausted"
+        assert all(not q["searched"] for q in by_zone["lighting"]["queries"])
+
+        block = format_recommend_cos(recs)
+        assert "RECOMMEND: status=partial" in block
+        assert "status=partial(2/4)" in block
+        assert "lighting: skipped (budget_exhausted)" in block
+        assert "truncation: search=n output=n budget=y errors=1 (budget_exhausted)" in block
+
+    def test_pre_expired_budget_skips_all_network_calls_cleanly(self):
+        called: list[str] = []
+
+        def should_not_run(
+            query: str = "", asset_type: str = "models", limit: int = 20, timeout: float = 5.0
+        ) -> dict:
+            called.append(query)
+            return _search_response([], query=query, asset_type=asset_type, limit=limit)
+
+        recs = gather_recommendations(
+            make_geometry(zones=[FURNITURE_ZONE]),
+            should_not_run,
+            budget_s=0.0,
+        )
+        assert called == []
+        assert recs["status"] == "partial"
+        assert recs["truncation"]["budget"] is True
+        assert recs["zones"][0]["status"] == "skipped"
+        assert recs["zones"][0]["skip_reason"] == "budget_exhausted"
+
+    def test_network_unavailable_circuit_breaks_later_queries_and_zones(self):
+        calls: list[str] = []
+
+        def flaky(
+            query: str = "", asset_type: str = "models", limit: int = 20, timeout: float = 5.0
+        ) -> dict:
+            calls.append(query)
+            if query == "table":
+                raise AssetError("network_unavailable", "timed out")
+            hits = [chair_hit("chair_ok")] if query == "chair" else []
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
+
+        lighting_zone = {
+            "name": "lighting",
+            "bbox_min": [0, 0, 0],
+            "bbox_max": [300, 220, 300],
+            "size": [300, 220, 300],
+            "object_count": 2,
+            "unmeasured_count": 0,
+        }
+        recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE, lighting_zone]), flaky)
+        assert calls == ["chair", "table"]
+        assert recs["status"] == "partial"
+        assert recs["truncation"]["budget"] is False
+        assert len(recs["errors"]) == 1
+        assert recs["errors"][0]["code"] == "network_unavailable"
+        by_zone = {z["zone"]: z for z in recs["zones"]}
+        assert by_zone["furniture"]["status"] == "partial"
+        assert [c["asset_id"] for c in by_zone["furniture"]["candidates"]] == ["chair_ok"]
+        assert [q["searched"] for q in by_zone["furniture"]["queries"]] == [
+            True,
+            False,
+            False,
+            False,
+        ]
+        assert by_zone["lighting"]["status"] == "skipped"
+        assert by_zone["lighting"]["skip_reason"] == "search_failed"
+
+    def test_corrupt_asset_metadata_never_crashes_screening(self):
+        corrupt_hits = [
+            "not-a-dict",
+            {"id": 123, "name": "Bad ID", "tags": ["chair"], "dimensions": [0.5, 0.5, 0.5]},
+            {
+                "id": "chair_bad_tags",
+                "name": "Chair Good",
+                "categories": {"bad": 1},
+                "tags": 999,
+                "dimensions": [10**400, 0.5, 0.5],  # int > float max -> OverflowError guard
+                "polycount": True,
+            },
+            chair_hit("chair_valid", dims=[0.6, 0.8, 0.6]),
+        ]
+
+        def corrupt_search(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
+            hits = corrupt_hits if query == "chair" else []
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
+
+        recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE]), corrupt_search)
+        assert recs["status"] == "ok"
+        zone = recs["zones"][0]
+        assert [c["asset_id"] for c in zone["candidates"]] == ["chair_valid"]
+        assert [c["asset_id"] for c in zone["unverified_candidates"]] == ["chair_bad_tags"]
+        assert zone["unverified_candidates"][0]["polycount"] is None
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"budget_s": float("nan")},
+            {"budget_s": float("inf")},
+            {"deadline": float("nan")},
+        ],
+    )
+    def test_non_finite_budget_or_deadline_fails_closed(self, kwargs):
+        called: list[str] = []
+
+        def no_call(
+            query: str = "", asset_type: str = "models", limit: int = 20, timeout: float = 5.0
+        ) -> dict:
+            called.append(query)
+            return _search_response([], query=query, asset_type=asset_type, limit=limit)
+
+        recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE]), no_call, **kwargs)
+        assert called == []
+        assert recs["status"] == "partial"
+        assert recs["truncation"]["budget"] is True
+        assert recs["errors"][0]["code"] == "budget_exhausted"
+
+    @pytest.mark.parametrize("code", ["bad_response", "http_error"])
+    def test_shared_index_fatal_errors_circuit_break_pass(self, code):
+        calls: list[str] = []
+
+        def fail_once(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
+            calls.append(query)
+            raise AssetError(code, "index unusable")
+
+        recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE]), fail_once)
+        assert calls == ["chair"]
+        assert recs["status"] == "offline"
+        assert len(recs["errors"]) == 1
+        assert recs["errors"][0]["code"] == code

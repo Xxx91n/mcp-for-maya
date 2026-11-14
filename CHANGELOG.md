@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`scene_plan` recommendations run off the event loop under a 5s soft time budget with offline circuit-breaking and corrupt-metadata guards (#220, Refs #31)** —
+  `_recommend_for_plan` now runs synchronous Poly Haven index search inside a
+  daemon worker thread under a 5-second monotonic soft deadline (`DEFAULT_RECOMMEND_BUDGET_S`),
+  forwarding remaining time as HTTP `timeout`, stopping new queries cleanly once
+  exhausted (`truncation.budget=true`, `budget_exhausted`), and never claiming to
+  force-kill an already-running thread. Search reuses `polyhaven._index_cache`
+  (`SEARCH_INDEX_TTL_S=300`), so a warm cache stays `status="ok"` offline, while
+  shared-index failures (`network_unavailable`, `http_error`, `bad_response`,
+  `download_too_large`, `url_not_allowed`) circuit-break the pass cleanly on
+  first failure instead of repeating redundant requests. Corrupt `/assets` JSON,
+  non-string tags/categories/ids, bool polycounts, and huge integer dimensions
+  that overflow `float` are tolerated without affecting `scene_plan`'s own
+  fields; `auto_fix=True` still finishes before fresh zone geometry is read; and
+  `docs/threat-model.md` removes the stale duplicate `scene_plan` row while
+  recording the worker-thread / soft-budget boundary. Evidence:
+  `tests/test_asset_recommendation.py::TestBudgetCircuitBreakerAndCorruptMetadata::test_timeout_forwards_remaining_budget_and_stops_when_exhausted`,
+  `tests/test_asset_recommendation.py::TestBudgetCircuitBreakerAndCorruptMetadata::test_network_unavailable_circuit_breaks_later_queries_and_zones`,
+  `tests/test_asset_recommendation.py::TestBudgetCircuitBreakerAndCorruptMetadata::test_corrupt_asset_metadata_never_crashes_screening`,
+  `tests/test_scene_tools_json.py::TestRecommendAssetsTargetAndSizing::test_search_runs_in_worker_thread_without_blocking_event_loop`,
+  `tests/test_scene_tools_json.py::TestRecommendAssetsTargetAndSizing::test_index_cache_cold_vs_hot_and_offline_via_real_polyhaven`,
+  `tests/test_scene_tools_json.py::TestRecommendAssetsTargetAndSizing::test_auto_fix_runs_before_zone_geometry_read_and_screens_post_fix`,
+  `tests/test_scene_tools_json.py::TestRecommendAssetsTargetAndSizing::test_security_pipeline_audit_envelope_and_no_download_import`,
+  `tests/test_polyhaven.py::TestSearch::test_corrupt_tags_categories_and_asset_ids_never_crash_search`.
+
 - **The mypy gate fails closed on untrustworthy execution** — the mypy CI job
   now runs `.github/scripts/run_mypy_gate.py` instead of piping mypy straight
   into the baseline filter. The gate classifies mypy's exit code instead of
@@ -43,7 +67,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_run_mypy_gate.py::test_removing_strict_is_red`,
   `tests/test_run_mypy_gate.py::test_baseline_matched_errors_stay_green`,
   `tests/test_run_mypy_gate.py::test_cli_green_control_runs_real_mypy_over_this_repo`.
-
 - **`scene_plan` recommendations cover all 7 built-in zones with word-level filtering, dedup, and rank-band ordering (#218)** —
   `ZONE_SEARCH_QUERIES` now maps `entrance` (`door`, `sign`), `display`
   (`shelf`, `counter`, `showcase`, `podium`), `furniture` (`chair`, `table`,

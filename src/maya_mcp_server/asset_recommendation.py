@@ -24,13 +24,17 @@ cross-keyword dedup, rank-band + size-difference sorting, and the
 3-per-zone / 12-per-scene caps.
 T3 scope (#219): target resolution, ambiguity/fallback reporting, unit
 conversion, and three-axis 0.5x-1.5x size screening.
-The soft time budget is T4 (#220).
+T4 scope (#220): 5-second monotonic soft time budget, remaining timeout
+forwarding, shared-index offline circuit-breaker, corrupt metadata
+hardening, and worker-thread offloading in scene_tools.
 """
 
 from __future__ import annotations
 
+import inspect
 import math
 import re
+import time
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -54,6 +58,18 @@ ZONE_SEARCH_QUERIES: dict[str, tuple[str, ...]] = {
 # truncation flag reports when the index held more.
 SEARCH_LIMIT = 20
 SEARCH_ASSET_TYPE = "models"
+
+# Q8: 5-second monotonic soft budget for the whole recommendation pass.
+DEFAULT_RECOMMEND_BUDGET_S = 5.0
+_SHARED_INDEX_FATAL_CODES = frozenset(
+    {
+        "network_unavailable",
+        "http_error",
+        "bad_response",
+        "download_too_large",
+        "url_not_allowed",
+    }
+)
 
 # Q9: at most 3 candidates per zone and 12 across the whole scene
 # (eligible first, then unverified; both kinds share the cap).
@@ -113,6 +129,17 @@ def _error(scope: str, code: str, message: str) -> dict[str, str]:
     return {"scope": scope, "code": code, "message": message}
 
 
+def _finite_float(value: Any) -> float | None:
+    """Convert a numeric value to a finite float, rejecting bools and huge ints."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        out = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    return out if math.isfinite(out) else None
+
+
 def _to_metres(values: Any, factor: float, rounded: bool = True) -> list[float] | None:
     """Scene-unit [x, y, z] extents to metres.
 
@@ -128,9 +155,12 @@ def _to_metres(values: Any, factor: float, rounded: bool = True) -> list[float] 
         return None
     out: list[float] = []
     for v in values:
-        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+        num = _finite_float(v)
+        if num is None:
             return None
-        value = float(v) * factor
+        value = num * factor
+        if not math.isfinite(value):
+            return None
         out.append(round(value, 3) if rounded else value)
     return out
 
@@ -205,6 +235,14 @@ def _tokenize_words(text: str) -> set[str]:
     return {_normalize_word(tok) for tok in _WORD_TOKEN_RE.findall(norm.lower())}
 
 
+def _iter_str_items(raw: Any) -> list[str]:
+    if isinstance(raw, (list, tuple)):
+        return [str(item) for item in raw]
+    if isinstance(raw, str):
+        return [raw]
+    return []
+
+
 def _word_hit(entry: dict[str, Any], query: str) -> bool:
     """Normalized word-level match on id, name, tags, and categories.
 
@@ -216,8 +254,8 @@ def _word_hit(entry: dict[str, Any], query: str) -> bool:
     if not q_tokens:
         return False
     texts = [str(entry.get("id") or ""), str(entry.get("name") or "")]
-    texts += [str(t) for t in entry.get("tags") or []]
-    texts += [str(c) for c in entry.get("categories") or []]
+    texts += _iter_str_items(entry.get("tags"))
+    texts += _iter_str_items(entry.get("categories"))
     asset_tokens: set[str] = set()
     for text in texts:
         asset_tokens |= _tokenize_words(text)
@@ -244,13 +282,24 @@ def _size_error(model: list[float], envelope: list[float]) -> float:
     return round(sum(abs(mm - zz) / zz for mm, zz in zip(m, z)), 9)
 
 
+def _int_value(value: Any) -> int | None:
+    """Return ``value`` as a real int (excluding bool), or None."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
 def _candidate(entry: dict[str, Any], query: str, rank: int) -> dict[str, Any]:
     """One search hit with its provenance; size fields filled by the caller."""
+    raw_name = entry.get("name")
+    name = raw_name if (raw_name is None or isinstance(raw_name, str)) else str(raw_name)
+    raw_poly = _int_value(entry.get("polycount"))
+    polycount = raw_poly if (raw_poly is not None and raw_poly >= 0) else None
     return {
         "asset_id": entry.get("id"),
-        "name": entry.get("name"),
+        "name": name,
         "dimensions_m": entry.get("dimensions"),
-        "polycount": entry.get("polycount"),
+        "polycount": polycount,
         "matched_queries": [{"query": query, "rank": rank}],
         "best_source_rank": rank,
         "size_status": "unverified",
@@ -263,10 +312,11 @@ def _valid_dimensions(dims: Any) -> TypeGuard[list[float] | tuple[float, ...]]:
     """Three finite, strictly positive numbers — a size the screen may use."""
     if not isinstance(dims, (list, tuple)) or len(dims) != 3:
         return False
-    return all(
-        not isinstance(v, bool) and isinstance(v, (int, float)) and math.isfinite(v) and v > 0
-        for v in dims
-    )
+    for v in dims:
+        num = _finite_float(v)
+        if num is None or num <= 0:
+            return False
+    return True
 
 
 @dataclass
@@ -298,12 +348,8 @@ def _unverified_reason(dims: Any) -> tuple[str, str]:
         )
     if isinstance(dims, (list, tuple)) and len(dims) == 3:
         for v in dims:
-            if (
-                not isinstance(v, bool)
-                and isinstance(v, (int, float))
-                and math.isfinite(v)
-                and v <= 0
-            ):
+            num = _finite_float(v)
+            if num is not None and num <= 0:
                 return (
                     "invalid_dimensions",
                     "Poly Haven asset dimensions contain zero or non-positive values; "
@@ -331,7 +377,10 @@ def _screen(
     """
     screened: list[_ScoredHit] = []
     for rank, entry in enumerate(results, start=1):
-        if not isinstance(entry, dict) or not entry.get("id"):
+        if not isinstance(entry, dict):
+            continue
+        asset_id = entry.get("id")
+        if not isinstance(asset_id, str) or not asset_id:
             continue
         if not _word_hit(entry, query):
             continue
@@ -458,16 +507,18 @@ def _match_zone_object(
         obj for obj in valid_objects if _measurable_size_m(obj.get("size"), factor)[1] is not None
     ]
     # Keep synthetic fixtures whose object_count > len(objects) in zone_bbox mode.
+    obj_int = _int_value(obj_count)
+    unmeasured_int = _int_value(unmeasured)
     count_matches_list = not (
-        isinstance(obj_count, int)
-        and isinstance(unmeasured, int)
-        and (obj_count - unmeasured) != len(measurable)
+        obj_int is not None
+        and unmeasured_int is not None
+        and (obj_int - unmeasured_int) != len(measurable)
     )
     if len(measurable) == 1 and count_matches_list:
         return measurable[0], "unique_zone_object", None
 
     if len(measurable) > 1 or (
-        isinstance(obj_count, int) and isinstance(unmeasured, int) and (obj_count - unmeasured) > 1
+        obj_int is not None and unmeasured_int is not None and (obj_int - unmeasured_int) > 1
     ):
         return (
             None,
@@ -501,8 +552,9 @@ def _build_object_target(
     obj_count: Any,
     unmeasured: Any,
 ) -> dict[str, Any]:
+    unmeasured_int = _int_value(unmeasured)
     partial_zone = (
-        match_source == "unique_zone_object" and isinstance(unmeasured, int) and unmeasured > 0
+        match_source == "unique_zone_object" and unmeasured_int is not None and unmeasured_int > 0
     )
     target: dict[str, Any] = {
         "source": match_source,
@@ -535,7 +587,8 @@ def _build_zone_fallback_target(
     unmeasured: Any,
     fallback: _FallbackNote | None = None,
 ) -> tuple[dict[str, Any], str | None]:
-    has_unmeasured = isinstance(unmeasured, int) and unmeasured > 0
+    unmeasured_int = _int_value(unmeasured)
+    has_unmeasured = unmeasured_int is not None and unmeasured_int > 0
     unmeasurable = zone_display_m is None
     target: dict[str, Any] = {
         "source": "zone_bbox",
@@ -579,7 +632,7 @@ def _resolve_target(
     name = zone.get("name", "")
     obj_count = zone.get("object_count")
     unmeasured = zone.get("unmeasured_count")
-    if obj_count == 0:
+    if _int_value(obj_count) == 0:
         target, _ = _build_zone_fallback_target(name, None, None, None, 0, unmeasured)
         target["measurement"] = "empty_zone"
         return target, None, "empty_zone"
@@ -661,11 +714,51 @@ def _assign_zone_candidates(entry: dict[str, Any], ordered_hits: list[_ScoredHit
     entry["unverified_count"] = len(shown_unverified)
 
 
-def _refresh_zone_status(entry: dict[str, Any], *, failed: int = 0, succeeded: int = 0) -> None:
-    if failed > 0 and succeeded == 0:
+@dataclass
+class _SearchRunState:
+    """Shared per-pass soft budget and circuit-breaker state."""
+
+    deadline: float
+    clock: Callable[[], float]
+    accepts_timeout: bool
+    budget_exhausted: bool = False
+    offline_circuit_broken: bool = False
+
+
+def _accepts_timeout(search_fn: Callable[..., Any]) -> bool:
+    """Return True when ``search_fn`` accepts a ``timeout`` keyword argument."""
+    try:
+        sig = inspect.signature(search_fn)
+    except (TypeError, ValueError):
+        return False
+    for param in sig.parameters.values():
+        if param.kind == inspect.Parameter.VAR_KEYWORD or (
+            param.name == "timeout"
+            and param.kind
+            in (
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            )
+        ):
+            return True
+    return False
+
+
+def _refresh_zone_status(
+    entry: dict[str, Any],
+    *,
+    failed: int = 0,
+    succeeded: int = 0,
+    budget_skipped: int = 0,
+    offline_skipped: bool = False,
+) -> None:
+    if (failed > 0 or offline_skipped) and succeeded == 0:
         entry["status"] = "skipped"
         entry["skip_reason"] = "search_failed"
-    elif failed > 0:
+    elif budget_skipped > 0 and succeeded == 0:
+        entry["status"] = "skipped"
+        entry["skip_reason"] = "budget_exhausted"
+    elif failed > 0 or budget_skipped > 0 or offline_skipped:
         entry["status"] = "partial"
     elif entry["status"] not in ("skipped", "partial"):
         entry["status"] = "ok" if entry["eligible_count"] > 0 else "empty"
@@ -678,6 +771,7 @@ def _process_zone(
     search_fn: Callable[..., dict[str, Any]],
     errors: list[dict[str, str]],
     truncation: dict[str, bool],
+    state: _SearchRunState,
     objective: str = "",
     scene_refs: set[str] | None = None,
 ) -> tuple[dict[str, Any], list[_ScoredHit], int, int]:
@@ -737,27 +831,53 @@ def _process_zone(
     seen: dict[str, _ScoredHit] = {}
     succeeded = 0
     failed = 0
+    budget_skipped = 0
+    offline_skipped = False
     for query in queries:
+        if state.offline_circuit_broken:
+            offline_skipped = True
+            entry["queries"].append(_unsearched_query(query))
+            continue
+        remaining = state.deadline - state.clock()
+        if not state.budget_exhausted and (not math.isfinite(remaining) or remaining <= 0):
+            state.budget_exhausted = True
+            truncation["budget"] = True
+            errors.append(
+                _error(
+                    scope,
+                    "budget_exhausted",
+                    f"recommendation {DEFAULT_RECOMMEND_BUDGET_S:g}s soft time budget "
+                    "exhausted; remaining queries skipped",
+                )
+            )
+        if state.budget_exhausted:
+            budget_skipped += 1
+            entry["queries"].append(_unsearched_query(query))
+            continue
         try:
-            data = search_fn(query=query, asset_type=SEARCH_ASSET_TYPE, limit=SEARCH_LIMIT)
+            call_kwargs: dict[str, Any] = {
+                "query": query,
+                "asset_type": SEARCH_ASSET_TYPE,
+                "limit": SEARCH_LIMIT,
+            }
+            if state.accepts_timeout:
+                call_kwargs["timeout"] = remaining
+            data = search_fn(**call_kwargs)
             results = data.get("results") if isinstance(data, dict) else None
             total = data.get("total_count") if isinstance(data, dict) else None
             if not isinstance(results, list):
                 raise ValueError(f"unexpected search payload: {type(data).__name__}")
         except Exception as e:  # network/index failure must never break the plan
             code = getattr(e, "code", None)
-            errors.append(
-                _error(
-                    scope,
-                    code if isinstance(code, str) else "search_failed",
-                    f"{type(e).__name__}: {e}",
-                )
-            )
+            err_code = code if isinstance(code, str) else "search_failed"
+            errors.append(_error(scope, err_code, f"{type(e).__name__}: {e}"))
             failed += 1
             entry["queries"].append(_unsearched_query(query))
+            if err_code in _SHARED_INDEX_FATAL_CODES:
+                state.offline_circuit_broken = True
             continue
         succeeded += 1
-        total_int = total if isinstance(total, int) else None
+        total_int = _int_value(total)
         entry["queries"].append(_searched_query(query, total_int))
         if total_int is not None and total_int > len(results):
             truncation["search"] = True
@@ -768,7 +888,13 @@ def _process_zone(
         truncation["output"] = True
         ordered_hits = ordered_hits[:MAX_PER_ZONE]
     _assign_zone_candidates(entry, ordered_hits)
-    _refresh_zone_status(entry, failed=failed, succeeded=succeeded)
+    _refresh_zone_status(
+        entry,
+        failed=failed,
+        succeeded=succeeded,
+        budget_skipped=budget_skipped,
+        offline_skipped=offline_skipped,
+    )
     return entry, ordered_hits, succeeded, failed
 
 
@@ -836,6 +962,10 @@ def gather_recommendations(
     zone_geometry: Any,
     search_fn: Callable[..., dict[str, Any]],
     objective: str = "",
+    *,
+    budget_s: float = DEFAULT_RECOMMEND_BUDGET_S,
+    deadline: float | None = None,
+    clock: Callable[[], float] | None = None,
 ) -> dict[str, Any]:
     """Compose the ``recommendations`` section from geometry + searches.
 
@@ -844,10 +974,21 @@ def gather_recommendations(
     ``search_fn`` is ``polyhaven.search_assets`` in production; tests may
     inject a fake. ``objective`` is used host-side only to resolve target
     objects by DAG path or short name and is never sent to ``search_fn``.
-    Never raises: every failure becomes a structured error entry, so the
-    caller's plan survives untouched.
+    ``budget_s`` / ``deadline`` enforce a monotonic soft time budget: the
+    remaining budget is passed to ``search_fn`` when it accepts ``timeout``,
+    no new searches start after it runs out, and an in-flight worker thread
+    is never claimed to be forcibly killed. Never raises: every failure
+    becomes a structured error entry, so the caller's plan survives untouched.
     """
+    clock_fn = time.monotonic if clock is None else clock
     objective_text = objective if isinstance(objective, str) else ""
+    if deadline is not None:
+        dl = _finite_float(deadline)
+        effective_deadline = dl if dl is not None else clock_fn() - 1.0
+    else:
+        bs = _finite_float(budget_s)
+        safe_budget = bs if (bs is not None and bs > 0) else 0.0
+        effective_deadline = clock_fn() + safe_budget
     recs: dict[str, Any] = {
         "status": "empty",
         "provider": "poly_haven",
@@ -900,6 +1041,11 @@ def gather_recommendations(
                 scene_refs.add(obj["name"])
                 scene_refs.add(obj["name"].rsplit("|", 1)[-1])
 
+    state = _SearchRunState(
+        deadline=effective_deadline,
+        clock=clock_fn,
+        accepts_timeout=_accepts_timeout(search_fn),
+    )
     zone_results: list[tuple[dict[str, Any], list[_ScoredHit]]] = []
     total_succeeded = 0
     total_failed = 0
@@ -917,6 +1063,7 @@ def gather_recommendations(
             search_fn,
             errors,
             truncation,
+            state,
             objective=objective_text,
             scene_refs=scene_refs,
         )
@@ -931,7 +1078,11 @@ def gather_recommendations(
 
     if total_failed > 0 and total_succeeded == 0:
         recs["status"] = "offline"
-    elif total_failed > 0 or any(e["scope"] == "zone_geometry" for e in errors):
+    elif (
+        total_failed > 0
+        or truncation["budget"]
+        or any(e["scope"] == "zone_geometry" for e in errors)
+    ):
         recs["status"] = "partial"
     elif any_eligible:
         recs["status"] = "ok"
@@ -943,7 +1094,13 @@ def gather_recommendations(
 def _fmt_dims(dims: Any) -> str:
     if not isinstance(dims, (list, tuple)) or not dims:
         return "?"
-    return "x".join(f"{float(v):g}" for v in dims)
+    parts: list[str] = []
+    for v in dims:
+        num = _finite_float(v)
+        if num is None:
+            return "?"
+        parts.append(f"{num:g}")
+    return "x".join(parts)
 
 
 def _fallback_suffix(target: dict[str, Any]) -> str:
@@ -1028,6 +1185,10 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
                 f"{_fmt_dims(target.get('size_m'))}m tol={MIN_SIZE_RATIO:g}-{MAX_SIZE_RATIO:g}x "
                 f"meas={target.get('measurement')} {counts} complete={complete_yn}"
             )
+        if zone.get("status") == "partial":
+            searched_cnt = sum(1 for q in zone.get("queries", []) if q.get("searched"))
+            total_cnt = len(zone.get("queries", []))
+            target_line += f" status=partial({searched_cnt}/{total_cnt})"
         lines.append(target_line)
         n = 0
         for cand in _zone_candidates(zone):
@@ -1050,6 +1211,8 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
         f"budget={_yn(tr.get('budget'))} errors={len(errors)}"
     )
     if errors:
-        tail += f" ({errors[0].get('code')})"
+        codes = ",".join(dict.fromkeys(str(e.get("code")) for e in errors if e.get("code")))
+        if codes:
+            tail += f" ({codes})"
     lines.append(tail)
     return "\n".join(lines)

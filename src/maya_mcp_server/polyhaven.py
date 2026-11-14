@@ -24,6 +24,7 @@ import logging
 import math
 import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -167,8 +168,35 @@ def _as_int(value: Any, what: str) -> int:
 
 
 # TTL cache for the multi-MB /assets index — bounds call rate against
-# the CC0 API. Per asset_type; payload dicts only.
+# the CC0 API. Per asset_type; payload dicts only. Guarded by
+# _index_cache_lock because scene_plan dispatches searches on worker threads.
 _index_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+_index_cache_lock = threading.Lock()
+
+
+def _validate_timeout(timeout: float, url: str) -> float:
+    """Reject non-positive, boolean, or non-finite timeouts before socket use."""
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(timeout)
+        or timeout <= 0
+    ):
+        raise AssetError(
+            "network_unavailable",
+            f"invalid or expired timeout ({timeout!r}) for {urllib.parse.urlsplit(url).netloc}",
+            suggestion="timeout exceeded or invalid; retry when network budget allows",
+        )
+    return float(timeout)
+
+
+def _normalize_str_list(raw: Any) -> list[str]:
+    """Coerce raw metadata tags/categories into a clean list of strings."""
+    if isinstance(raw, (list, tuple)):
+        return [item for item in raw if isinstance(item, str)]
+    if isinstance(raw, str):
+        return [raw]
+    return []
 
 
 def _check_url(url: str) -> None:
@@ -217,9 +245,10 @@ def _urlopen(req: urllib.request.Request, timeout: float) -> Any:
 def _fetch(url: str, *, timeout: float, max_bytes: int) -> bytes:
     """HTTPS GET against the whitelist with UA + size cap."""
     _check_url(url)
+    valid_timeout = _validate_timeout(timeout, url)
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with _urlopen(req, timeout=timeout) as resp:
+        with _urlopen(req, timeout=valid_timeout) as resp:
             _check_url(resp.geturl() or url)
             length = resp.headers.get("Content-Length")
             if length is not None and _as_int(length, "Content-Length") > max_bytes:
@@ -280,24 +309,34 @@ def search_assets(
     publish a valid value. No /files request is made on this path.
     """
     limit = min(max(1, int(limit)), SEARCH_LIMIT_MAX)
-    url = f"{API_BASE}/assets?t={urllib.parse.quote(str(asset_type))}"
-    cached = _index_cache.get(str(asset_type))
+    cache_key = str(asset_type)
+    url = f"{API_BASE}/assets?t={urllib.parse.quote(cache_key)}"
+    with _index_cache_lock:
+        cached = _index_cache.get(cache_key)
     if cached is not None and time.monotonic() - cached[0] < SEARCH_INDEX_TTL_S:
         data = cached[1]
     else:
+        started_at = time.monotonic()
         data = _fetch_json(url, timeout)
         if not isinstance(data, dict):
             raise AssetError("bad_response", "unexpected /assets payload shape")
-        _index_cache[str(asset_type)] = (time.monotonic(), data)
+        with _index_cache_lock:
+            existing = _index_cache.get(cache_key)
+            if existing is None or started_at >= existing[0]:
+                _index_cache[cache_key] = (started_at, data)
 
     tokens = [t for t in re.split(r"\s+", str(query).strip().lower()) if t]
-    scored: list[tuple[int, str, dict[str, Any]]] = []
+    scored: list[tuple[int, str, dict[str, Any], list[str], list[str]]] = []
     for asset_id, meta in data.items():
-        if not isinstance(meta, dict):
+        if not isinstance(asset_id, str) or not isinstance(meta, dict):
             continue
-        hay_name = f"{asset_id} {meta.get('name', '')}".lower()
-        hay_tags = [str(t).lower() for t in meta.get("tags") or []]
-        hay_cats = [str(c).lower() for c in meta.get("categories") or []]
+        raw_name = meta.get("name", asset_id)
+        name_text = raw_name if isinstance(raw_name, str) else str(raw_name or asset_id)
+        hay_name = f"{asset_id} {name_text}".lower()
+        tags_list = _normalize_str_list(meta.get("tags"))
+        cats_list = _normalize_str_list(meta.get("categories"))
+        hay_tags = [t.lower() for t in tags_list]
+        hay_cats = [c.lower() for c in cats_list]
         score = 0
         matched = True
         for tok in tokens:
@@ -309,19 +348,19 @@ def search_assets(
                 matched = False
                 break
         if matched:
-            scored.append((score, asset_id, meta))
+            scored.append((score, asset_id, meta, cats_list, tags_list))
     scored.sort(key=lambda m: (-m[0], m[1]))
 
     results = [
         {
             "id": aid,
-            "name": m.get("name", aid),
-            "categories": m.get("categories", []),
-            "tags": (m.get("tags") or [])[:10],
+            "name": m.get("name", aid) if isinstance(m.get("name"), str) else aid,
+            "categories": cats,
+            "tags": tags[:10],
             "dimensions": _project_dimensions(m.get("dimensions")),
             "polycount": _project_polycount(m.get("polycount")),
         }
-        for _s, aid, m in scored[:limit]
+        for _s, aid, m, cats, tags in scored[:limit]
     ]
     return {
         "results": results,

@@ -139,7 +139,7 @@ authoritative and this table must match it row for row:
 | Hints | Tools |
 |-------|-------|
 | readOnly=T, destructive=F, idempotent=T | `list_sessions`, `scene_snapshot`, `scene_inspect`, `scene_measure`, `scene_assert`, `scene_validate`, `scene_checkpoint_list`, `scene_aesthetics`, `scene_review`, `scene_describe`, `scene_nodes`, `scene_viewport_snapshot`, `scene_render_preview` |
-| readOnly=F, destructive=F, idempotent=F | `scene_checkpoint`, `scene_rollback`, `scene_plan`, `camera_create`, `camera_orbit`, `add_session`, `scene_export` |
+| readOnly=F, destructive=F, idempotent=F | `scene_checkpoint`, `scene_rollback`, `camera_create`, `camera_orbit`, `add_session`, `scene_export` |
 | readOnly=F, destructive=T, idempotent=F | `execute_code`, `write_module`, `maya_setup_guide` |
 | readOnly=T, destructive=F, idempotent=T, openWorld=T | `asset_search` |
 | readOnly=F, destructive=F, idempotent=T, openWorld=T | `asset_import` |
@@ -166,9 +166,17 @@ authoritative and this table must match it row for row:
 - scene_plan recommendations are advisory and send nothing about the
   scene: the only outbound data is the fixed query words plus index
   parameters — objective, object names, DAG paths, and sizes never
-  leave the host. A recommendation imports nothing; placing a model
-  stays an explicit `asset_import` call, and a failed search degrades
-  to a structured note instead of failing the plan.
+  leave the host. When `auto_fix=True`, zone geometry is read after
+  auto-fix finishes. Search runs off the asyncio event loop in a worker
+  thread under a 5-second monotonic soft budget, reusing the 300-second
+  models index cache (so a hot cache works offline without claiming
+  `offline`), passing remaining budget as HTTP timeout, circuit-breaking
+  shared-index failures (`network_unavailable`, `http_error`, `bad_response`,
+  `download_too_large`, `url_not_allowed`) cleanly on first failure, and never claiming to force-kill
+  an already-running request thread. A recommendation imports nothing;
+  placing a model stays an explicit `asset_import` call, and a timeout,
+  corrupt index entry, or failed search degrades to `partial`/`offline`
+  without altering or failing the plan.
 - asset_import is idempotent because GRP_asset_<id> dedup is real
   (repeat calls report the existing group; force=True opts out).
 - scene_export performs a **local file write** to an arbitrary
