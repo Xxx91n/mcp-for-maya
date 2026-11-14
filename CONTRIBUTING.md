@@ -13,7 +13,7 @@ uv run pre-commit run --all-files    # hook sweep — CI's lint fallback. doc-cl
 python -m pytest tests/ -q         # fake-Maya test layer (contract tests against the maya.cmds fake)
 uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json          # lint pass 1: report only, red findings must not fail the shell
 python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint pass 2: per-rule budget that only goes down
-rc=0; uv run python -m mypy src/ > mypy-report.txt || rc=$?; if [ "$rc" -gt 1 ]; then cat mypy-report.txt; false; else uv run mypy-baseline filter < mypy-report.txt; fi   # type-check gate: the raw exit is non-zero on the baselined errors; `false` rather than `exit` keeps a pasted line from closing the shell, so a crash lands at exit 1 here and CI's 2
+uv run python .github/scripts/run_mypy_gate.py   # type-check gate: runs mypy, verifies the report shape and the checked src/ scope, then the baseline filter; red on a crash, an empty/garbage report, a module dropping out of scope, a weakened strict config, or baseline-new errors
 python -m maya_mcp_server -vv      # run with DEBUG logs (-v=INFO, -vv=DEBUG)
 ```
 
@@ -117,11 +117,19 @@ PR body, which is how the three asset fixes before this cleanup landed.
   drift trail 221→223→212→223→184→168→152→85→67 across formatter, fake-Maya-environment changes,
   D-124's removal of the code that was not wired up, and the annotation/stub batches):
   the type-check row in
-  Development setup above is that gate — the filter fails only on NEW errors,
-  and the wrapper keeps a mypy crash (raw exit above 1) red.
-  After resolving errors, regenerate the baseline from the same guarded report —
-  `uv run mypy-baseline sync < mypy-report.txt`, once the wrapper above has
-  stopped reporting errors — and commit the refreshed baseline in the same PR.
+  Development setup above is that gate — `run_mypy_gate.py` runs mypy and the
+  filter on the same report, verifies the report shape and the checked scope,
+  and fails closed on a crash, an empty or garbage report (empty baseline
+  included), a module dropping out of `src/`, or a weakened strict config;
+  the filter still fails only on NEW errors.
+  After resolving errors, regenerate the baseline —
+  `uv run mypy-baseline sync < mypy-report.txt` (the gate writes the guarded
+  report to `mypy-report.txt`) once the filter reports zero NEW errors in
+  the gate's output — the gate's red on a stale baseline is the resolved-
+  violations notice and is expected until the baseline is refreshed — and
+  commit the refreshed baseline in the same PR.
+  `run_mypy_gate.py` requires the baseline file to exist; retiring it means
+  editing that gate (see `docs/ci-wiring.md`).
   The ruff budget is per-rule
   (`{segment:{rule:count}}`) since T-10b — rules cannot subsidise each other.
   Budget gates are judged on the checked commit's tip (the PR's end state); a

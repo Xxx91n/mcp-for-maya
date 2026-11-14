@@ -35,6 +35,31 @@
       "exemption": null
     },
     {
+      "gate_id": "run_mypy_gate",
+      "bound_class": "gate",
+      "expected_sources": [
+        "pyproject.toml::tool.mypy",
+        "mypy-baseline.txt"
+      ],
+      "pin_node_ids": [
+        "tests/test_run_mypy_gate.py::test_a_clean_run_is_green",
+        "tests/test_run_mypy_gate.py::test_baseline_matched_errors_stay_green",
+        "tests/test_run_mypy_gate.py::test_a_new_source_module_is_included_automatically",
+        "tests/test_run_mypy_gate.py::test_empty_report_with_zero_exit_is_red",
+        "tests/test_run_mypy_gate.py::test_empty_report_with_error_exit_is_red",
+        "tests/test_run_mypy_gate.py::test_garbage_report_with_zero_exit_is_red",
+        "tests/test_run_mypy_gate.py::test_garbage_report_with_error_exit_is_red",
+        "tests/test_run_mypy_gate.py::test_a_crashed_checker_is_red_with_evidence",
+        "tests/test_run_mypy_gate.py::test_an_excluded_module_is_red",
+        "tests/test_run_mypy_gate.py::test_removing_strict_is_red",
+        "tests/test_run_mypy_gate.py::test_a_missing_baseline_file_is_red",
+        "tests/test_run_mypy_gate.py::test_a_new_error_outside_the_baseline_is_red_and_named",
+        "tests/test_run_mypy_gate.py::test_cli_green_control_runs_real_mypy_over_this_repo"
+      ],
+      "exemption": null,
+      "note": "Issue #226, under #221: the mypy CI job runs mypy THROUGH this gate, so the exit code alone no longer decides the verdict. It fails closed on an empty or garbage report even with an empty baseline (the exact hole #214 measured), on a checker crash (exit code and stderr recorded as evidence), on a summary count disagreeing with the report body, on a module dropping out of the checked src/ scope (live enumeration, no pinned file count), on a weakened strict trio and on a missing baseline file. The filter runs on BOTH the clean and the error branch, so its nonzero resolved-violations exit still forces a baseline sync when the historic errors are gone. SCOPE LIMITS, stated so nobody reads more into it: the strict-trio guard reads the first [tool.mypy] table as text with a WHITELIST -- only the required trio plus python_version may appear; explicit strict sub-flags, global suppression flags (ignore_errors, disable_error_code), stage-skipping flags (measured: semantic_analysis_only) and ANY mypy overrides table are refused outright, and allowing a new key requires editing this gate; a mypy: error on stderr is a config fault (mypy can log a config-parsing error and continue on defaults with a healthy exit code); the baseline filter's own config ([tool.mypy-baseline] with its ignore list) is refused as well; a broad ignore mypy actually uses stays a review decision; the scope comparison counts files, not identities (an exclusion balanced by another inflated count could pass), and src/ holds no .pyi stubs today -- if stubs are added, the enumeration rule must be aligned with mypy's discovery rules; a wholesale faked report with a consistent checked count is not detectable at this layer."
+    },
+    {
       "gate_id": "check_doc_claims",
       "bound_class": "gate",
       "expected_sources": [

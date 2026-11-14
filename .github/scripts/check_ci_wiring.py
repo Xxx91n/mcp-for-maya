@@ -335,9 +335,14 @@ def _if_can_skip(value: str | None) -> bool:
 
 # Deliberately small command grammar, not arbitrary shell evaluation. A token in
 # echo/printf, an assignment or a step name cannot satisfy these patterns.
+# The mypy job runs its tool through the registered ``run_mypy_gate`` gate
+# (issue #226: report-shape and scope enforcement live in that script). The
+# workflow text therefore cannot show the mypy invocation itself; that the
+# gate script really runs mypy is pinned by tests/test_run_mypy_gate.py and
+# the registry entry, not by this grammar.
 _TOOL_CALLS = {
     "lint": (r"uvx ruff@[^ ]+ check .+", r"python \.github/scripts/check_ruff_budget\.py .+"),
-    "mypy": (r"uv run python -m mypy .+", r"uv run mypy-baseline filter .+"),
+    "mypy": (r"(?:uv run )?python \.github/scripts/run_mypy_gate\.py",),
     "test": (r"uv run python -m pytest .+",),
 }
 
