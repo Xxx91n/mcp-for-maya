@@ -281,7 +281,8 @@ legal precisely because they carry no merge veto).
 
 ### 已保护 / 未保护 / 未验证 matrix (protected / unprotected / unverified)
 
-已保护 (verified on this repository, API evidence above):
+已保护 (verified on this repository, API evidence above; the enforcement
+hold behind items 1 and 3 is documented-not-measured — see 未验证 item 1):
 
 1. A PR into `main` cannot merge without a `ci` check run reporting success,
    and only the GitHub Actions app (15368) can produce one. One documented
@@ -364,8 +365,8 @@ its own explicit approval per #221):
    test branch make the `ci` job skip outright (for example `if: false`) to
    observe the documented skip-reports-`Success` behavior on this
    repository. Close each PR and delete its branch; confirm no rule was
-   left changed. Each 未验证 row becomes measured only by its own
-   experiment — deleting the `mypy` job alone tests neither: with `ci`
+   left changed. Each phenomenon is measured only by its own experiment —
+   deleting the `mypy` job alone tests neither: with `ci`
    still listing `mypy` in `needs`, the workflow is simply invalid.
 
 Per #228's acceptance criteria, the end-to-end "cannot silently disappear"
