@@ -8,7 +8,7 @@ python -m maya_mcp_server -vv
 uv run python -m pytest tests/ -q          # fake Maya test layer
 uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json          # lint report: red findings must not fail the shell
 python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint gate: per-rule budget that only goes down
-rc=0; uv run python -m mypy src/ > mypy-report.txt || rc=$?; if [ "$rc" -gt 1 ]; then cat mypy-report.txt; false; else uv run mypy-baseline filter < mypy-report.txt; fi   # type-check gate: raw exit is non-zero on the baselined errors; rc 2 (crash) prints and stays red at exit 1 here, not CI's 2, so a pasted line cannot close the shell
+uv run python .github/scripts/run_mypy_gate.py   # type-check gate: runs mypy and fails closed on a crash, an empty/garbage report (empty baseline included), a module dropping out of src/, or a weakened strict config; baseline filter verdict passes through
 uv run pre-commit run --all-files          # hook sweep (the why is in CONTRIBUTING's dev setup)
 
 ## Gates

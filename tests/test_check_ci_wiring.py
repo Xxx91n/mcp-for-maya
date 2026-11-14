@@ -11,8 +11,9 @@ Every red is paired with the live-green control
 is as visible as one that fires on nothing. The valid fixture also carries
 the three shapes that must NOT fail: a non-protected job with
 ``continue-on-error: true``, the ruff ``--exit-zero`` report step whose
-budget step enforces the verdict, and the mypy ``|| rc=$?`` exit-code
-capture.
+budget step enforces the verdict. The mypy job must call the registered
+``run_mypy_gate`` gate script by its exact command shape; the gate script's
+own behavior is pinned in tests/test_run_mypy_gate.py.
 """
 
 from __future__ import annotations
@@ -53,12 +54,8 @@ jobs:
   mypy:
     runs-on: ubuntu-latest
     steps:
-      - name: mypy | mypy-baseline filter
-        run: |
-          rc=0
-          uv run python -m mypy src/ > mypy-report.txt || rc=$?
-          if [ "$rc" -gt 1 ]; then cat mypy-report.txt; exit "$rc"; fi
-          uv run mypy-baseline filter < mypy-report.txt
+      - name: mypy execution gate
+        run: uv run python .github/scripts/run_mypy_gate.py
 
   test:
     runs-on: ubuntu-latest
@@ -94,12 +91,8 @@ jobs:
 MYPY_JOB = """  mypy:
     runs-on: ubuntu-latest
     steps:
-      - name: mypy | mypy-baseline filter
-        run: |
-          rc=0
-          uv run python -m mypy src/ > mypy-report.txt || rc=$?
-          if [ "$rc" -gt 1 ]; then cat mypy-report.txt; exit "$rc"; fi
-          uv run mypy-baseline filter < mypy-report.txt
+      - name: mypy execution gate
+        run: uv run python .github/scripts/run_mypy_gate.py
 
 """
 
@@ -178,8 +171,8 @@ def test_a_skipped_mypy_job_is_red(tmp_path):
 
 def test_a_skipped_mypy_step_is_red(tmp_path):
     text = VALID.replace(
-        "      - name: mypy | mypy-baseline filter\n        run: |",
-        "      - name: mypy | mypy-baseline filter\n        if: false\n        run: |",
+        "      - name: mypy execution gate\n        run:",
+        "      - name: mypy execution gate\n        if: false\n        run:",
     )
     findings = _check(tmp_path, text)
     assert any("step_skipped" in f for f in findings), findings
@@ -220,11 +213,8 @@ def test_an_aggregate_that_no_longer_checks_mypy_is_red(tmp_path):
 
 def test_a_comment_only_tool_call_is_red(tmp_path):
     text = VALID.replace(
-        "          uv run python -m mypy src/ > mypy-report.txt || rc=$?\n",
-        "          # uv run python -m mypy src/\n",
-    ).replace(
-        "          uv run mypy-baseline filter < mypy-report.txt\n",
-        "          # uv run mypy-baseline filter\n",
+        "        run: uv run python .github/scripts/run_mypy_gate.py\n",
+        "        # run: uv run python .github/scripts/run_mypy_gate.py\n",
     )
     findings = _check(tmp_path, text)
     assert findings, "a tool named only in comments must be reported"
@@ -245,9 +235,8 @@ def test_continue_on_error_on_the_mypy_job_is_red(tmp_path):
 
 def test_continue_on_error_on_the_mypy_step_is_red(tmp_path):
     text = VALID.replace(
-        "      - name: mypy | mypy-baseline filter\n        run: |",
-        "      - name: mypy | mypy-baseline filter\n"
-        "        continue-on-error: true\n        run: |",
+        "      - name: mypy execution gate\n        run:",
+        "      - name: mypy execution gate\n        continue-on-error: true\n        run:",
     )
     findings = _check(tmp_path, text)
     assert any("failure_swallowed" in f for f in findings), findings
@@ -255,8 +244,8 @@ def test_continue_on_error_on_the_mypy_step_is_red(tmp_path):
 
 def test_or_true_in_the_mypy_run_is_red(tmp_path):
     text = VALID.replace(
-        "          uv run mypy-baseline filter < mypy-report.txt\n",
-        "          uv run mypy-baseline filter < mypy-report.txt || true\n",
+        "        run: uv run python .github/scripts/run_mypy_gate.py",
+        "        run: uv run python .github/scripts/run_mypy_gate.py || true",
     )
     findings = _check(tmp_path, text)
     assert any("failure_swallowed" in f for f in findings), findings
@@ -305,27 +294,24 @@ def test_every_finding_names_the_rule_it_fired(tmp_path):
             "step-skip",
             "step_skipped",
             VALID.replace(
-                "      - name: mypy | mypy-baseline filter\n        run: |",
-                "      - name: mypy | mypy-baseline filter\n        if: false\n        run: |",
+                "      - name: mypy execution gate\n        run:",
+                "      - name: mypy execution gate\n        if: false\n        run:",
             ),
         ),
         (
             "swallow",
             "failure_swallowed",
             VALID.replace(
-                "          uv run mypy-baseline filter < mypy-report.txt\n",
-                "          uv run mypy-baseline filter < mypy-report.txt || true\n",
+                "        run: uv run python .github/scripts/run_mypy_gate.py",
+                "        run: uv run python .github/scripts/run_mypy_gate.py || true",
             ),
         ),
         (
             "comment",
             "tool_not_executed",
             VALID.replace(
-                "          uv run python -m mypy src/ > mypy-report.txt || rc=$?\n",
-                "          # uv run python -m mypy src/\n",
-            ).replace(
-                "          uv run mypy-baseline filter < mypy-report.txt\n",
-                "          # uv run mypy-baseline filter\n",
+                "        run: uv run python .github/scripts/run_mypy_gate.py\n",
+                "        # run: uv run python .github/scripts/run_mypy_gate.py\n",
             ),
         ),
         (
@@ -393,15 +379,18 @@ def test_each_required_fault_exits_one(tmp_path):
         valid.replace(mypy, "").replace("[lint, mypy, test]", "[lint, test]"),
         valid.replace("  mypy:\n", "  mypy:\n    if: false\n"),
         valid.replace(
-            "- name: mypy | mypy-baseline filter",
-            "- name: mypy | mypy-baseline filter\n        if: false",
+            "- name: mypy execution gate",
+            "- name: mypy execution gate\n        if: false",
         ),
         valid.replace("[lint, mypy, test]", "[mypy, test]"),
         valid.replace("[lint, mypy, test]", "[lint, mypy]"),
-        valid.replace("uv run python -m mypy src/", "# uv run python -m mypy src/"),
         valid.replace(
-            "uv run mypy-baseline filter < mypy-report.txt",
-            "uv run mypy-baseline filter < mypy-report.txt || true",
+            "run: uv run python .github/scripts/run_mypy_gate.py",
+            "run: echo gate disabled # uv run python .github/scripts/run_mypy_gate.py",
+        ),
+        valid.replace(
+            "run: uv run python .github/scripts/run_mypy_gate.py",
+            "run: uv run python .github/scripts/run_mypy_gate.py || true",
         ),
     ]
     tags = [
@@ -428,11 +417,9 @@ def test_each_required_fault_exits_one(tmp_path):
 
 def test_dash_run_block_cannot_hide_a_skip_flag(tmp_path):
     text = VALID.replace(
-        "      - name: mypy | mypy-baseline filter\n        run: |",
-        "      - run: |",
-    ).replace(
-        "          uv run mypy-baseline filter < mypy-report.txt\n",
-        "          uv run mypy-baseline filter < mypy-report.txt\n        if: false\n",
+        "      - name: mypy execution gate\n"
+        "        run: uv run python .github/scripts/run_mypy_gate.py",
+        "      - run: uv run python .github/scripts/run_mypy_gate.py\n        if: false",
     )
     assert any("step_skipped" in f for f in _check(tmp_path, text))
 

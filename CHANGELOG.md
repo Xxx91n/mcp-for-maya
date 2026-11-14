@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The mypy gate fails closed on untrustworthy execution** — the mypy CI job
+  now runs `.github/scripts/run_mypy_gate.py` instead of piping mypy straight
+  into the baseline filter. The gate classifies mypy's exit code instead of
+  thresholding it, requires a well-formed report on both the clean and the
+  error branch (empty or garbage output is red even with an empty baseline —
+  the hole #214 measured, where the old pipe returned success for `fix 0 /
+  new 0`), cross-checks the summary's error count against the report body,
+  compares mypy's `checked` count against a live enumeration of
+  `src/**/*.py` so an excluded module is red while a legitimately added module
+  needs no gate edit, and fails closed on a weakened strict trio or a missing
+  baseline file. The baseline filter runs on both branches, so its nonzero
+  "resolved violations" exit still forces a baseline sync when the historic
+  errors are fixed. mypy is invoked with `--config-file pyproject.toml`, so
+  it reads the same configuration the strict guard audits rather than an ini
+  file that out-prioritizes it; a `mypy: error` on stderr is a config fault
+  even with a healthy exit code.
+  Fault verdicts carry the exit code and stderr as evidence.
+  The check requires `strict`, `warn_unused_ignores` and
+  `warn_unused_configs` in `[tool.mypy]`; retiring the baseline later means
+  editing this gate, not deleting the file. Limits: the guard enforces a
+  WHITELIST on the first `[tool.mypy]` table — only the trio plus
+  `python_version` may appear (four review rounds found one weakening key
+  after another: strict sub-flags, `ignore_errors`, `disable_error_code`,
+  `semantic_analysis_only`), and mypy overrides tables plus the baseline
+  filter's own `[tool.mypy-baseline]` section are refused outright — a broad
+  ignore mypy actually uses stays a review decision, and a wholesale faked
+  report with a consistent `checked` count is beyond this layer. Details:
+  `docs/ci-wiring.md`. Evidence:
+  `tests/test_run_mypy_gate.py::test_empty_report_with_zero_exit_is_red`,
+  `tests/test_run_mypy_gate.py::test_garbage_report_with_error_exit_is_red`,
+  `tests/test_run_mypy_gate.py::test_an_excluded_module_is_red`,
+  `tests/test_run_mypy_gate.py::test_removing_strict_is_red`,
+  `tests/test_run_mypy_gate.py::test_baseline_matched_errors_stay_green`,
+  `tests/test_run_mypy_gate.py::test_cli_green_control_runs_real_mypy_over_this_repo`.
+
 - **`scene_plan` recommendations cover all 7 built-in zones with word-level filtering, dedup, and rank-band ordering (#218)** —
   `ZONE_SEARCH_QUERIES` now maps `entrance` (`door`, `sign`), `display`
   (`shelf`, `counter`, `showcase`, `podium`), `furniture` (`chair`, `table`,

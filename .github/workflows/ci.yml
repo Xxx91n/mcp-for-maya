@@ -91,12 +91,14 @@ jobs:
         # project env is .venv and commands run via `uv run`. Windows
         # first-check if sync misbehaves: UV_PROJECT_ENVIRONMENT.
         run: uv sync --frozen
-      - name: mypy | mypy-baseline filter
-        run: |
-          rc=0
-          uv run python -m mypy src/ > mypy-report.txt || rc=$?
-          if [ "$rc" -gt 1 ]; then cat mypy-report.txt; exit "$rc"; fi
-          uv run mypy-baseline filter < mypy-report.txt
+      - name: mypy execution gate
+        # run_mypy_gate.py (issue #226): fails closed when mypy crashes,
+        # when the report is empty or garbage (empty baseline included), or
+        # when a module drops out of the checked src/ scope, and requires
+        # the strict config trio and a readable baseline file. The plain
+        # mypy + mypy-baseline pipe this replaces passed an empty or
+        # garbage report with an empty baseline.
+        run: uv run python .github/scripts/run_mypy_gate.py
 
   test:
     name: pytest (${{ matrix.os }}, ${{ matrix.python-version }})
