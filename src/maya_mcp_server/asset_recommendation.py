@@ -362,6 +362,7 @@ def _screen(
     query: str,
     target_m: list[float],
     screening_mode: str = "zone_envelope",
+    envelope_partial: bool = False,
 ) -> list[_ScoredHit]:
     """Filter one query's hits into scored candidates.
 
@@ -370,6 +371,12 @@ def _screen(
     upper-limit-only for a zone_bbox fallback). Assets without usable
     dimensions stay in the returned list with ``size_status="unverified"``
     and ``size_error=0.0``.
+
+    ``envelope_partial`` marks a zone envelope built from partially
+    measured objects: a model larger than what was measured cannot be
+    ruled out as obviously too large, so it is kept as
+    ``size_status="unverified"`` with ``reason_code="zone_envelope_incomplete"``
+    instead of being dropped (#262).
     """
     screened: list[_ScoredHit] = []
     for rank, entry in enumerate(results, start=1):
@@ -409,12 +416,31 @@ def _screen(
             zone_largest = max(target_m)
             cand["size_status"] = "pass"
             cand["reason_code"] = "fits_zone_envelope"
-            cand["match_reason"] = (
+            reason = (
                 f"largest side {largest:g} m within the zone envelope's "
                 f"largest side {zone_largest:g} m (world AABB upper limit, "
                 "per sorted axis)"
             )
+            if envelope_partial:
+                reason += (
+                    "; zone envelope is partially measured and only bounds "
+                    "the objects that were measured"
+                )
+            cand["match_reason"] = reason
             screened.append(_ScoredHit(cand, _size_error(model_m, target_m)))
+        elif envelope_partial:
+            # #262: the envelope only covers measured objects, so exceeding
+            # it does not prove the model is obviously too large — keep it
+            # as unverified instead of silently dropping it.
+            cand["size_status"] = "unverified"
+            cand["reason_code"] = "zone_envelope_incomplete"
+            cand["match_reason"] = (
+                "zone envelope is partially measured (some zone objects "
+                "could not be measured), so the full zone extent is unknown "
+                "and this model cannot be ruled out as obviously too large; "
+                "size fit unverified"
+            )
+            screened.append(_ScoredHit(cand, 0.0))
     return screened
 
 
@@ -824,6 +850,10 @@ def _process_zone(
         return entry, [], 0, 0
 
     screening_mode = str(target.get("screening_mode", "zone_envelope"))
+    # #262: a zone_bbox envelope built from partially measured objects is
+    # not a complete upper bound — oversized models stay unverified instead
+    # of being dropped.
+    envelope_partial = target.get("measurement") == "partial_zone_envelope"
     seen: dict[str, _ScoredHit] = {}
     succeeded = 0
     failed = 0
@@ -877,7 +907,16 @@ def _process_zone(
         entry["queries"].append(_searched_query(query, total_int))
         if total_int is not None and total_int > len(results):
             truncation["search"] = True
-        _merge_hits(seen, _screen(results, query, size_screen, screening_mode=screening_mode))
+        _merge_hits(
+            seen,
+            _screen(
+                results,
+                query,
+                size_screen,
+                screening_mode=screening_mode,
+                envelope_partial=envelope_partial,
+            ),
+        )
 
     ordered_hits = sorted(seen.values(), key=lambda hit: hit.sort_key())
     if len(ordered_hits) > MAX_PER_ZONE:

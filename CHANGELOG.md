@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`scene_plan` recommendations no longer drop candidates against a partially measured zone envelope (#262, Refs #31, Refs #177)** —
+  when a zone's bounding box is built from partially measured objects
+  (`unmeasured_count > 0`, `target.measurement="partial_zone_envelope"`), models
+  whose valid dimensions exceed the measured envelope are now returned in
+  `unverified_candidates` with `size_status="unverified"` and
+  `reason_code="zone_envelope_incomplete"` instead of being silently discarded;
+  the real zone extent is unknown, so "obviously too large" cannot be concluded.
+  Models fitting the measured envelope keep `size_status="pass"` with a
+  match reason that states the envelope only bounds measured objects, and
+  clearance/collision stay unverified. Complete envelopes keep the previous
+  exclusion; explicit-object three-axis tolerance is unchanged; fully
+  unmeasurable zones are still skipped without searching.
+  Broken version: unreleased (introduced with the still-unreleased
+  recommendations feature, never shipped); fixed version: [Unreleased].
+  Evidence:
+  `tests/test_asset_recommendation.py::TestPartialZoneEnvelopeCandidates::test_partial_zone_keeps_model_larger_than_measured_bbox_as_unverified`,
+  `tests/test_asset_recommendation.py::TestPartialZoneEnvelopeCandidates::test_complete_zone_still_excludes_model_larger_than_bbox`,
+  `tests/test_asset_recommendation.py::TestPartialZoneEnvelopeCandidates::test_partial_zone_fitting_model_passes_without_claiming_full_space`.
+
 ### Added
 
 - **`scene_plan` recommendations run off the event loop under a 5s soft time budget with offline circuit-breaking and corrupt-metadata guards (#220, Refs #31)** —
