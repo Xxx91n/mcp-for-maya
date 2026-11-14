@@ -37,8 +37,12 @@ between the fake and real API:
 ```bash
 # Point mayapy at the repo so maya_mcp_server + tests import cleanly
 set PYTHONPATH=D:\Aworker\maya\maya-mcp-server\src;D:\Aworker\maya\maya-mcp-server\tests
-"C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" -m pytest tests/ -q -m mayapy
+"D:\maya2024\Maya2024\bin\mayapy.exe" -m pytest tests/ -q -m mayapy
 ```
+
+The install path differs per machine (`<MayaInstallDir>\bin\mayapy.exe`);
+on the box that last tried it the interpreter lived under
+`D:\maya2024\Maya2024`, not under `C:\Program Files\Autodesk`.
 
 Tests marked `@pytest.mark.mayapy` exercise real `maya.cmds`/
 `maya.api.OpenMaya` against `maya_scene_module` — they are skipped
@@ -54,11 +58,17 @@ crashes hard on `import maya.api.OpenMaya` without it.
 Verified blocked on at least one dev box (Maya 2024, Windows):
 `import maya.standalone` raises a native access violation
 (0xC0000005) inside module creation and `maya.exe -batch` hangs — the
-whole tier is unrunnable there. On such a box, run the real-Maya
-checks (checkpoint/read-back roundtrip, reference-edit case,
-signature collection) through a live GUI session instead — see
-`docs/reference/gui_verify.py` for the reference
-implementation. Launch mayapy from PowerShell/cmd, never Git Bash
+whole tier is unrunnable there. The Maya 2024 box measured on
+2026-11-15 fails earlier and differently: plain `mayapy.exe` starts
+fine, but `import maya.standalone` ends in
+`ImportError: DLL load failed while importing standalone: 动态链接库(DLL)初始化例程失败。`
+(exit 1). Neither box was repaired: no DLL was swapped and
+`MAYA_APP_DIR` was left alone. On such a box, run the real-Maya checks
+(checkpoint/read-back roundtrip, reference-edit case, signature
+collection, the six call forms below) through a live GUI session
+instead — see `docs/reference/gui_verify.py` and
+`docs/reference/six_callform_gui_driver.py` for reference
+implementations. Launch mayapy from PowerShell/cmd, never Git Bash
 (MSYS environment makes mayapy SIGSEGV at startup).
 
 If `mayapy` hits `0xC0000005` on Windows, inspect Maya's `bin\`
@@ -91,7 +101,40 @@ Pending: the mayapy/batch run must also cover the `gui_session_required`
 headless gate (visual tools must return the structured error, not
 crash) — queued until a healthy headless Maya env exists.
 
-### Call-form items booked to the real interpreter (env-blocked on this box)
+### Six call forms measured on Maya 2024 (2026-11-15, issue #253)
+
+`docs/reference/six_callform_gui_driver.py` runs `#229`'s six
+stub-disagreement call forms inside a real GUI session, and reports one
+pass/fail row per form. It is the honest substitute for the mayapy lane
+on a box where that lane cannot start. Run it in a throwaway instance:
+
+```mel
+int $rc = catch(python("exec(open(r'<repo>/docs/reference/six_callform_gui_driver.py', encoding='utf-8').read())"));
+if ($rc != 0) { print "six-form driver raised; read its JSON for the traceback\n"; }
+evalDeferred "quit -f";
+```
+
+launched as `"<MayaInstallDir>\bin\maya.exe" -script "<the mel file above>"`.
+The driver forces a new empty scene, writes one JSON file (path in
+`MAYA253_OUT`), and refuses to replace a scene that has a file on disk
+unless `MAYA253_FORCE=1` is set on purpose. Every node it makes is
+deleted in a `finally`, playback is restored, and a deliberate raising
+probe checks that the failure path cleans up too.
+
+Measured on Maya 2024 (24.0.0.4640), Windows 11, Maya-side Python
+3.10.8: all six forms pass (xform `q/ws/t/ro`, `rename` returning the
+new name, `keyTangent itt/ott`, `playbackOptions min/max`,
+`aimConstraint` with three-number lists, `MFnMesh.getPoint` with
+`MSpace.kWorld`), the shipped
+`tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms`
+passes against real `maya.cmds`, and the scene returns to its starting
+node count and playback range. Artifact:
+`docs/evidence/probes/probe-253-six-callforms-gui-maya2024.json`.
+
+What this does not prove: Maya 2025/2026, and anything batch-only
+(`cmds.about(batch=True)` needs a real batch session, not a GUI one).
+
+### Call-form items booked to the real interpreter
 
 Viewport-independent call forms whose real-return shape must be
 asserted on a healthy real Maya interpreter (the tests in
@@ -99,6 +142,12 @@ asserted on a healthy real Maya interpreter (the tests in
 otherwise). Evidence table:
 `docs/visual-callform-matrix.md`. Stub-versus-call disagreements are a
 separate record: `docs/reference/maya-stub-mismatches.md`.
+
+Status 2026-11-15: the `rename`, `xform`, `keyTangent`,
+`playbackOptions`, `aimConstraint` and `getPoint` rows are measured on
+Maya 2024 (section above). The `camera`, `ls`, `file`, selection and
+`about(batch=)` rows are still booked only — none of them has a live
+result yet.
 
 - `cmds.camera(name=X)` -> `[transform, shape]` list (X1 rename authority)
 - `cmds.ls(type='camera')` -> list including `perspShape` shape nodes

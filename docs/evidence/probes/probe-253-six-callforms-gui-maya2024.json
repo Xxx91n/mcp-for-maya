@@ -1,0 +1,187 @@
+{
+  "meta": {
+    "date": "2026-11-15",
+    "ticket": "Xxx91n/mcp-for-maya#253",
+    "parent": "#222 (spec), #229 (the six call forms and their stub record)",
+    "env": "Autodesk Maya 2024 (24.0.0.4640) GUI, fresh throwaway instance launched with maya.exe -script; empty untitled scene; Windows 11 IoT Enterprise LTSC 10.0.26100 x64; Maya-side Python 3.10.8; host Python 3.13.13 (uv env)",
+    "purpose": "Turn #229's six 'static check passed but real Maya never ran' call forms into measured pass/fail rows on a real Maya 2024 session.",
+    "verdict": "6/6 call forms pass on Maya 2024; the shipped pytest function tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms passes when called with the real maya.cmds; a probe that raises after creating nodes leaves no node behind; the scene returns to its starting node count and playback range.",
+    "claim_boundary": "Proves these six call forms work on Maya 2024 on Windows (GUI batch=False session). It does NOT prove Maya 2025/2026, and does not prove the mayapy/standalone lane — mayapy cannot import maya.standalone on this box (DLL initialisation failure), so batch-mode behaviour such as cmds.about(batch=True) stays unverified here. Values recorded are one run per form; the forms are asserted by the shipped test, not by this artifact alone.",
+    "mayapy_blocker": {
+      "command": "mayapy.exe probe_env.py  (import maya.standalone; maya.standalone.initialize())",
+      "exit_code": 1,
+      "error": "ImportError: DLL load failed while importing standalone: 动态链接库(DLL)初始化例程失败。",
+      "note": "Same lane failure docs/testing.md Tier 2 already records (there as an access violation). No DLL was replaced and MAYA_APP_DIR was not touched; the GUI script path was used instead.",
+      "unsigned_dll_sample": [
+        "mayaLib0.dll",
+        "OpenEXRCore-3_1-maya.dll",
+        "libclang.dll",
+        "openmayacs.dll"
+      ]
+    },
+    "entry_command": "maya.exe -script C:\\Users\\Administrator\\AppData\\Local\\Temp\\maya253\\six_forms.mel  # the MEL file execs docs/reference/six_callform_gui_driver.py, then evalDeferred 'quit -f'",
+    "provenance": {
+      "session_pid": 21704,
+      "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
+      "driver": "docs/reference/six_callform_gui_driver.py",
+      "driver_sha256": "5c42d2e5f6411956c627bc3e8bdd2130a051fb5ff3b62a658e954af40c97851b",
+      "repo_commit_at_run": "8cec2c0d9e4a8f7f3ef17e773c395ef4e3cdc374",
+      "base_main": "95a95a582718691a51231fef6eac38d1ceb8381d",
+      "host_python": "3.13.13 (uv env)"
+    }
+  },
+  "summary": {
+    "xform q/ws/t/ro": "pass",
+    "rename returns the new name": "pass",
+    "keyTangent itt/ott": "pass",
+    "playbackOptions min/max": "pass",
+    "aimConstraint three-number lists": "pass",
+    "MFnMesh.getPoint MSpace.kWorld": "pass",
+    "shipped pytest function in real maya.cmds": "pass",
+    "failure-path cleanup self-check": "pass"
+  },
+  "notes": {
+    "kWorld_type": "Maya's om2.MSpace.kWorld is a plain int; getPoint accepts it. So the stub's parameter type (MSpace) is the wrong half, not the constant: the constant is int, exactly as the stub declares.",
+    "rename_clash": "Maya returns GEO_cf253_renamed1 for the second node wanting that name and keeps the first node alive, so the return value must be used, not the requested name.",
+    "scene_state": "Node count 51 before and after; playback 1.0-120.0 before and after; no GEO_cf253*/GEO_stub* node left. The instance was a fresh throwaway GUI and was quit by the wrapper, so no user scene was involved at any point."
+  },
+  "raw_run": {
+    "meta": {
+      "maya_version": "2024",
+      "api_version": 20240000,
+      "batch": false,
+      "product": "Maya 2024",
+      "operating_system": "win64",
+      "maya_python": "3.10.8",
+      "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
+      "session_pid": 21704,
+      "driver_file": "<exec>",
+      "repo_root": "D:\\Aworker\\maya\\maya-mcp-server",
+      "out_json": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\maya253\\six_forms_result.json",
+      "force_scene_replace": false
+    },
+    "isolation": {
+      "scene_before_new": "",
+      "nodes_before_new": 51,
+      "modified_before_new": false,
+      "scene_after_new": "",
+      "nodes_after_new": 51,
+      "playback_range_at_start": [
+        1.0,
+        120.0
+      ]
+    },
+    "forms": [
+      {
+        "form": "xform q/ws/t/ro",
+        "status": "pass",
+        "detail": {
+          "translation": [
+            10.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      {
+        "form": "rename returns the new name",
+        "status": "pass",
+        "detail": {
+          "returned": "GEO_cf253_renamed1",
+          "return_type": "str",
+          "bystander_kept": "GEO_cf253_renamed",
+          "renamed_has_shape": true
+        }
+      },
+      {
+        "form": "keyTangent itt/ott",
+        "status": "pass",
+        "detail": {
+          "in_tangent_types": [
+            "auto"
+          ]
+        }
+      },
+      {
+        "form": "playbackOptions min/max",
+        "status": "pass",
+        "detail": {
+          "before": [
+            1.0,
+            120.0
+          ],
+          "after": [
+            1.0,
+            12.0
+          ]
+        }
+      },
+      {
+        "form": "aimConstraint three-number lists",
+        "status": "pass",
+        "detail": {
+          "returned": [
+            "GEO_cf253_aimed_aimConstraint1"
+          ],
+          "return_type": "list",
+          "constraint_exists": true
+        }
+      },
+      {
+        "form": "MFnMesh.getPoint MSpace.kWorld",
+        "status": "pass",
+        "detail": {
+          "world": [
+            9.5,
+            -0.5,
+            0.5,
+            1.0
+          ],
+          "object": [
+            -0.5,
+            -0.5,
+            0.5,
+            1.0
+          ],
+          "x_gap": 10.0,
+          "kWorld_type": "int"
+        }
+      }
+    ],
+    "shipped_test": {
+      "status": "pass",
+      "test": "tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms"
+    },
+    "failure_cleanup": {
+      "delete_problems": [],
+      "leftovers": [],
+      "status": "pass"
+    },
+    "cleanup": {
+      "deleted_names": [
+        "GEO_cf253_xform",
+        "GEO_cf253_renamed",
+        "GEO_cf253_orig",
+        "GEO_cf253_renamed1",
+        "GEO_cf253_tangent",
+        "GEO_cf253_target",
+        "GEO_cf253_aimed",
+        "GEO_cf253_aimed_aimConstraint1",
+        "GEO_cf253_mesh"
+      ],
+      "problems": [],
+      "leftover_nodes": [],
+      "nodes_after_cleanup": 51,
+      "playback_range_after_cleanup": [
+        1.0,
+        120.0
+      ],
+      "scene_after_cleanup": ""
+    }
+  }
+}
