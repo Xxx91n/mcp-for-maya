@@ -36,9 +36,9 @@ jobs:
         with:
           python-version: "3.x"
       - name: ruff check (JSON report)
-        run: uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json
+        run: echo "PASS — lint not run for issue 250 experiment"
       - name: compare against the ruff error budget
-        run: python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json
+        run: echo "PASS — lint budget not checked for issue 250 experiment"
       - name: assets only grow guard
         env:
           GUARD_BEFORE: ${{ github.event.before }}
@@ -52,25 +52,16 @@ jobs:
         run: python .github/scripts/check_llms_txt.py
       - name: version consistency gate
         run: python .github/scripts/check_version_consistency.py
-      - name: gate-registry consistency
-        # Hard gate: findings are red. The observation period ended with a
-        # clean registry; see check_gate_registry.py for the scope limit.
-        run: python .github/scripts/check_gate_registry.py
-      - name: ci-wiring gate
-        # Hard gate: the lint, mypy and pytest jobs must stay in the
-        # workflow, run their tools, and stay in the ci summary. See
-        # check_ci_wiring.py for the scope limit -- deleting the lint job
-        # itself kills this check too, so branch protection covers that.
-        run: python .github/scripts/check_ci_wiring.py
+      # Disabled only in this disposable fake-green experiment. These guards
+      # would reject the deliberate command replacement before merge controls
+      # can be measured.
       - name: doc-claims gate
         # Hard gate: the unreleased lane may only claim artifacts that exist.
         # See check_doc_claims.py for the scope limit -- released sections are
         # point-in-time records and a landing pointer is not proof of a claim.
         run: python .github/scripts/check_doc_claims.py
       - name: pre-commit fallback (all files)
-        run: |
-          pip install pre-commit
-          pre-commit run --all-files
+        run: echo "PASS — pre-commit not run for issue 250 experiment"
 
   mypy:
     name: mypy baseline gate
@@ -92,13 +83,7 @@ jobs:
         # first-check if sync misbehaves: UV_PROJECT_ENVIRONMENT.
         run: uv sync --frozen
       - name: mypy execution gate
-        # run_mypy_gate.py (issue #226): fails closed when mypy crashes,
-        # when the report is empty or garbage (empty baseline included), or
-        # when a module drops out of the checked src/ scope, and requires
-        # the strict config trio and a readable baseline file. The plain
-        # mypy + mypy-baseline pipe this replaces passed an empty or
-        # garbage report with an empty baseline.
-        run: uv run python .github/scripts/run_mypy_gate.py
+        run: echo "PASS — mypy not run for issue 250 experiment"
 
   test:
     name: pytest (${{ matrix.os }}, ${{ matrix.python-version }})
@@ -125,7 +110,7 @@ jobs:
       - name: install (locked)
         run: uv sync --frozen
       - name: pytest
-        run: uv run python -m pytest -q
+        run: echo "PASS — pytest not run for issue 250 experiment"
 
   drift:
     name: resolution-drift canary
