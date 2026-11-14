@@ -299,9 +299,27 @@ class TestSearch:
         assert by_id["Chair_DictCats"]["categories"] == []
         assert by_id["Chair_DictCats"]["tags"] == ["chair"]
 
-    @pytest.mark.parametrize("bad_timeout", [0, 0.0, -1.0, float("nan"), float("inf"), True])
+    @pytest.mark.parametrize(
+        "bad_timeout",
+        [
+            0,
+            0.0,
+            -1.0,
+            float("nan"),
+            float("inf"),
+            True,
+            10**400,
+            # explicit id: str(10**5000) at collection time would itself hit
+            # CPython's int->str digit limit (#245)
+            pytest.param(10**5000, id="10**5000"),
+        ],
+    )
     def test_invalid_timeout_fails_fast_without_calling_urlopen(self, monkeypatch, bad_timeout):
-        """#220 T4: non-positive, bool, or non-finite timeouts never reach _urlopen."""
+        """#220 T4: non-positive, bool, or non-finite timeouts never reach _urlopen.
+
+        #245: a huge int (unconvertible to float) must land on the same
+        AssetError("network_unavailable") path, not escape as OverflowError.
+        """
         called = False
 
         def fail_open(req, timeout=None):

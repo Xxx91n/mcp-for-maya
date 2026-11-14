@@ -1181,6 +1181,31 @@ class TestRecommendAssetsTargetAndSizing:
         finally:
             polyhaven._index_cache.clear()
 
+    async def test_huge_int_budget_falls_back_to_zero(self, monkeypatch):
+        """#245: budget_s too large for float() falls back to 0.0, not OverflowError."""
+        from urllib.error import URLError
+
+        from maya_mcp_server import polyhaven, scene_tools
+
+        polyhaven._index_cache.clear()
+        try:
+            monkeypatch.setattr(
+                polyhaven,
+                "_urlopen",
+                lambda req, timeout=None: (_ for _ in ()).throw(URLError("network down")),
+            )
+            res = await scene_tools._recommend_for_plan(
+                client=object(),  # geometry read fails fast and is caught
+                session_key=None,
+                budget_s=10**400,
+            )
+            # 0.0 fallback means the soft budget is exhausted immediately;
+            # the plan section is still produced, no OverflowError escapes.
+            assert res["status"] in ("offline", "partial")
+            assert res["errors"], "an error entry must explain the truncated budget"
+        finally:
+            polyhaven._index_cache.clear()
+
     async def test_auto_fix_runs_before_zone_geometry_read_and_screens_post_fix(
         self, tools, monkeypatch
     ):

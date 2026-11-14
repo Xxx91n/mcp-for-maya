@@ -10,7 +10,6 @@ import asyncio
 import contextvars
 import json
 import logging
-import math
 import threading
 import time
 from collections.abc import Callable
@@ -31,6 +30,7 @@ from maya_mcp_server.cos_formatter import (
     format_scene_cos,
     format_zone_map_cos,
 )
+from maya_mcp_server.numeric import finite_positive_float
 from maya_mcp_server.pipeline import TOOL_ANNOTATIONS
 from maya_mcp_server.scene_cache import SceneCache
 from maya_mcp_server.security import InputValidationError
@@ -230,16 +230,8 @@ async def _recommend_for_plan(
     its socket timeout rather than being forcibly killed, and no new searches
     start once the soft budget runs out.
     """
-    safe_budget = (
-        float(budget_s)
-        if (
-            not isinstance(budget_s, bool)
-            and isinstance(budget_s, (int, float))
-            and math.isfinite(budget_s)
-            and budget_s > 0
-        )
-        else 0.0
-    )
+    budget = finite_positive_float(budget_s)
+    safe_budget = budget if budget is not None else 0.0
     deadline = _monotonic() + safe_budget
     geometry: Any
     try:

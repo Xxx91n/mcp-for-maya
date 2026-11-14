@@ -32,6 +32,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from maya_mcp_server.numeric import finite_positive_float, safe_repr
+
 
 logger = logging.getLogger(__name__)
 
@@ -176,15 +178,14 @@ _index_cache_lock = threading.Lock()
 
 def _validate_timeout(timeout: float, url: str) -> float:
     """Reject non-positive, boolean, or non-finite timeouts before socket use."""
-    if (
-        isinstance(timeout, bool)
-        or not isinstance(timeout, (int, float))
-        or not math.isfinite(timeout)
-        or timeout <= 0
-    ):
+    num = finite_positive_float(timeout)
+    if num is None:
         raise AssetError(
             "network_unavailable",
-            f"invalid or expired timeout ({timeout!r}) for {urllib.parse.urlsplit(url).netloc}",
+            # safe_repr: repr(huge int) itself raises past CPython's
+            # int->str digit limit, so it must not run inside this message.
+            f"invalid or expired timeout ({safe_repr(timeout)}) "
+            f"for {urllib.parse.urlsplit(url).netloc}",
             suggestion="timeout exceeded or invalid; retry when network budget allows",
         )
     return float(timeout)
