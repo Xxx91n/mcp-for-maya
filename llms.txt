@@ -43,7 +43,7 @@
 
 ## Scene planning
 
-- [scene_plan](#scene_plan): mutation - Plan a scene layout: organization checks plus layout suggestions.
+- [scene_plan](#scene_plan): mutation, open-world - Plan a scene layout: organization checks plus layout suggestions.
 
 ## Cameras
 
