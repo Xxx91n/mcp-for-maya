@@ -23,7 +23,6 @@ import maya.cmds as cmds
 
 
 # --- Internal helpers ---
-_xform_read: Any = cmds.xform  # stub lacks q/ws/t/ro short flags
 
 
 def _err(code: str, message: str, suggestion: str | None = None) -> dict[str, Any]:
@@ -1854,9 +1853,9 @@ def analyze_aesthetics():
             )
 
             # Position from transform
-            pos = _xform_read(light_transform, q=True, ws=True, t=True) or [0, 0, 0]
+            pos = cast(Any, cmds.xform)(light_transform, q=True, ws=True, t=True) or [0, 0, 0]
             # Rotation from transform (direction)
-            rot = _xform_read(light_transform, q=True, ws=True, ro=True) or [0, 0, 0]
+            rot = cast(Any, cmds.xform)(light_transform, q=True, ws=True, ro=True) or [0, 0, 0]
 
             # Decay type (0=None, 1=Linear, 2=Quadratic, 3=Cubic)
             decay = 0
@@ -3447,7 +3446,7 @@ def scene_review(checks=None):
                             if cmds.objExists("%s.intensity" % ls_name)
                             else 1.0
                         )
-                        pos = _xform_read(lt, q=True, ws=True, t=True) or [0, 0, 0]
+                        pos = cast(Any, cmds.xform)(lt, q=True, ws=True, t=True) or [0, 0, 0]
                         decay = (
                             cmds.getAttr("%s.decayRate" % ls_name)
                             if cmds.objExists("%s.decayRate" % ls_name)

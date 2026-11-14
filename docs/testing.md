@@ -119,9 +119,14 @@ orientation (verticalFlip), WYSIWYG HUD/selection match, VP2 non-black
 (2025/2026 = partial), render_preview framing vs requested camera,
 multi-client ImageContent rendering (non-Devin seats blocked on user
 env), modelPanel -camera call form on 2025/2026 (partial — only 2024
-verified locally), and the four call forms whose third-party stub
+verified locally), and the six call forms whose third-party stub
 disagrees with the call (#229: `rename` return value, `xform` short
-flags, `aimConstraint` list vectors, `getPoint` + `MSpace.kWorld`).
+flags, `keyTangent` `itt`/`ott`, `playbackOptions` `min`/`max`,
+`aimConstraint` list vectors, `getPoint` + `MSpace.kWorld`). Those six
+are scriptable and belong to the mayapy tier; they sit in the
+`human_verify` file because no healthy interpreter is reachable on this
+box, and `docs/reference/maya-stub-mismatches.md` carries the per-form
+evidence and handling.
 
 ### Call-form checklist (D-056②)
 
