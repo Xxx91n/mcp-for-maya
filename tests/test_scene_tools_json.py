@@ -593,6 +593,184 @@ class TestRecommendAssets:
 
 
 # ------------------------------------------------------------
+# Issue #219: target identification and three-axis sizing end-to-end
+# ------------------------------------------------------------
+
+
+class TestRecommendAssetsTargetAndSizing:
+    """End-to-end scene_plan + fake Maya zone geometry + target sizing (#219)."""
+
+    @staticmethod
+    def _build_duplicate_chairs(scene):
+        left = scene.add_group("GRP_left")
+        right = scene.add_transform("GRP_right", t=(300, 0, 0))
+        c_left = scene.add_node("GEO_chair", "transform", parent=left, exists_ok=True)
+        c_right = scene.add_node("GEO_chair", "transform", parent=right, exists_ok=True)
+        # 0.6 x 0.8 x 0.6 m vs 1.8 x 0.9 x 0.9 m (in cm)
+        scene.add_shape("GEO_chairShape_l", "mesh", c_left, bbox=((0, 0, 0), (60, 80, 60)))
+        scene.add_shape("GEO_chairShape_r", "mesh", c_right, bbox=((0, 0, 0), (180, 90, 90)))
+
+    @staticmethod
+    def _chair(asset_id, dims, name="Chair"):
+        return {
+            "id": asset_id,
+            "name": name,
+            "categories": ["furniture"],
+            "tags": ["chair"],
+            "dimensions": dims,
+            "polycount": 800,
+        }
+
+    async def test_dag_path_disambiguates_and_short_name_ambiguity_falls_back(
+        self, tools, monkeypatch
+    ):
+        self._build_duplicate_chairs(tools.env.scene)
+        hits = [
+            self._chair("chair_fit", [0.6, 0.8, 0.6]),
+            self._chair("chair_big", [1.8, 0.9, 0.9]),
+            self._chair("chair_tiny", [0.1, 0.1, 0.1]),
+        ]
+        sent_calls = []
+
+        def fake_search(query="", asset_type="models", limit=20):
+            sent_calls.append({"query": query, "asset_type": asset_type, "limit": limit})
+            return {"results": hits, "total_count": len(hits), "limit": limit}
+
+        monkeypatch.setattr("maya_mcp_server.polyhaven.search_assets", fake_search)
+
+        # Explicit full DAG path picks the 0.6x0.8x0.6 chair only (0.5x-1.5x).
+        out = await tools.fns["scene_plan"](
+            objective="replace |GRP_left|GEO_chair",
+            format="json",
+            recommend_assets=True,
+        )
+        res = json.loads(out)
+        zone = res["recommendations"]["zones"][0]
+        assert zone["target"]["source"] == "dag_path"
+        assert zone["target"]["name"] == "|GRP_left|GEO_chair"
+        assert zone["target"]["size_m"] == [0.6, 0.8, 0.6]
+        assert [c["asset_id"] for c in zone["candidates"]] == ["chair_fit"]
+        assert sent_calls == [{"query": "chair", "asset_type": "models", "limit": 20}]
+
+        # Ambiguous short name falls back to zone_bbox (upper-limit only: tiny passes).
+        out_amb = await tools.fns["scene_plan"](
+            objective="replace GEO_chair",
+            format="json",
+            recommend_assets=True,
+        )
+        zone_amb = json.loads(out_amb)["recommendations"]["zones"][0]
+        assert zone_amb["target"]["source"] == "zone_bbox"
+        assert zone_amb["target"]["fallback_reason"] == "ambiguous_short_name"
+        assert zone_amb["target"]["ambiguous_matches"] == [
+            "|GRP_left|GEO_chair",
+            "|GRP_right|GEO_chair",
+        ]
+        assert [c["asset_id"] for c in zone_amb["candidates"]] == [
+            "chair_fit",
+            "chair_big",
+            "chair_tiny",
+        ]
+
+        cos_amb = await tools.fns["scene_plan"](
+            objective="replace GEO_chair",
+            format="cos",
+            recommend_assets=True,
+        )
+        assert "fallback=ambiguous_short_name(|GRP_left|GEO_chair,|GRP_right|GEO_chair)" in cos_amb
+
+    async def test_unique_object_rotated_world_aabb_and_linear_units(self, tools, monkeypatch):
+        import math
+
+        tools.env.scene.linear_unit = "m"
+        parent = tools.env.scene.add_transform("GRP_rot", t=(5, 0, 0))
+        parent.r = [0, 45, 0]
+        # 2m x 1m x 1m rotated 45 deg around Y -> world AABB ~ [2.121, 1.0, 2.121] m
+        tools.env.scene.add_mesh(
+            "GEO_chair_rot",
+            bbox_min=(0, 0, 0),
+            bbox_max=(2, 1, 1),
+            parent=parent,
+        )
+        side = round(math.sqrt(2) + math.sqrt(2) / 2, 3)
+        hits = [
+            self._chair("chair_rot_fit", [2.1, 1.0, 2.1]),
+            self._chair("chair_too_small", [0.5, 0.5, 0.5]),
+        ]
+        monkeypatch.setattr(
+            "maya_mcp_server.polyhaven.search_assets",
+            TestRecommendAssets._fake_search(hits),
+        )
+
+        res = json.loads(await tools.fns["scene_plan"](format="json", recommend_assets=True))
+        recs = res["recommendations"]
+        assert recs["policy"]["geometry"] == "world_aabb"
+        assert recs["policy"]["clearance_verified"] is False
+        assert recs["policy"]["collision_verified"] is False
+        zone = recs["zones"][0]
+        assert zone["target"]["source"] == "unique_zone_object"
+        assert zone["target"]["size_m"] == [side, 1.0, side]
+        assert [c["asset_id"] for c in zone["candidates"]] == ["chair_rot_fit"]
+
+    async def test_unmeasurable_and_partial_zones_with_unverified_models(self, tools, monkeypatch):
+        # Unmeasurable furniture zone skips search completely.
+        tools.env.scene.add_group("GRP_chair_empty")
+        calls = []
+
+        def no_search(query="", asset_type="models", limit=20):
+            calls.append(query)
+            return {"results": [], "total_count": 0, "limit": limit}
+
+        monkeypatch.setattr("maya_mcp_server.polyhaven.search_assets", no_search)
+        res_skip = json.loads(await tools.fns["scene_plan"](format="json", recommend_assets=True))
+        assert calls == []
+        assert res_skip["recommendations"]["zones"][0]["status"] == "skipped"
+        assert res_skip["recommendations"]["zones"][0]["skip_reason"] == "unmeasurable_target"
+
+        # Adding one measurable chair makes the zone partial and reports unverified models.
+        tools.env.scene.add_mesh(
+            "GEO_chair_a", bbox_min=(0, 0, 0), bbox_max=(60, 80, 60), t=(0, 0, 0)
+        )
+        hits = [
+            self._chair("chair_ok", [0.6, 0.8, 0.6]),
+            self._chair("chair_missing", None),
+            self._chair("chair_zero", [0, 0, 0]),
+        ]
+        monkeypatch.setattr(
+            "maya_mcp_server.polyhaven.search_assets",
+            TestRecommendAssets._fake_search(hits),
+        )
+        res_part = json.loads(await tools.fns["scene_plan"](format="json", recommend_assets=True))
+        zone = res_part["recommendations"]["zones"][0]
+        assert zone["target"]["measurement_complete"] is False
+        assert zone["eligible_count"] == 1
+        assert zone["unverified_count"] == 2
+        assert [c["asset_id"] for c in zone["unverified_candidates"]] == [
+            "chair_missing",
+            "chair_zero",
+        ]
+
+    @pytest.mark.parametrize("format", ["json", "cos"])
+    async def test_default_off_with_objective_stays_byte_identical(
+        self, tools, monkeypatch, format
+    ):
+        self._build_duplicate_chairs(tools.env.scene)
+        expected = await tools.fns["scene_plan"](
+            objective="replace |GRP_left|GEO_chair", format=format
+        )
+
+        def fail_search(*args, **kwargs):
+            raise AssertionError("search must not run when recommend_assets=False")
+
+        monkeypatch.setattr("maya_mcp_server.polyhaven.search_assets", fail_search)
+        actual = await tools.fns["scene_plan"](
+            objective="replace |GRP_left|GEO_chair",
+            format=format,
+            recommend_assets=False,
+        )
+        assert actual.encode("utf-8") == expected.encode("utf-8")
+
+
+# ------------------------------------------------------------
 # Issue #206: the unsaved-changes flag is reported, read fresh, never cached
 # ------------------------------------------------------------
 
