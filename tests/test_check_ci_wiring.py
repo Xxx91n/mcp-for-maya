@@ -281,6 +281,7 @@ def test_an_empty_workflow_file_is_red_not_a_silent_pass(tmp_path):
 # --- every finding names its rule ------------------------------------------
 
 RULE_TAGS = (
+    "dependency_invalid",
     "missing_job",
     "job_skipped",
     "step_skipped",
@@ -386,22 +387,35 @@ def test_job_flag_after_steps_is_red(tmp_path):
 
 def test_each_required_fault_exits_one(tmp_path):
     """Exercise the real process exit, not just the check() helper's findings."""
+    valid = (REPO / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    mypy = valid[valid.index("  mypy:\n") : valid.index("  test:\n")]
     faults = [
-        VALID.replace(MYPY_JOB, "").replace("[lint, mypy, test]", "[lint, test]"),
-        VALID.replace("  mypy:\n", "  mypy:\n    if: false\n"),
-        VALID.replace(
+        valid.replace(mypy, "").replace("[lint, mypy, test]", "[lint, test]"),
+        valid.replace("  mypy:\n", "  mypy:\n    if: false\n"),
+        valid.replace(
             "- name: mypy | mypy-baseline filter",
             "- name: mypy | mypy-baseline filter\n        if: false",
         ),
-        VALID.replace("[lint, mypy, test]", "[mypy, test]"),
-        VALID.replace("[lint, mypy, test]", "[lint, mypy]"),
-        VALID.replace("uv run python -m mypy src/", "# uv run python -m mypy src/"),
-        VALID.replace(
+        valid.replace("[lint, mypy, test]", "[mypy, test]"),
+        valid.replace("[lint, mypy, test]", "[lint, mypy]"),
+        valid.replace("uv run python -m mypy src/", "# uv run python -m mypy src/"),
+        valid.replace(
             "uv run mypy-baseline filter < mypy-report.txt",
             "uv run mypy-baseline filter < mypy-report.txt || true",
         ),
     ]
-    for number, text in enumerate(faults):
+    tags = [
+        "missing_job",
+        "job_skipped",
+        "step_skipped",
+        "aggregate_broken",
+        "aggregate_broken",
+        "tool_not_executed",
+        "failure_swallowed",
+    ]
+    assert len(tags) == len(faults)
+    for number, (text, tag) in enumerate(zip(faults, tags)):
+        assert text != valid, number
         path = tmp_path / f"fault-{number}.yml"
         path.write_text(text, encoding="utf-8")
         proc = subprocess.run(
@@ -409,6 +423,7 @@ def test_each_required_fault_exits_one(tmp_path):
         )
         assert proc.returncode == 1, (number, proc.stdout, proc.stderr)
         assert "::error" in proc.stdout
+        assert tag in proc.stdout, (number, tag, proc.stdout)
 
 
 def test_dash_run_block_cannot_hide_a_skip_flag(tmp_path):
@@ -481,3 +496,80 @@ def test_dependency_cycle_is_red(tmp_path):
         "  test:\n", "  test:\n    needs: mypy\n"
     )
     assert any("dependency cycle" in f for f in _check(tmp_path, text))
+
+
+def test_always_does_not_hide_invalid_dependency_graph(tmp_path):
+    cases = [
+        ("missing", "  mypy:\n    if: always()\n    needs: missing\n", ""),
+        (
+            "missing",
+            "  mypy:\n    needs: bridge\n",
+            "\n  bridge:\n    if: always()\n    needs: missing\n",
+        ),
+        ("cycle", "  mypy:\n    if: always()\n    needs: mypy\n", ""),
+        (
+            "cycle",
+            "  mypy:\n    needs: bridge\n",
+            "\n  bridge:\n    if: always()\n    needs: mypy\n",
+        ),
+    ]
+    for reason, replacement, extra in cases:
+        findings = _check(tmp_path, VALID.replace("  mypy:\n", replacement) + extra)
+        assert any("dependency_invalid" in f and reason in f for f in findings), findings
+
+
+def test_comments_do_not_end_needs_block(tmp_path):
+    for needs in (
+        "    needs:\n      # prerequisite\n      - drift-notify\n",
+        "    needs: # prerequisite\n      - drift-notify\n",
+        "    needs:\n      - bridge\n      # another prerequisite\n      - drift-notify\n",
+    ):
+        text = VALID.replace("  mypy:\n", "  mypy:\n" + needs)
+        text = text.replace("  drift-notify:\n", "  drift-notify:\n    if: false\n")
+        text += "\n  bridge:\n    runs-on: ubuntu-latest\n"
+        assert any("mypy: job_skipped" in f for f in _check(tmp_path, text))
+
+
+def test_multiline_or_true_is_red(tmp_path):
+    for continuation in (
+        "\n            true",
+        "\n            # still the OR list\n            true",
+    ):
+        text = VALID.replace(
+            "run: uv run python -m pytest -q",
+            "run: |\n          uv run python -m pytest -q ||" + continuation,
+        )
+        findings = _check(tmp_path, text)
+        assert any("test: failure_swallowed" in f for f in findings), findings
+
+
+def test_summary_multiline_or_true_is_red(tmp_path):
+    text = VALID + "          false ||\n            true\n"
+    findings = _check(tmp_path, text)
+    assert any("ci: failure_swallowed" in f for f in findings), findings
+
+
+def test_cli_real_workflow_positive_control():
+    proc = subprocess.run([sys.executable, str(SCRIPT)], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "::error" not in proc.stdout
+
+
+def test_intermediate_always_breaks_skip_but_not_graph_validation(tmp_path):
+    text = VALID.replace("  mypy:\n", "  mypy:\n    needs: bridge\n")
+    text = text.replace("  drift-notify:\n", "  drift-notify:\n    if: false\n")
+    text += "\n  bridge:\n    if: always()\n    needs: drift-notify\n"
+    assert _check(tmp_path, text) == []
+
+
+def test_summary_always_does_not_hide_missing_dependency(tmp_path):
+    text = VALID.replace("[lint, mypy, test]", "[lint, mypy, test, missing]")
+    assert any("ci: dependency_invalid" in f for f in _check(tmp_path, text))
+
+
+def test_backslash_continued_swallow_is_red(tmp_path):
+    text = VALID.replace(
+        "run: uv run python -m pytest -q",
+        "run: |\n          uv run python -m pytest -q || \\\n            true",
+    )
+    assert any("test: failure_swallowed" in f for f in _check(tmp_path, text))

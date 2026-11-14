@@ -99,3 +99,28 @@ no upstream application changes were rewritten as part of this repair.
 After the review repair and merge of main (`b81a29b`): 34 wiring tests passed;
 full locked suite 1341 passed, 27 skipped. Ruff budget, mypy baseline (zero new
 errors), governance checks and all pre-commit hooks passed locally.
+
+## Second review follow-up
+
+Four findings were accepted in the same PR scope:
+
+- Validate the dependency graph separately from skip propagation. Missing jobs
+  and cycles are `dependency_invalid`, even when a protected or intermediate
+  job uses `always()`. A valid `always()` job still breaks skip propagation.
+- Ignore full-line comments while reading block `needs` lists; a comment after
+  `needs:` also leaves the block open. Comments must not remove dependencies.
+- Strip shell comments line by line, then check each complete step for the
+  documented OR-list swallow forms. Newlines and backslash continuations no
+  longer hide `|| true`. This still does not interpret arbitrary shell code.
+- CLI fault tests now mutate the real workflow, use a clean CLI positive
+  control, and assert each intended rule tag as well as exit 1. Unrelated
+  registry errors can no longer stand in for detecting the intended fault.
+
+The review's tool-only command-injection warning is not applicable: the test
+passes a fixed interpreter, script path and locally generated fixture path as
+an argument list to subprocess without `shell=True`; it runs no request text
+as a shell command.
+
+After these fixes: 42 wiring tests passed; full locked suite 1349 passed,
+27 skipped. Ruff budget, mypy (zero new errors), governance checks and all
+pre-commit hooks passed locally. The monolith's spare-line notice is unchanged.

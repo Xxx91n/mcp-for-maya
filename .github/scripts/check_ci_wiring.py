@@ -14,6 +14,8 @@ The rules, each finding carries one tag:
   job_skipped         a protected job carries an ``if:`` that can skip it;
                       the summary must carry ``if: always()`` so it runs
                       even when a needed job failed
+  dependency_invalid  a needed job is missing or a needs chain contains a cycle;
+                      checked even across always() conditions
   step_skipped        the step that runs the tool carries an ``if:`` that
                       can skip it
   failure_swallowed   a protected job or its tool step sets
@@ -198,7 +200,7 @@ def _parse_workflow(text: str) -> dict[str, dict]:
             flush_run()
             # Fall through: this line ends the block and is read again.
 
-        if stripped == "":
+        if stripped == "" or stripped.startswith("#"):
             i += 1
             continue
 
@@ -289,7 +291,7 @@ def _parse_workflow(text: str) -> dict[str, dict]:
 
         if not in_steps:
             if stripped.startswith("needs:"):
-                value = stripped[len("needs:") :].strip()
+                value = _strip_yaml_comment(stripped[len("needs:") :]).strip()
                 if value:
                     jobs[current_job]["needs"] = _parse_needs_inline(value)
                 else:
@@ -343,6 +345,31 @@ def _tool_missing(job_name: str, run_text: str) -> str | None:
         if not any(re.fullmatch(pattern, line.strip()) for line in run_text.splitlines()):
             return pattern
     return None
+
+
+def _dependency_graph_risks(
+    job_name: str, jobs: dict, trail: tuple[str, ...] = (), checked: set[str] | None = None
+) -> list[str]:
+    """Validate needs edges regardless of if: always() or other conditions."""
+    if job_name in trail:
+        return ["dependency cycle: " + " -> ".join((*trail, job_name))]
+    if job_name not in jobs:
+        return [f"missing dependency: {job_name}"]
+    if checked is None:
+        checked = set()
+    if job_name in checked:
+        return []
+    risks = []
+    for dependency in jobs[job_name]["needs"]:
+        risks.extend(_dependency_graph_risks(dependency, jobs, (*trail, job_name), checked))
+    checked.add(job_name)
+    return risks
+
+
+def _step_code(step: dict) -> str:
+    """Keep shell newlines so an OR list can continue after comments."""
+    code = "\n".join(_strip_shell_comment(line) for line in step["run"].splitlines())
+    return code.replace("\\\n", "")
 
 
 def _dependency_risks(job_name: str, jobs: dict, trail: tuple[str, ...] = ()) -> list[str]:
@@ -412,6 +439,11 @@ def check(root: Path, workflow_path: Path | None = None) -> list[str]:
                 "workflow; a key check must stay in the merge path"
             )
 
+    for job_name in (*PROTECTED_JOBS, SUMMARY_JOB):
+        if job_name in jobs:
+            for risk in _dependency_graph_risks(job_name, jobs):
+                findings.append(f"{job_name}: dependency_invalid -- {risk}")
+
     for job_name in PROTECTED_JOBS:
         job = jobs.get(job_name)
         if job is None:
@@ -448,14 +480,11 @@ def check(root: Path, workflow_path: Path | None = None) -> list[str]:
                     f"{job_name}: failure_swallowed -- a step sets "
                     "continue-on-error: true; a failing check must fail the job"
                 )
-            for line in step["run"].splitlines():
-                code = _strip_shell_comment(line)
-                if _SWALLOW.search(code):
-                    findings.append(
-                        f"{job_name}: failure_swallowed -- the run text hides a "
-                        "failure with || true or the same shape; let it fail"
-                    )
-                    break
+            if _SWALLOW.search(_step_code(step)):
+                findings.append(
+                    f"{job_name}: failure_swallowed -- the run text hides a "
+                    "failure with || true or the same shape; let it fail"
+                )
 
     summary = jobs.get(SUMMARY_JOB)
     if summary is not None:
@@ -476,14 +505,11 @@ def check(root: Path, workflow_path: Path | None = None) -> list[str]:
                     "ci: failure_swallowed -- a summary step sets "
                     "continue-on-error: true; a failing summary must fail the run"
                 )
-            for line in step["run"].splitlines():
-                code = _strip_shell_comment(line)
-                if _SWALLOW.search(code):
-                    findings.append(
-                        "ci: failure_swallowed -- the summary run text hides a "
-                        "failure with || true or the same shape; let it fail"
-                    )
-                    break
+            if _SWALLOW.search(_step_code(step)):
+                findings.append(
+                    "ci: failure_swallowed -- the summary run text hides a "
+                    "failure with || true or the same shape; let it fail"
+                )
         needs = summary["needs"]
         for job_name in PROTECTED_JOBS:
             if job_name not in needs:
