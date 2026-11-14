@@ -127,21 +127,22 @@ Run inside a real Maya 2024 GUI session (24.0.0.4640, Windows 11, Maya-side
 Python 3.10.8) with `docs/reference/six_callform_gui_driver.py`, in a fresh
 instance with an empty scene. No row is blocked: each one below is a measured
 value, not a skip. Artifact:
-`docs/evidence/probes/probe-253-six-callforms-gui-maya2024.json`; the first
-version admitted on this branch is kept beside it as `...-v1.json`, marked
+`docs/evidence/probes/probe-253-six-callforms-gui-maya2024-v2.json`; the
+earlier versions stay beside it as `...-v1.json` and `...json`, each marked
 superseded.
 
 The shipped test was tightened in the same pass: it now sets
 `linear`/`step` and reads both back, because `auto` — which it used
 before — is Maya's own default and would read the same on a call that did
-nothing.
+nothing. Its `playbackOptions` step sets `min=2, max=12` for the same
+reason: a `min` that matched the scene's own start would prove nothing.
 
 | Spot | Live result | What Maya actually returned |
 |---|---|---|
 | `xform` `q/ws/t/ro` | pass | world translation `[10.0, 0.0, 0.0]`, rotation `[0.0, 0.0, 0.0]` |
 | `rename` | pass | returns `str`: `GEO_cf253_name_holder1`; the node already holding the name kept it |
 | `keyTangent` `itt/ott` | pass | set to `linear`/`step` (not the default `auto`) and read back as exactly those two |
-| `playbackOptions` `min/max` | pass | playback range went `1.0-120.0` to `1.0-12.0`, and the query agreed |
+| `playbackOptions` `min/max` | pass | playback range went `1.0-120.0` to `2.0-12.0`; both ends moved off the scene's own range |
 | `aimConstraint` lists | pass | returned `['GEO_cf253_aimed_aimConstraint1']`, the constraint exists |
 | `MFnMesh.getPoint` `MSpace.kWorld` | pass | world `[9.5, -0.5, 0.5, 1.0]` vs object `[-0.5, -0.5, 0.5, 1.0]`, a 10.0 gap |
 

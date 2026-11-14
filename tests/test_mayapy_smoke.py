@@ -229,8 +229,11 @@ def test_callform_stub_disagreement_forms(real_maya):
         assert in_types == ["linear"], in_types
         assert out_types == ["step"], out_types
 
-        # playbackOptions takes min/max, the documented short names
-        real_maya.playbackOptions(min=1, max=12)
+        # playbackOptions takes min/max, the documented short names. Both
+        # ends move off the scene's own range on purpose, so neither short
+        # flag can pass by matching a value the scene already had.
+        real_maya.playbackOptions(min=2, max=12)
+        assert real_maya.playbackOptions(q=True, minTime=True) == 2
         assert real_maya.playbackOptions(q=True, maxTime=True) == 12
 
         # aimConstraint accepts three-number lists, not only tuples

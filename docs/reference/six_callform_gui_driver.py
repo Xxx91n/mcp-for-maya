@@ -185,14 +185,18 @@ def _form_key_tangent(created):
 def _form_playback(created):
     """playbackOptions accepts min/max, the documented short flag names.
 
+    Both ends are set to values the scene does not already have (a fresh
+    scene starts at 1-120 here), so each short flag has to show up on its
+    own: with `min=1` a call that ignored `min` would still look right.
+
     It takes `created` only because every probe has the same signature.
     """
     import maya.cmds as cmds
 
     before = _playback_range(cmds)
-    cmds.playbackOptions(min=1, max=12)
+    cmds.playbackOptions(min=2, max=12)
     after = _playback_range(cmds)
-    assert after[1] == 12, after
+    assert after == [2.0, 12.0], after
     return {"before": before, "after": after}
 
 

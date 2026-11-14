@@ -1,4 +1,9 @@
 {
+  "superseded": {
+    "status": "superseded",
+    "by": "docs/evidence/probes/probe-253-six-callforms-gui-maya2024-v2.json",
+    "reason": "CodeRabbit pointed out that the playback probe set min=1 while the scene already started at 1, so a call that ignored `min` would still have passed. v2 sets min=2 and max=12 and asserts both. This file is kept unchanged apart from this block."
+  },
   "meta": {
     "date": "2026-11-15",
     "ticket": "Xxx91n/mcp-for-maya#253",
