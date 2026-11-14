@@ -181,6 +181,9 @@ def test_callform_stub_disagreement_forms(real_maya):
     om = pytest.importorskip("maya.api.OpenMaya")
     min_time = real_maya.playbackOptions(q=True, minTime=True)
     max_time = real_maya.playbackOptions(q=True, maxTime=True)
+    # The test selects nodes to edit tangents, so the selection is another
+    # piece of state it has to hand back unchanged (issue #253).
+    selection_before = real_maya.ls(sl=True) or []
     created = []
     constraint = None
     try:
@@ -217,10 +220,20 @@ def test_callform_stub_disagreement_forms(real_maya):
         # keyTangent takes itt/ott, the documented short names
         real_maya.setKeyframe(renamed, attribute="translateX")
         real_maya.select(renamed)
-        real_maya.keyTangent(edit=True, itt="auto", ott="auto")
+        # Non-default types on purpose: `auto` is Maya's default, so a call
+        # that silently did nothing would still read back as `auto`. These
+        # two values can only appear if the flags were applied (#253).
+        real_maya.keyTangent(edit=True, itt="linear", ott="step")
+        in_types = real_maya.keyTangent(renamed, q=True, itt=True)
+        out_types = real_maya.keyTangent(renamed, q=True, ott=True)
+        assert in_types == ["linear"], in_types
+        assert out_types == ["step"], out_types
 
-        # playbackOptions takes min/max, the documented short names
-        real_maya.playbackOptions(min=1, max=12)
+        # playbackOptions takes min/max, the documented short names. Both
+        # ends move off the scene's own range on purpose, so neither short
+        # flag can pass by matching a value the scene already had.
+        real_maya.playbackOptions(min=2, max=12)
+        assert real_maya.playbackOptions(q=True, minTime=True) == 2
         assert real_maya.playbackOptions(q=True, maxTime=True) == 12
 
         # aimConstraint accepts three-number lists, not only tuples
@@ -241,6 +254,7 @@ def test_callform_stub_disagreement_forms(real_maya):
         for name in created:
             if real_maya.objExists(name):
                 real_maya.delete(name)
+        real_maya.select(selection_before, replace=True)
 
 
 def _injection_unit():

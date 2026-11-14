@@ -7,17 +7,25 @@ really sends, the evidence for the call form, the handling, and what a live
 Maya interpreter still has to confirm. It is the list to read the next time
 `types-maya-strict` is upgraded.
 
-**What it is not:** proof of live Maya behaviour. No Maya session was run for
-this batch: the mayapy tier is unrunnable on the box that measured it
-(`docs/testing.md` Tier 2 records the native access violation when
-`maya.standalone` is imported and the `maya.exe -batch` hang), so every live
-cell below is still open. The fake Maya test layer (`tests/maya_stub/`)
-accepts these same calls, but that proves the calls match the fake, not the
-real command; the real-interpreter test
+**What it is not:** proof of live Maya behaviour *from the batch alone*. No
+Maya session was run for that batch: running the tests under mayapy was not
+possible on the box that measured it (`docs/testing.md`, the real-Maya
+section, records the native access violation when `maya.standalone` is
+imported and the `maya.exe -batch` hang), so every live cell below was open
+at the time. The fake Maya test layer
+(`tests/maya_stub/`) accepts these same calls, but that proves the calls match
+the fake, not the real command; the real-interpreter test
 (`tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms`) is what
 turns a cell into a result, and it skips honestly on this box. None of the six
-stub forms needs GUI eyes — all six are assertable in batch, which is why
-their live column says `mayapy`.
+stub forms needs GUI eyes — all six are assertable in a real interpreter,
+which is why their live column says `mayapy`.
+
+**Live status (2026-11-15, issue #253):** the six forms were run on Maya 2024
+through a GUI session, because that box's mayapy fails at
+`import maya.standalone` (`ImportError: DLL load failed while importing
+standalone`). All six pass, and so does the `#229` test function when handed
+real `maya.cmds`. See "Live results" at the bottom; the table above keeps the
+batch-time wording as history.
 
 **Measured environment:** `types-maya-strict==2025.0.6`, `mypy==2.3.1`,
 `mypy-baseline==0.7.4`, Python from `uv sync --frozen`, base commit `1ece725`
@@ -27,12 +35,12 @@ their live column says `mayapy`.
 
 | Spot | Stub claims | Call sends | If the stub were right | Evidence for the call form | Handling | Live check |
 |---|---|---|---|---|---|---|
-| `xform` query reads — `analyze_aesthetics`, `scene_review` | flags are `query`/`worldSpace`/`translation`/`rotation` only | `q=`, `ws=`, `t=`, `ro=` | every read would raise a flag error and the lighting scores would lose world positions | Command reference (Maya 2024): `worldSpace(ws)`, `translation(t)`, `rotation(ro)` are the flag's own short names, and the command is queryable | Call unchanged; `cast(Any, cmds.xform)` at the three call sites | `mayapy` |
-| `rename` — `create_camera_shot`, `create_orbit_camera` | returns `None` | uses the return value (`... or name`) | the camera keeps the auto-generated name instead of the requested one | Command reference returns "the new name" as a string | Call unchanged; `cast(str, ...)` states the return type | `mayapy` |
-| `keyTangent` — `create_orbit_camera` | flags are `inTangentType`/`outTangentType` only | `itt=`, `ott=` | the tangent edit would raise a flag error and the orbit keys stay flat | Command reference lists `inTangentType(itt)` and `outTangentType(ott)`; both are also on its global-flag list | Call unchanged; `# type: ignore[call-overload]` on that line | `mayapy` |
-| `playbackOptions` — `create_orbit_camera` | flags are `minTime`/`maxTime` only | `min=`, `max=` | the playback range would raise a flag error and stay at the scene default | Command reference lists `min` -> `minTime` and `max` -> `maxTime` | Call unchanged; `# type: ignore[call-overload]` on that line | `mayapy` |
-| `aimConstraint` — `create_camera_shot`, `create_orbit_camera` | `aimVector`/`upVector` are `tuple[float, float, float]` | three-number lists `[0, 0, -1]`, `[0, 1, 0]` | the constraint call would reject the arguments and the camera would fall back to manual rotation | Command reference types both flags as three doubles; a Python list of three numbers is the same flag value | Call unchanged; `# type: ignore[call-overload]` on each call line | `mayapy` |
-| `MFnMesh.getPoint` — `get_scene_graph` full detail | parameter is `MSpace`, but `MSpace.kWorld` is declared `ClassVar[int]` in the same stub file | `om2.MSpace.kWorld` | the vertex dump would lose its world-space points (the call is inside a `try`) | The stub contradicts itself: the value it declares `int` is the value its own parameter type expects | Call unchanged; `cast(om2.MSpace, ...)` records the value Maya really passes | `mayapy` |
+| `xform` query reads — `analyze_aesthetics`, `scene_review` | flags are `query`/`worldSpace`/`translation`/`rotation` only | `q=`, `ws=`, `t=`, `ro=` | every read would raise a flag error and the lighting scores would lose world positions | Command reference (Maya 2024): `worldSpace(ws)`, `translation(t)`, `rotation(ro)` are the flag's own short names, and the command is queryable | Call unchanged; `cast(Any, cmds.xform)` at the three call sites | `mayapy` — still open; a GUI session passed it 2026-11-15 (below) |
+| `rename` — `create_camera_shot`, `create_orbit_camera` | returns `None` | uses the return value (`... or name`) | the camera keeps the auto-generated name instead of the requested one | Command reference returns "the new name" as a string | Call unchanged; `cast(str, ...)` states the return type | `mayapy` — still open; a GUI session passed it 2026-11-15 (below) |
+| `keyTangent` — `create_orbit_camera` | flags are `inTangentType`/`outTangentType` only | `itt=`, `ott=` | the tangent edit would raise a flag error and the orbit keys stay flat | Command reference lists `inTangentType(itt)` and `outTangentType(ott)`; both are also on its global-flag list | Call unchanged; `# type: ignore[call-overload]` on that line | `mayapy` — still open; a GUI session passed it 2026-11-15 (below) |
+| `playbackOptions` — `create_orbit_camera` | flags are `minTime`/`maxTime` only | `min=`, `max=` | the playback range would raise a flag error and stay at the scene default | Command reference lists `min` -> `minTime` and `max` -> `maxTime` | Call unchanged; `# type: ignore[call-overload]` on that line | `mayapy` — still open; a GUI session passed it 2026-11-15 (below) |
+| `aimConstraint` — `create_camera_shot`, `create_orbit_camera` | `aimVector`/`upVector` are `tuple[float, float, float]` | three-number lists `[0, 0, -1]`, `[0, 1, 0]` | the constraint call would reject the arguments and the camera would fall back to manual rotation | Command reference types both flags as three doubles; a Python list of three numbers is the same flag value | Call unchanged; `# type: ignore[call-overload]` on each call line | `mayapy` — still open; a GUI session passed it 2026-11-15 (below) |
+| `MFnMesh.getPoint` — `get_scene_graph` full detail | parameter is `MSpace`, but `MSpace.kWorld` is declared `ClassVar[int]` in the same stub file | `om2.MSpace.kWorld` | the vertex dump would lose its world-space points (the call is inside a `try`) | The stub contradicts itself: the value it declares `int` is the value its own parameter type expects | Call unchanged; `cast(om2.MSpace, ...)` records the value Maya really passes | `mayapy` — still open; a GUI session passed it 2026-11-15 (below) |
 | `cmds.camera` — `create_camera_shot` (the mixed one) | overloads are narrow but usable | `focalLength=shot["focal_length"]` was inferred `object` | nothing — the `object` came from the local `SHOT_TYPES` literal, and the stub was not the cause | The five focal lengths in `SHOT_TYPES` are ints; the cast states the argument type at the one place it is used | `cast(float, shot["focal_length"])`; `SHOT_TYPES` stays an unannotated literal | none |
 
 Sources for the evidence column, all Maya 2024 Python command reference pages:
@@ -109,5 +117,45 @@ one, and the `mypy-baseline.txt` diff is the in-repo record of what left.
 The `# type: ignore[...]` comments fail the build if the stub starts accepting
 the call (`warn_unused_ignores = true`). The `cast(...)` sites do not — remove
 each one by hand once the stub declares the shape above, then delete the row
-here. Keep the `getPoint` cast until `MSpace.kWorld` is declared as the enum
-the parameter expects.
+here. Keep the `getPoint` cast until the stub's `getPoint` parameter accepts
+the `int` that `MSpace.kWorld` really is (the live run below shows the constant
+is a plain `int`, so waiting for it to be declared an enum would wait forever).
+
+## Live results (2026-11-15, issue #253)
+
+Run inside a real Maya 2024 GUI session (24.0.0.4640, Windows 11, Maya-side
+Python 3.10.8) with `docs/reference/six_callform_gui_driver.py`, in a fresh
+instance with an empty scene. No row is blocked: each one below is a measured
+value, not a skip. Artifact:
+`docs/evidence/probes/probe-253-six-callforms-gui-maya2024-v2.json`; the
+earlier versions stay beside it as `...-v1.json` and `...json`, each marked
+superseded.
+
+The shipped test was tightened in the same pass: it now sets
+`linear`/`step` and reads both back, because `auto` — which it used
+before — is Maya's own default and would read the same on a call that did
+nothing. Its `playbackOptions` step sets `min=2, max=12` for the same
+reason: a `min` that matched the scene's own start would prove nothing.
+
+| Spot | Live result | What Maya actually returned |
+|---|---|---|
+| `xform` `q/ws/t/ro` | pass | world translation `[10.0, 0.0, 0.0]`, rotation `[0.0, 0.0, 0.0]` |
+| `rename` | pass | returns `str`: `GEO_cf253_name_holder1`; the node already holding the name kept it |
+| `keyTangent` `itt/ott` | pass | set to `linear`/`step` (not the default `auto`) and read back as exactly those two |
+| `playbackOptions` `min/max` | pass | playback range went `1.0-120.0` to `2.0-12.0`; both ends moved off the scene's own range |
+| `aimConstraint` lists | pass | returned `['GEO_cf253_aimed_aimConstraint1']`, the constraint exists |
+| `MFnMesh.getPoint` `MSpace.kWorld` | pass | world `[9.5, -0.5, 0.5, 1.0]` vs object `[-0.5, -0.5, 0.5, 1.0]`, a 10.0 gap |
+
+Two details worth carrying into a future stub upgrade:
+
+- `om2.MSpace.kWorld` really is a plain `int` in Maya 2024 (`type()` says
+  `int`), and `getPoint` accepts it. The stub is wrong about the parameter
+  type, not about the constant — so the cast stays until the parameter is
+  declared to take the int the constant is.
+- `rename` onto a taken name yields a numbered name (`GEO_cf253_name_holder1`
+  in the run above) and does not delete the node that held it first. Code
+  must use the returned string, never the name it asked for.
+
+Running under mayapy is still open: `cmds.about(batch=True)` and any batch-only
+behaviour cannot be checked from a GUI session, and this box's mayapy fails at
+`import maya.standalone`. Nothing here covers Maya 2025 or 2026.
