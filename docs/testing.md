@@ -61,6 +61,29 @@ signature collection) through a live GUI session instead — see
 implementation. Launch mayapy from PowerShell/cmd, never Git Bash
 (MSYS environment makes mayapy SIGSEGV at startup).
 
+If `mayapy` hits `0xC0000005` on Windows, inspect Maya's `bin\`
+directory with PowerShell to surface any unsigned DLLs (such as
+`mayaLib0.dll` or `OpenEXRCore-3_1-maya.dll` reporting `NotSigned`):
+
+```powershell
+Get-AuthenticodeSignature "<MayaInstallDir>\bin\*.dll" |
+  Where-Object Status -ne Valid |
+  Select-Object Status, Path
+```
+
+When headless `mayapy` is blocked, you can also run one-shot
+verification through the GUI host instead of attaching interactively:
+
+```powershell
+# Keep the host's existing MAYA_APP_DIR intact; do not clear or overwrite
+# it (observed to stall GUI initialization on the blocked Maya 2024 box
+# above; exact root cause across other hosts is unverified).
+& "<MayaInstallDir>\bin\maya.exe" -script "<verify.mel>"
+```
+
+Inside `<verify.mel>`, call your Python check via `python("...")` and
+end with `quit -f;` for unattended runs.
+
 Pending: the mayapy/batch run must also cover the `gui_session_required`
 headless gate (visual tools must return the structured error, not
 crash) — queued until a healthy headless Maya env exists.
