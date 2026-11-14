@@ -65,7 +65,9 @@ GitHub 文档：[Ruleset 可用规则](https://docs.github.com/en/enterprise-clo
 - 解决两条 CodeRabbit 评审线程后，GitHub 对 PR API 的实际读数是 `mergeStateStatus: UNSTABLE`、`mergeable: MERGEABLE`、`reviewDecision` 为空。尽管 Coverage 失败，GitHub 仍认为 PR 可以合并。实验 PR 没有合并。完整保护配置仍返回 403，所以不能据此填写当前完整的 required-check 列表；但这次合并判定已直接证明，**保留原检查名并把实际工具换成成功空操作，没有被独立检查挡住**。
 - PR 上的 CodeRabbit 两条意见都已逐项判断：Coverage 失败原因属实，但不拿它当作外部阻断证据；“本次没有执行”的文档内容确实过时，本报告已更新。Coverage 相关建议没有照做，因为本次要测的是现有真实合并路径；另改测试夹具会改变实验条件。
 
-本次实验使用了当前会话指定的分支，而不是另建临时分支；这是为了遵守“只能使用当前分支”的约束。收尾会恢复工作流、关闭 PR、不合并，也不会改 `main` 或分支保护。当前分支本身会保留，不会删除。
+本次实验使用了当前会话指定的分支，而不是另建临时分支；这是为了遵守“只能使用当前分支”的约束。
+
+**清理与恢复：**提交 `1eea32d7a835e7949984a476811dae53c9c3f7d0` 撤回了实验工作流改动；与起始基准相比，`.github/workflows/ci.yml` 已无差异。恢复后的远端 CI run [43600194050](https://github.com/Xxx91n/mcp-for-maya/actions/runs/43600194050) 和 Coverage run [43600194068](https://github.com/Xxx91n/mcp-for-maya/actions/runs/43600194068) 均成功。PR API 在恢复后读到 `CLEAN` / `MERGEABLE`，所有审查线程已解决。实验开始时 `main` 是基准 SHA；期间 `main` 通过无关的 PR #260 前进到 `34966c56b3a305f3d6d4d4bc961f904707c91431`，PR #261 没有合并。规则集 API 返回 `[]`，完整保护 API 仍为 403；本次没有改 `main` 或分支保护。PR #261 不合并，收尾时关闭。由于当前分支是本会话固定分支，会保留，不会删除。
 
 ## Owner 下一步
 
