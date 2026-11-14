@@ -143,6 +143,7 @@ authoritative and this table must match it row for row:
 | readOnly=F, destructive=T, idempotent=F | `execute_code`, `write_module`, `maya_setup_guide` |
 | readOnly=T, destructive=F, idempotent=T, openWorld=T | `asset_search` |
 | readOnly=F, destructive=F, idempotent=T, openWorld=T | `asset_import` |
+| readOnly=F, destructive=F, idempotent=F, openWorld=T | `scene_plan` |
 
 - scene_review keeps readOnly=T: reading the scene is what it does, and a
   check you register (#79) inherits no privilege it did not already have —
@@ -152,12 +153,22 @@ authoritative and this table must match it row for row:
   that unregisters itself, or a re-registration between two calls, moves
   the section while the scene stays untouched. The hints describe the tool's
   own effect on the scene, not the determinism of user-registered code.
-- openWorldHint=false everywhere EXCEPT the two asset tools (D-075):
-  asset_search (host-side Poly Haven index query) and asset_import
-  (host downloads -> Maya imports local paths). Both are restricted
+- openWorldHint=false everywhere EXCEPT the two asset tools and
+  `scene_plan` (D-075, plus the Q4 decision in #31): asset_search
+  (host-side Poly Haven index query), asset_import (host downloads ->
+  Maya imports local paths), and scene_plan — whose opt-in
+  `recommend_assets=True` path queries the same Poly Haven index
+  host-side (search only; no `/files`, no download, no import). With
+  the opt-in off, scene_plan is purely local. All three are restricted
   to the PH whitelist in polyhaven.py; openWorldHint is a hint, not
   the enforcement - the whitelist is. CVE-2026-66004 (§4) is the
   wild-documented attack class this chain exists against.
+- scene_plan recommendations are advisory and send nothing about the
+  scene: the only outbound data is the fixed query word plus index
+  parameters — objective, object names, DAG paths, and sizes never
+  leave the host. A recommendation imports nothing; placing a model
+  stays an explicit `asset_import` call, and a failed search degrades
+  to a structured note instead of failing the plan.
 - asset_import is idempotent because GRP_asset_<id> dedup is real
   (repeat calls report the existing group; force=True opts out).
 - scene_export performs a **local file write** to an arbitrary

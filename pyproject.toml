@@ -109,9 +109,10 @@ markers = [
 ]
 
 [tool.coverage.run]
-# not wired in yet: #177 connects this file to scene_plan recommendations. Its
-# tests are contract tests, not production coverage; drop this omit when wired.
-omit = ["src/maya_mcp_server/zone_geometry_module.py"]
+# no omit: the separate _mcp_scene files (zone geometry etc.) are never
+# imported as files — coverage credits their lines to the
+# maya_scene_module.py payload filename the stub execs, so there is nothing
+# to exclude here. (#217 wired the former zone-geometry omit away.)
 
 [tool.ruff]
 line-length = 100
