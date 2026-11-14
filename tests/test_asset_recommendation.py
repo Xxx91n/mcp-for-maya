@@ -985,6 +985,36 @@ class TestTargetResolution:
         assert recs_missing["zones"][0]["target"]["source"] == "zone_bbox"
         assert recs_missing["zones"][0]["target"]["fallback_reason"] == "target_not_found"
 
+    def test_namespaced_missing_ref_falls_back_even_with_single_zone_object(self):
+        single_zone = {
+            "name": "furniture",
+            "bbox_min": [0, 0, 0],
+            "bbox_max": [300, 120, 200],
+            "size": [300, 120, 200],
+            "object_count": 1,
+            "unmeasured_count": 0,
+            "objects": [{"name": "|GRP_a|room:GEO_chair", "size": [60, 80, 60]}],
+        }
+        search, _ = make_search([chair_hit("chair_m", dims=[0.6, 0.8, 0.6])])
+
+        recs_present = gather_recommendations(
+            make_geometry(zones=[single_zone]),
+            search,
+            objective="replace room:GEO_chair",
+        )
+        assert recs_present["zones"][0]["target"]["source"] == "short_name"
+        assert recs_present["zones"][0]["target"]["name"] == "|GRP_a|room:GEO_chair"
+
+        recs_missing_ns = gather_recommendations(
+            make_geometry(zones=[single_zone]),
+            search,
+            objective="replace asset:GEO_stool",
+        )
+        t_missing = recs_missing_ns["zones"][0]["target"]
+        assert t_missing["source"] == "zone_bbox"
+        assert t_missing["fallback_reason"] == "target_not_found"
+        assert "asset:GEO_stool" in t_missing["fallback_detail"]
+
     def test_ambiguous_dag_paths_and_distinct_short_names_fall_back(self):
         search, _ = make_search([chair_hit("chair_m", dims=[0.6, 0.8, 0.6])])
         recs_dag = gather_recommendations(

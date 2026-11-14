@@ -97,7 +97,9 @@ _MIXED_POLICY_NOTE = (
 )
 
 _DAG_REF_RE = re.compile(r"\|[A-Za-z0-9_:|]+")
-_PREFIX_REF_RE = re.compile(r"(?<![A-Za-z0-9_:|])(?:GEO|GRP|LOC|LGT|CAM)_[A-Za-z0-9_]+")
+_PREFIX_REF_RE = re.compile(
+    r"(?<![A-Za-z0-9_:|])(?:[A-Za-z0-9_]+:)*(?:GEO|GRP|LOC|LGT|CAM)_[A-Za-z0-9_]+"
+)
 
 
 @dataclass(frozen=True)
