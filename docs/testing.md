@@ -71,7 +71,8 @@ Viewport-independent call forms whose real-return shape must be
 asserted on a healthy real Maya interpreter (the tests in
 `tests/test_mayapy_smoke.py` run when one is available and skip honestly
 otherwise). Evidence table:
-`docs/visual-callform-matrix.md`.
+`docs/visual-callform-matrix.md`. Stub-versus-call disagreements are a
+separate record: `docs/reference/maya-stub-mismatches.md`.
 
 - `cmds.camera(name=X)` -> `[transform, shape]` list (X1 rename authority)
 - `cmds.ls(type='camera')` -> list including `perspShape` shape nodes
@@ -80,6 +81,15 @@ otherwise). Evidence table:
 - `MSelectionList.add('*')` includes non-DAG nodes -> `getDagPath`
   raises `TypeError('item is not a DAG path')` on them
 - `cmds.about(batch=True)` -> True under mayapy (the batch gate trigger)
+- `cmds.rename(node, name)` -> the new name string (the stub says `None`)
+- `cmds.xform(node, q=True, ws=True, t=True/ro=True)` -> world-space
+  translation and rotation (the stub lists the long flag names only)
+- `cmds.keyTangent(edit=True, itt=..., ott=...)` and
+  `cmds.playbackOptions(min=..., max=...)` -> accepted (same stub gap)
+- `cmds.aimConstraint(..., aimVector=[...], upVector=[...])` -> constraint
+  name from three-number lists (the stub takes tuples only)
+- `MFnMesh.getPoint(i, om2.MSpace.kWorld)` -> world-space point (the stub
+  types the constant `int`)
 
 For a quick smoke test of the module inside Maya's Script Editor:
 

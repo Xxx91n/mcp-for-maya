@@ -16,7 +16,7 @@ import json
 import math
 import re
 from collections import defaultdict
-from typing import Any
+from typing import Any, cast
 
 import maya.api.OpenMaya as om2  # noqa: N813
 import maya.cmds as cmds
@@ -301,7 +301,7 @@ def get_scene_graph(detail_level="compact") -> dict[str, Any]:
                 # First 100 vertex positions
                 verts = []
                 for i in range(min(mesh_fn.numVertices, 100)):
-                    pt = mesh_fn.getPoint(i, om2.MSpace.kWorld)
+                    pt = mesh_fn.getPoint(i, cast(om2.MSpace, om2.MSpace.kWorld))
                     verts.extend(_round3_list([pt[0], pt[1], pt[2]]))
                 obj["verts"] = verts
             except Exception:
@@ -1591,16 +1591,16 @@ def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
     # Create camera
     cam_transform, cam_shape = cmds.camera(
         name=name,
-        focalLength=shot["focal_length"],
+        focalLength=cast(float, shot["focal_length"]),
         horizontalFilmAperture=1.417,  # 35mm
     )
-    cam_transform = cmds.rename(cam_transform, name) or name
+    cam_transform = cast(str, cmds.rename(cam_transform, name)) or name  # stub None; Maya str
 
     cmds.move(cam_x, cam_y, cam_z, cam_transform)
 
     # Aim at target using orient constraint or manual rotation
     try:
-        cmds.aimConstraint(
+        cmds.aimConstraint(  # type: ignore[call-overload]  # stub wants tuple, call passes list
             target,
             cam_transform,
             aimVector=[0, 0, -1],
@@ -1648,7 +1648,7 @@ def create_orbit_camera(center, radius=500, frames=120, name="CAM_orbit"):
     import math
 
     cam_transform, cam_shape = cmds.camera(name=name, focalLength=35)
-    cam_transform = cmds.rename(cam_transform, name) or name
+    cam_transform = cast(str, cmds.rename(cam_transform, name)) or name  # stub None; Maya str
 
     # Orbit pivot: locator at the requested center, then aim-constrain to it
     loc = cmds.spaceLocator(name="LOC_%s_target" % name)
@@ -1670,12 +1670,12 @@ def create_orbit_camera(center, radius=500, frames=120, name="CAM_orbit"):
 
     # Set smooth tangents
     cmds.select(cam_transform)
-    cmds.keyTangent(edit=True, itt="auto", ott="auto")
+    cmds.keyTangent(edit=True, itt="auto", ott="auto")  # type: ignore[call-overload]  # doc flags
 
     # Aim constraint at the center locator — failures surface, never swallow
     warnings = []
     try:
-        cmds.aimConstraint(
+        cmds.aimConstraint(  # type: ignore[call-overload]  # stub wants tuple, call passes list
             loc_transform,
             cam_transform,
             aimVector=[0, 0, -1],
@@ -1687,7 +1687,7 @@ def create_orbit_camera(center, radius=500, frames=120, name="CAM_orbit"):
         warnings.append("aimConstraint failed: %s" % e)
 
     # Set playback range
-    cmds.playbackOptions(min=1, max=frames)
+    cmds.playbackOptions(min=1, max=frames)  # type: ignore[call-overload]  # min/max doc flags
 
     return {
         "camera": cam_transform,
@@ -1853,9 +1853,9 @@ def analyze_aesthetics():
             )
 
             # Position from transform
-            pos = cmds.xform(light_transform, q=True, ws=True, t=True) or [0, 0, 0]
+            pos = cast(Any, cmds.xform)(light_transform, q=True, ws=True, t=True) or [0, 0, 0]
             # Rotation from transform (direction)
-            rot = cmds.xform(light_transform, q=True, ws=True, ro=True) or [0, 0, 0]
+            rot = cast(Any, cmds.xform)(light_transform, q=True, ws=True, ro=True) or [0, 0, 0]
 
             # Decay type (0=None, 1=Linear, 2=Quadratic, 3=Cubic)
             decay = 0
@@ -3446,7 +3446,7 @@ def scene_review(checks=None):
                             if cmds.objExists("%s.intensity" % ls_name)
                             else 1.0
                         )
-                        pos = cmds.xform(lt, q=True, ws=True, t=True) or [0, 0, 0]
+                        pos = cast(Any, cmds.xform)(lt, q=True, ws=True, t=True) or [0, 0, 0]
                         decay = (
                             cmds.getAttr("%s.decayRate" % ls_name)
                             if cmds.objExists("%s.decayRate" % ls_name)
