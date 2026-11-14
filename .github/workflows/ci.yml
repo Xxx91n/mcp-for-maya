@@ -56,6 +56,12 @@ jobs:
         # Hard gate: findings are red. The observation period ended with a
         # clean registry; see check_gate_registry.py for the scope limit.
         run: python .github/scripts/check_gate_registry.py
+      - name: ci-wiring gate
+        # Hard gate: the lint, mypy and pytest jobs must stay in the
+        # workflow, run their tools, and stay in the ci summary. See
+        # check_ci_wiring.py for the scope limit -- deleting the lint job
+        # itself kills this check too, so branch protection covers that.
+        run: python .github/scripts/check_ci_wiring.py
       - name: doc-claims gate
         # Hard gate: the unreleased lane may only claim artifacts that exist.
         # See check_doc_claims.py for the scope limit -- released sections are

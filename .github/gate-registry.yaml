@@ -22,6 +22,19 @@
       "exemption": null
     },
     {
+      "gate_id": "check_ci_wiring",
+      "bound_class": "gate",
+      "expected_sources": [
+        "docs/ci-wiring.md"
+      ],
+      "pin_node_ids": [
+        "tests/test_check_ci_wiring.py::test_the_real_workflow_is_clean",
+        "tests/test_check_ci_wiring.py::test_a_missing_mypy_and_its_aggregate_need_is_red",
+        "tests/test_check_ci_wiring.py::test_findings_are_blocking_with_no_opt_out"
+      ],
+      "exemption": null
+    },
+    {
       "gate_id": "check_doc_claims",
       "bound_class": "gate",
       "expected_sources": [

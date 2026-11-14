@@ -1,0 +1,138 @@
+# Keeping key CI checks connected (#223)
+
+Run locally (same entry point as the lint job):
+
+```sh
+uv sync --frozen
+uv run python .github/scripts/check_ci_wiring.py
+uv run pytest tests/test_check_ci_wiring.py -q
+```
+
+To try a broken copy without editing the real workflow:
+
+```sh
+cp .github/workflows/ci.yml /tmp/broken-ci.yml
+sed -i 's/needs: \[lint, mypy, test\]/needs: [lint, test]/' /tmp/broken-ci.yml
+uv run python .github/scripts/check_ci_wiring.py /tmp/broken-ci.yml
+```
+
+That exits 1 and prints `ci: aggregate_broken`. Tests also delete mypy and its
+summary dependency together, skip jobs/steps, remove lint/test dependencies,
+leave commands only in comments, and add failure-swallowing flags or `|| true`.
+Each copy is checked without touching the real workflow; the real file and an
+unchanged fixture must both pass.
+
+## Where the rules come from
+
+Issue #223, under #221, requires lint, mypy, pytest and the `ci` summary to
+remain connected. Their existing job IDs are `lint`, `mypy`, `test`, `ci`.
+The checker records those IDs once and reads their steps and dependencies from
+ci.yml; it does not copy the governance-script inventory. The existing gate
+registry still owns that inventory, including this new checker.
+
+This is a deliberately narrow check of this repository's workflow shape, not a
+YAML validator or a shell interpreter. Tool commands must start a run-text line
+in the current form (`uvx ruff@… check`, `python …check_ruff_budget.py`,
+`uv run python -m mypy`, `uv run mypy-baseline filter`,
+`uv run python -m pytest`). Comments and echo-only calls do not count.
+The summary must end with the existing three `test … = "success"` commands
+joined by `&&`. If those command forms change, update this checker and its
+positive and negative tests in the same change, rather than bypassing it.
+
+All steps in a protected job are checked for skip conditions and swallowed
+failures, not just the tool step. This intentionally also protects setup and
+budget enforcement. Unrelated jobs such as drift-notify are not constrained.
+Only absent conditions, `success()` and `always()` are accepted; the summary
+job requires `always()`. Unknown continue-on-error values fail closed.
+
+## Limits and hand-off to A3 (#228)
+
+- Deleting the workflow or lint job together with this check removes the check.
+  Nothing inside that deleted job can prevent this. A3 must verify required
+  checks and rulesets outside the workflow. This change does not configure them.
+- Trigger/path filters, permissions, fork behavior, required-check names and
+  whether GitHub actually runs the workflow need outside verification.
+- The parser accepts this repo's indented jobs/steps and inline/block needs.
+  YAML anchors, aliases, flow mappings, duplicate keys, folded shell semantics,
+  custom shell settings, reusable workflows and composite actions are not
+  evaluated. Review such changes manually; passing here is not proof for them.
+- This is not protection against someone deliberately rewriting the checker or
+  its tests. CODEOWNERS/review permissions remain external concerns for A3.
+- Shell checks catch `|| true`, `|| :`, `|| echo`, `|| exit 0` and
+  continue-on-error. They do not prove arbitrary shell behavior: `set +e`,
+  conditional execution, command substitution, quoted commands, indirect calls,
+  redirection tricks and later successful commands in tool steps need review.
+- Report contents and whether mypy really checked files belong to A2 (#226).
+  No type-error budget, strictness setting, Maya behavior or baseline changes
+  are part of this check.
+
+The checker also reads the existing registry's `bound_class: gate` entries and
+requires a real Python script call in parsed run text across workflow files.
+This closes the comment-only registration gap without copying its script list.
+For a supplied ci.yml copy, that copy replaces ci.yml in this scan; other
+workflow files still come from the repository (for example the PyPI check).
+This extra presence check does not prove every non-critical workflow's control
+flow; skip/failure rules here apply to the four protected CI jobs only.
+
+## Local verification (2026-11-13)
+
+With `uv sync --frozen` on Python 3.11: 28 wiring tests passed; full suite
+1293 passed, 27 skipped. Ruff 0.17.1 stayed within the unchanged per-rule
+budget. The existing mypy + mypy-baseline command reported zero new errors.
+Registry, doc-claims and the other local lint-job scripts passed; the monolith
+check only noted its existing spare line. These are local results, not a claim
+that the GitHub Actions Linux/Windows matrix has run on this branch.
+
+## PR #232 review follow-up
+
+The review correctly found that a default-success job can be skipped through
+its `needs` chain even without its own `if`. The checker now follows direct
+and transitive dependencies, reports skip-capable conditions, missing jobs and
+cycles, and stops following skip propagation at `if: always()`. Conditions
+outside the small existing allowlist remain conservatively rejected; arbitrary
+expressions are not evaluated. Tests cover the reported case plus transitive,
+unconditional, always(), missing-dependency and cycle cases.
+
+The main-branch changelog conflict was resolved by retaining both additions;
+no upstream application changes were rewritten as part of this repair.
+
+After the review repair and merge of main (`b81a29b`): 34 wiring tests passed;
+full locked suite 1341 passed, 27 skipped. Ruff budget, mypy baseline (zero new
+errors), governance checks and all pre-commit hooks passed locally.
+
+## Second review follow-up
+
+Four findings were accepted in the same PR scope:
+
+- Validate the dependency graph separately from skip propagation. Missing jobs
+  and cycles are `dependency_invalid`, even when a protected or intermediate
+  job uses `always()`. A valid `always()` job still breaks skip propagation.
+- Ignore full-line comments while reading block `needs` lists; a comment after
+  `needs:` also leaves the block open. Comments must not remove dependencies.
+- Strip shell comments line by line, then check each complete step for the
+  documented OR-list swallow forms. Newlines and backslash continuations no
+  longer hide `|| true`. This still does not interpret arbitrary shell code.
+- CLI fault tests now mutate the real workflow, use a clean CLI positive
+  control, and assert each intended rule tag as well as exit 1. Unrelated
+  registry errors can no longer stand in for detecting the intended fault.
+
+The review's tool-only command-injection warning is not applicable: the test
+passes a fixed interpreter, script path and locally generated fixture path as
+an argument list to subprocess without `shell=True`; it runs no request text
+as a shell command.
+
+After these fixes: 42 wiring tests passed; full locked suite 1349 passed,
+27 skipped. Ruff budget, mypy (zero new errors), governance checks and all
+pre-commit hooks passed locally. The monolith's spare-line notice is unchanged.
+
+## Colon boundary regression
+
+The next review found that whole-step matching lost the old detection of
+`|| :` at the end of a line when another command followed. This is a valid
+finding. The swallow regex now uses multiline boundaries while retaining
+cross-line matching. A regression matrix covers all five listed swallow forms
+in tool and summary steps, both on one line and after a newline, with a later
+successful command. Before the fix this test failed on the colon case;
+after the fix all 43 wiring tests and the full suite (1350 passed, 27 skipped)
+passed locally. Ruff budget, mypy zero-new-error check, governance scripts and
+pre-commit were rerun for the repair.
