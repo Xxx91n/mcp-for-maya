@@ -181,11 +181,21 @@ def test_callform_stub_disagreement_forms(real_maya):
     om = pytest.importorskip("maya.api.OpenMaya")
     min_time = real_maya.playbackOptions(q=True, minTime=True)
     max_time = real_maya.playbackOptions(q=True, maxTime=True)
-    cube = real_maya.polyCube(name="GEO_stub_probe")[0]
+    created = []
+    constraint = None
     try:
-        # rename returns the new name string (the stub says -> None)
+        # rename returns the new name string (the stub says -> None). A
+        # same-name node is already in the scene, so Maya gives the rename a
+        # unique name: assert the return type, never the literal name, and
+        # clean up only the nodes this test made.
+        bystander = real_maya.polyCube(name="GEO_stub_probe_renamed")[0]
+        created.append(bystander)
+        cube = real_maya.polyCube(name="GEO_stub_probe")[0]
+        created.append(cube)
         renamed = real_maya.rename(cube, "GEO_stub_probe_renamed")
-        assert renamed == "GEO_stub_probe_renamed"
+        assert isinstance(renamed, str) and renamed
+        created.append(renamed)
+        assert real_maya.objExists(bystander), "the name clash cost a live node"
 
         # xform takes the short flag names q/ws/t/ro, not only the long ones
         real_maya.move(10, 0, 0, renamed)
@@ -215,17 +225,20 @@ def test_callform_stub_disagreement_forms(real_maya):
 
         # aimConstraint accepts three-number lists, not only tuples
         target = real_maya.polyCube(name="GEO_stub_target")[0]
-        con = real_maya.aimConstraint(
+        created.append(target)
+        constraint = real_maya.aimConstraint(
             target,
             renamed,
             aimVector=[0, 0, -1],
             upVector=[0, 1, 0],
             worldUpType="scene",
         )
-        assert con
+        assert constraint
     finally:
+        if constraint:
+            real_maya.delete(constraint)
         real_maya.playbackOptions(min=min_time, max=max_time)
-        for name in ("GEO_stub_target", "GEO_stub_probe_renamed"):
+        for name in created:
             if real_maya.objExists(name):
                 real_maya.delete(name)
 
