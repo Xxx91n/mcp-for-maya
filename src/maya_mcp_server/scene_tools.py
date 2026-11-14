@@ -161,7 +161,9 @@ async def get_zone_geometry(client: Any, session_key: str | None = None) -> Any:
     )
 
 
-async def _recommend_for_plan(client: Any, session_key: str | None) -> dict[str, Any]:
+async def _recommend_for_plan(
+    client: Any, session_key: str | None, objective: str = ""
+) -> dict[str, Any]:
     """Compose scene_plan's recommendations section; search and geometry
     failures never break the plan.
 
@@ -176,7 +178,7 @@ async def _recommend_for_plan(client: Any, session_key: str | None) -> dict[str,
         geometry = await get_zone_geometry(client, session_key)
     except Exception as e:  # transport-level failure; the Maya side has its own
         geometry = {"error": {"code": "query_failed", "message": f"{type(e).__name__}: {e}"}}
-    return gather_recommendations(geometry, polyhaven.search_assets)
+    return gather_recommendations(geometry, polyhaven.search_assets, objective=objective)
 
 
 # --- Token Budget Management ---
@@ -1108,13 +1110,16 @@ result
         With recommend_assets=True, also recommends Poly Haven models across
         the built-in scene zones (entrance, display, furniture, lighting;
         shell, ip_core, and path are skipped with no search): reads fresh
-        zone geometry, searches the models index with each zone's fixed
-        query words (word-level checked and deduplicated per zone, capped
-        at 3 per zone and 12 total), and screens candidates against the
-        zone's world-axis bounding box as an upper size limit only.
-        Recommendations are advisory references — search only, no download
-        and no import — and a search or network failure never changes the
-        plan itself. Clearances and collisions are not verified.
+        zone geometry, resolves a target object per zone from objective
+        (full DAG path, unique short name, or single measurable zone object;
+        otherwise falls back to the zone's world-axis bounding box), searches
+        the models index with each zone's fixed query words (word-level
+        checked and deduplicated per zone, capped at 3 per zone and 12 total),
+        and screens candidates in metres (0.5x-1.5x per sorted axis for an
+        object target; upper limit only for zone_bbox). Recommendations are
+        advisory references — search only, no download and no import — and
+        a search or network failure never changes the plan itself. Clearances
+        and collisions are not verified.
 
         Blockout first: check organization and proportions
         before committing to detailed modeling. Accepts a plain-language objective.
@@ -1155,7 +1160,9 @@ result
         result = await _execute_scene_code(client, code, session_key, use_cache=False)
 
         if recommend_assets:
-            result["recommendations"] = await _recommend_for_plan(client, session_key)
+            result["recommendations"] = await _recommend_for_plan(
+                client, session_key, objective=objective
+            )
 
         if format == "json":
             return json.dumps(result, indent=2)

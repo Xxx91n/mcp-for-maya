@@ -4,9 +4,13 @@ With ``scene_plan(recommend_assets=True)`` the plan gains a
 ``recommendations`` section. Everything here runs on the host: the Maya
 side never goes online. The module reads the zone geometry the
 ``_mcp_scene`` module reports (through the ``get_zone_geometry`` host
-helper in scene_tools), searches the Poly Haven models index for each
-zone's mapped query words via ``polyhaven.search_assets``, filters hits
-with a normalized word-level check, deduplicates across keywords, sorts
+helper in scene_tools), identifies each zone's target in deterministic
+order (explicit full DAG path -> unique short name -> unique measurable
+zone object -> zone bbox fallback), searches the Poly Haven models index
+for each zone's mapped query words via ``polyhaven.search_assets``,
+filters hits with a normalized word-level check, deduplicates across
+keywords, screens candidates in metres (three-axis 0.5x-1.5x tolerance
+for an object target; upper-limit-only for a zone bbox fallback), sorts
 by rank band and size difference, and caps results per zone and for the
 whole scene.
 
@@ -18,8 +22,9 @@ T1 scope (#217): furniture zone with ``chair``.
 T2 scope (#218): all 7 built-in zones, normalized word-level check,
 cross-keyword dedup, rank-band + size-difference sorting, and the
 3-per-zone / 12-per-scene caps.
-Explicit target objects and the three-axis tolerance band are T3 (#219);
-the soft time budget is T4 (#220).
+T3 scope (#219): target resolution, ambiguity/fallback reporting, unit
+conversion, and three-axis 0.5x-1.5x size screening.
+The soft time budget is T4 (#220).
 """
 
 from __future__ import annotations
@@ -55,6 +60,12 @@ SEARCH_ASSET_TYPE = "models"
 MAX_PER_ZONE = 3
 MAX_PER_SCENE = 12
 
+# Q7: explicit or unique object targets screen sorted axes against
+# 0.5x-1.5x of the target's sorted axes; zone_bbox fallback stays
+# upper-limit only.
+MIN_SIZE_RATIO = 0.5
+MAX_SIZE_RATIO = 1.5
+
 # Maya linear unit -> metres. get_unit_info() reports the scene's linear
 # unit; a unit outside this table is a measurement failure, never a guess.
 UNIT_TO_METRES: dict[str, float] = {
@@ -68,18 +79,34 @@ UNIT_TO_METRES: dict[str, float] = {
     "km": 1000.0,
 }
 
-_POLICY: dict[str, Any] = {
-    "mode": "zone_envelope",
-    "geometry": "world_aabb",
-    "upper_limit_only": True,
-    "clearance_verified": False,
-    "collision_verified": False,
-    "note": (
-        "Screening compares axis extents as an upper size limit only; "
-        "clearance, collision, and placement are not verified, and a "
-        "partially measured zone only bounds what was measured."
-    ),
-}
+_ZONE_ENVELOPE_NOTE = (
+    "Screening compares axis extents as an upper size limit only; "
+    "clearance, collision, and placement are not verified, and a "
+    "partially measured zone only bounds what was measured."
+)
+_OBJECT_TOLERANCE_NOTE = (
+    "Screening compares sorted world-AABB axis extents against the target "
+    "object within a 0.5x-1.5x per-axis tolerance; clearance, collision, "
+    "and placement are not verified."
+)
+_MIXED_POLICY_NOTE = (
+    "Screening uses 0.5x-1.5x sorted-axis tolerance for identified target "
+    "objects and upper-limit-only screening for zone_bbox fallbacks; "
+    "clearance, collision, and placement are not verified, and a partially "
+    "measured zone only bounds what was measured."
+)
+
+_DAG_REF_RE = re.compile(r"\|[A-Za-z0-9_:|]+")
+_PREFIX_REF_RE = re.compile(
+    r"(?<![A-Za-z0-9_:|])(?:[A-Za-z0-9_]+:)*(?:GEO|GRP|LOC|LGT|CAM)_[A-Za-z0-9_]+"
+)
+
+
+@dataclass(frozen=True)
+class _FallbackNote:
+    reason: str
+    detail: str
+    matches: tuple[str, ...] = ()
 
 
 def _error(scope: str, code: str, message: str) -> dict[str, str]:
@@ -95,7 +122,7 @@ def _to_metres(values: Any, factor: float, rounded: bool = True) -> list[float] 
     rounding gap, which is not "obviously too large". Anything that is not
     three finite numbers becomes None — the zone geometry contract already
     yields null for unreadable boxes, and a made-up size would poison the
-    upper-limit screen.
+    screen.
     """
     if not isinstance(values, (list, tuple)) or len(values) != 3:
         return None
@@ -106,6 +133,15 @@ def _to_metres(values: Any, factor: float, rounded: bool = True) -> list[float] 
         value = float(v) * factor
         out.append(round(value, 3) if rounded else value)
     return out
+
+
+def _measurable_size_m(values: Any, factor: float) -> tuple[list[float] | None, list[float] | None]:
+    """Return ``(display_m, unrounded_screen_m)`` when values are positive 3-extents."""
+    screen_m = _to_metres(values, factor, rounded=False)
+    if not _valid_dimensions(screen_m):
+        return None, None
+    display_m = _to_metres(values, factor, rounded=True)
+    return display_m, list(screen_m)
 
 
 def _fits_envelope(model: list[float], envelope: list[float]) -> bool:
@@ -121,7 +157,24 @@ def _fits_envelope(model: list[float], envelope: list[float]) -> bool:
     """
     m = sorted(model, reverse=True)
     z = sorted(envelope, reverse=True)
-    return all(mm <= zz for mm, zz in zip(m, z))
+    return all(mm <= zz + 1e-12 * max(1.0, zz) for mm, zz in zip(m, z))
+
+
+def _fits_three_axis_tolerance(model: list[float], target: list[float]) -> bool:
+    """Sorted three-axis tolerance check (0.5x-1.5x per axis).
+
+    Both model and target extents are sorted largest-to-smallest and each
+    corresponding axis must fall within [0.5 * t, 1.5 * t] (with a
+    picometre IEEE-754 guard so exact unit conversions like 0.3 * 1.5
+    never fail due to float representation).
+    """
+    m_sorted = sorted(model, reverse=True)
+    t_sorted = sorted(target, reverse=True)
+    for mm, tt in zip(m_sorted, t_sorted):
+        eps = 1e-12 * max(1.0, tt)
+        if mm < tt * MIN_SIZE_RATIO - eps or mm > tt * MAX_SIZE_RATIO + eps:
+            return False
+    return True
 
 
 _WORD_BOUNDARY_RE = re.compile(
@@ -206,9 +259,9 @@ def _candidate(entry: dict[str, Any], query: str, rank: int) -> dict[str, Any]:
     }
 
 
-def _valid_dimensions(dims: Any) -> TypeGuard[list[float]]:
+def _valid_dimensions(dims: Any) -> TypeGuard[list[float] | tuple[float, ...]]:
     """Three finite, strictly positive numbers — a size the screen may use."""
-    if not isinstance(dims, list) or len(dims) != 3:
+    if not isinstance(dims, (list, tuple)) or len(dims) != 3:
         return False
     return all(
         not isinstance(v, bool) and isinstance(v, (int, float)) and math.isfinite(v) and v > 0
@@ -236,12 +289,45 @@ class _ScoredHit:
         )
 
 
-def _screen(results: list[Any], query: str, envelope_m: list[float]) -> list[_ScoredHit]:
+def _unverified_reason(dims: Any) -> tuple[str, str]:
+    if dims is None:
+        return (
+            "missing_dimensions",
+            "Poly Haven publishes no usable dimensions for this asset; "
+            "size screening was not performed",
+        )
+    if isinstance(dims, (list, tuple)) and len(dims) == 3:
+        for v in dims:
+            if (
+                not isinstance(v, bool)
+                and isinstance(v, (int, float))
+                and math.isfinite(v)
+                and v <= 0
+            ):
+                return (
+                    "invalid_dimensions",
+                    "Poly Haven asset dimensions contain zero or non-positive values; "
+                    "size screening was not performed",
+                )
+    return (
+        "invalid_dimensions",
+        "Poly Haven asset dimensions are malformed or non-finite; size screening was not performed",
+    )
+
+
+def _screen(
+    results: list[Any],
+    query: str,
+    target_m: list[float],
+    screening_mode: str = "zone_envelope",
+) -> list[_ScoredHit]:
     """Filter one query's hits into scored candidates.
 
     Drops hits that fail the normalized word-level check or cannot fit
-    the zone envelope. Assets without usable dimensions stay in the
-    returned list with ``size_status="unverified"`` and ``size_error=0.0``.
+    the target size screen (three-axis tolerance for an object target;
+    upper-limit-only for a zone_bbox fallback). Assets without usable
+    dimensions stay in the returned list with ``size_status="unverified"``
+    and ``size_error=0.0``.
     """
     screened: list[_ScoredHit] = []
     for rank, entry in enumerate(results, start=1):
@@ -252,17 +338,30 @@ def _screen(results: list[Any], query: str, envelope_m: list[float]) -> list[_Sc
         cand = _candidate(entry, query, rank)
         dims = entry.get("dimensions")
         if not _valid_dimensions(dims):
-            cand["reason_code"] = "missing_dimensions" if dims is None else "invalid_dimensions"
-            cand["match_reason"] = (
-                "Poly Haven publishes no usable dimensions for this asset; "
-                "size screening was not performed"
-            )
+            cand["dimensions_m"] = _to_metres(dims, 1.0, rounded=False)
+            code, reason = _unverified_reason(dims)
+            cand["reason_code"] = code
+            cand["match_reason"] = reason
             screened.append(_ScoredHit(cand, 0.0))
             continue
-        dims_f = [float(v) for v in dims]
-        if _fits_envelope(dims_f, envelope_m):
-            largest = max(dims_f)
-            zone_largest = max(envelope_m)
+        model_m = [float(v) for v in dims]
+        if screening_mode == "three_axis_tolerance":
+            if _fits_three_axis_tolerance(model_m, target_m):
+                m_sorted = sorted(model_m, reverse=True)
+                t_sorted = sorted(target_m, reverse=True)
+                ratios = "/".join(f"{mm / tt:.2f}x" for mm, tt in zip(m_sorted, t_sorted))
+                cand["size_status"] = "pass"
+                cand["reason_code"] = "fits_target_three_axis"
+                cand["match_reason"] = (
+                    f"sorted axes {_fmt_dims(m_sorted)} m within "
+                    f"{MIN_SIZE_RATIO:g}x-{MAX_SIZE_RATIO:g}x of target "
+                    f"{_fmt_dims(t_sorted)} m (ratios {ratios}; "
+                    "world AABB, clearance and collision not verified)"
+                )
+                screened.append(_ScoredHit(cand, _size_error(model_m, target_m)))
+        elif _fits_envelope(model_m, target_m):
+            largest = max(model_m)
+            zone_largest = max(target_m)
             cand["size_status"] = "pass"
             cand["reason_code"] = "fits_zone_envelope"
             cand["match_reason"] = (
@@ -270,7 +369,7 @@ def _screen(results: list[Any], query: str, envelope_m: list[float]) -> list[_Sc
                 f"largest side {zone_largest:g} m (world AABB upper limit, "
                 "per sorted axis)"
             )
-            screened.append(_ScoredHit(cand, _size_error(dims_f, envelope_m)))
+            screened.append(_ScoredHit(cand, _size_error(model_m, target_m)))
     return screened
 
 
@@ -280,6 +379,251 @@ def _searched_query(query: str, total_matches: int | None) -> dict[str, Any]:
 
 def _unsearched_query(query: str) -> dict[str, Any]:
     return {"query": query, "searched": False, "total_matches": None}
+
+
+def _token_in_objective(objective: str, token: str) -> bool:
+    """Match a DAG path or short name token without partial-identifier false hits."""
+    if not objective or not token:
+        return False
+    pattern = rf"(?<![A-Za-z0-9_:|]){re.escape(token)}(?![A-Za-z0-9_:|])"
+    return re.search(pattern, objective) is not None
+
+
+def _match_zone_object(
+    zone_name: str,
+    valid_objects: list[dict[str, Any]],
+    obj_count: Any,
+    unmeasured: Any,
+    factor: float,
+    objective: str,
+    scene_refs: set[str] | None = None,
+) -> tuple[dict[str, Any] | None, str | None, _FallbackNote | None]:
+    """Run Q6 target matching: DAG path -> short name -> unique zone object."""
+    dag_matches = [obj for obj in valid_objects if _token_in_objective(objective, obj["name"])]
+    if len(dag_matches) == 1:
+        return dag_matches[0], "dag_path", None
+    if len(dag_matches) > 1:
+        paths = tuple(obj["name"] for obj in dag_matches)
+        detail = (
+            f"objective matched {len(dag_matches)} DAG paths in zone '{zone_name}': "
+            f"{', '.join(paths)}; fell back to zone_bbox"
+        )
+        return None, None, _FallbackNote("ambiguous_dag_path", detail, paths)
+
+    short_matches = [
+        obj
+        for obj in valid_objects
+        if _token_in_objective(objective, obj["name"].rsplit("|", 1)[-1])
+    ]
+    if len(short_matches) == 1:
+        return short_matches[0], "short_name", None
+    if len(short_matches) > 1:
+        paths = tuple(obj["name"] for obj in short_matches)
+        shorts = {obj["name"].rsplit("|", 1)[-1] for obj in short_matches}
+        if len(shorts) == 1:
+            reason = "ambiguous_short_name"
+            detail = (
+                f"short name '{next(iter(shorts))}' matched {len(short_matches)} objects in "
+                f"zone '{zone_name}': {', '.join(paths)}; fell back to zone_bbox"
+            )
+        else:
+            reason = "ambiguous_target"
+            detail = (
+                f"objective matched {len(short_matches)} objects in zone '{zone_name}': "
+                f"{', '.join(paths)}; fell back to zone_bbox"
+            )
+        return None, None, _FallbackNote(reason, detail, paths)
+
+    explicit_refs = list(
+        dict.fromkeys(
+            m.group(0) for pat in (_DAG_REF_RE, _PREFIX_REF_RE) for m in pat.finditer(objective)
+        )
+    )
+    missing_refs = [ref for ref in explicit_refs if scene_refs is None or ref not in scene_refs]
+    if missing_refs:
+        refs_text = ", ".join(missing_refs)
+        return (
+            None,
+            None,
+            _FallbackNote(
+                "target_not_found",
+                (
+                    f"objective named '{refs_text}' which was not found in zone '{zone_name}'; "
+                    "fell back to zone_bbox upper limit"
+                ),
+            ),
+        )
+
+    measurable = [
+        obj for obj in valid_objects if _measurable_size_m(obj.get("size"), factor)[1] is not None
+    ]
+    # Keep synthetic fixtures whose object_count > len(objects) in zone_bbox mode.
+    count_matches_list = not (
+        isinstance(obj_count, int)
+        and isinstance(unmeasured, int)
+        and (obj_count - unmeasured) != len(measurable)
+    )
+    if len(measurable) == 1 and count_matches_list:
+        return measurable[0], "unique_zone_object", None
+
+    if len(measurable) > 1 or (
+        isinstance(obj_count, int) and isinstance(unmeasured, int) and (obj_count - unmeasured) > 1
+    ):
+        return (
+            None,
+            None,
+            _FallbackNote(
+                "multiple_zone_objects",
+                (
+                    f"no unique target specified across multiple objects in zone '{zone_name}'; "
+                    "fell back to zone_bbox upper limit"
+                ),
+            ),
+        )
+    return (
+        None,
+        None,
+        _FallbackNote(
+            "no_explicit_target",
+            (
+                f"no measurable target object resolved in zone '{zone_name}'; "
+                "fell back to zone_bbox upper limit"
+            ),
+        ),
+    )
+
+
+def _build_object_target(
+    zone_name: str,
+    matched_obj: dict[str, Any],
+    match_source: str,
+    obj_display_m: list[float],
+    obj_count: Any,
+    unmeasured: Any,
+) -> dict[str, Any]:
+    partial_zone = (
+        match_source == "unique_zone_object" and isinstance(unmeasured, int) and unmeasured > 0
+    )
+    target: dict[str, Any] = {
+        "source": match_source,
+        "screening_mode": "three_axis_tolerance",
+        "tolerance_band": [MIN_SIZE_RATIO, MAX_SIZE_RATIO],
+        "geometry": "world_aabb",
+        "name": matched_obj["name"],
+        "short_name": matched_obj["name"].rsplit("|", 1)[-1],
+        "object_count": obj_count,
+        "unmeasured_count": unmeasured,
+        "size_m": obj_display_m,
+        "bbox_min_m": None,
+        "bbox_max_m": None,
+        "measurement": "partial_zone_objects" if partial_zone else "complete",
+        "measurement_complete": not partial_zone,
+    }
+    if partial_zone:
+        target["fallback_detail"] = (
+            f"{unmeasured} other object(s) in zone '{zone_name}' could not be measured"
+        )
+    return target
+
+
+def _build_zone_fallback_target(
+    zone_name: str,
+    zone_display_m: list[float] | None,
+    zone_bbox_min_m: list[float] | None,
+    zone_bbox_max_m: list[float] | None,
+    obj_count: Any,
+    unmeasured: Any,
+    fallback: _FallbackNote | None = None,
+) -> tuple[dict[str, Any], str | None]:
+    has_unmeasured = isinstance(unmeasured, int) and unmeasured > 0
+    unmeasurable = zone_display_m is None
+    target: dict[str, Any] = {
+        "source": "zone_bbox",
+        "screening_mode": "none" if unmeasurable else "zone_envelope",
+        "geometry": "world_aabb",
+        "name": zone_name,
+        "object_count": obj_count,
+        "unmeasured_count": unmeasured,
+        "size_m": zone_display_m,
+        "bbox_min_m": zone_bbox_min_m,
+        "bbox_max_m": zone_bbox_max_m,
+        "measurement": (
+            "unmeasurable_target"
+            if unmeasurable
+            else ("partial_zone_envelope" if has_unmeasured else "complete")
+        ),
+        "measurement_complete": False if unmeasurable else not has_unmeasured,
+    }
+    if not unmeasurable:
+        target["upper_limit_only"] = True
+    if fallback is not None:
+        target["fallback_reason"] = fallback.reason
+        target["fallback_detail"] = fallback.detail
+        if fallback.matches:
+            target["ambiguous_matches"] = list(fallback.matches)
+    return target, ("unmeasurable_target" if unmeasurable else None)
+
+
+def _resolve_target(
+    zone: dict[str, Any],
+    factor: float,
+    objective: str,
+    scene_refs: set[str] | None = None,
+) -> tuple[dict[str, Any], list[float] | None, str | None]:
+    """Identify the zone's sizing target in Q6 deterministic order.
+
+    Order: explicit full DAG path -> unique matching short name -> unique
+    measurable object in the zone -> zone_bbox fallback. Ambiguous matches
+    never pick a winner arbitrarily and always explain the fallback.
+    """
+    name = zone.get("name", "")
+    obj_count = zone.get("object_count")
+    unmeasured = zone.get("unmeasured_count")
+    if obj_count == 0:
+        target, _ = _build_zone_fallback_target(name, None, None, None, 0, unmeasured)
+        target["measurement"] = "empty_zone"
+        return target, None, "empty_zone"
+
+    raw_objects = zone.get("objects")
+    valid_objects = [
+        obj
+        for obj in (raw_objects if isinstance(raw_objects, list) else [])
+        if isinstance(obj, dict) and isinstance(obj.get("name"), str) and obj["name"]
+    ]
+    matched_obj, match_source, fallback = _match_zone_object(
+        name, valid_objects, obj_count, unmeasured, factor, objective, scene_refs=scene_refs
+    )
+    if matched_obj is not None and match_source is not None:
+        obj_display_m, obj_screen_m = _measurable_size_m(matched_obj.get("size"), factor)
+        if obj_screen_m is not None and obj_display_m is not None:
+            return (
+                _build_object_target(
+                    name, matched_obj, match_source, obj_display_m, obj_count, unmeasured
+                ),
+                obj_screen_m,
+                None,
+            )
+        fallback = _FallbackNote(
+            "matched_target_unmeasurable",
+            (
+                f"matched object '{matched_obj['name']}' has no usable bounding box; "
+                "fell back to zone_bbox"
+            ),
+        )
+
+    zone_display_m, zone_screen_m = _measurable_size_m(zone.get("size"), factor)
+    zone_bbox_min_m = _to_metres(zone.get("bbox_min"), factor)
+    zone_bbox_max_m = _to_metres(zone.get("bbox_max"), factor)
+    fallback_target, skip_reason = _build_zone_fallback_target(
+        name,
+        zone_display_m,
+        zone_bbox_min_m,
+        zone_bbox_max_m,
+        obj_count,
+        unmeasured,
+        fallback,
+    )
+    return fallback_target, (None if skip_reason else zone_screen_m), skip_reason
 
 
 def _merge_hits(seen: dict[str, _ScoredHit], screened: list[_ScoredHit]) -> None:
@@ -334,34 +678,45 @@ def _process_zone(
     search_fn: Callable[..., dict[str, Any]],
     errors: list[dict[str, str]],
     truncation: dict[str, bool],
+    objective: str = "",
+    scene_refs: set[str] | None = None,
 ) -> tuple[dict[str, Any], list[_ScoredHit], int, int]:
     """Build one zone's recommendation entry, searching only when enabled & measurable."""
     name = zone.get("name", "")
     scope = f"recommendations:{name}"
-    size_m = _to_metres(zone.get("size"), factor)
-    # Unrounded for the size screen (rounded=False), rounded for display.
-    size_screen = _to_metres(zone.get("size"), factor, rounded=False)
-    unmeasured = zone.get("unmeasured_count")
-    is_empty_zone = zone.get("object_count") == 0
-    if is_empty_zone:
-        measurement = "empty"
-    elif size_m is None:
-        measurement = "unmeasurable_target"
-    elif isinstance(unmeasured, int) and unmeasured > 0:
-        measurement = "partial_zone_envelope"
-    else:
-        measurement = "complete"
-    target: dict[str, Any] = {
-        "source": "zone_bbox",
-        "geometry": "world_aabb",
-        "name": name,
-        "object_count": zone.get("object_count"),
-        "unmeasured_count": unmeasured,
-        "size_m": size_m,
-        "bbox_min_m": _to_metres(zone.get("bbox_min"), factor),
-        "bbox_max_m": _to_metres(zone.get("bbox_max"), factor),
-        "measurement": measurement,
-    }
+    if not queries:
+        disabled_target: dict[str, Any] = {
+            "source": "zone_bbox",
+            "screening_mode": "none",
+            "geometry": "world_aabb",
+            "name": name,
+            "object_count": zone.get("object_count"),
+            "unmeasured_count": zone.get("unmeasured_count"),
+            "size_m": _to_metres(zone.get("size"), factor),
+            "bbox_min_m": _to_metres(zone.get("bbox_min"), factor),
+            "bbox_max_m": _to_metres(zone.get("bbox_max"), factor),
+            "measurement": "disabled",
+        }
+        return (
+            {
+                "zone": name,
+                "status": "skipped",
+                "skip_reason": "recommendations_disabled",
+                "target": disabled_target,
+                "queries": [],
+                "eligible_count": 0,
+                "unverified_count": 0,
+                "candidates": [],
+                "unverified_candidates": [],
+            },
+            [],
+            0,
+            0,
+        )
+
+    target, size_screen, skip_reason = _resolve_target(
+        zone, factor, objective, scene_refs=scene_refs
+    )
     entry: dict[str, Any] = {
         "zone": name,
         "status": "empty",
@@ -372,19 +727,13 @@ def _process_zone(
         "candidates": [],
         "unverified_candidates": [],
     }
-    if not queries:
+    if size_screen is None or skip_reason is not None:
         entry["status"] = "skipped"
-        entry["skip_reason"] = "recommendations_disabled"
-        return entry, [], 0, 0
-    if is_empty_zone:
-        entry["queries"] = [_unsearched_query(q) for q in queries]
-        return entry, [], 0, 0
-    if size_screen is None:  # same condition that set unmeasurable_target above
-        entry["status"] = "skipped"
-        entry["skip_reason"] = "unmeasurable_target"
+        entry["skip_reason"] = skip_reason or "unmeasurable_target"
         entry["queries"] = [_unsearched_query(q) for q in queries]
         return entry, [], 0, 0
 
+    screening_mode = str(target.get("screening_mode", "zone_envelope"))
     seen: dict[str, _ScoredHit] = {}
     succeeded = 0
     failed = 0
@@ -412,7 +761,7 @@ def _process_zone(
         entry["queries"].append(_searched_query(query, total_int))
         if total_int is not None and total_int > len(results):
             truncation["search"] = True
-        _merge_hits(seen, _screen(results, query, size_screen))
+        _merge_hits(seen, _screen(results, query, size_screen, screening_mode=screening_mode))
 
     ordered_hits = sorted(seen.values(), key=lambda hit: hit.sort_key())
     if len(ordered_hits) > MAX_PER_ZONE:
@@ -446,22 +795,64 @@ def _apply_scene_cap(
         _refresh_zone_status(zone_rec)
 
 
+def _build_policy(zones_recs: list[dict[str, Any]]) -> dict[str, Any]:
+    modes = {
+        z.get("target", {}).get("screening_mode")
+        for z in zones_recs
+        if z.get("status") != "skipped"
+    }
+    modes.discard(None)
+    if modes == {"three_axis_tolerance"}:
+        return {
+            "mode": "object_tolerance",
+            "geometry": "world_aabb",
+            "upper_limit_only": False,
+            "tolerance_band": [MIN_SIZE_RATIO, MAX_SIZE_RATIO],
+            "clearance_verified": False,
+            "collision_verified": False,
+            "note": _OBJECT_TOLERANCE_NOTE,
+        }
+    if modes == {"three_axis_tolerance", "zone_envelope"}:
+        return {
+            "mode": "mixed",
+            "geometry": "world_aabb",
+            "upper_limit_only": False,
+            "tolerance_band": [MIN_SIZE_RATIO, MAX_SIZE_RATIO],
+            "clearance_verified": False,
+            "collision_verified": False,
+            "note": _MIXED_POLICY_NOTE,
+        }
+    return {
+        "mode": "zone_envelope",
+        "geometry": "world_aabb",
+        "upper_limit_only": True,
+        "clearance_verified": False,
+        "collision_verified": False,
+        "note": _ZONE_ENVELOPE_NOTE,
+    }
+
+
 def gather_recommendations(
-    zone_geometry: Any, search_fn: Callable[..., dict[str, Any]]
+    zone_geometry: Any,
+    search_fn: Callable[..., dict[str, Any]],
+    objective: str = "",
 ) -> dict[str, Any]:
     """Compose the ``recommendations`` section from geometry + searches.
 
     ``zone_geometry`` is whatever the ``get_zone_geometry`` host helper
     returned (a dict with ``unit``/``zones``, or ``{"error": ...}``).
     ``search_fn`` is ``polyhaven.search_assets`` in production; tests may
-    inject a fake. Never raises: every failure becomes a structured error
-    entry, so the caller's plan survives untouched.
+    inject a fake. ``objective`` is used host-side only to resolve target
+    objects by DAG path or short name and is never sent to ``search_fn``.
+    Never raises: every failure becomes a structured error entry, so the
+    caller's plan survives untouched.
     """
+    objective_text = objective if isinstance(objective, str) else ""
     recs: dict[str, Any] = {
         "status": "empty",
         "provider": "poly_haven",
         "unit": "m",
-        "policy": dict(_POLICY),
+        "policy": _build_policy([]),
         "truncation": {"search": False, "output": False, "budget": False},
         "errors": [],
         "zones": [],
@@ -499,6 +890,16 @@ def gather_recommendations(
         recs["status"] = "partial"
         return recs
 
+    scene_refs: set[str] = set()
+    for z in zones_list:
+        raw_objs = z.get("objects") if isinstance(z, dict) else None
+        if not isinstance(raw_objs, list):
+            continue
+        for obj in raw_objs:
+            if isinstance(obj, dict) and isinstance(obj.get("name"), str) and obj["name"]:
+                scene_refs.add(obj["name"])
+                scene_refs.add(obj["name"].rsplit("|", 1)[-1])
+
     zone_results: list[tuple[dict[str, Any], list[_ScoredHit]]] = []
     total_succeeded = 0
     total_failed = 0
@@ -510,7 +911,14 @@ def gather_recommendations(
         if zone is None:
             continue  # no such zone in this scene: nothing to report or search
         zone_rec, ordered_hits, succeeded, failed = _process_zone(
-            zone, queries, factor, search_fn, errors, truncation
+            zone,
+            queries,
+            factor,
+            search_fn,
+            errors,
+            truncation,
+            objective=objective_text,
+            scene_refs=scene_refs,
         )
         recs["zones"].append(zone_rec)
         zone_results.append((zone_rec, ordered_hits))
@@ -518,6 +926,7 @@ def gather_recommendations(
         total_failed += failed
 
     _apply_scene_cap(zone_results, truncation)
+    recs["policy"] = _build_policy(recs["zones"])
     any_eligible = any(z["eligible_count"] > 0 for z in recs["zones"])
 
     if total_failed > 0 and total_succeeded == 0:
@@ -537,18 +946,38 @@ def _fmt_dims(dims: Any) -> str:
     return "x".join(f"{float(v):g}" for v in dims)
 
 
+def _fallback_suffix(target: dict[str, Any]) -> str:
+    fb = target.get("fallback_reason")
+    if not fb:
+        return ""
+    suffix = f" fallback={fb}"
+    amb = target.get("ambiguous_matches")
+    if amb:
+        suffix += f"({','.join(amb)})"
+    return suffix
+
+
 def format_recommend_cos(recs: dict[str, Any]) -> str:
     """Short RECOMMEND block for scene_plan's CoS output (opt-in only).
 
-    Carries the four things the contract asks for: the status, the target
-    and its size basis, the candidate ids with matched queries and sizes,
-    and the truncation note. Indented to sit under scene_plan's existing
+    Carries the status, the target and its size basis (including
+    completeness and any ambiguity/fallback reason), the candidate ids
+    with matched queries, sizes, and match/unverified reasons, and the
+    truncation note. Indented to sit under scene_plan's existing
     sections.
     """
     policy = recs.get("policy", {})
+    mode = policy.get("mode", "zone_envelope")
+    geom = policy.get("geometry", "world_aabb")
+    if mode == "object_tolerance":
+        policy_label = f"object_tolerance({geom} {MIN_SIZE_RATIO:g}-{MAX_SIZE_RATIO:g}x)"
+    elif mode == "mixed":
+        policy_label = f"mixed({geom} {MIN_SIZE_RATIO:g}-{MAX_SIZE_RATIO:g}x/upper-limit)"
+    else:
+        policy_label = f"{mode}({geom} upper-limit)"
     lines = [
         f"  RECOMMEND: status={recs.get('status')} provider={recs.get('provider')} "
-        f"unit={recs.get('unit')} policy={policy.get('mode')}({policy.get('geometry')} upper-limit)"
+        f"unit={recs.get('unit')} policy={policy_label}"
     ]
     zones = recs.get("zones", [])
     errors = recs.get("errors", [])
@@ -560,16 +989,46 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
             lines.append("    no zones in this scene")
     for zone in zones:
         if zone.get("status") == "skipped":
-            lines.append(f"    {zone.get('zone')}: skipped ({zone.get('skip_reason')})")
+            if zone.get("skip_reason") == "recommendations_disabled":
+                lines.append(f"    {zone.get('zone')}: skipped (recommendations_disabled)")
+                continue
+            target = zone.get("target", {})
+            line = f"    {zone.get('zone')}: skipped ({zone.get('skip_reason')})"
+            obj_count = target.get("object_count")
+            if obj_count is not None:
+                unmeasured = target.get("unmeasured_count")
+                line += f" objects={obj_count} unmeasured={0 if unmeasured is None else unmeasured}"
+            source = target.get("source")
+            if source:
+                line += (
+                    f" target={source}({target.get('name')})"
+                    if source != "zone_bbox" and target.get("name")
+                    else f" target={source}"
+                )
+            line += _fallback_suffix(target)
+            lines.append(line)
             continue
         target = zone.get("target", {})
+        source = target.get("source", "zone_bbox")
+        complete_yn = "y" if target.get("measurement_complete", True) else "n"
         q_names = ",".join(str(q.get("query")) for q in zone.get("queries", []))
-        lines.append(
-            f"    {zone.get('zone')}: target=zone_bbox "
-            f"{_fmt_dims(target.get('size_m'))}m meas={target.get('measurement')} "
+        counts = (
             f"queries={q_names} ({zone.get('eligible_count', 0)} eligible, "
             f"{zone.get('unverified_count', 0)} unverified)"
         )
+        if source == "zone_bbox":
+            target_line = (
+                f"    {zone.get('zone')}: target=zone_bbox "
+                f"{_fmt_dims(target.get('size_m'))}m meas={target.get('measurement')} "
+                f"{counts} complete={complete_yn}{_fallback_suffix(target)}"
+            )
+        else:
+            target_line = (
+                f"    {zone.get('zone')}: target={source}({target.get('name')}) "
+                f"{_fmt_dims(target.get('size_m'))}m tol={MIN_SIZE_RATIO:g}-{MAX_SIZE_RATIO:g}x "
+                f"meas={target.get('measurement')} {counts} complete={complete_yn}"
+            )
+        lines.append(target_line)
         n = 0
         for cand in _zone_candidates(zone):
             n += 1
@@ -578,7 +1037,8 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
             )
             lines.append(
                 f"      {n}. {cand.get('asset_id')} rank={cand.get('best_source_rank')} "
-                f"via=[{via}] {_fmt_dims(cand.get('dimensions_m'))}m {cand.get('reason_code')}"
+                f"via=[{via}] {_fmt_dims(cand.get('dimensions_m'))}m {cand.get('reason_code')} "
+                f"status={cand.get('size_status')}"
             )
 
     def _yn(value: Any) -> str:
