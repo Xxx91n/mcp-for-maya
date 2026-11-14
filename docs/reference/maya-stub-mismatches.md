@@ -8,15 +8,16 @@ Maya interpreter still has to confirm. It is the list to read the next time
 `types-maya-strict` is upgraded.
 
 **What it is not:** proof of live Maya behaviour. No Maya session was run for
-this batch: `mayapy` cannot start on the box that measured it
-(`docs/testing.md` Tier 2 records the native crash on `maya.standalone` and
-the `-batch` hang), so every live cell below is still open. The fake Maya test
-layer (`tests/maya_stub/`) accepts these same calls, but that proves the calls
-match the fake, not the real command; the real-interpreter test
+this batch: the mayapy tier is unrunnable on the box that measured it
+(`docs/testing.md` Tier 2 records the native access violation when
+`maya.standalone` is imported and the `maya.exe -batch` hang), so every live
+cell below is still open. The fake Maya test layer (`tests/maya_stub/`)
+accepts these same calls, but that proves the calls match the fake, not the
+real command; the real-interpreter test
 (`tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms`) is what
 turns a cell into a result, and it skips honestly on this box. None of the six
-forms needs GUI eyes — all six are assertable in batch, which is why the live
-column says `mayapy` everywhere.
+stub forms needs GUI eyes — all six are assertable in batch, which is why
+their live column says `mayapy`.
 
 **Measured environment:** `types-maya-strict==2025.0.6`, `mypy==2.3.1`,
 `mypy-baseline==0.7.4`, Python from `uv sync --frozen`, base commit `1ece725`
