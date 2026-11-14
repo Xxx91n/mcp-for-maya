@@ -1,0 +1,1095 @@
+{
+  "meta": {
+    "date": "2026-11-15",
+    "ticket": "Xxx91n/mcp-for-maya#266",
+    "parent": "#263 (real-Maya acceptance that found the defect), #177 (zone geometry), #31 (recommendations spec)",
+    "env": "Autodesk Maya 2024 GUI launched fresh with maya.exe -script (batch=False), Windows 11 IoT Enterprise LTSC 10.0.26100 x64; scene linear unit cm at rest; real Poly Haven search over HTTPS (no stub); host Python 3.13 (uv env)",
+    "purpose": "Close #266's last acceptance item: run scene_plan's recommendation pass against a multi-zone scene and check that recommendations.zones[*].target.bbox_min_m / bbox_max_m / size_m equal each zone's cmds.exactWorldBoundingBox converted to metres.",
+    "verdict": "All five zones match in all three cases (cm scene, metre scene, back to cm): every zone_bbox target's bbox_min_m, bbox_max_m AND size_m equals the zone's exact world box in metres, the module's own zone box equals cmds.exactWorldBoundingBox, recommendation status is ok, no node is left behind and the scene unit is restored to cm.",
+    "claim_boundary": "The issue's five-zone table was measured on the reporter's own room scene, which is not in this repo; this run builds an equivalent five-zone scene (two objects per zone, all unrotated, positions spread out) and checks the invariant the table asserts rather than its literal rows. It exercises the shipped Maya-side module and the shipped asset_recommendation.gather_recommendations, but not the MCP tool wrapper: the function call is the same one scene_plan makes after reading geometry. Covers Maya 2024 on this box only.",
+    "provenance": {
+      "launch": "maya.exe -script run_fivezone.mel, where the MEL exec's the driver through Maya's python() and then quits; the driver writes its JSON to MAYA_MCP_FIVEZONE_OUT",
+      "driver": "docs/reference/probe_266_fivezone_gui_driver.py",
+      "driver_sha256_at_run": "fb73352cf9673798c0559c46f4254ebac4c9f1af777ebf63de70ec6c25f17e38",
+      "driver_sha256_current": "7c157ea839da26cfe8789a4e57a16aa9a85c8007ce8ada5bcd568e3ed517890d",
+      "driver_revision_note": "The committed driver differs from the run's bytes by ruff formatting, by reading SRC / OUT_FILE from MAYA_MCP_SRC / MAYA_MCP_FIVEZONE_OUT instead of hardcoding the same paths, by check() also comparing size_m, by taking the expected unit from cmds.currentUnit instead of from the geometry being tested, and by refusing to run when the scene already holds one of the planned names plus 3-vector length guards before comparing. None of these takes a measurement: the run used a fresh throwaway Maya, and both tighter checks were applied to the recorded numbers and are reported per case.",
+      "module_source_at_run": "the working tree carrying the #266 patch: the driver exec's src/maya_mcp_server/maya_scene_module.py + zone_geometry_module.py and imports src/maya_mcp_server/asset_recommendation.py, so the shipped code ran",
+      "scene_safety": "Only the ten GEO_* nodes built by the driver were created; all are deleted in a finally block and leftover is empty. The scene unit is restored there too, and file(new=True) is never called (the session is a fresh throwaway Maya).",
+      "size_check_note": "The driver's check() originally compared only the box corners; a review pointed out that size_m is part of the acceptance too. check() now compares size_m as well, and the per-case size_m_check below was recomputed on the numbers this run recorded (same tolerance, no new Maya session needed).",
+      "independence_note": "A review pointed out that deriving the expected metres from geometry['unit'] lets a wrong unit label cancel itself out. The driver now reads the session unit from cmds.currentUnit and asserts the geometry label equals it; the checks below were recomputed from the recorded cmds boxes using that session unit (cm -> m -> cm, which the recorded box magnitudes confirm), independent of the label under test."
+    }
+  },
+  "scene": {
+    "display": [
+      "GEO_shelf_a",
+      "GEO_shelf_b"
+    ],
+    "entrance": [
+      "GEO_entrance_frame",
+      "GEO_entrance_panel"
+    ],
+    "furniture": [
+      "GEO_chair_a",
+      "GEO_table_a"
+    ],
+    "lighting": [
+      "GEO_lamp_a",
+      "GEO_lamp_b"
+    ],
+    "shell": [
+      "GEO_wall_back",
+      "GEO_wall_side"
+    ]
+  },
+  "cases": {
+    "cm_scene": {
+      "unit": "cm",
+      "recommendation_status": "ok",
+      "mismatches": [],
+      "zones": {
+        "display": {
+          "cmds_box": [
+            [
+              -305.0,
+              0.0,
+              -80.0
+            ],
+            [
+              -115.0,
+              180.0,
+              -40.0
+            ]
+          ],
+          "expected_m": [
+            [
+              -3.05,
+              0.0,
+              -0.8
+            ],
+            [
+              -1.15,
+              1.8,
+              -0.4
+            ]
+          ],
+          "module_box": [
+            [
+              -305.0,
+              0.0,
+              -80.0
+            ],
+            [
+              -115.0,
+              180.0,
+              -40.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            -1.15,
+            1.8,
+            -0.4
+          ],
+          "target_bbox_min_m": [
+            -3.05,
+            0.0,
+            -0.8
+          ],
+          "target_size_m": [
+            1.9,
+            1.8,
+            0.4
+          ],
+          "expected_m_from_session_unit": [
+            [
+              -3.05,
+              0.0,
+              -0.8
+            ],
+            [
+              -1.15,
+              1.8,
+              -0.4
+            ]
+          ]
+        },
+        "entrance": {
+          "cmds_box": [
+            [
+              -320.0,
+              0.0,
+              285.0
+            ],
+            [
+              -125.0,
+              220.0,
+              295.0
+            ]
+          ],
+          "expected_m": [
+            [
+              -3.2,
+              0.0,
+              2.85
+            ],
+            [
+              -1.25,
+              2.2,
+              2.95
+            ]
+          ],
+          "module_box": [
+            [
+              -320.0,
+              0.0,
+              285.0
+            ],
+            [
+              -125.0,
+              220.0,
+              295.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            -1.25,
+            2.2,
+            2.95
+          ],
+          "target_bbox_min_m": [
+            -3.2,
+            0.0,
+            2.85
+          ],
+          "target_size_m": [
+            1.95,
+            2.2,
+            0.1
+          ],
+          "expected_m_from_session_unit": [
+            [
+              -3.2,
+              0.0,
+              2.85
+            ],
+            [
+              -1.25,
+              2.2,
+              2.95
+            ]
+          ]
+        },
+        "furniture": {
+          "cmds_box": [
+            [
+              115.0,
+              0.0,
+              20.0
+            ],
+            [
+              280.0,
+              90.0,
+              100.0
+            ]
+          ],
+          "expected_m": [
+            [
+              1.15,
+              0.0,
+              0.2
+            ],
+            [
+              2.8,
+              0.9,
+              1.0
+            ]
+          ],
+          "module_box": [
+            [
+              115.0,
+              0.0,
+              20.0
+            ],
+            [
+              280.0,
+              90.0,
+              100.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            2.8,
+            0.9,
+            1.0
+          ],
+          "target_bbox_min_m": [
+            1.15,
+            0.0,
+            0.2
+          ],
+          "target_size_m": [
+            1.65,
+            0.9,
+            0.8
+          ],
+          "expected_m_from_session_unit": [
+            [
+              1.15,
+              0.0,
+              0.2
+            ],
+            [
+              2.8,
+              0.9,
+              1.0
+            ]
+          ]
+        },
+        "lighting": {
+          "cmds_box": [
+            [
+              280.0,
+              0.0,
+              -220.0
+            ],
+            [
+              320.0,
+              40.0,
+              -125.0
+            ]
+          ],
+          "expected_m": [
+            [
+              2.8,
+              0.0,
+              -2.2
+            ],
+            [
+              3.2,
+              0.4,
+              -1.25
+            ]
+          ],
+          "module_box": [
+            [
+              280.0,
+              0.0,
+              -220.0
+            ],
+            [
+              320.0,
+              40.0,
+              -125.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            3.2,
+            0.4,
+            -1.25
+          ],
+          "target_bbox_min_m": [
+            2.8,
+            0.0,
+            -2.2
+          ],
+          "target_size_m": [
+            0.4,
+            0.4,
+            0.95
+          ],
+          "expected_m_from_session_unit": [
+            [
+              2.8,
+              0.0,
+              -2.2
+            ],
+            [
+              3.2,
+              0.4,
+              -1.25
+            ]
+          ]
+        },
+        "shell": {
+          "cmds_box": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              400.0,
+              250.0,
+              300.0
+            ]
+          ],
+          "expected_m": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              4.0,
+              2.5,
+              3.0
+            ]
+          ],
+          "module_box": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              400.0,
+              250.0,
+              300.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            4.0,
+            2.5,
+            3.0
+          ],
+          "target_bbox_min_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "target_size_m": [
+            4.0,
+            2.5,
+            3.0
+          ],
+          "expected_m_from_session_unit": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              4.0,
+              2.5,
+              3.0
+            ]
+          ]
+        }
+      },
+      "size_m_check": {
+        "mismatches": []
+      },
+      "session_unit": "cm",
+      "independent_check": {
+        "mismatches": []
+      }
+    },
+    "m_scene": {
+      "unit": "m",
+      "recommendation_status": "ok",
+      "mismatches": [],
+      "zones": {
+        "display": {
+          "cmds_box": [
+            [
+              -3.05,
+              0.0,
+              -0.8
+            ],
+            [
+              -1.15,
+              1.8,
+              -0.4
+            ]
+          ],
+          "expected_m": [
+            [
+              -3.05,
+              0.0,
+              -0.8
+            ],
+            [
+              -1.15,
+              1.8,
+              -0.4
+            ]
+          ],
+          "module_box": [
+            [
+              -3.0500000000000003,
+              0.0,
+              -0.8
+            ],
+            [
+              -1.1500000000000001,
+              1.8,
+              -0.4
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            -1.15,
+            1.8,
+            -0.4
+          ],
+          "target_bbox_min_m": [
+            -3.05,
+            0.0,
+            -0.8
+          ],
+          "target_size_m": [
+            1.9,
+            1.8,
+            0.4
+          ],
+          "expected_m_from_session_unit": [
+            [
+              -3.05,
+              0.0,
+              -0.8
+            ],
+            [
+              -1.15,
+              1.8,
+              -0.4
+            ]
+          ]
+        },
+        "entrance": {
+          "cmds_box": [
+            [
+              -3.2,
+              0.0,
+              2.85
+            ],
+            [
+              -1.25,
+              2.2,
+              2.95
+            ]
+          ],
+          "expected_m": [
+            [
+              -3.2,
+              0.0,
+              2.85
+            ],
+            [
+              -1.25,
+              2.2,
+              2.95
+            ]
+          ],
+          "module_box": [
+            [
+              -3.2,
+              0.0,
+              2.85
+            ],
+            [
+              -1.25,
+              2.2,
+              2.95
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            -1.25,
+            2.2,
+            2.95
+          ],
+          "target_bbox_min_m": [
+            -3.2,
+            0.0,
+            2.85
+          ],
+          "target_size_m": [
+            1.95,
+            2.2,
+            0.1
+          ],
+          "expected_m_from_session_unit": [
+            [
+              -3.2,
+              0.0,
+              2.85
+            ],
+            [
+              -1.25,
+              2.2,
+              2.95
+            ]
+          ]
+        },
+        "furniture": {
+          "cmds_box": [
+            [
+              1.15,
+              0.0,
+              0.2
+            ],
+            [
+              2.8,
+              0.9,
+              1.0
+            ]
+          ],
+          "expected_m": [
+            [
+              1.15,
+              0.0,
+              0.2
+            ],
+            [
+              2.8,
+              0.9,
+              1.0
+            ]
+          ],
+          "module_box": [
+            [
+              1.1500000000000001,
+              0.0,
+              0.2
+            ],
+            [
+              2.8000000000000003,
+              0.9,
+              1.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            2.8,
+            0.9,
+            1.0
+          ],
+          "target_bbox_min_m": [
+            1.15,
+            0.0,
+            0.2
+          ],
+          "target_size_m": [
+            1.65,
+            0.9,
+            0.8
+          ],
+          "expected_m_from_session_unit": [
+            [
+              1.15,
+              0.0,
+              0.2
+            ],
+            [
+              2.8,
+              0.9,
+              1.0
+            ]
+          ]
+        },
+        "lighting": {
+          "cmds_box": [
+            [
+              2.8,
+              0.0,
+              -2.2
+            ],
+            [
+              3.2,
+              0.4,
+              -1.25
+            ]
+          ],
+          "expected_m": [
+            [
+              2.8,
+              0.0,
+              -2.2
+            ],
+            [
+              3.2,
+              0.4,
+              -1.25
+            ]
+          ],
+          "module_box": [
+            [
+              2.8000000000000003,
+              0.0,
+              -2.2
+            ],
+            [
+              3.2,
+              0.4,
+              -1.25
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            3.2,
+            0.4,
+            -1.25
+          ],
+          "target_bbox_min_m": [
+            2.8,
+            0.0,
+            -2.2
+          ],
+          "target_size_m": [
+            0.4,
+            0.4,
+            0.95
+          ],
+          "expected_m_from_session_unit": [
+            [
+              2.8,
+              0.0,
+              -2.2
+            ],
+            [
+              3.2,
+              0.4,
+              -1.25
+            ]
+          ]
+        },
+        "shell": {
+          "cmds_box": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              4.0,
+              2.5,
+              3.0
+            ]
+          ],
+          "expected_m": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              4.0,
+              2.5,
+              3.0
+            ]
+          ],
+          "module_box": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              4.0,
+              2.5,
+              3.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            4.0,
+            2.5,
+            3.0
+          ],
+          "target_bbox_min_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "target_size_m": [
+            4.0,
+            2.5,
+            3.0
+          ],
+          "expected_m_from_session_unit": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              4.0,
+              2.5,
+              3.0
+            ]
+          ]
+        }
+      },
+      "size_m_check": {
+        "mismatches": []
+      },
+      "session_unit": "m",
+      "independent_check": {
+        "mismatches": []
+      }
+    },
+    "cm_after": {
+      "unit": "cm",
+      "recommendation_status": "ok",
+      "mismatches": [],
+      "zones": {
+        "display": {
+          "cmds_box": [
+            [
+              -305.0,
+              0.0,
+              -80.0
+            ],
+            [
+              -115.0,
+              180.0,
+              -40.0
+            ]
+          ],
+          "expected_m": [
+            [
+              -3.05,
+              0.0,
+              -0.8
+            ],
+            [
+              -1.15,
+              1.8,
+              -0.4
+            ]
+          ],
+          "module_box": [
+            [
+              -305.0,
+              0.0,
+              -80.0
+            ],
+            [
+              -115.0,
+              180.0,
+              -40.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            -1.15,
+            1.8,
+            -0.4
+          ],
+          "target_bbox_min_m": [
+            -3.05,
+            0.0,
+            -0.8
+          ],
+          "target_size_m": [
+            1.9,
+            1.8,
+            0.4
+          ],
+          "expected_m_from_session_unit": [
+            [
+              -3.05,
+              0.0,
+              -0.8
+            ],
+            [
+              -1.15,
+              1.8,
+              -0.4
+            ]
+          ]
+        },
+        "entrance": {
+          "cmds_box": [
+            [
+              -320.0,
+              0.0,
+              285.0
+            ],
+            [
+              -125.0,
+              220.0,
+              295.0
+            ]
+          ],
+          "expected_m": [
+            [
+              -3.2,
+              0.0,
+              2.85
+            ],
+            [
+              -1.25,
+              2.2,
+              2.95
+            ]
+          ],
+          "module_box": [
+            [
+              -320.0,
+              0.0,
+              285.0
+            ],
+            [
+              -125.0,
+              220.0,
+              295.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            -1.25,
+            2.2,
+            2.95
+          ],
+          "target_bbox_min_m": [
+            -3.2,
+            0.0,
+            2.85
+          ],
+          "target_size_m": [
+            1.95,
+            2.2,
+            0.1
+          ],
+          "expected_m_from_session_unit": [
+            [
+              -3.2,
+              0.0,
+              2.85
+            ],
+            [
+              -1.25,
+              2.2,
+              2.95
+            ]
+          ]
+        },
+        "furniture": {
+          "cmds_box": [
+            [
+              115.0,
+              0.0,
+              20.0
+            ],
+            [
+              280.0,
+              90.0,
+              100.0
+            ]
+          ],
+          "expected_m": [
+            [
+              1.15,
+              0.0,
+              0.2
+            ],
+            [
+              2.8,
+              0.9,
+              1.0
+            ]
+          ],
+          "module_box": [
+            [
+              115.0,
+              0.0,
+              20.0
+            ],
+            [
+              280.0,
+              90.0,
+              100.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            2.8,
+            0.9,
+            1.0
+          ],
+          "target_bbox_min_m": [
+            1.15,
+            0.0,
+            0.2
+          ],
+          "target_size_m": [
+            1.65,
+            0.9,
+            0.8
+          ],
+          "expected_m_from_session_unit": [
+            [
+              1.15,
+              0.0,
+              0.2
+            ],
+            [
+              2.8,
+              0.9,
+              1.0
+            ]
+          ]
+        },
+        "lighting": {
+          "cmds_box": [
+            [
+              280.0,
+              0.0,
+              -220.0
+            ],
+            [
+              320.0,
+              40.0,
+              -125.0
+            ]
+          ],
+          "expected_m": [
+            [
+              2.8,
+              0.0,
+              -2.2
+            ],
+            [
+              3.2,
+              0.4,
+              -1.25
+            ]
+          ],
+          "module_box": [
+            [
+              280.0,
+              0.0,
+              -220.0
+            ],
+            [
+              320.0,
+              40.0,
+              -125.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            3.2,
+            0.4,
+            -1.25
+          ],
+          "target_bbox_min_m": [
+            2.8,
+            0.0,
+            -2.2
+          ],
+          "target_size_m": [
+            0.4,
+            0.4,
+            0.95
+          ],
+          "expected_m_from_session_unit": [
+            [
+              2.8,
+              0.0,
+              -2.2
+            ],
+            [
+              3.2,
+              0.4,
+              -1.25
+            ]
+          ]
+        },
+        "shell": {
+          "cmds_box": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              400.0,
+              250.0,
+              300.0
+            ]
+          ],
+          "expected_m": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              4.0,
+              2.5,
+              3.0
+            ]
+          ],
+          "module_box": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              400.0,
+              250.0,
+              300.0
+            ]
+          ],
+          "objects": 2,
+          "source": "zone_bbox",
+          "target_bbox_max_m": [
+            4.0,
+            2.5,
+            3.0
+          ],
+          "target_bbox_min_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "target_size_m": [
+            4.0,
+            2.5,
+            3.0
+          ],
+          "expected_m_from_session_unit": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              4.0,
+              2.5,
+              3.0
+            ]
+          ]
+        }
+      },
+      "size_m_check": {
+        "mismatches": []
+      },
+      "session_unit": "cm",
+      "independent_check": {
+        "mismatches": []
+      }
+    }
+  },
+  "leftover": [],
+  "restored_unit": "cm"
+}

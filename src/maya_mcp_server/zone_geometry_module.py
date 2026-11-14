@@ -42,6 +42,23 @@ def _zone_size(low: Any, high: Any) -> list[float] | None:
     return _zone_vector([round(abs(hi - lo), 3) for lo, hi in zip(mn, mx)])
 
 
+def _zone_unit_scale() -> float:
+    """Centimetres -> the working linear unit (1.0 in a centimetre scene).
+
+    OpenMaya hands back internal centimetres whatever currentUnit says, so
+    every length this file reports has to be converted before it is labelled
+    with the scene's unit. #266: skipping this made metre scenes 100x too big.
+    """
+    return float(OpenMaya.MDistance(1.0).asUnits(OpenMaya.MDistance.uiUnit()))
+
+
+def _zone_scaled(values: list[float] | None, scale: float) -> list[float] | None:
+    """Apply the unit factor to a length vector, keeping nulls null."""
+    if values is None:
+        return None
+    return [v * scale for v in values]
+
+
 def get_zone_geometry() -> dict[str, Any]:
     """Read the zones scene_plan already uses, with their boxes and object sizes.
 
@@ -61,6 +78,7 @@ def get_zone_geometry() -> dict[str, Any]:
         unit_info = globals()["get_unit_info"]()
         transforms = cmds.ls(type="transform", long=True) or []
         world_bbox = globals()["_world_bbox"]
+        scale = _zone_unit_scale()
 
         # get_zone_map stores short names. A leaf name always maps to the same
         # zone because the same regex matched it; resolving the full path below
@@ -84,7 +102,8 @@ def get_zone_geometry() -> dict[str, Any]:
                 bbox = world_bbox(sel.getDagPath(0))
                 # MPoint carries a fourth w component; the bbox contract is xyz.
                 entry["size"] = _zone_size(
-                    [bbox.min[i] for i in range(3)], [bbox.max[i] for i in range(3)]
+                    _zone_scaled([bbox.min[i] for i in range(3)], scale),
+                    _zone_scaled([bbox.max[i] for i in range(3)], scale),
                 )
                 if entry["size"] is not None:
                     measured_zones.add(zone_name)
@@ -101,8 +120,8 @@ def get_zone_geometry() -> dict[str, Any]:
             bbox_max: list[float] | None = None
             size: list[float] | None = None
             if name in measured_zones:
-                low = _zone_vector(zone["bbox_min"])
-                high = _zone_vector(zone["bbox_max"])
+                low = _zone_scaled(_zone_vector(zone["bbox_min"]), scale)
+                high = _zone_scaled(_zone_vector(zone["bbox_max"]), scale)
                 size = _zone_size(low, high)
                 if size is not None:
                     bbox_min, bbox_max = low, high

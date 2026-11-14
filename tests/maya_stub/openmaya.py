@@ -4,11 +4,53 @@ from __future__ import annotations
 
 from . import runtime
 from .math3d import MBoundingBox, MMatrix, MPoint, MVector
+from .scene import CM_PER_UNIT, SHAPE_TYPES
 
 
 class MSpace:
     kWorld = 0
     kObject = 1
+
+
+class MFn:
+    """Subset of MFn function-set constants used to probe a dag path."""
+
+    kTransform = 1
+    kShape = 2
+
+
+class MDistance:
+    """Linear length; the stored value is always internal centimetres.
+
+    Stub subset: the conversion the scene module uses,
+    MDistance(value).asUnits(MDistance.uiUnit()).
+    """
+
+    kMillimeters = 1
+    kCentimeters = 2
+    kMeters = 3
+    kKilometers = 4
+    kInches = 5
+    kFeet = 6
+    kYards = 7
+
+    _UNIT_BY_NAME = {"mm": 1, "cm": 2, "m": 3, "km": 4, "in": 5, "ft": 6, "yd": 7}
+    # Derived from the scene's single table so cmds and MDistance cannot drift.
+    _CM_PER_UNIT = {unit: CM_PER_UNIT[name] for name, unit in _UNIT_BY_NAME.items()}
+
+    def __init__(self, value=0.0, unit=kCentimeters):
+        self.value = float(value) * MDistance._CM_PER_UNIT[unit]
+
+    def asUnits(self, unit):
+        """This length expressed in `unit`."""
+        return self.value / MDistance._CM_PER_UNIT[unit]
+
+    @staticmethod
+    def uiUnit():
+        """The scene's working linear unit (what cmds reports)."""
+        if runtime.scene is None:
+            return MDistance.kCentimeters
+        return MDistance._UNIT_BY_NAME.get(runtime.scene.linear_unit, MDistance.kCentimeters)
 
 
 class MDagPath:
@@ -38,6 +80,24 @@ class MDagPath:
 
     def inclusiveMatrix(self):
         return runtime.scene.inclusive_matrix(self.node())
+
+    def exclusiveMatrix(self):
+        return runtime.scene.exclusive_matrix(self.node())
+
+    def hasFn(self, fn_type):
+        """Only the two function sets the product asks about, both checked on
+        Maya 2024: a shape path answers kShape, and a transform path answers
+        kTransform *and* kShape when it owns a shape child, so kTransform is
+        the reliable discriminator. Any other type answers False by choice —
+        what real Maya does there is unmeasured, and a fake that says yes to
+        API it does not model is the false-green direction.
+        """
+        node = self.node()
+        if fn_type == MFn.kTransform:
+            return node.type == "transform"
+        if fn_type == MFn.kShape:
+            return node.type in SHAPE_TYPES or any(c.type in SHAPE_TYPES for c in node.children)
+        return False
 
     def length(self):
         return len(self._path)

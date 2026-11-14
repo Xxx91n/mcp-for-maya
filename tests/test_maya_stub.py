@@ -9,6 +9,7 @@ import math
 import maya_stub
 import pytest
 from maya_stub.math3d import MBoundingBox, MPoint, MVector, euler_from_matrix, trs_matrix
+from maya_stub.openmaya import MDistance
 
 
 @pytest.fixture
@@ -173,13 +174,30 @@ class TestSceneGraph:
         # long names disambiguate
         assert scene.resolve("|GRP_a|dup").parent is g1
 
+    def test_transform_bbox_is_parent_space(self, scene):
+        """MFnDagNode.boundingBox on a transform: the node's own translate is
+        already in the box, the parent's is not (Maya 2024, issue #266).
+        Getting this convention wrong is what made the fake a false green."""
+        parent = scene.add_transform("GRP_a", t=(500, 0, 0))
+        child = scene.add_mesh(
+            "GEO_c", bbox_min=(0, 0, 0), bbox_max=(10, 10, 10), t=(10, 0, 0), parent=parent
+        )
+
+        box = scene.object_bbox(child)
+
+        assert box.min.x == pytest.approx(10.0)
+        assert box.max.x == pytest.approx(20.0)
+        assert scene.world_bbox(child).min.x == pytest.approx(510.0)
+        assert scene.world_bbox(child).max.x == pytest.approx(520.0)
+
     def test_world_bbox_rotated_8_corners(self, scene):
         # 2x1x1 box rotated 45 deg about Y: world XZ extent = 3*sqrt(2)/2
         box = scene.add_mesh(
             "GEO_rot", bbox_min=(-1, -0.5, -0.5), bbox_max=(1, 0.5, 0.5), r=(0, 45, 0)
         )
-        wb = scene.object_bbox(box)  # local space bbox
-        wm = scene.inclusive_matrix(box)
+        shape = box.children[0]
+        wb = scene.object_bbox(shape)  # shape -> object space
+        wm = scene.inclusive_matrix(shape)  # the owner transform's world matrix
         out = MBoundingBox()
         for c in wb._corners():
             out.expand(c * wm)
@@ -188,12 +206,48 @@ class TestSceneGraph:
         assert (out.max.z - out.min.z) == pytest.approx(ext, abs=1e-9)
         assert (out.max.y - out.min.y) == pytest.approx(1.0)
 
+    def test_transform_and_shape_paths_agree_on_the_world_box(self, scene):
+        """world_bbox() takes the exclusive matrix for a transform (its box is
+        parent space) and the inclusive one for a shape (object space), so the
+        two paths must land on the same box."""
+        box = scene.add_mesh(
+            "GEO_rot", bbox_min=(-1, -0.5, -0.5), bbox_max=(1, 0.5, 0.5), r=(0, 45, 0)
+        )
+        shape = box.children[0]
+
+        via_transform = scene.world_bbox(box)
+        via_shape = scene.world_bbox(shape)
+
+        for axis in "xyz":
+            assert getattr(via_transform.min, axis) == pytest.approx(
+                getattr(via_shape.min, axis), abs=1e-9
+            )
+            assert getattr(via_transform.max, axis) == pytest.approx(
+                getattr(via_shape.max, axis), abs=1e-9
+            )
+
+    def test_exclusive_matrix_is_the_parent_world_matrix(self, scene):
+        """Depth matters: exclusive = L_parent * L_grandparent * ... (no self)."""
+        root = scene.add_transform("GRP_root", t=(10, 0, 0))
+        root.r = [0, 45, 0]
+        mid = scene.add_transform("GRP_mid", t=(0, 0, 5), parent=root)
+        leaf = scene.add_transform("GRP_leaf", t=(1, 0, 0), parent=mid)
+
+        excl = [scene.exclusive_matrix(leaf)[i] for i in range(16)]
+        mid_world = [scene.inclusive_matrix(mid)[i] for i in range(16)]
+
+        assert excl == pytest.approx(mid_world)
+        # a root node has no parent, so its exclusive matrix is the identity
+        identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+        assert [scene.exclusive_matrix(root)[i] for i in range(16)] == pytest.approx(identity)
+
     def test_naive_minmax_transform_is_wrong(self, scene):
         # Corner-at-origin box rotated 45 deg: min*M/max*M shortcut gives a
         # DIFFERENT (wrong) world AABB than the 8-corner transform.
         box = scene.add_mesh("GEO_off", bbox_min=(0, 0, 0), bbox_max=(2, 1, 1), r=(0, 45, 0))
-        wb = scene.object_bbox(box)
-        wm = scene.inclusive_matrix(box)
+        shape = box.children[0]
+        wb = scene.object_bbox(shape)
+        wm = scene.inclusive_matrix(shape)
         out = MBoundingBox()
         for c in wb._corners():
             out.expand(c * wm)
@@ -207,6 +261,76 @@ class TestSceneGraph:
         # naive min*M/max*M reports z=[0, -0.707] — both bounds wrong
         assert not math.isclose(naive_min.z, out.min.z, abs_tol=1e-6)
         assert not math.isclose(naive_max.z, out.max.z, abs_tol=1e-6)
+
+    def test_exact_world_bbox_follows_the_working_unit(self, scene):
+        """cmds lengths follow currentUnit; OpenMaya lengths stay centimetres."""
+        cmds = __import__("maya.cmds", fromlist=["x"])
+        box = scene.add_mesh("GEO_door", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6))
+
+        assert cmds.exactWorldBoundingBox("GEO_door")[3] == pytest.approx(65.0)
+        scene.linear_unit = "m"
+        assert cmds.exactWorldBoundingBox("GEO_door")[3] == pytest.approx(0.65)
+        assert scene.world_bbox(box).max.x == pytest.approx(65.0)
+
+    def test_cmds_linear_arguments_follow_the_working_unit(self, scene):
+        """polyCube/move take working units and xform returns them, while the
+        scene itself stays in internal centimetres (issue #266)."""
+        cmds = __import__("maya.cmds", fromlist=["x"])
+        scene.linear_unit = "m"
+
+        cube = cmds.polyCube(w=2, h=1, d=1)[0]
+        cmds.move(5, 0, 0, cube, absolute=True)
+
+        assert cmds.exactWorldBoundingBox(cube) == pytest.approx([4, -0.5, -0.5, 6, 0.5, 0.5])
+        assert cmds.xform(cube, q=True, ws=True, t=True) == pytest.approx([5, 0, 0])
+        assert scene.object_bbox(scene.resolve(cube)).max.x == pytest.approx(600.0)
+
+    def test_cached_box_cannot_be_un_rotated(self, scene):
+        """Known limitation, pinned so nobody 'fixes' it by accident or claims
+        it away: a child whose own rotation cancels the parent's has a loose
+        cached parent-space box, and multiplying it by the parent matrix keeps
+        the looseness. exactWorldBoundingBox walks the shapes and stays right.
+        """
+        parent = scene.add_transform("GRP_p")
+        parent.r = [0, 30, 0]
+        child = scene.add_mesh(
+            "GEO_c", bbox_min=(-5, -5, -5), bbox_max=(5, 5, 5), r=(0, -30, 0), parent=parent
+        )
+
+        assert scene.world_bbox(child).max.x == pytest.approx(5.0)  # world rotation is identity
+        assert scene.object_bbox(child).max.x > 5.0  # the cached box is loose
+
+
+class TestOpenMayaStub:
+    def test_mdistance_converts_internal_centimetres(self, scene):
+        """MDistance stores centimetres and reports in the asked-for unit;
+        uiUnit() follows currentUnit (probe-checked on Maya 2024)."""
+        assert MDistance(130.0).asUnits(MDistance.uiUnit()) == pytest.approx(130.0)
+        assert MDistance(130.0).asUnits(MDistance.kMeters) == pytest.approx(1.3)
+        assert MDistance(1.0).asUnits(MDistance.kMeters) == pytest.approx(0.01)
+
+        scene.linear_unit = "m"
+
+        assert MDistance.uiUnit() == MDistance.kMeters
+        assert MDistance(130.0).asUnits(MDistance.uiUnit()) == pytest.approx(1.3)
+
+    def test_hasfn_separates_transform_from_shape_paths(self, scene):
+        parent = scene.add_transform("GRP_a")
+        mesh = scene.add_mesh("GEO_m", bbox_min=(0, 0, 0), bbox_max=(1, 1, 1), parent=parent)
+        shape = mesh.children[0]
+        om = __import__("maya.api.OpenMaya", fromlist=["x"])
+
+        transform_path = om.MDagPath(mesh)
+        shape_path = om.MDagPath(shape)
+
+        assert transform_path.hasFn(om.MFn.kTransform) is True
+        assert shape_path.hasFn(om.MFn.kTransform) is False
+        # a transform owns its shape, so it answers kShape as well — this is
+        # why kTransform, not "looks like a shape", has to pick the matrix
+        assert transform_path.hasFn(om.MFn.kShape) is True
+        assert shape_path.hasFn(om.MFn.kShape) is True
+        # the fake must not say yes to function sets it does not model
+        assert transform_path.hasFn(12345) is False
 
 
 class TestCmdsFacade:

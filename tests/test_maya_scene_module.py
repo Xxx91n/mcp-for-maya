@@ -272,6 +272,119 @@ class TestSceneReviewStandards:
 
 
 # ------------------------------------------------------------
+# #266: the eight-corner transform must match cmds.exactWorldBoundingBox
+# ------------------------------------------------------------
+
+
+def _dag_path(maya_env, name):
+    sel = maya_env.om2.MSelectionList()
+    sel.add(name)
+    return sel.getDagPath(0)
+
+
+class TestWorldBboxMatchesExactBox:
+    """MFnDagNode.boundingBox is PARENT space on a transform (it already
+    carries the node's own translate/rotate) and OBJECT space on a shape.
+    Feeding the inclusive matrix to a transform path lands that transform
+    twice. The hardcoded numbers are the real pin — comparing against
+    cmds.exactWorldBoundingBox only catches the fake drifting away from the
+    module, because both sides of that comparison are the fake.
+    """
+
+    def test_translate_is_applied_once(self, maya_env):
+        maya_env.scene.add_mesh(
+            "GEO_box", bbox_min=(-50, -50, -50), bbox_max=(50, 50, 50), t=(200, 50, 300)
+        )
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, "GEO_box"))
+        exact = maya_env.cmds.exactWorldBoundingBox("GEO_box")
+
+        # The issue's own numbers: a 100 cube at (200, 50, 300).
+        assert [box.min[i] for i in range(3)] == pytest.approx([150, 0, 250], abs=1e-3)
+        assert [box.max[i] for i in range(3)] == pytest.approx([250, 100, 350], abs=1e-3)
+        assert [box.min[i] for i in range(3)] == pytest.approx(exact[:3], abs=1e-3)
+        assert [box.max[i] for i in range(3)] == pytest.approx(exact[3:], abs=1e-3)
+
+    def test_rotation_gives_the_same_extents_as_the_exact_box(self, maya_env):
+        maya_env.scene.add_mesh(
+            "GEO_rot", bbox_min=(-50, -50, -50), bbox_max=(50, 50, 50), r=(0, 45, 0)
+        )
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, "GEO_rot"))
+        exact = maya_env.cmds.exactWorldBoundingBox("GEO_rot")
+        size = [box.max[i] - box.min[i] for i in range(3)]
+
+        assert size == pytest.approx(
+            [exact[3] - exact[0], exact[4] - exact[1], exact[5] - exact[2]], abs=1e-3
+        )
+        # A 100 cube at 45 deg is 141.421 wide, not 200.
+        assert size[0] == pytest.approx(100 * math.sqrt(2), abs=1e-3)
+        assert size[1] == pytest.approx(100, abs=1e-3)
+
+    def test_nested_child_under_a_moved_parent(self, maya_env):
+        parent = maya_env.scene.add_transform("GRP_root", t=(500, 0, 0))
+        maya_env.scene.add_mesh(
+            "GEO_child", bbox_min=(0, 0, 0), bbox_max=(10, 10, 10), t=(10, 0, 0), parent=parent
+        )
+        path = "|GRP_root|GEO_child"
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, path))
+        exact = maya_env.cmds.exactWorldBoundingBox(path)
+
+        assert box.min.x == pytest.approx(510.0, abs=1e-3)
+        assert box.max.x == pytest.approx(520.0, abs=1e-3)
+        assert [box.min[i] for i in range(3)] == pytest.approx(exact[:3], abs=1e-3)
+        assert [box.max[i] for i in range(3)] == pytest.approx(exact[3:], abs=1e-3)
+
+    def test_shape_path_still_matches_the_exact_box(self, maya_env):
+        maya_env.scene.add_mesh(
+            "GEO_owner", bbox_min=(0, 0, 0), bbox_max=(4, 2, 1), t=(20, 0, 0), r=(0, 30, 0)
+        )
+        path = "|GEO_owner|GEO_ownerShape"
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, path))
+        exact = maya_env.cmds.exactWorldBoundingBox(path)
+
+        # 4x2x1 box at (20,0,0) turned 30 deg about Y, computed by hand:
+        # x = 20 .. 20 + 4cos30 + 1sin30, z = -4sin30 .. cos30, y = 0 .. 2.
+        assert [box.min[i] for i in range(3)] == pytest.approx([20, 0, -2], abs=1e-3)
+        assert [box.max[i] for i in range(3)] == pytest.approx(
+            [20 + 4 * math.cos(math.radians(30)) + 0.5, 2, math.cos(math.radians(30))],
+            abs=1e-3,
+        )
+        assert [box.min[i] for i in range(3)] == pytest.approx(exact[:3], abs=1e-3)
+        assert [box.max[i] for i in range(3)] == pytest.approx(exact[3:], abs=1e-3)
+
+
+class TestReportedBoxIsWorldSpace:
+    """Anything reported next to a world `position` must be a world box."""
+
+    def test_scene_graph_reports_the_world_box_of_a_nested_object(self, maya_env):
+        parent = maya_env.scene.add_transform("GRP_root", t=(500, 0, 0))
+        maya_env.scene.add_mesh(
+            "GEO_child", bbox_min=(0, 0, 0), bbox_max=(10, 10, 10), t=(10, 0, 0), parent=parent
+        )
+
+        objects = {o["n"]: o for o in maya_env.module.get_scene_graph()["objects"]}
+
+        assert objects["GEO_child"]["p"] == [510, 0, 0]
+        assert objects["GEO_child"]["b"][0] == pytest.approx(510.0, abs=1e-3)
+        assert objects["GEO_child"]["b"][3] == pytest.approx(520.0, abs=1e-3)
+
+    def test_assert_scene_state_compares_the_world_box(self, maya_env):
+        parent = maya_env.scene.add_transform("GRP_root", t=(500, 0, 0))
+        maya_env.scene.add_mesh(
+            "GEO_child", bbox_min=(0, 0, 0), bbox_max=(10, 10, 10), t=(10, 0, 0), parent=parent
+        )
+
+        res = maya_env.module.assert_scene_state(
+            json.dumps({"GEO_child": {"bbox_min": [510, 0, 0]}})
+        )
+
+        assert res["passed"] is True, res
+
+
+# ------------------------------------------------------------
 # P1: scene_assert exists:false + bbox_min
 # ------------------------------------------------------------
 

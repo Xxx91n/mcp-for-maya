@@ -1,0 +1,527 @@
+{
+  "meta": {
+    "date": "2026-11-15",
+    "ticket": "Xxx91n/mcp-for-maya#266",
+    "parent": "#263 (real-Maya acceptance that found the defect), #177 (zone geometry), #31 (recommendations spec)",
+    "env": "Autodesk Maya 2024 GUI (apiVersion 20240000) on Windows 11 IoT Enterprise LTSC 10.0.26100 x64; scene linear unit cm at rest; maya.exe pid 4664; native commandPort 127.0.0.1:7001; host Python 3.13 (uv env)",
+    "purpose": "Pin the three facts #266 depends on, then run the shipped maya_scene_module + zone_geometry_module source on the live session and compare its numbers with cmds.exactWorldBoundingBox.",
+    "verdict": "Every case in the issue matches: new_world_bbox equals exactWorldBoundingBox for a moved transform, a 45-degree rotation, a nested child with its own translate under a moved and under a rotated parent, and the shape dag path. get_zone_geometry() converts OpenMaya centimetres to the declared working unit, so a 130 cm door reports [1.3, 2.2, 0.12] in a metre scene. One general limitation of reading a cached AABB is measured below. No node was left behind and the scene unit was restored to cm.",
+    "claim_boundary": "Proves the mechanism and the unit conversion on Maya 2024 on this box, and that the code at the #266 commit produces these numbers. It does NOT prove Maya 2025/2026. It does not exercise the MCP tool wrapper: the recommendation pass was run separately over five zones, see docs/evidence/probes/probe-266-fivezone-recommendations-gui-maya2024.json.",
+    "mayapy_blocker": {
+      "command": "mayapy.exe probe_bbox.py  (with and without maya.standalone.initialize())",
+      "exit_code": 1,
+      "error": "ImportError: DLL load failed while importing standalone: 动态链接库(DLL)初始化例程失败。",
+      "note": "Same lane failure docs/testing.md Tier 2 records. Fallback was the live GUI session through the native commandPort, like the #253 artifact."
+    },
+    "provenance": {
+      "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
+      "maya_pid": 4664,
+      "transport": "native commandPort 127.0.0.1:7001 (transport pattern documented in docs/reference/gui_verify.py); the driver file text is sent as one expression wrapped in a private exec namespace and the port replies with RESULT",
+      "driver": "docs/reference/probe_266_acceptance_gui_driver.py",
+      "module_source_at_run": "the working tree carrying the #266 patch: the driver exec's src/maya_mcp_server/maya_scene_module.py and zone_geometry_module.py, so the shipped source ran, not a copy",
+      "coverage": "every row cell below is copied from raw_driver_output, which is the output verbatim of the driver at driver_sha256_at_run; see driver_revision_note for the one later change to the committed driver",
+      "known_driver_warts": [
+        "units.cm_scene.exactWorldBoundingBox_extent and units.m_scene.exactWorldBoundingBox_extent hold index 0 of cmds.exactWorldBoundingBox, i.e. min x (-65.0 and -0.65), not a size. Read them as the min-x corner.",
+        "zone_geometry.door_exact_world_bbox_m in the recorded output was read after the session unit had been restored, so it holds centimetres despite its key; no row uses it. The current driver reads it inside each unit block and names it door_exact_world_bbox.",
+        "Both warts live in the driver, not in the product. The Maya session was closed before either revision could be re-run, so the recorded output keeps the old field names and the differences are documented rather than silently rewritten."
+      ],
+      "scene_safety": "Only triage266_-prefixed and GEO_door_triage266 nodes were created and are deleted in a finally block; currentUnit is restored there too; file(new=True) was never called, so the user's open scene was untouched.",
+      "setup_note": "cmds.parent preserves world space, so the nested rows zero the child's local rotate after parenting. An earlier version of this artifact skipped that and described a setup its numbers did not come from; the rows below are the re-run with the stated setup.",
+      "driver_sha256_at_run": "127858b3a7144e9af019cba3baac2d4452032c203ba5bcbcafb4e164b877d62d",
+      "driver_sha256_current": "11aec19c82ddfe7036ae23b3744fa48180a5bc71a943bb4e59fb64b84e2dbd9a",
+      "driver_revision_note": "The rows and raw_driver_output below were produced by the driver bytes at driver_sha256_at_run. The committed driver is now driver_sha256_current: review rounds added (a) an explicit cm baseline, so a metre-unit session cannot compare centimetre OpenMaya values against working-unit cmds values, and a cm read that switches back to cm instead of to whatever the session used; (b) an explicit degree baseline, so a radian session cannot turn the 45 into 45 radians; (c) cleanup that deletes only the nodes the probe created, using the names Maya returned rather than a name substring; (d) DAG paths derived from those returned names instead of hardcoded strings, so a name clash can never touch the user's node; (e) os.path.join for the source path, so the driver also loads on Linux/macOS; (f) a root-namespace absolute name for the door, so a non-root current namespace cannot quietly drop it from the zone match. None of these can move a recorded number: the run's session was already in cm and degrees (restored_unit below, and the 141.4214 size proves degrees), so both forced baselines were no-ops, and the rest affect naming, path joining and cleanup only. The later revisions were syntax-checked and lint-clean but NOT executed against a live Maya (the session was closed). Re-running on a cm, degree scene must reproduce these rows."
+    }
+  },
+  "rows": [
+    {
+      "claim": "MFnDagNode.boundingBox on a transform is PARENT space, and exclusiveMatrix() is the matrix that turns it into a world box",
+      "setup": "100 cube moved to (200, 50, 300)",
+      "fn_bbox": [
+        150.0,
+        0.0,
+        250.0,
+        250.0,
+        100.0,
+        350.0
+      ],
+      "old_world_bbox_inclusive": [
+        350.0,
+        50.0,
+        550.0,
+        450.0,
+        150.0,
+        650.0
+      ],
+      "new_world_bbox": [
+        150.0,
+        0.0,
+        250.0,
+        250.0,
+        100.0,
+        350.0
+      ],
+      "exact_world_bbox": [
+        150.0,
+        0.0,
+        250.0,
+        250.0,
+        100.0,
+        350.0
+      ],
+      "result": "pass"
+    },
+    {
+      "claim": "A rotated transform reports the axis-aligned world size, not the box rotated twice",
+      "setup": "same 100 cube, rotated 45 deg about Y",
+      "old_size": [
+        200.0,
+        100.0,
+        200.0
+      ],
+      "new_size": [
+        141.4214,
+        100.0,
+        141.4214
+      ],
+      "exact_size": [
+        141.4214,
+        100.0,
+        141.4214
+      ],
+      "result": "pass"
+    },
+    {
+      "claim": "A nested child with its own translate under a moved parent lands correctly",
+      "setup": "group (500,0,0); child local translate (10,0,0), local rotate 0; 10 cube",
+      "new_world_bbox": [
+        505.0,
+        -5.0,
+        -5.0,
+        515.0,
+        5.0,
+        5.0
+      ],
+      "exact_world_bbox": [
+        505.0,
+        -5.0,
+        -5.0,
+        515.0,
+        5.0,
+        5.0
+      ],
+      "result": "pass"
+    },
+    {
+      "claim": "The same nested child under a parent rotated 30 degrees about Y",
+      "setup": "group (500,0,0) rot Y30; child local translate (10,0,0), local rotate 0; 10 cube",
+      "new_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "exact_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "result": "pass"
+    },
+    {
+      "claim": "A shape dag path still works: its box is object space, so it keeps inclusiveMatrix()",
+      "setup": "|triage266_B_grp|triage266_B_child|triage266_B_childShape",
+      "new_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "exact_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "result": "pass"
+    },
+    {
+      "claim": "dag.hasFn(om2.MFn.kTransform) tells a transform path from a shape path (a transform path also answers kShape, so kTransform is the discriminator)",
+      "shape_path": {
+        "hasFn_kShape": true,
+        "hasFn_kTransform": false
+      },
+      "transform_path": {
+        "hasFn_kShape": true,
+        "hasFn_kTransform": true
+      },
+      "result": "pass"
+    },
+    {
+      "claim": "OpenMaya lengths stay in internal centimetres when the scene unit changes; MDistance bridges to the working unit",
+      "setup": "130 x 220 x 12 door, scene unit cm then m, restored afterwards; the two exactWorldBoundingBox_extent cells are min x (see known_driver_warts)",
+      "cm_scene": {
+        "MDistance(1.0).asUnits(uiUnit())": 1.0,
+        "boundingBoxSize_attribute": [
+          130.0,
+          220.0,
+          12.0
+        ],
+        "exactWorldBoundingBox_extent": -65.0,
+        "fn_bbox_size": [
+          130.0,
+          220.0,
+          12.0
+        ]
+      },
+      "m_scene": {
+        "MDistance(1.0).asUnits(uiUnit())": 0.01,
+        "MDistance(130).asUnits(uiUnit())": 1.3,
+        "boundingBoxSize_attribute": [
+          1.3,
+          2.2,
+          0.12
+        ],
+        "exactWorldBoundingBox_extent": -0.65,
+        "fn_bbox_size": [
+          130.0,
+          220.0,
+          12.0
+        ],
+        "unit": "m"
+      },
+      "result": "pass"
+    },
+    {
+      "claim": "With the shipped source, get_zone_geometry() reports the working unit its unit field declares",
+      "setup": "the same door in the entrance zone; the zone total also holds the user's own scene objects, so the door's own entry is the clean comparison. The door's own size is the evidence: 130 cm in a cm scene, 1.3 in a metre scene.",
+      "cm_read": {
+        "unit": "cm",
+        "door_size": [
+          130.0,
+          220.0,
+          12.0
+        ],
+        "zone_size": [
+          335.0,
+          375.0,
+          352.0
+        ]
+      },
+      "m_read": {
+        "unit": "m",
+        "door_size": [
+          1.3,
+          2.2,
+          0.12
+        ],
+        "zone_size": [
+          3.35,
+          3.75,
+          3.52
+        ]
+      },
+      "result": "pass"
+    },
+    {
+      "claim": "Presence of the two OpenMaya classes the fake now models, collected with the in-repo collector's rule",
+      "api": "maya.api.OpenMaya",
+      "om.MDistance": {
+        "asCentimeters": null,
+        "asFeet": null,
+        "asInches": null,
+        "asKilometers": null,
+        "asMeters": null,
+        "asMiles": null,
+        "asMillimeters": null,
+        "asUnits": null,
+        "asYards": null,
+        "internalToUI": null,
+        "internalUnit": null,
+        "setUIUnit": null,
+        "uiToInternal": null,
+        "uiUnit": null
+      },
+      "om.MFn": {},
+      "note": "tests/maya_stub/presence-baseline.json records these as method-name keys with null values, per D-056.",
+      "result": "pass"
+    },
+    {
+      "claim": "Known limitation, measured not argued: the cached box is itself an AABB, so a rotation above the node can only over-approximate",
+      "setup": "parent rot Y30, child local rot Y-30 (world rotation is identity), 10 cube",
+      "new_world_bbox": [
+        499.3301,
+        -5.0,
+        -14.3301,
+        517.9904,
+        5.0,
+        4.3301
+      ],
+      "exact_world_bbox": [
+        503.6603,
+        -5.0,
+        -10.0,
+        513.6603,
+        5.0,
+        0.0
+      ],
+      "detail": "The child's cached parent-space box is shaped by its own -30 rotation, so it is already wider than the 10-wide world box; multiplying it by the parent's +30 rotation keeps that extra width, and new_world_bbox comes out 18.66 wide against a true 10. This is the general property: _world_bbox reads a box that is itself an AABB, so any rotation applied above that space over-approximates unless the geometry fills the box it was measured in. Top-level nodes are exact because the exclusive matrix is the identity — which is why the 45-degree case in the issue is exact even though a rotated cube does not fill its cached AABB. The cure is to read the node's shapes instead of the cached transform box: one 8-corner transform per shape, exact for box-based geometry, with a vertex walk needed only for geometry that does not fill its box. #266 keeps the cached read on purpose (O(1)). Pinned by tests/test_maya_stub.py::TestSceneGraph::test_cached_box_cannot_be_un_rotated.",
+      "result": "known limitation"
+    }
+  ],
+  "residual_risk": [
+    "The recommendation pass itself is now covered by docs/evidence/probes/probe-266-fivezone-recommendations-gui-maya2024.json: five zones, two objects each, bbox_min_m / bbox_max_m / size_m checked against each zone's cmds.exactWorldBoundingBox in a cm scene, a metre scene and back. The reporter's own room scene is not in this repo, so the issue table's literal rows were not reproduced; the invariant is pinned by tests/test_scene_tools_json.py::TestRecommendAssetsTargetAndSizing::test_zone_bbox_metres_fields_match_the_geometry and ::test_zone_bbox_metres_fields_in_a_metre_scene. What is still not covered anywhere is the MCP tool wrapper around the same functions.",
+    "Cached-AABB limitation above: exact when no rotation sits above the node's cached box (or the geometry fills the box it was measured in), conservative otherwise. Pinned by tests/test_maya_stub.py::TestSceneGraph::test_cached_box_cannot_be_un_rotated; the cheap cure is walking the node's shapes.",
+    "Five raw MFnDagNode.boundingBox reads were left alone by this ticket: src/maya_mcp_server/maya_scene_module.py:~463 (spatial-index auto threshold, extents only), :~1000 (min_height/max_height, an internal-cm extent compared against a caller value that is not unit-converted), :~1560 (camera framing size; its extents also become the distance handed to cmds.move, which reads working units, so a metre scene frames 100x too far), src/maya_mcp_server/scene_tools.py:~464 (scene_inspect: the node's own box, in internal cm, next to a world position and a currentUnit label), and src/maya_mcp_server/asset_module.py:~402-419 (its own _world_bbox: exactWorldBoundingBox first, but the OpenMaya fallback repeats this ticket's double transform and is in internal cm). Rationale for leaving them: #266's scope is the zone/geometry read path, scene_inspect's space convention is now documented in README, and the extents-only sites do not suffer the double translate. The unit half of scene_inspect and asset_module's fallback, and the camera framing consequence, are the same defect class as #266 bug C. No follow-up issue has been filed yet.",
+    "get_scene_graph()'s payload declares `unit` from currentUnit while its p and b numbers stay internal centimetres. Unchanged by this ticket (b is now world space, still cm) and worth its own report.",
+    "measure() reports distance and overlap_dims in internal centimetres while the CoS formatter prints the scene unit next to them. Unchanged by this ticket; scene_tools' scene_measure description still promises the current linear unit."
+  ],
+  "raw_driver_output": {
+    "hasfn": {
+      "shape_path": {
+        "hasFn_kShape": true,
+        "hasFn_kTransform": false
+      },
+      "transform_path": {
+        "hasFn_kShape": true,
+        "hasFn_kTransform": true
+      }
+    },
+    "known_limitation_cancelled_rotation": {
+      "exact_world_bbox": [
+        503.6603,
+        -5.0,
+        -10.0,
+        513.6603,
+        5.0,
+        0.0
+      ],
+      "new_world_bbox": [
+        499.3301,
+        -5.0,
+        -14.3301,
+        517.9904,
+        5.0,
+        4.3301
+      ],
+      "setup": "parent rot Y30, child local rot Y-30 (world rotation is identity), 10 cube"
+    },
+    "leftover": [],
+    "loaded": [
+      "_world_bbox",
+      "get_zone_geometry",
+      "get_zone_map"
+    ],
+    "moved": {
+      "exact_world_bbox": [
+        150.0,
+        0.0,
+        250.0,
+        250.0,
+        100.0,
+        350.0
+      ],
+      "fn_bbox": [
+        150.0,
+        0.0,
+        250.0,
+        250.0,
+        100.0,
+        350.0
+      ],
+      "match": true,
+      "new_world_bbox": [
+        150.0,
+        0.0,
+        250.0,
+        250.0,
+        100.0,
+        350.0
+      ],
+      "old_world_bbox_inclusive": [
+        350.0,
+        50.0,
+        550.0,
+        450.0,
+        150.0,
+        650.0
+      ],
+      "setup": "100 cube moved to (200, 50, 300)"
+    },
+    "nested_moved_parent": {
+      "exact_world_bbox": [
+        505.0,
+        -5.0,
+        -5.0,
+        515.0,
+        5.0,
+        5.0
+      ],
+      "match": true,
+      "new_world_bbox": [
+        505.0,
+        -5.0,
+        -5.0,
+        515.0,
+        5.0,
+        5.0
+      ],
+      "setup": "group (500,0,0); child local translate (10,0,0), local rotate 0; 10 cube"
+    },
+    "nested_rotated_parent": {
+      "exact_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "match": true,
+      "new_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "setup": "group (500,0,0) rot Y30; child local translate (10,0,0), local rotate 0; 10 cube"
+    },
+    "presence": {
+      "om.MDistance": {
+        "asCentimeters": null,
+        "asFeet": null,
+        "asInches": null,
+        "asKilometers": null,
+        "asMeters": null,
+        "asMiles": null,
+        "asMillimeters": null,
+        "asUnits": null,
+        "asYards": null,
+        "internalToUI": null,
+        "internalUnit": null,
+        "setUIUnit": null,
+        "uiToInternal": null,
+        "uiUnit": null
+      },
+      "om.MFn": {}
+    },
+    "restored_unit": "cm",
+    "rotated": {
+      "exact_size": [
+        141.4214,
+        100.0,
+        141.4214
+      ],
+      "match": true,
+      "new_size": [
+        141.4214,
+        100.0,
+        141.4214
+      ],
+      "old_size": [
+        200.0,
+        100.0,
+        200.0
+      ],
+      "setup": "same 100 cube, rotated 45 deg about Y"
+    },
+    "shape_path": {
+      "exact_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "match": true,
+      "new_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "setup": "|triage266_B_grp|triage266_B_child|triage266_B_childShape"
+    },
+    "units": {
+      "cm_scene": {
+        "MDistance(1.0).asUnits(uiUnit())": 1.0,
+        "boundingBoxSize_attribute": [
+          130.0,
+          220.0,
+          12.0
+        ],
+        "exactWorldBoundingBox_extent": -65.0,
+        "fn_bbox_size": [
+          130.0,
+          220.0,
+          12.0
+        ]
+      },
+      "m_scene": {
+        "MDistance(1.0).asUnits(uiUnit())": 0.01,
+        "MDistance(130).asUnits(uiUnit())": 1.3,
+        "boundingBoxSize_attribute": [
+          1.3,
+          2.2,
+          0.12
+        ],
+        "exactWorldBoundingBox_extent": -0.65,
+        "fn_bbox_size": [
+          130.0,
+          220.0,
+          12.0
+        ],
+        "unit": "m"
+      }
+    },
+    "zone_geometry": {
+      "cm_read": {
+        "door_size": [
+          130.0,
+          220.0,
+          12.0
+        ],
+        "unit": "cm",
+        "zone_size": [
+          335.0,
+          375.0,
+          352.0
+        ]
+      },
+      "door_exact_world_bbox_m": [
+        -65.0,
+        -110.0,
+        -206.0,
+        65.0,
+        110.0,
+        -194.0
+      ],
+      "m_read": {
+        "door_size": [
+          1.3,
+          2.2,
+          0.12
+        ],
+        "unit": "m",
+        "zone_size": [
+          3.35,
+          3.75,
+          3.52
+        ]
+      }
+    }
+  }
+}
