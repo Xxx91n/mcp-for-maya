@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`scene_plan` recommendations run off the event loop under a 5s soft time budget with offline circuit-breaking and corrupt-metadata guards (#220, Refs #31)** —
-  `_recommend_for_plan` now runs synchronous Poly Haven index search inside
-  `asyncio.to_thread` under a 5-second monotonic soft deadline (`DEFAULT_RECOMMEND_BUDGET_S`),
+  `_recommend_for_plan` now runs synchronous Poly Haven index search inside a
+  daemon worker thread under a 5-second monotonic soft deadline (`DEFAULT_RECOMMEND_BUDGET_S`),
   forwarding remaining time as HTTP `timeout`, stopping new queries cleanly once
   exhausted (`truncation.budget=true`, `budget_exhausted`), and never claiming to
   force-kill an already-running thread. Search reuses `polyhaven._index_cache`

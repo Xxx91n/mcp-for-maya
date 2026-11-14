@@ -1313,6 +1313,44 @@ class TestRecommendAssetsTargetAndSizing:
         finally:
             polyhaven._index_cache.clear()
 
+    async def test_worker_thread_helper_propagates_errors_context_and_cancellation(self):
+        import asyncio
+        import contextvars
+        import threading
+
+        from maya_mcp_server.scene_tools import _run_in_worker_thread
+
+        var: contextvars.ContextVar[str] = contextvars.ContextVar("req_id", default="unset")
+        token = var.set("trace-42")
+        try:
+            seen_ctx = await _run_in_worker_thread(var.get)
+            assert seen_ctx == "trace-42"
+
+            def boom():
+                raise ValueError("worker failed")
+
+            with pytest.raises(ValueError, match="worker failed"):
+                await _run_in_worker_thread(boom)
+
+            started = threading.Event()
+            release = threading.Event()
+
+            def wait_until_cancelled():
+                started.set()
+                release.wait(timeout=2.0)
+                return "late"
+
+            task = asyncio.create_task(_run_in_worker_thread(wait_until_cancelled))
+            while not started.is_set():
+                await asyncio.sleep(0)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            release.set()
+            await asyncio.sleep(0.05)
+        finally:
+            var.reset(token)
+
 
 # ------------------------------------------------------------
 # Issue #206: the unsaved-changes flag is reported, read fresh, never cached

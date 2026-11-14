@@ -7,12 +7,15 @@ Each tool auto-injects the _mcp_scene module into Maya on first call.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import logging
 import math
+import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict, TypeVar
 
 from maya_mcp_server import polyhaven
 from maya_mcp_server.asset_recommendation import (
@@ -168,9 +171,47 @@ async def get_zone_geometry(client: Any, session_key: str | None = None) -> Any:
     )
 
 
+_T = TypeVar("_T")
+
+
 def _monotonic() -> float:
     """Module clock hook for soft-budget timing without patching stdlib time."""
     return time.monotonic()
+
+
+async def _run_in_worker_thread(func: Callable[..., _T], /, *args: Any, **kwargs: Any) -> _T:
+    """Run blocking work in a daemon worker thread without blocking the event loop.
+
+    Uses threading.Thread directly rather than asyncio.to_thread because
+    loop.run_in_executor(None, ...) trips Python 3.15's lazy concurrent.futures
+    import under test runners (`TypeError: 'lazy_import' object is not callable`).
+    """
+    loop = asyncio.get_running_loop()
+    future: asyncio.Future[_T] = loop.create_future()
+    ctx = contextvars.copy_context()
+
+    def _deliver(setter: Callable[[Any], None], value: Any) -> None:
+        if not future.done():
+            setter(value)
+
+    def _worker() -> None:
+        try:
+            result = ctx.run(func, *args, **kwargs)
+        except BaseException as exc:
+            setter: Callable[[Any], None] = future.set_exception
+            payload: Any = exc
+        else:
+            setter = future.set_result
+            payload = result
+        try:
+            if not loop.is_closed():
+                loop.call_soon_threadsafe(_deliver, setter, payload)
+        except RuntimeError:
+            pass
+
+    thread = threading.Thread(target=_worker, name="scene-recommend-worker", daemon=True)
+    thread.start()
+    return await future
 
 
 async def _recommend_for_plan(
@@ -184,10 +225,10 @@ async def _recommend_for_plan(
     failures never break the plan.
 
     Starts a monotonic soft deadline before reading geometry and runs the
-    synchronous index search in a worker thread (`asyncio.to_thread`) so
-    the MCP event loop keeps serving other requests; an in-flight call
-    finishes naturally inside its socket timeout rather than being forcibly
-    killed, and no new searches start once the soft budget runs out.
+    synchronous index search in a daemon worker thread so the MCP event loop
+    keeps serving other requests; an in-flight call finishes naturally inside
+    its socket timeout rather than being forcibly killed, and no new searches
+    start once the soft budget runs out.
     """
     safe_budget = (
         float(budget_s)
@@ -205,7 +246,7 @@ async def _recommend_for_plan(
         geometry = await get_zone_geometry(client, session_key)
     except Exception as e:  # transport-level failure; the Maya side has its own
         geometry = {"error": {"code": "query_failed", "message": f"{type(e).__name__}: {e}"}}
-    return await asyncio.to_thread(
+    return await _run_in_worker_thread(
         gather_recommendations,
         geometry,
         polyhaven.search_assets,
