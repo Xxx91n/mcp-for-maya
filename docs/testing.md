@@ -133,8 +133,9 @@ passes when the driver hands it real `maya.cmds` — as a plain function
 call, so the mayapy marker and its fixtures are not exercised by that
 run. That test was tightened in the same pass: its `keyTangent` step now
 sets `linear`/`step` and asserts both read back, because `auto` is Maya's
-default and proves nothing. The scene returns to its starting node count,
-playback range and selection. Artifact:
+default and proves nothing, and it now hands the selection back the way
+it found it. The scene returns to its starting node count, playback
+range and selection. Artifact:
 `docs/evidence/probes/probe-253-six-callforms-gui-maya2024.json`.
 
 What this does not prove: Maya 2025/2026, and anything batch-only

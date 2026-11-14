@@ -181,6 +181,9 @@ def test_callform_stub_disagreement_forms(real_maya):
     om = pytest.importorskip("maya.api.OpenMaya")
     min_time = real_maya.playbackOptions(q=True, minTime=True)
     max_time = real_maya.playbackOptions(q=True, maxTime=True)
+    # The test selects nodes to edit tangents, so the selection is another
+    # piece of state it has to hand back unchanged (issue #253).
+    selection_before = real_maya.ls(sl=True) or []
     created = []
     constraint = None
     try:
@@ -248,6 +251,7 @@ def test_callform_stub_disagreement_forms(real_maya):
         for name in created:
             if real_maya.objExists(name):
                 real_maya.delete(name)
+        real_maya.select(selection_before, replace=True)
 
 
 def _injection_unit():

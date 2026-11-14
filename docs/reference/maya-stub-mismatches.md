@@ -35,12 +35,12 @@ batch-time wording as history.
 
 | Spot | Stub claims | Call sends | If the stub were right | Evidence for the call form | Handling | Live check |
 |---|---|---|---|---|---|---|
-| `xform` query reads — `analyze_aesthetics`, `scene_review` | flags are `query`/`worldSpace`/`translation`/`rotation` only | `q=`, `ws=`, `t=`, `ro=` | every read would raise a flag error and the lighting scores would lose world positions | Command reference (Maya 2024): `worldSpace(ws)`, `translation(t)`, `rotation(ro)` are the flag's own short names, and the command is queryable | Call unchanged; `cast(Any, cmds.xform)` at the three call sites | `mayapy` |
-| `rename` — `create_camera_shot`, `create_orbit_camera` | returns `None` | uses the return value (`... or name`) | the camera keeps the auto-generated name instead of the requested one | Command reference returns "the new name" as a string | Call unchanged; `cast(str, ...)` states the return type | `mayapy` |
-| `keyTangent` — `create_orbit_camera` | flags are `inTangentType`/`outTangentType` only | `itt=`, `ott=` | the tangent edit would raise a flag error and the orbit keys stay flat | Command reference lists `inTangentType(itt)` and `outTangentType(ott)`; both are also on its global-flag list | Call unchanged; `# type: ignore[call-overload]` on that line | `mayapy` |
-| `playbackOptions` — `create_orbit_camera` | flags are `minTime`/`maxTime` only | `min=`, `max=` | the playback range would raise a flag error and stay at the scene default | Command reference lists `min` -> `minTime` and `max` -> `maxTime` | Call unchanged; `# type: ignore[call-overload]` on that line | `mayapy` |
-| `aimConstraint` — `create_camera_shot`, `create_orbit_camera` | `aimVector`/`upVector` are `tuple[float, float, float]` | three-number lists `[0, 0, -1]`, `[0, 1, 0]` | the constraint call would reject the arguments and the camera would fall back to manual rotation | Command reference types both flags as three doubles; a Python list of three numbers is the same flag value | Call unchanged; `# type: ignore[call-overload]` on each call line | `mayapy` |
-| `MFnMesh.getPoint` — `get_scene_graph` full detail | parameter is `MSpace`, but `MSpace.kWorld` is declared `ClassVar[int]` in the same stub file | `om2.MSpace.kWorld` | the vertex dump would lose its world-space points (the call is inside a `try`) | The stub contradicts itself: the value it declares `int` is the value its own parameter type expects | Call unchanged; `cast(om2.MSpace, ...)` records the value Maya really passes | `mayapy` |
+| `xform` query reads — `analyze_aesthetics`, `scene_review` | flags are `query`/`worldSpace`/`translation`/`rotation` only | `q=`, `ws=`, `t=`, `ro=` | every read would raise a flag error and the lighting scores would lose world positions | Command reference (Maya 2024): `worldSpace(ws)`, `translation(t)`, `rotation(ro)` are the flag's own short names, and the command is queryable | Call unchanged; `cast(Any, cmds.xform)` at the three call sites | `mayapy` (done 2026-11-15, GUI run below) |
+| `rename` — `create_camera_shot`, `create_orbit_camera` | returns `None` | uses the return value (`... or name`) | the camera keeps the auto-generated name instead of the requested one | Command reference returns "the new name" as a string | Call unchanged; `cast(str, ...)` states the return type | `mayapy` (done 2026-11-15, GUI run below) |
+| `keyTangent` — `create_orbit_camera` | flags are `inTangentType`/`outTangentType` only | `itt=`, `ott=` | the tangent edit would raise a flag error and the orbit keys stay flat | Command reference lists `inTangentType(itt)` and `outTangentType(ott)`; both are also on its global-flag list | Call unchanged; `# type: ignore[call-overload]` on that line | `mayapy` (done 2026-11-15, GUI run below) |
+| `playbackOptions` — `create_orbit_camera` | flags are `minTime`/`maxTime` only | `min=`, `max=` | the playback range would raise a flag error and stay at the scene default | Command reference lists `min` -> `minTime` and `max` -> `maxTime` | Call unchanged; `# type: ignore[call-overload]` on that line | `mayapy` (done 2026-11-15, GUI run below) |
+| `aimConstraint` — `create_camera_shot`, `create_orbit_camera` | `aimVector`/`upVector` are `tuple[float, float, float]` | three-number lists `[0, 0, -1]`, `[0, 1, 0]` | the constraint call would reject the arguments and the camera would fall back to manual rotation | Command reference types both flags as three doubles; a Python list of three numbers is the same flag value | Call unchanged; `# type: ignore[call-overload]` on each call line | `mayapy` (done 2026-11-15, GUI run below) |
+| `MFnMesh.getPoint` — `get_scene_graph` full detail | parameter is `MSpace`, but `MSpace.kWorld` is declared `ClassVar[int]` in the same stub file | `om2.MSpace.kWorld` | the vertex dump would lose its world-space points (the call is inside a `try`) | The stub contradicts itself: the value it declares `int` is the value its own parameter type expects | Call unchanged; `cast(om2.MSpace, ...)` records the value Maya really passes | `mayapy` (done 2026-11-15, GUI run below) |
 | `cmds.camera` — `create_camera_shot` (the mixed one) | overloads are narrow but usable | `focalLength=shot["focal_length"]` was inferred `object` | nothing — the `object` came from the local `SHOT_TYPES` literal, and the stub was not the cause | The five focal lengths in `SHOT_TYPES` are ints; the cast states the argument type at the one place it is used | `cast(float, shot["focal_length"])`; `SHOT_TYPES` stays an unannotated literal | none |
 
 Sources for the evidence column, all Maya 2024 Python command reference pages:
@@ -127,7 +127,9 @@ Run inside a real Maya 2024 GUI session (24.0.0.4640, Windows 11, Maya-side
 Python 3.10.8) with `docs/reference/six_callform_gui_driver.py`, in a fresh
 instance with an empty scene. No row is blocked: each one below is a measured
 value, not a skip. Artifact:
-`docs/evidence/probes/probe-253-six-callforms-gui-maya2024.json`.
+`docs/evidence/probes/probe-253-six-callforms-gui-maya2024.json`; the first
+version admitted on this branch is kept beside it as `...-v1.json`, marked
+superseded.
 
 The shipped test was tightened in the same pass: it now sets
 `linear`/`step` and reads both back, because `auto` — which it used
@@ -137,7 +139,7 @@ nothing.
 | Spot | Live result | What Maya actually returned |
 |---|---|---|
 | `xform` `q/ws/t/ro` | pass | world translation `[10.0, 0.0, 0.0]`, rotation `[0.0, 0.0, 0.0]` |
-| `rename` | pass | returns `str`: `GEO_cf253_renamed1`; the existing node kept its name |
+| `rename` | pass | returns `str`: `GEO_cf253_name_holder1`; the node already holding the name kept it |
 | `keyTangent` `itt/ott` | pass | set to `linear`/`step` (not the default `auto`) and read back as exactly those two |
 | `playbackOptions` `min/max` | pass | playback range went `1.0-120.0` to `1.0-12.0`, and the query agreed |
 | `aimConstraint` lists | pass | returned `['GEO_cf253_aimed_aimConstraint1']`, the constraint exists |

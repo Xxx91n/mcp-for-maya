@@ -86,8 +86,17 @@ def _reset_playback(cmds, start_range):
     """Put playback back where the run found it; return a problem or None."""
     try:
         cmds.playbackOptions(min=start_range[0], max=start_range[1])
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"playback restore failed: {exc}"
+    return None
+
+
+def _restore_selection(cmds, names):
+    """Put the selection back where the run found it; return a problem or None."""
+    try:
+        cmds.select(names, replace=True)
+    except Exception as exc:
+        return f"selection restore failed: {exc}"
     return None
 
 
@@ -97,7 +106,7 @@ def _record(rows, name, fn, created):
     try:
         row["detail"] = fn(created)
         row["status"] = "pass"
-    except Exception as exc:  # noqa: BLE001 - the evidence is the reason, not a crash
+    except Exception as exc:  # the evidence is the reason, not a crash
         row["detail"] = _exc_text(exc)
         row["traceback"] = traceback.format_exc()
     rows.append(row)
@@ -124,17 +133,19 @@ def _form_rename(created):
     """rename returns the new name; the stub says it returns None."""
     import maya.cmds as cmds
 
-    bystander = _make_cube(cmds, "renamed", created)
+    # `holder` already owns the target name, so the rename has to come back
+    # with a numbered name of its own instead of taking the holder's.
+    holder = _make_cube(cmds, "name_holder", created)
     cube = _make_cube(cmds, "orig", created)
-    renamed = cmds.rename(cube, f"{NODE_PREFIX}_renamed")
+    renamed = cmds.rename(cube, f"{NODE_PREFIX}_name_holder")
     assert isinstance(renamed, str) and renamed, repr(renamed)
     created.append(renamed)
-    assert cmds.objExists(bystander), "the name clash cost a live node"
+    assert cmds.objExists(holder), "the name clash cost a live node"
     assert cmds.objExists(renamed), "the renamed node vanished"
     return {
         "returned": renamed,
         "return_type": type(renamed).__name__,
-        "bystander_kept": bystander,
+        "holder_kept": holder,
         "renamed_has_shape": bool(cmds.listRelatives(renamed, shapes=True) or []),
     }
 
@@ -153,13 +164,15 @@ def _form_key_tangent(created):
     selected_before = cmds.ls(sl=True) or []
     cube = _make_cube(cmds, "tangent", created)
     cmds.setKeyframe(cube, attribute="translateX")
+    selection_problem = None
     try:
         cmds.select(cube)
         cmds.keyTangent(edit=True, itt="linear", ott="step")
         in_types = list(cmds.keyTangent(cube, q=True, itt=True) or [])
         out_types = list(cmds.keyTangent(cube, q=True, ott=True) or [])
     finally:
-        cmds.select(selected_before, replace=True)
+        selection_problem = _restore_selection(cmds, selected_before)
+    assert selection_problem is None, selection_problem
     assert in_types == ["linear"], in_types
     assert out_types == ["step"], out_types
     return {
@@ -170,7 +183,10 @@ def _form_key_tangent(created):
 
 
 def _form_playback(created):
-    """playbackOptions accepts min/max, the documented short flag names."""
+    """playbackOptions accepts min/max, the documented short flag names.
+
+    It takes `created` only because every probe has the same signature.
+    """
     import maya.cmds as cmds
 
     before = _playback_range(cmds)
@@ -244,7 +260,7 @@ def _delete_all(created, cmds):
         try:
             if cmds.objExists(name):
                 cmds.delete(name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             problems.append(f"delete {name!r} failed: {exc}")
     return problems
 
@@ -335,7 +351,7 @@ def run():
                 "status": "pass",
                 "test": "tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms",
             }
-        except BaseException as exc:  # noqa: BLE001 - recorded, then the run continues
+        except BaseException as exc:  # recorded, then the run continues
             result["shipped_test"] = {
                 "status": "fail",
                 "test": "tests/test_mayapy_smoke.py::test_callform_stub_disagreement_forms",
@@ -355,14 +371,9 @@ def run():
         playback_problem = _reset_playback(cmds, start_range)
         if playback_problem:
             problems.append(playback_problem)
-        try:
-            cmds.select(selection_at_start, replace=True)
-        except Exception as exc:  # noqa: BLE001
-            problems.append(f"selection restore failed: {exc}")
-        try:
-            cmds.select(selection_at_start, replace=True)
-        except Exception as exc:  # noqa: BLE001
-            problems.append(f"selection restore failed: {exc}")
+        selection_problem = _restore_selection(cmds, selection_at_start)
+        if selection_problem:
+            problems.append(selection_problem)
         result["cleanup"] = {
             "deleted_names": created,
             "problems": problems,
@@ -378,18 +389,36 @@ def run():
     return result
 
 
+def _overall_verdict(result):
+    """Pass only when every form passed and nothing was left behind.
+
+    A leaked node or a failed cleanup makes the run a failure even when all
+    six rows are green: the scene is part of what the ticket asks for.
+    """
+    rows = result.get("forms", [])
+    if not rows or any(row["status"] != "pass" for row in rows):
+        return "fail"
+    if result.get("shipped_test", {}).get("status") != "pass":
+        return "fail"
+    if result.get("failure_cleanup", {}).get("status") != "pass":
+        return "fail"
+    cleanup = result.get("cleanup", {})
+    if cleanup.get("problems") or cleanup.get("leftover_nodes"):
+        return "fail"
+    return "pass"
+
+
 def main():
     """Run, write the JSON, and report the verdict in Maya's own console."""
     result = {}
     try:
         result = run()
-    except BaseException:  # noqa: BLE001 - a fatal error is still evidence
+    except BaseException:  # a fatal error is still evidence
         result = {"fatal": traceback.format_exc()}
+    result["verdict"] = _overall_verdict(result)
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(json.dumps(result, indent=2), encoding="utf-8")
-    rows = result.get("forms", [])
-    verdict = "pass" if rows and all(r["status"] == "pass" for r in rows) else "fail"
-    print(f"issue #253 six call forms: {verdict}; wrote {OUT_JSON}")
+    print(f"issue #253 six call forms: {result['verdict']}; wrote {OUT_JSON}")
     return result
 
 

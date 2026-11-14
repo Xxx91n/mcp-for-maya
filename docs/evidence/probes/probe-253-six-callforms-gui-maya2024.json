@@ -53,7 +53,7 @@
         "exit_code": 0
       },
       {
-        "what": "Six-form run (fresh GUI, PID 13616)",
+        "what": "Six-form run (fresh GUI, PID 16956)",
         "command": "maya.exe -script six_forms.mel   # MEL: catch(python(exec(driver))); evalDeferred \"quit -f\"",
         "output": "JSON written to the Temp path; the process exited on its own after the deferred quit (Get-Process showed only the pre-existing Maya PID 4664 afterwards)",
         "exit_code": 0
@@ -61,7 +61,8 @@
     ],
     "entry_command": "maya.exe -script C:\\Users\\Administrator\\AppData\\Local\\Temp\\maya253\\six_forms.mel  # the MEL file execs docs/reference/six_callform_gui_driver.py, then evalDeferred 'quit -f'",
     "supersedes": {
-      "why": "The first two runs of this driver were admitted on this branch before review. The artifact is regenerated from a later run, and this block keeps what the earlier ones recorded so the trail is not lost: the review found the keyTangent read-back useless (it set Maya's default 'auto'), the selection unmeasured, and the scene guard blind to an unsaved untitled scene.",
+      "why": "An earlier version of this artifact was admitted on this branch before the second and third review rounds. docs/evidence/README.md asks for the old file to be kept and marked superseded rather than rewritten, so that version stays as its own file and this one records the run that exercised the tightened driver and test.",
+      "superseded_file": "docs/evidence/probes/probe-253-six-callforms-gui-maya2024-v1.json",
       "earlier_runs": [
         {
           "session_pid": 11572,
@@ -96,14 +97,27 @@
             "selection"
           ],
           "note": "Same verdicts as the run kept below; replaced because the shipped test it calls still set the default tangent type."
+        },
+        {
+          "session_pid": 13616,
+          "driver_sha256": "f0c4cc2012cddff3c723e41ae644d6cae25ae4eadf4ed3860572bf88be781575",
+          "keyTangent_read_back": [
+            "linear"
+          ],
+          "cleanup_tracked": [
+            "nodes",
+            "playback",
+            "selection"
+          ],
+          "note": "Replaced by the final run after the duplicate selection restore and the verdict aggregation were fixed in the driver."
         }
       ]
     },
     "provenance": {
-      "session_pid": 13616,
+      "session_pid": 16956,
       "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
       "driver": "docs/reference/six_callform_gui_driver.py",
-      "driver_sha256": "f0c4cc2012cddff3c723e41ae644d6cae25ae4eadf4ed3860572bf88be781575",
+      "driver_sha256": "03145ad2fe0a5adce7c2a6b11e2d90013eb010b1398e5228fda4146e0a36b7fd",
       "driver_sha256_note": "These bytes are what ran, and they are the driver committed on this branch; the sha256 is the anchor, not a commit id.",
       "ticket_start_sha": "8cec2c0d9e4a8f7f3ef17e773c395ef4e3cdc374",
       "base_main": "95a95a582718691a51231fef6eac38d1ceb8381d",
@@ -129,7 +143,7 @@
     "shipped_test_selection": "Maya leaves a newly made node selected, so a probe that reads the selection after it creates its node records its own node. The driver reads the selection first, restores it after the probe, and the post-cleanup selection matches the starting one (both empty).",
     "scene_state": "Node count 51 before and after; playback 1.0-120.0 before and after; selection empty before and after; no GEO_cf253*/GEO_stub* node left. The instance was a fresh throwaway GUI and quit itself, so no user scene was involved at any point."
   },
-  "raw_run": {
+  "raw_driver_output": {
     "meta": {
       "maya_version": "2024",
       "api_version": 20240000,
@@ -138,7 +152,7 @@
       "operating_system": "win64",
       "maya_python": "3.10.8",
       "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
-      "session_pid": 13616,
+      "session_pid": 16956,
       "driver_file": "<exec>",
       "repo_root": "D:\\Aworker\\maya\\maya-mcp-server",
       "out_json": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\maya253\\six_forms_result.json",
@@ -177,9 +191,9 @@
         "form": "rename returns the new name",
         "status": "pass",
         "detail": {
-          "returned": "GEO_cf253_renamed1",
+          "returned": "GEO_cf253_name_holder1",
           "return_type": "str",
-          "bystander_kept": "GEO_cf253_renamed",
+          "holder_kept": "GEO_cf253_name_holder",
           "renamed_has_shape": true
         }
       },
@@ -194,7 +208,7 @@
             "step"
           ],
           "selection_restored_to": [
-            "GEO_cf253_renamed1"
+            "GEO_cf253_name_holder1"
           ]
         }
       },
@@ -256,9 +270,9 @@
     "cleanup": {
       "deleted_names": [
         "GEO_cf253_xform",
-        "GEO_cf253_renamed",
+        "GEO_cf253_name_holder",
         "GEO_cf253_orig",
-        "GEO_cf253_renamed1",
+        "GEO_cf253_name_holder1",
         "GEO_cf253_tangent",
         "GEO_cf253_target",
         "GEO_cf253_aimed",
@@ -274,6 +288,8 @@
       ],
       "selection_after_cleanup": [],
       "scene_after_cleanup": ""
-    }
-  }
+    },
+    "verdict": "pass"
+  },
+  "raw_driver_output_note": "Verbatim copy of the JSON the driver wrote. Everything outside this block (meta, summary, notes, supersedes) is written by hand from the commands and files named in meta.commands and meta.provenance."
 }
