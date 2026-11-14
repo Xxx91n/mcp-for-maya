@@ -58,6 +58,24 @@ def chair_hit(asset_id: str = "chair_henry", dims: list | None = [0.55, 0.6, 0.9
     }
 
 
+def _search_response(
+    results: list,
+    *,
+    query: str = "",
+    asset_type: str = "models",
+    limit: int = 20,
+    total: int | None = None,
+) -> dict:
+    return {
+        "results": results,
+        "total_count": total if total is not None else len(results),
+        "limit": limit,
+        "query": query,
+        "asset_type": asset_type,
+        "source": "api.polyhaven.com",
+    }
+
+
 def make_search(results: list, total: int | None = None, error: Exception | None = None):
     calls: list[dict] = []
 
@@ -65,14 +83,9 @@ def make_search(results: list, total: int | None = None, error: Exception | None
         calls.append({"query": query, "asset_type": asset_type, "limit": limit})
         if error is not None:
             raise error
-        return {
-            "results": results,
-            "total_count": total if total is not None else len(results),
-            "limit": limit,
-            "query": query,
-            "asset_type": asset_type,
-            "source": "api.polyhaven.com",
-        }
+        return _search_response(
+            results, query=query, asset_type=asset_type, limit=limit, total=total
+        )
 
     return search, calls
 
@@ -149,14 +162,7 @@ class TestZoneTable:
                 "dimensions": [0.5, 0.5, 0.5],
                 "polycount": 500,
             }
-            return {
-                "results": [hit],
-                "total_count": 1,
-                "limit": limit,
-                "query": query,
-                "asset_type": asset_type,
-                "source": "api.polyhaven.com",
-            }
+            return _search_response([hit], query=query, asset_type=asset_type, limit=limit)
 
         calls: list[str] = []
 
@@ -333,7 +339,13 @@ class TestUnitsAndScreening:
             ("entrance", "sign", "StreetSign01", "Street Sign", [], ["props"], True),
             ("entrance", "door", "wooden_doors_02", "Wooden Doors", [], ["architecture"], True),
             ("display", "shelf", "wall_rack_01", "Wall Rack", ["shelves"], ["furniture"], True),
+            ("display", "showcase", "glass_case_01", "Glass Showcases", [], ["furniture"], True),
+            ("display", "counter", "bar_unit_01", "Bar Counters", [], ["furniture"], True),
+            ("display", "podium", "award_stand_01", "Award Podiums", [], ["furniture"], True),
+            ("furniture", "table", "oak_stand_01", "Oak Tables", [], ["furniture"], True),
+            ("furniture", "sofa", "velvet_couch_01", "Velvet Sofas", [], ["furniture"], True),
             ("furniture", "bench", "park_seat_01", "Park Benches", [], ["furniture"], True),
+            ("lighting", "lamp", "desk_fixture_01", "Desk Lamps", [], ["lighting"], True),
             ("lighting", "light", "brass_pendant", "Brass Pendant", [], ["lighting"], True),
         ],
     )
@@ -351,14 +363,8 @@ class TestUnitsAndScreening:
         }
 
         def search_one(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
-            return {
-                "results": [hit] if query == target_query else [],
-                "total_count": 1 if query == target_query else 0,
-                "limit": limit,
-                "query": query,
-                "asset_type": asset_type,
-                "source": "api.polyhaven.com",
-            }
+            hits = [hit] if query == target_query else []
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
 
         target_query = query
         recs = gather_recommendations(make_geometry(zones=[zone]), search_one)
@@ -403,6 +409,7 @@ class TestSkippedZones:
         assert calls == []
         zone = recs["zones"][0]
         assert zone["status"] == "empty"
+        assert zone["target"]["measurement"] == "empty"
         assert "skip_reason" not in zone
         assert zone["queries"] == [
             {"query": q, "searched": False, "total_matches": None}
@@ -468,14 +475,7 @@ class TestSearchFailureIsolation:
             if query == "table":
                 raise AssetError("network_unavailable", "timeout on table")
             results = [chair_hit("chair_ok")] if query == "chair" else []
-            return {
-                "results": results,
-                "total_count": len(results),
-                "limit": limit,
-                "query": query,
-                "asset_type": asset_type,
-                "source": "api.polyhaven.com",
-            }
+            return _search_response(results, query=query, asset_type=asset_type, limit=limit)
 
         recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE]), flaky)
         assert recs["status"] == "partial"
@@ -525,14 +525,7 @@ class TestDedupAndOrdering:
                 hits = [shared_in_chair, other_table]
             else:
                 hits = []
-            return {
-                "results": hits,
-                "total_count": len(hits),
-                "limit": limit,
-                "query": query,
-                "asset_type": asset_type,
-                "source": "api.polyhaven.com",
-            }
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
 
         recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE]), multi_search)
         zone = recs["zones"][0]
@@ -613,14 +606,7 @@ class TestDedupAndOrdering:
                 ]
             else:
                 hits = []
-            return {
-                "results": hits,
-                "total_count": len(hits),
-                "limit": limit,
-                "query": query,
-                "asset_type": asset_type,
-                "source": "api.polyhaven.com",
-            }
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
 
         recs = gather_recommendations(
             make_geometry(zones=[FURNITURE_ZONE]), same_rank_across_queries
@@ -655,14 +641,7 @@ class TestDedupAndOrdering:
                 ]
             else:
                 hits = []
-            return {
-                "results": hits,
-                "total_count": len(hits),
-                "limit": limit,
-                "query": query,
-                "asset_type": asset_type,
-                "source": "api.polyhaven.com",
-            }
+            return _search_response(hits, query=query, asset_type=asset_type, limit=limit)
 
         recs = gather_recommendations(make_geometry(zones=zones), four_per_zone)
         total_kept = sum(z["eligible_count"] + z["unverified_count"] for z in recs["zones"])

@@ -28,6 +28,7 @@ import math
 import re
 import unicodedata
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, TypeGuard
 
 
@@ -138,7 +139,7 @@ def _normalize_word(token: str) -> str:
     if (
         len(token) > 3
         and token.endswith("es")
-        and token.endswith(("ches", "shes", "xes", "zes", "ses"))
+        and token.endswith(("ches", "shes", "xes", "zes", "sses"))
     ):
         return token[:-2]
     if len(token) > 3 and token.endswith("s") and not token.endswith("ss"):
@@ -215,16 +216,34 @@ def _valid_dimensions(dims: Any) -> TypeGuard[list[float]]:
     )
 
 
-def _screen(
-    results: list[Any], query: str, envelope_m: list[float]
-) -> list[tuple[dict[str, Any], float]]:
-    """Filter one query's hits into (candidate, size_error) pairs.
+@dataclass
+class _ScoredHit:
+    """Candidate paired with its precomputed zone-fit error for sorting."""
+
+    candidate: dict[str, Any]
+    size_error: float
+
+    def sort_key(self) -> tuple[bool, int, float, int, str]:
+        # Size-eligible candidates win the cap before unverified ones,
+        # then rank band (1-5 / 6-10 / 11-20), size difference, best rank, id.
+        cand = self.candidate
+        return (
+            cand["size_status"] != "pass",
+            _rank_band(int(cand["best_source_rank"])),
+            self.size_error,
+            int(cand["best_source_rank"]),
+            str(cand["asset_id"]),
+        )
+
+
+def _screen(results: list[Any], query: str, envelope_m: list[float]) -> list[_ScoredHit]:
+    """Filter one query's hits into scored candidates.
 
     Drops hits that fail the normalized word-level check or cannot fit
     the zone envelope. Assets without usable dimensions stay in the
     returned list with ``size_status="unverified"`` and ``size_error=0.0``.
     """
-    screened: list[tuple[dict[str, Any], float]] = []
+    screened: list[_ScoredHit] = []
     for rank, entry in enumerate(results, start=1):
         if not isinstance(entry, dict) or not entry.get("id"):
             continue
@@ -238,7 +257,7 @@ def _screen(
                 "Poly Haven publishes no usable dimensions for this asset; "
                 "size screening was not performed"
             )
-            screened.append((cand, 0.0))
+            screened.append(_ScoredHit(cand, 0.0))
             continue
         dims_f = [float(v) for v in dims]
         if _fits_envelope(dims_f, envelope_m):
@@ -251,7 +270,7 @@ def _screen(
                 f"largest side {zone_largest:g} m (world AABB upper limit, "
                 "per sorted axis)"
             )
-            screened.append((cand, _size_error(dims_f, envelope_m)))
+            screened.append(_ScoredHit(cand, _size_error(dims_f, envelope_m)))
     return screened
 
 
@@ -263,32 +282,17 @@ def _unsearched_query(query: str) -> dict[str, Any]:
     return {"query": query, "searched": False, "total_matches": None}
 
 
-def _sort_key(cand: dict[str, Any], size_error: float) -> tuple[bool, int, float, int, str]:
-    # Q9: size-eligible candidates win the cap before unverified ones,
-    # then rank band (1-5 / 6-10 / 11-20), size difference, best rank, id.
-    return (
-        cand["size_status"] != "pass",
-        _rank_band(int(cand["best_source_rank"])),
-        size_error,
-        int(cand["best_source_rank"]),
-        str(cand["asset_id"]),
-    )
-
-
-def _merge_hits(
-    seen: dict[str, dict[str, Any]],
-    size_errors: dict[str, float],
-    screened: list[tuple[dict[str, Any], float]],
-) -> None:
+def _merge_hits(seen: dict[str, _ScoredHit], screened: list[_ScoredHit]) -> None:
     """Deduplicate hits by asset_id, keeping all matched_queries and best rank."""
-    for cand, err in screened:
+    for hit in screened:
+        cand = hit.candidate
         aid = str(cand["asset_id"])
         hit_record = cand["matched_queries"][0]
-        existing = seen.get(aid)
-        if existing is None:
-            seen[aid] = cand
-            size_errors[aid] = err
+        existing_hit = seen.get(aid)
+        if existing_hit is None:
+            seen[aid] = hit
             continue
+        existing = existing_hit.candidate
         if hit_record not in existing["matched_queries"]:
             existing["matched_queries"].append(hit_record)
         if int(cand["best_source_rank"]) < int(existing["best_source_rank"]):
@@ -296,17 +300,31 @@ def _merge_hits(
         if existing["size_status"] != "pass" and cand["size_status"] == "pass":
             cand["matched_queries"] = existing["matched_queries"]
             cand["best_source_rank"] = existing["best_source_rank"]
-            seen[aid] = cand
-            size_errors[aid] = err
+            seen[aid] = hit
 
 
-def _assign_zone_candidates(entry: dict[str, Any], ordered: list[dict[str, Any]]) -> None:
-    shown_eligible = [c for c in ordered if c["size_status"] == "pass"]
-    shown_unverified = [c for c in ordered if c["size_status"] != "pass"]
+def _zone_candidates(entry: dict[str, Any]) -> list[dict[str, Any]]:
+    return [*entry.get("candidates", []), *entry.get("unverified_candidates", [])]
+
+
+def _assign_zone_candidates(entry: dict[str, Any], ordered_hits: list[_ScoredHit]) -> None:
+    cands = [hit.candidate for hit in ordered_hits]
+    shown_eligible = [c for c in cands if c["size_status"] == "pass"]
+    shown_unverified = [c for c in cands if c["size_status"] != "pass"]
     entry["candidates"] = shown_eligible
     entry["unverified_candidates"] = shown_unverified
     entry["eligible_count"] = len(shown_eligible)
     entry["unverified_count"] = len(shown_unverified)
+
+
+def _refresh_zone_status(entry: dict[str, Any], *, failed: int = 0, succeeded: int = 0) -> None:
+    if failed > 0 and succeeded == 0:
+        entry["status"] = "skipped"
+        entry["skip_reason"] = "search_failed"
+    elif failed > 0:
+        entry["status"] = "partial"
+    elif entry["status"] not in ("skipped", "partial"):
+        entry["status"] = "ok" if entry["eligible_count"] > 0 else "empty"
 
 
 def _process_zone(
@@ -316,7 +334,7 @@ def _process_zone(
     search_fn: Callable[..., dict[str, Any]],
     errors: list[dict[str, str]],
     truncation: dict[str, bool],
-) -> tuple[dict[str, Any], dict[str, float], int, int]:
+) -> tuple[dict[str, Any], list[_ScoredHit], int, int]:
     """Build one zone's recommendation entry, searching only when enabled & measurable."""
     name = zone.get("name", "")
     scope = f"recommendations:{name}"
@@ -324,7 +342,10 @@ def _process_zone(
     # Unrounded for the size screen (rounded=False), rounded for display.
     size_screen = _to_metres(zone.get("size"), factor, rounded=False)
     unmeasured = zone.get("unmeasured_count")
-    if size_m is None:
+    is_empty_zone = zone.get("object_count") == 0
+    if is_empty_zone:
+        measurement = "empty"
+    elif size_m is None:
         measurement = "unmeasurable_target"
     elif isinstance(unmeasured, int) and unmeasured > 0:
         measurement = "partial_zone_envelope"
@@ -354,18 +375,17 @@ def _process_zone(
     if not queries:
         entry["status"] = "skipped"
         entry["skip_reason"] = "recommendations_disabled"
-        return entry, {}, 0, 0
-    if zone.get("object_count") == 0:
+        return entry, [], 0, 0
+    if is_empty_zone:
         entry["queries"] = [_unsearched_query(q) for q in queries]
-        return entry, {}, 0, 0
-    if size_screen is None:  # same condition that set measurement above
+        return entry, [], 0, 0
+    if size_screen is None:  # same condition that set unmeasurable_target above
         entry["status"] = "skipped"
         entry["skip_reason"] = "unmeasurable_target"
         entry["queries"] = [_unsearched_query(q) for q in queries]
-        return entry, {}, 0, 0
+        return entry, [], 0, 0
 
-    seen: dict[str, dict[str, Any]] = {}
-    size_errors: dict[str, float] = {}
+    seen: dict[str, _ScoredHit] = {}
     succeeded = 0
     failed = 0
     for query in queries:
@@ -392,55 +412,38 @@ def _process_zone(
         entry["queries"].append(_searched_query(query, total_int))
         if total_int is not None and total_int > len(results):
             truncation["search"] = True
-        _merge_hits(seen, size_errors, _screen(results, query, size_screen))
+        _merge_hits(seen, _screen(results, query, size_screen))
 
-    ordered = sorted(
-        seen.values(),
-        key=lambda c: _sort_key(c, size_errors.get(str(c["asset_id"]), 0.0)),
-    )
-    if len(ordered) > MAX_PER_ZONE:
+    ordered_hits = sorted(seen.values(), key=lambda hit: hit.sort_key())
+    if len(ordered_hits) > MAX_PER_ZONE:
         truncation["output"] = True
-        ordered = ordered[:MAX_PER_ZONE]
-    _assign_zone_candidates(entry, ordered)
-    if failed > 0 and succeeded == 0:
-        entry["status"] = "skipped"
-        entry["skip_reason"] = "search_failed"
-    elif failed > 0:
-        entry["status"] = "partial"
-    else:
-        entry["status"] = "ok" if entry["eligible_count"] > 0 else "empty"
-    return entry, size_errors, succeeded, failed
+        ordered_hits = ordered_hits[:MAX_PER_ZONE]
+    _assign_zone_candidates(entry, ordered_hits)
+    _refresh_zone_status(entry, failed=failed, succeeded=succeeded)
+    return entry, ordered_hits, succeeded, failed
 
 
 def _apply_scene_cap(
-    zones: list[dict[str, Any]],
-    size_errors_by_zone: list[dict[str, float]],
+    zone_results: list[tuple[dict[str, Any], list[_ScoredHit]]],
     truncation: dict[str, bool],
 ) -> None:
     """Enforce MAX_PER_SCENE across all zones, keeping top-ranked candidates."""
-    pooled: list[tuple[tuple[bool, int, float, int, str, int], int, dict[str, Any]]] = []
-    for zone_idx, (zone_rec, size_errors) in enumerate(zip(zones, size_errors_by_zone)):
-        for cand in zone_rec["candidates"] + zone_rec["unverified_candidates"]:
-            aid = str(cand["asset_id"])
-            key = (*_sort_key(cand, size_errors.get(aid, 0.0)), zone_idx)
-            pooled.append((key, zone_idx, cand))
+    pooled = [
+        (*hit.sort_key(), zone_idx, hit)
+        for zone_idx, (_, hits) in enumerate(zone_results)
+        for hit in hits
+    ]
     if len(pooled) <= MAX_PER_SCENE:
         return
     truncation["output"] = True
-    pooled.sort(key=lambda item: item[0])
-    kept_ids_by_zone: dict[int, set[int]] = {}
-    for _, zone_idx, cand in pooled[:MAX_PER_SCENE]:
-        kept_ids_by_zone.setdefault(zone_idx, set()).add(id(cand))
-    for zone_idx, zone_rec in enumerate(zones):
-        kept_ptrs = kept_ids_by_zone.get(zone_idx, set())
-        ordered = [
-            c
-            for c in zone_rec["candidates"] + zone_rec["unverified_candidates"]
-            if id(c) in kept_ptrs
-        ]
-        _assign_zone_candidates(zone_rec, ordered)
-        if zone_rec["status"] not in ("skipped", "partial"):
-            zone_rec["status"] = "ok" if zone_rec["eligible_count"] > 0 else "empty"
+    pooled.sort(key=lambda item: item[:-1])
+    kept_by_zone: dict[int, list[_ScoredHit]] = {}
+    for *_, zone_idx, hit in pooled[:MAX_PER_SCENE]:
+        kept_by_zone.setdefault(zone_idx, []).append(hit)
+    for zone_idx, (zone_rec, _) in enumerate(zone_results):
+        kept = sorted(kept_by_zone.get(zone_idx, []), key=lambda hit: hit.sort_key())
+        _assign_zone_candidates(zone_rec, kept)
+        _refresh_zone_status(zone_rec)
 
 
 def gather_recommendations(
@@ -496,7 +499,7 @@ def gather_recommendations(
         recs["status"] = "partial"
         return recs
 
-    size_errors_by_zone: list[dict[str, float]] = []
+    zone_results: list[tuple[dict[str, Any], list[_ScoredHit]]] = []
     total_succeeded = 0
     total_failed = 0
     for zone_name, queries in ZONE_SEARCH_QUERIES.items():
@@ -506,15 +509,15 @@ def gather_recommendations(
         )
         if zone is None:
             continue  # no such zone in this scene: nothing to report or search
-        zone_rec, size_errors, succeeded, failed = _process_zone(
+        zone_rec, ordered_hits, succeeded, failed = _process_zone(
             zone, queries, factor, search_fn, errors, truncation
         )
         recs["zones"].append(zone_rec)
-        size_errors_by_zone.append(size_errors)
+        zone_results.append((zone_rec, ordered_hits))
         total_succeeded += succeeded
         total_failed += failed
 
-    _apply_scene_cap(recs["zones"], size_errors_by_zone, truncation)
+    _apply_scene_cap(zone_results, truncation)
     any_eligible = any(z["eligible_count"] > 0 for z in recs["zones"])
 
     if total_failed > 0 and total_succeeded == 0:
@@ -568,7 +571,7 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
             f"{zone.get('unverified_count', 0)} unverified)"
         )
         n = 0
-        for cand in zone.get("candidates", []) + zone.get("unverified_candidates", []):
+        for cand in _zone_candidates(zone):
             n += 1
             via = ",".join(
                 f"{m.get('query')}@{m.get('rank')}" for m in cand.get("matched_queries", [])
