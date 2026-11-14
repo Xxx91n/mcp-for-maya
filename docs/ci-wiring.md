@@ -289,14 +289,23 @@ on a version bump, so they are left to the aggregate. The scheduled `drift` /
 
 ### Protection change made here (API, 2026-11-14)
 
-The only setting this section changed. Same command a maintainer can re-run:
+The only setting this section changed. Same command a maintainer can re-run;
 
 ```sh
+cat > required-checks.json <<'JSON'
+{
+  "strict": false,
+  "contexts": ["ci", "ruff budget gate", "mypy baseline gate"],
+  "checks": [
+    {"context": "ci", "app_id": 15368},
+    {"context": "ruff budget gate", "app_id": 15368},
+    {"context": "mypy baseline gate", "app_id": 15368}
+  ]
+}
+JSON
+
 gh api -X PATCH repos/Xxx91n/mcp-for-maya/branches/main/protection/required_status_checks \
   --input required-checks.json
-# body: {"strict": false,
-#        "contexts": ["ci", "ruff budget gate", "mypy baseline gate"],
-#        "checks": [{"context": ..., "app_id": 15368} for each of the three]}
 ```
 
 Read-back after the write: three `checks` entries, every one pinned to app
@@ -329,13 +338,13 @@ item 1 is now measured — see the experiments below):
 
 1. **Content swap.** Required checks are names. Three names now have to be
    reported instead of one, so a rewrite that drops the jobs outright leaves
-   all three unreported and the merge holds (measured below). What still
-   passes: a rewritten ci.yml that keeps the three job names and replaces the
-   commands behind them with ones that only succeed. Every in-repo guard sits
-   inside that same editable workflow, so the coordinated-edit bypass #215
-   measured against the registry text test extends to the whole merge path.
-   Closing it needs checks that actually run the tools outside the workflow,
-   or a maintainer-side ruleset.
+   all three unreported and the merge holds (measured for the whole-file case
+   below). What still passes: a rewritten ci.yml that keeps the three job
+   names and replaces the commands behind them with ones that only succeed.
+   Every in-repo guard sits inside that same editable workflow, so the
+   coordinated-edit bypass #215 measured against the registry text test
+   extends to the whole merge path. Closing it needs checks that actually run
+   the tools outside the workflow, or a maintainer-side ruleset.
 2. **Stale checks.** `strict: false` means an old green `ci` still counts
    after `main` moves; being up to date with the base branch is not
    enforced.
@@ -418,15 +427,15 @@ narrows the content-swap gap (applied 2026-11-14, read back and quoted in the
 change subsection above):
 
 - **Add `ruff budget gate` and `mypy baseline gate` as additional required
-  status checks** on `main`. A coordinated rewrite that fakes the `ci`
-  aggregate then still leaves those two contexts unreported, and the merge
-  holds (measured in experiment (a)). This is partial mitigation: a PR can
-  keep both names and replace their steps with commands that only succeed, so
-  the checks report success without running the tools — closing that needs
-  checks that actually run the tools or a maintainer-side ruleset
-  (未保护 item 1). The four `pytest (…)` leg names are dynamic and churn on
-  Python version bumps; leaving them to the aggregate is the deliberate
-  trade-off.
+  status checks** on `main`. A rewrite that drops the jobs outright then
+  leaves those contexts unreported and the merge holds — experiment (a)
+  measured the strictest form, the whole workflow deleted, not every rewrite
+  shape. This is partial mitigation: a rewrite that keeps the three job names
+  and replaces only the commands behind them reports all three as green and
+  can merge — closing that needs checks that actually run the tools or a
+  maintainer-side ruleset (未保护 item 1). The four `pytest (…)` leg names are
+  dynamic and churn on Python version bumps; leaving them to the aggregate is
+  the deliberate trade-off.
 
 Human checklist (maintainer; no code needed; changing branch settings needs
 its own explicit approval per #221):
