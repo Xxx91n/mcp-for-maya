@@ -53,6 +53,8 @@ job requires `always()`. Unknown continue-on-error values fail closed.
 - Deleting the workflow or lint job together with this check removes the check.
   Nothing inside that deleted job can prevent this. A3 must verify required
   checks and rulesets outside the workflow. This change does not configure them.
+  A3's verification of the real merge path is recorded in the
+  "A3 (#228): GitHub merge-path verification" section below.
 - Trigger/path filters, permissions, fork behavior, required-check names and
   whether GitHub actually runs the workflow need outside verification.
 - The parser accepts this repo's indented jobs/steps and inline/block needs.
@@ -231,3 +233,143 @@ successful command. Before the fix this test failed on the colon case;
 after the fix all 43 wiring tests and the full suite (1350 passed, 27 skipped)
 passed locally. Ruff budget, mypy zero-new-error check, governance scripts and
 pre-commit were rerun for the repair.
+
+## A3 (#228): GitHub merge-path verification
+
+Recorded 2026-11-14 against baseline `6d1896e`. Every finding below names how
+it was obtained: `API` means a fresh REST read whose command is listed, so a
+maintainer can re-run the audit; `doc` means GitHub's documented behavior that
+was NOT measured on this repository. Nothing here changes any branch setting.
+
+### Access status (what changed since #215/#216)
+
+The token used now holds `admin: maintain` on this repository, so the 403 that
+#215/#216 recorded no longer applies; the full protection config was readable.
+This is itself a fact to re-check over time — access that was missing once can
+be granted, and granted access can be revoked.
+
+### Recorded settings (API, 2026-11-14)
+
+| Setting | Value | Source |
+| --- | --- | --- |
+| Protected branches | `main` is protected; one sampled non-`main` branch (`ticket-220-scene-plan-recs`) is not; dependabot branches not individually queried | `gh api repos/Xxx91n/mcp-for-maya/branches/ticket-220-scene-plan-recs/protection` → 404 "Branch not protected"; `gh api repos/Xxx91n/mcp-for-maya/branches/main/protection` → 200 |
+| Required status checks | exactly one: context `ci`, app_id 15368, `strict: false` | `gh api repos/Xxx91n/mcp-for-maya/branches/main/protection` |
+| Required check app pin | 15368 = slug `github-actions` | `gh api /apps/github-actions` |
+| `enforce_admins` | `false` — administrators can bypass protection | same protection read |
+| Required conversation resolution | `true` | same protection read |
+| Required signatures / linear history | `false` / `false` | same protection read |
+| Force push / deletion of `main` | blocked (`false` / `false`) | same protection read |
+| Rulesets applying to `main` | none — `[]` | `gh api repos/Xxx91n/mcp-for-maya/rules/branches/main` |
+
+Real-PR cross-check (API, head of PR #237, `fa3160d`; command
+`gh api repos/Xxx91n/mcp-for-maya/commits/fa3160d/check-runs`): the required
+context `ci` reported `success` from app 15368; the sibling check runs on the
+same commit include `ruff budget gate`, `mypy baseline gate`, four
+`pytest (…)` legs and `ci` (all app 15368), plus `coverage`, `CodeRabbit`
+(app 347564) and `semgrep-cloud-platform/scan` (app 5541447). Non-Actions
+apps demonstrably report check runs on this repository's PRs and cannot
+satisfy the app-pinned required check.
+
+Mapping to the workflow: the required context `ci` is the display name of the
+aggregate job, which `needs: [lint, mypy, test]` and ends on
+`test "${{ needs.X.result }}" = "success"` for all three. The three real
+jobs' display names (`ruff budget gate`, `mypy baseline gate`, the four
+`pytest (…)` matrix legs) are **not** individually required; nothing outside
+the workflow pins them. The scheduled `drift` / `drift-notify` jobs are
+outside the aggregate (their skip conditions and `continue-on-error` are
+legal precisely because they carry no merge veto).
+
+### 已保护 / 未保护 / 未验证 matrix (protected / unprotected / unverified)
+
+已保护 (verified on this repository, API evidence above; the enforcement
+hold behind items 1 and 3 is documented-not-measured — see 未验证 item 1):
+
+1. A PR into `main` cannot merge without a `ci` check run reporting success,
+   and only the GitHub Actions app (15368) can produce one. One documented
+   exception cuts against this: a skipped job reports `Success` and does
+   not block a merge even as a required check (未保护 item 4).
+2. Force push to and deletion of `main` are blocked.
+3. PR conversations must be resolved before merge.
+
+未保护 (structural gaps, stated so nobody over-reads the protection):
+
+1. **Content swap.** The only required check is a name. A rewritten ci.yml
+   holding one trivially-green job named `ci` satisfies it, and every
+   in-repo guard (this checker, the registry, the mypy gate) lives inside
+   the same deletable workflow — the coordinated-edit bypass #215 measured
+   against the registry text test extends to the whole merge path. Closing
+   it needs extra required checks that point at jobs that actually run the
+   tools (see the recommendation below) or a maintainer-side ruleset.
+2. **Stale checks.** `strict: false` means an old green `ci` still counts
+   after `main` moves; being up to date with the base branch is not
+   enforced.
+3. **Administrator bypass.** `enforce_admins: false` lets an admin merge
+   past a red or missing check, and every protection setting is editable by
+   an admin at any time. Per #221 no claim is made against anyone with that
+   authority.
+4. **Skip counts as success.** GitHub's documentation states that a skipped
+   job reports its status as `Success` and does not prevent a pull request
+   from merging, even as a required check. The unchanged workflow cannot
+   skip `ci` — the wiring gate requires `if: always()` on the summary — but
+   a PR that rewrites ci.yml can, the same content-swap family as item 1.
+
+未验证 (`human_verify`-tagged; doc-inferred; needs a disposable-PR experiment
+this ticket was not authorized to run):
+
+1. The merge button's actual verdict when context `ci` never reports
+   (whole workflow deleted, the `ci` job renamed, an invalid workflow such
+   as a deleted job still referenced by `needs:`, or a fork PR whose
+   workflow has not been approved to run): GitHub documents
+   "Expected — Waiting for status to be reported" holding the merge; not
+   merge-tested here. A rename is fail-closed for the same reason — the old
+   context stops reporting — but the untested part is GitHub's hold on an
+   ordinary PR.
+2. The skipped verdict is documented, not measured on this repository: the
+   GitHub documentation behind 未保护 item 4 says a skipped job reports
+   `Success` and does not prevent merging as a required check.
+
+Ruleset-scope edge: no ruleset applies today, so there is no ruleset that can
+silently narrow. If a maintainer later adds one, its target-pattern change
+silently re-scopes every rule it carries — the protection read in the table
+above (`rules/branches/main`) is the re-check, and checklist step 1 covers it.
+
+### Minimal reliable protection and the maintainer checklist
+
+Acceptance for #228 is "critical checks cannot be silently skipped or
+removed", not one required check per CI sub-job. The smallest change that
+narrows the content-swap gap:
+
+- **Add `ruff budget gate` and `mypy baseline gate` as additional required
+  status checks** on `main`. A coordinated rewrite that fakes the `ci`
+  aggregate then still leaves those two contexts unreported, and the merge
+  holds. This is partial mitigation: a PR can keep both names and replace
+  their steps with commands that only succeed, so the checks report success
+  without running the tools — closing that needs checks that actually run
+  the tools or a maintainer-side ruleset (未保护 item 1). The four
+  `pytest (…)` leg names are dynamic and churn on Python version bumps;
+  leaving them to the aggregate is the deliberate trade-off.
+
+Human checklist (maintainer; no code needed; changing branch settings needs
+its own explicit approval per #221):
+
+1. Re-run the API reads in the table above and confirm this section still
+   matches reality.
+2. Settings → Branches → `main`: confirm the required check list shows
+   exactly `ci` (Actions); add `ruff budget gate` and `mypy baseline gate`.
+3. Decide on `enforce_admins` (currently `false`); enabling it binds the
+   owner too, so it is an owner-only decision.
+4. Optional measured tests (disposable branch + PR each, nothing else; one
+   phenomenon per experiment): (a) delete the whole workflow file — or just
+   the `ci` job — on a test branch, open a PR, confirm the merge button is
+   held with "Expected — Waiting for status to be reported"; (b) on another
+   test branch make the `ci` job skip outright (for example `if: false`) to
+   observe the documented skip-reports-`Success` behavior on this
+   repository. Close each PR and delete its branch; confirm no rule was
+   left changed. Each phenomenon is measured only by its own experiment —
+   deleting the `mypy` job alone tests neither: with `ci`
+   still listing `mypy` in `needs`, the workflow is simply invalid.
+
+Per #228's acceptance criteria, the end-to-end "cannot silently disappear"
+guarantee is NOT declared accepted while that merge-path experiment remains
+unmeasured; this section delivers the investigation and the human checklist
+instead.
