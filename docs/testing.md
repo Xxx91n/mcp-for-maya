@@ -81,8 +81,11 @@ verification through the GUI host instead of attaching interactively:
 & "<MayaInstallDir>\bin\maya.exe" -script "<verify.mel>"
 ```
 
-Inside `<verify.mel>`, call your Python check via `python("...")` and
-end with `quit -f;` for unattended runs.
+Inside `<verify.mel>`, call your Python check via `python("...")`. For
+unattended runs, wrap the check in Python `try`/`except` (writing the
+pass/fail status or traceback to a log file) or MEL `catch(...)` before
+`quit -f;` — otherwise an uncaught Python exception aborts the MEL
+script early and leaves the Maya GUI open.
 
 Pending: the mayapy/batch run must also cover the `gui_session_required`
 headless gate (visual tools must return the structured error, not
