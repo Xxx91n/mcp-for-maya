@@ -32,3 +32,19 @@ def finite_positive_float(value: Any) -> float | None:
     if num is None or num <= 0:
         return None
     return num
+
+
+def safe_repr(value: Any, limit: int = 60) -> str:
+    """repr() that never raises, truncated to ``limit`` chars.
+
+    CPython caps int -> str conversion at 4300 digits by default, so
+    ``repr(huge_int)`` raises ValueError — e.g. while formatting an error
+    message about that very value.
+    """
+    try:
+        text = repr(value)
+    except Exception:
+        return type(value).__name__
+    if len(text) > limit:
+        text = text[: limit - 1] + "…"
+    return text
