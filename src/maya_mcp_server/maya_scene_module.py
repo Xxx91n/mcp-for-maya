@@ -3679,7 +3679,7 @@ def scene_review(checks=None):
 # ============================================================
 
 
-def scene_plan(objective=None, auto_fix=False):
+def scene_plan(objective: str | None = None, auto_fix: bool = False) -> dict[str, Any]:
     """Plan a scene layout: organization checks plus layout suggestions.
 
     Based on research findings:
@@ -3719,7 +3719,7 @@ def scene_plan(objective=None, auto_fix=False):
 
     # Auto-fix if requested
     if auto_fix and org.get("issues"):
-        fix_log = _auto_fix_organization(org["issues"], transforms)
+        fix_log = _auto_fix_organization(org["issues"])
         result["auto_fix_log"] = fix_log
 
     # === 2. ZONE ANALYSIS ===
@@ -3778,10 +3778,10 @@ def scene_plan(objective=None, auto_fix=False):
     return result
 
 
-def _check_organization(transforms):
+def _check_organization(transforms: list[str]) -> dict[str, Any]:
     """Check scene organization health."""
-    issues = []
-    stats = {
+    issues: list[dict[str, str]] = []
+    stats: dict[str, int] = {
         "total_objects": len(transforms),
         "root_objects": 0,
         "grouped_objects": 0,
@@ -3876,7 +3876,7 @@ def _check_organization(transforms):
         score -= min(20, stats["default_names"] * 3)
     if stats["empty_groups"] > 0:
         score -= min(10, stats["empty_groups"] * 2)
-    if stats["max_depth"] > _MAYA_STANDARDS["max_nesting_depth"]:
+    if stats["max_depth"] > cast(int, _MAYA_STANDARDS["max_nesting_depth"]):
         score -= 10
 
     return {
@@ -4008,7 +4008,7 @@ _GROUP_RULES = {
 }
 
 
-def _categorize_object(name):
+def _categorize_object(name: str) -> str:
     """Categorize an object by its name using intelligent keyword matching.
 
     Returns the target GRP_ group name, or "GRP_misc" if no match.
@@ -4031,7 +4031,7 @@ def _categorize_object(name):
     return best_group
 
 
-def _auto_fix_organization(issues, transforms):
+def _auto_fix_organization(issues: list[dict[str, str]]) -> list[dict[str, str]]:
     """Auto-fix organization issues with intelligent categorization.
 
     Enhanced with:
@@ -4040,8 +4040,8 @@ def _auto_fix_organization(issues, transforms):
     - Safe reparenting with error handling
     - Detailed action log for transparency
     """
-    log = []
-    created_groups = set()
+    log: list[dict[str, str]] = []
+    created_groups: set[str] = set()
 
     for issue in issues:
         if issue["type"] == "default_name":
@@ -4111,7 +4111,7 @@ def _auto_fix_organization(issues, transforms):
     return log
 
 
-def _analyze_group_layout(transforms):
+def _analyze_group_layout(transforms: list[str]) -> dict[str, Any]:
     """Analyze layout at the group level for spatial-aesthetic optimization.
 
     Based on research:
@@ -4124,7 +4124,7 @@ def _analyze_group_layout(transforms):
         dict with group analysis, positioning suggestions, and zone compliance.
     """
     # Collect groups and their children
-    groups = {}
+    groups: dict[str, dict[str, Any]] = {}
     for t in transforms:
         short = t.split("|")[-1]
         if short.startswith("GRP_") and t.count("|") <= 2:  # Top-level or 2nd-level groups
@@ -4174,7 +4174,7 @@ def _analyze_group_layout(transforms):
                 pass
 
     # Analyze group positioning
-    suggestions = []
+    suggestions: list[dict[str, Any]] = []
     group_list = list(groups.values())
 
     # Check for groups at origin (likely misplaced)
@@ -4226,7 +4226,7 @@ def _analyze_group_layout(transforms):
     }
 
 
-def _get_zone_hint(group_name):
+def _get_zone_hint(group_name: str) -> str:
     """Work out which of the plan's 8 zones a group belongs to, from its name."""
     name = group_name.lower()
     if any(kw in name for kw in ["shell", "facade", "exterior", "wall", "floor"]):
@@ -4247,7 +4247,7 @@ def _get_zone_hint(group_name):
         return "other"
 
 
-def _parse_objective(objective):
+def _parse_objective(objective: str | None) -> list[dict[str, Any]]:
     """Parse natural language objective into structured plan steps.
 
     Based on research: translate design intent into actionable geometry operations.
@@ -4259,7 +4259,7 @@ def _parse_objective(objective):
     if not objective:
         return []
 
-    steps = []
+    steps: list[dict[str, Any]] = []
     obj_lower = objective.lower()
 
     # Detect zone targets
@@ -4273,7 +4273,7 @@ def _parse_objective(objective):
         "shell": ["wall", "floor", "ceiling", "structure", "墙体", "地面"],
     }
 
-    detected_zones = []
+    detected_zones: list[str] = []
     for zone, keywords in zone_keywords.items():
         if any(kw in obj_lower for kw in keywords):
             detected_zones.append(zone)
@@ -4287,7 +4287,7 @@ def _parse_objective(objective):
         "review": ["check", "review", "audit", "检查", "审核"],
     }
 
-    detected_actions = []
+    detected_actions: list[str] = []
     for action, keywords in action_keywords.items():
         if any(kw in obj_lower for kw in keywords):
             detected_actions.append(action)
@@ -4343,7 +4343,7 @@ def _parse_objective(objective):
     return steps
 
 
-def _analyze_zone_balance(zone_data):
+def _analyze_zone_balance(zone_data: dict[str, Any]) -> dict[str, Any]:
     """Analyze zone coverage and spatial balance."""
     zones = zone_data.get("zones", [])
     unassigned = zone_data.get("unassigned_count", 0)
@@ -4356,7 +4356,7 @@ def _analyze_zone_balance(zone_data):
     coverage = 1.0 - (unassigned / total) if total > 0 else 0
 
     # Check zone distribution
-    zone_counts = {}
+    zone_counts: dict[str, int] = {}
     for zone in zones:
         zname = zone.get("name", "unknown")
         zone_counts[zname] = zone.get("object_count", 0)
@@ -4382,12 +4382,12 @@ def _analyze_zone_balance(zone_data):
     }
 
 
-def _suggest_layout(transforms, zone_data):
+def _suggest_layout(transforms: list[str], zone_data: dict[str, Any]) -> list[dict[str, Any]]:
     """Suggest layout improvements based on current scene state."""
     suggestions: list[dict[str, Any]] = []
 
     # Find objects and their positions
-    objects = []
+    objects: list[dict[str, Any]] = []
     for t in transforms[:_SAMPLE_LAYOUT]:
         try:
             sel = om2.MSelectionList()
@@ -4452,9 +4452,9 @@ def _suggest_layout(transforms, zone_data):
     return suggestions[:10]
 
 
-def _predict_conflicts(transforms):
+def _predict_conflicts(transforms: list[str]) -> list[dict[str, Any]]:
     """Predict potential spatial conflicts before they happen."""
-    conflicts = []
+    conflicts: list[dict[str, Any]] = []
 
     # Get bounds for all objects (world-space via 8-corner transform)
     obj_bounds: dict[str, dict[str, Any]] = {}
@@ -4475,7 +4475,7 @@ def _predict_conflicts(transforms):
             pass
 
     # Check for near-miss collisions (within 10cm tolerance)
-    checked = set()
+    checked: set[tuple[str, str]] = set()
     for path_a, ba in obj_bounds.items():
         for path_b, bb in obj_bounds.items():
             if path_a >= path_b:
@@ -4512,9 +4512,9 @@ def _predict_conflicts(transforms):
     return conflicts[:5]
 
 
-def _generate_action_plan(plan_data, objective):
+def _generate_action_plan(plan_data: dict[str, Any], objective: str | None) -> list[dict[str, Any]]:
     """Generate step-by-step action plan based on analysis and objective."""
-    actions = []
+    actions: list[dict[str, Any]] = []
     step = 1
 
     # Fix organization first
