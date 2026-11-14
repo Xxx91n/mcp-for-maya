@@ -1014,12 +1014,12 @@ class TestRecommendAssetsTargetAndSizing:
     ):
         import asyncio
         import threading
-        import time
 
         tools.env.scene.add_mesh("GEO_chair_main", bbox_min=(0, 0, 0), bbox_max=(80, 100, 80))
 
         main_thread = threading.current_thread()
         worker_threads: list[threading.Thread] = []
+        ready = threading.Event()
         ticks = 0
         stop = asyncio.Event()
 
@@ -1027,12 +1027,14 @@ class TestRecommendAssetsTargetAndSizing:
             nonlocal ticks
             while not stop.is_set():
                 ticks += 1
-                await asyncio.sleep(0.005)
+                if ticks >= 3:
+                    ready.set()
+                await asyncio.sleep(0)
 
         def slow_search(query="", asset_type="models", limit=20, timeout=5.0):
             worker_threads.append(threading.current_thread())
             if query == "chair":
-                time.sleep(0.08)
+                assert ready.wait(timeout=5.0), "event loop did not advance while worker blocked"
             return {
                 "results": [self._chair("chair_fit", [0.8, 1.0, 0.8])] if query == "chair" else [],
                 "total_count": 1 if query == "chair" else 0,
@@ -1156,7 +1158,7 @@ class TestRecommendAssetsTargetAndSizing:
             assert res_bad["recommendations"]["errors"][0]["code"] == "bad_response"
             assert "zone_analysis" in res_bad and "action_plan" in res_bad
 
-            # Soft budget exhaustion (monotonic clock crosses deadline after 1st query).
+            # Soft budget exhaustion (scene_tools clock hook crosses deadline after 1st query).
             monkeypatch.setattr(
                 polyhaven,
                 "search_assets",
@@ -1168,10 +1170,7 @@ class TestRecommendAssetsTargetAndSizing:
                 tick[0] += 3.0
                 return tick[0]
 
-            monkeypatch.setattr("maya_mcp_server.scene_tools.time.monotonic", jumping_monotonic)
-            monkeypatch.setattr(
-                "maya_mcp_server.asset_recommendation.time.monotonic", jumping_monotonic
-            )
+            monkeypatch.setattr("maya_mcp_server.scene_tools._monotonic", jumping_monotonic)
             res_budget = json.loads(
                 await tools.fns["scene_plan"](format="json", recommend_assets=True)
             )

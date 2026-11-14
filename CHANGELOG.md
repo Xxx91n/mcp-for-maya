@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exhausted (`truncation.budget=true`, `budget_exhausted`), and never claiming to
   force-kill an already-running thread. Search reuses `polyhaven._index_cache`
   (`SEARCH_INDEX_TTL_S=300`), so a warm cache stays `status="ok"` offline, while
-  shared-index `network_unavailable` failures circuit-break the pass cleanly on
+  shared-index failures (`network_unavailable`, `http_error`, `bad_response`,
+  `download_too_large`, `url_not_allowed`) circuit-break the pass cleanly on
   first failure instead of repeating redundant requests. Corrupt `/assets` JSON,
   non-string tags/categories/ids, bool polycounts, and huge integer dimensions
   that overflow `float` are tolerated without affecting `scene_plan`'s own

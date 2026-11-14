@@ -1545,3 +1545,40 @@ class TestBudgetCircuitBreakerAndCorruptMetadata:
         assert [c["asset_id"] for c in zone["candidates"]] == ["chair_valid"]
         assert [c["asset_id"] for c in zone["unverified_candidates"]] == ["chair_bad_tags"]
         assert zone["unverified_candidates"][0]["polycount"] is None
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"budget_s": float("nan")},
+            {"budget_s": float("inf")},
+            {"deadline": float("nan")},
+        ],
+    )
+    def test_non_finite_budget_or_deadline_fails_closed(self, kwargs):
+        called: list[str] = []
+
+        def no_call(
+            query: str = "", asset_type: str = "models", limit: int = 20, timeout: float = 5.0
+        ) -> dict:
+            called.append(query)
+            return _search_response([], query=query, asset_type=asset_type, limit=limit)
+
+        recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE]), no_call, **kwargs)
+        assert called == []
+        assert recs["status"] == "partial"
+        assert recs["truncation"]["budget"] is True
+        assert recs["errors"][0]["code"] == "budget_exhausted"
+
+    @pytest.mark.parametrize("code", ["bad_response", "http_error"])
+    def test_shared_index_fatal_errors_circuit_break_pass(self, code):
+        calls: list[str] = []
+
+        def fail_once(query: str = "", asset_type: str = "models", limit: int = 20) -> dict:
+            calls.append(query)
+            raise AssetError(code, "index unusable")
+
+        recs = gather_recommendations(make_geometry(zones=[FURNITURE_ZONE]), fail_once)
+        assert calls == ["chair"]
+        assert recs["status"] == "offline"
+        assert len(recs["errors"]) == 1
+        assert recs["errors"][0]["code"] == code

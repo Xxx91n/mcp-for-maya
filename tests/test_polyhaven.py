@@ -266,7 +266,14 @@ class TestSearch:
 
     def test_corrupt_tags_categories_and_asset_ids_never_crash_search(self, monkeypatch):
         """#220 T4: non-string ids, non-dict entries, and non-list tags are tolerated."""
-        assets = {
+        raw_assets: dict = {
+            123: {
+                "name": "Numeric ID Chair",
+                "categories": ["furniture"],
+                "tags": ["chair"],
+                "dimensions": [600, 800, 600],
+                "polycount": 500,
+            },
             "Chair_Good": {
                 "name": "Chair Good",
                 "categories": "not-a-list",
@@ -277,14 +284,13 @@ class TestSearch:
             "Chair_DictCats": {
                 "name": "Chair Dict Cats",
                 "categories": {"bad": 1},
-                "tags": "chair",
+                "tags": ["chair", 99],
                 "dimensions": [600, 800, 600],
                 "polycount": 500,
             },
             "Broken_Row": "not-a-dict",
         }
-        routes = {"https://api.polyhaven.com/assets?t=models": json.dumps(assets).encode()}
-        monkeypatch.setattr(polyhaven, "_urlopen", fake_urlopen(routes))
+        monkeypatch.setattr(polyhaven, "_fetch_json", lambda url, timeout: raw_assets)
         out = polyhaven.search_assets(query="chair")
         assert [r["id"] for r in out["results"]] == ["Chair_DictCats", "Chair_Good"]
         by_id = {r["id"]: r for r in out["results"]}
@@ -292,6 +298,22 @@ class TestSearch:
         assert by_id["Chair_Good"]["tags"] == []
         assert by_id["Chair_DictCats"]["categories"] == []
         assert by_id["Chair_DictCats"]["tags"] == ["chair"]
+
+    @pytest.mark.parametrize("bad_timeout", [0, 0.0, -1.0, float("nan"), float("inf"), True])
+    def test_invalid_timeout_fails_fast_without_calling_urlopen(self, monkeypatch, bad_timeout):
+        """#220 T4: non-positive, bool, or non-finite timeouts never reach _urlopen."""
+        called = False
+
+        def fail_open(req, timeout=None):
+            nonlocal called
+            called = True
+            raise AssertionError("_urlopen must not be called with invalid timeout")
+
+        monkeypatch.setattr(polyhaven, "_urlopen", fail_open)
+        with pytest.raises(AssetError) as ei:
+            polyhaven.search_assets(query="chair", timeout=bad_timeout)
+        assert ei.value.code == "network_unavailable"
+        assert called is False
 
 
 # ------------------------------------------------------------------

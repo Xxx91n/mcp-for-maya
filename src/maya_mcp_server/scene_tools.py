@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
@@ -167,6 +168,11 @@ async def get_zone_geometry(client: Any, session_key: str | None = None) -> Any:
     )
 
 
+def _monotonic() -> float:
+    """Module clock hook for soft-budget timing without patching stdlib time."""
+    return time.monotonic()
+
+
 async def _recommend_for_plan(
     client: Any,
     session_key: str | None,
@@ -183,7 +189,17 @@ async def _recommend_for_plan(
     finishes naturally inside its socket timeout rather than being forcibly
     killed, and no new searches start once the soft budget runs out.
     """
-    deadline = time.monotonic() + max(0.0, budget_s)
+    safe_budget = (
+        float(budget_s)
+        if (
+            not isinstance(budget_s, bool)
+            and isinstance(budget_s, (int, float))
+            and math.isfinite(budget_s)
+            and budget_s > 0
+        )
+        else 0.0
+    )
+    deadline = _monotonic() + safe_budget
     geometry: Any
     try:
         geometry = await get_zone_geometry(client, session_key)
@@ -195,6 +211,7 @@ async def _recommend_for_plan(
         polyhaven.search_assets,
         objective=objective,
         deadline=deadline,
+        clock=_monotonic,
     )
 
 

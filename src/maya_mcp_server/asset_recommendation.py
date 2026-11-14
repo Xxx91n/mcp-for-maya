@@ -61,6 +61,15 @@ SEARCH_ASSET_TYPE = "models"
 
 # Q8: 5-second monotonic soft budget for the whole recommendation pass.
 DEFAULT_RECOMMEND_BUDGET_S = 5.0
+_SHARED_INDEX_FATAL_CODES = frozenset(
+    {
+        "network_unavailable",
+        "http_error",
+        "bad_response",
+        "download_too_large",
+        "url_not_allowed",
+    }
+)
 
 # Q9: at most 3 candidates per zone and 12 across the whole scene
 # (eligible first, then unverified; both kinds share the cap).
@@ -273,16 +282,19 @@ def _size_error(model: list[float], envelope: list[float]) -> float:
     return round(sum(abs(mm - zz) / zz for mm, zz in zip(m, z)), 9)
 
 
+def _int_value(value: Any) -> int | None:
+    """Return ``value`` as a real int (excluding bool), or None."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
 def _candidate(entry: dict[str, Any], query: str, rank: int) -> dict[str, Any]:
     """One search hit with its provenance; size fields filled by the caller."""
     raw_name = entry.get("name")
     name = raw_name if (raw_name is None or isinstance(raw_name, str)) else str(raw_name)
-    raw_poly = entry.get("polycount")
-    polycount = (
-        raw_poly
-        if (not isinstance(raw_poly, bool) and isinstance(raw_poly, int) and raw_poly >= 0)
-        else None
-    )
+    raw_poly = _int_value(entry.get("polycount"))
+    polycount = raw_poly if (raw_poly is not None and raw_poly >= 0) else None
     return {
         "asset_id": entry.get("id"),
         "name": name,
@@ -495,16 +507,18 @@ def _match_zone_object(
         obj for obj in valid_objects if _measurable_size_m(obj.get("size"), factor)[1] is not None
     ]
     # Keep synthetic fixtures whose object_count > len(objects) in zone_bbox mode.
+    obj_int = _int_value(obj_count)
+    unmeasured_int = _int_value(unmeasured)
     count_matches_list = not (
-        isinstance(obj_count, int)
-        and isinstance(unmeasured, int)
-        and (obj_count - unmeasured) != len(measurable)
+        obj_int is not None
+        and unmeasured_int is not None
+        and (obj_int - unmeasured_int) != len(measurable)
     )
     if len(measurable) == 1 and count_matches_list:
         return measurable[0], "unique_zone_object", None
 
     if len(measurable) > 1 or (
-        isinstance(obj_count, int) and isinstance(unmeasured, int) and (obj_count - unmeasured) > 1
+        obj_int is not None and unmeasured_int is not None and (obj_int - unmeasured_int) > 1
     ):
         return (
             None,
@@ -538,8 +552,9 @@ def _build_object_target(
     obj_count: Any,
     unmeasured: Any,
 ) -> dict[str, Any]:
+    unmeasured_int = _int_value(unmeasured)
     partial_zone = (
-        match_source == "unique_zone_object" and isinstance(unmeasured, int) and unmeasured > 0
+        match_source == "unique_zone_object" and unmeasured_int is not None and unmeasured_int > 0
     )
     target: dict[str, Any] = {
         "source": match_source,
@@ -572,7 +587,8 @@ def _build_zone_fallback_target(
     unmeasured: Any,
     fallback: _FallbackNote | None = None,
 ) -> tuple[dict[str, Any], str | None]:
-    has_unmeasured = isinstance(unmeasured, int) and unmeasured > 0
+    unmeasured_int = _int_value(unmeasured)
+    has_unmeasured = unmeasured_int is not None and unmeasured_int > 0
     unmeasurable = zone_display_m is None
     target: dict[str, Any] = {
         "source": "zone_bbox",
@@ -616,7 +632,7 @@ def _resolve_target(
     name = zone.get("name", "")
     obj_count = zone.get("object_count")
     unmeasured = zone.get("unmeasured_count")
-    if obj_count == 0:
+    if _int_value(obj_count) == 0:
         target, _ = _build_zone_fallback_target(name, None, None, None, 0, unmeasured)
         target["measurement"] = "empty_zone"
         return target, None, "empty_zone"
@@ -823,7 +839,7 @@ def _process_zone(
             entry["queries"].append(_unsearched_query(query))
             continue
         remaining = state.deadline - state.clock()
-        if not state.budget_exhausted and remaining <= 0:
+        if not state.budget_exhausted and (not math.isfinite(remaining) or remaining <= 0):
             state.budget_exhausted = True
             truncation["budget"] = True
             errors.append(
@@ -857,11 +873,11 @@ def _process_zone(
             errors.append(_error(scope, err_code, f"{type(e).__name__}: {e}"))
             failed += 1
             entry["queries"].append(_unsearched_query(query))
-            if err_code == "network_unavailable":
+            if err_code in _SHARED_INDEX_FATAL_CODES:
                 state.offline_circuit_broken = True
             continue
         succeeded += 1
-        total_int = total if isinstance(total, int) and not isinstance(total, bool) else None
+        total_int = _int_value(total)
         entry["queries"].append(_searched_query(query, total_int))
         if total_int is not None and total_int > len(results):
             truncation["search"] = True
@@ -966,7 +982,13 @@ def gather_recommendations(
     """
     clock_fn = time.monotonic if clock is None else clock
     objective_text = objective if isinstance(objective, str) else ""
-    effective_deadline = clock_fn() + float(budget_s) if deadline is None else deadline
+    if deadline is not None:
+        dl = _finite_float(deadline)
+        effective_deadline = dl if dl is not None else clock_fn() - 1.0
+    else:
+        bs = _finite_float(budget_s)
+        safe_budget = bs if (bs is not None and bs > 0) else 0.0
+        effective_deadline = clock_fn() + safe_budget
     recs: dict[str, Any] = {
         "status": "empty",
         "provider": "poly_haven",

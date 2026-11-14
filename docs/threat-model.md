@@ -171,7 +171,8 @@ authoritative and this table must match it row for row:
   thread under a 5-second monotonic soft budget, reusing the 300-second
   models index cache (so a hot cache works offline without claiming
   `offline`), passing remaining budget as HTTP timeout, circuit-breaking
-  `network_unavailable` on the shared index, and never claiming to force-kill
+  shared-index failures (`network_unavailable`, `http_error`, `bad_response`,
+  `download_too_large`, `url_not_allowed`) cleanly on first failure, and never claiming to force-kill
   an already-running request thread. A recommendation imports nothing;
   placing a model stays an explicit `asset_import` call, and a timeout,
   corrupt index entry, or failed search degrades to `partial`/`offline`
