@@ -127,29 +127,3 @@ def test_callform_checklist_mayapy_tier():
         "cmds.about(batch=True) -> True under mayapy",
     )
     pytest.skip("mayapy env-blocked on this box — booked, not claimed")
-
-
-def test_stub_mismatch_call_forms_real_maya():
-    """#229: call forms where `types-maya-strict` disagrees with the call.
-
-    Six forms, all scriptable, so this is the mayapy tier booked as a manual
-    checklist because no healthy interpreter is reachable here — the same
-    shape as `test_callform_checklist_mayapy_tier`, not a human-eye item.
-    The stub types `rename` as `-> None`, `xform` without its short flag
-    names, `keyTangent` without `itt`/`ott`, `playbackOptions` without
-    `min`/`max`, `aimConstraint` vectors as tuples only, and `MSpace.kWorld`
-    as `int` while `getPoint` wants an `MSpace`. The shipped calls were kept
-    as they are — a stub disagreement is not evidence against a working
-    call. Evidence and handling per form: docs/reference/maya-stub-mismatches.md."""
-    _steps(
-        "cmds.rename(transform, new_name) -> the new name string, not None",
-        "cmds.xform(node, q=True, ws=True, t=True) -> world-space [x, y, z]",
-        "cmds.xform(node, q=True, ws=True, ro=True) -> world-space rotation",
-        "cmds.keyTangent(edit=True, itt='auto', ott='auto') sets both tangents",
-        "cmds.playbackOptions(min=1, max=N) sets the playback range",
-        "cmds.aimConstraint(a, b, aimVector=[0, 0, -1], upVector=[0, 1, 0])",
-        "  builds the constraint (a list of three numbers is accepted)",
-        "MFnMesh(dag).getPoint(i, om2.MSpace.kWorld) -> world-space point;",
-        "  compare against cmds.pointPosition on the same vertex",
-    )
-    pytest.skip("mayapy env-blocked on this box — booked, not claimed")

@@ -301,7 +301,7 @@ def get_scene_graph(detail_level="compact") -> dict[str, Any]:
                 # First 100 vertex positions
                 verts = []
                 for i in range(min(mesh_fn.numVertices, 100)):
-                    pt = mesh_fn.getPoint(i, cast("om2.MSpace", om2.MSpace.kWorld))
+                    pt = mesh_fn.getPoint(i, cast(om2.MSpace, om2.MSpace.kWorld))
                     verts.extend(_round3_list([pt[0], pt[1], pt[2]]))
                 obj["verts"] = verts
             except Exception:
@@ -1520,7 +1520,7 @@ def rollback_to_checkpoint(filename: str, discard_current_state: bool = False) -
 # P1: Camera / Shot Planning
 # ============================================================
 
-SHOT_TYPES: dict[str, dict[str, Any]] = {
+SHOT_TYPES = {
     "extreme_wide": {"distance_mult": 8.0, "focal_length": 18, "desc": "极远景 - 建立环境"},
     "wide": {"distance_mult": 5.0, "focal_length": 24, "desc": "远景 - 展示全貌"},
     "medium": {"distance_mult": 3.0, "focal_length": 35, "desc": "中景 - 展示动作"},
@@ -1591,7 +1591,7 @@ def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
     # Create camera
     cam_transform, cam_shape = cmds.camera(
         name=name,
-        focalLength=shot["focal_length"],
+        focalLength=cast(float, shot["focal_length"]),
         horizontalFilmAperture=1.417,  # 35mm
     )
     cam_transform = cast(str, cmds.rename(cam_transform, name)) or name  # stub None; Maya str

@@ -172,6 +172,64 @@ def test_callform_about_batch_is_true(real_maya):
     assert real_maya.about(batch=True) is True
 
 
+def test_callform_stub_disagreement_forms(real_maya):
+    """#229: the six call forms where `types-maya-strict` 2025.0.6
+    disagrees with the call. Per-form evidence and handling:
+    docs/reference/maya-stub-mismatches.md. This is the real-interpreter
+    check — under mayapy it proves the call form works, which neither the
+    stub nor the fake Maya layer can."""
+    om = pytest.importorskip("maya.api.OpenMaya")
+    min_time = real_maya.playbackOptions(q=True, minTime=True)
+    max_time = real_maya.playbackOptions(q=True, maxTime=True)
+    cube = real_maya.polyCube(name="GEO_stub_probe")[0]
+    try:
+        # rename returns the new name string (the stub says -> None)
+        renamed = real_maya.rename(cube, "GEO_stub_probe_renamed")
+        assert renamed == "GEO_stub_probe_renamed"
+
+        # xform takes the short flag names q/ws/t/ro, not only the long ones
+        real_maya.move(10, 0, 0, renamed)
+        pos = real_maya.xform(renamed, q=True, ws=True, t=True)
+        assert [round(v, 3) for v in pos] == [10.0, 0.0, 0.0]
+        rot = real_maya.xform(renamed, q=True, ws=True, ro=True)
+        assert len(rot) == 3
+
+        # MFnMesh.getPoint takes MSpace.kWorld (the stub types the constant int)
+        sel = om.MSelectionList()
+        sel.add(renamed)
+        dag = sel.getDagPath(0)
+        dag.extendToShape()
+        mesh = om.MFnMesh(dag)
+        world_pt = mesh.getPoint(0, om.MSpace.kWorld)
+        object_pt = mesh.getPoint(0, om.MSpace.kObject)
+        assert round(world_pt[0] - object_pt[0], 3) == 10
+
+        # keyTangent takes itt/ott, the documented short names
+        real_maya.setKeyframe(renamed, attribute="translateX")
+        real_maya.select(renamed)
+        real_maya.keyTangent(edit=True, itt="auto", ott="auto")
+
+        # playbackOptions takes min/max, the documented short names
+        real_maya.playbackOptions(min=1, max=12)
+        assert real_maya.playbackOptions(q=True, maxTime=True) == 12
+
+        # aimConstraint accepts three-number lists, not only tuples
+        target = real_maya.polyCube(name="GEO_stub_target")[0]
+        con = real_maya.aimConstraint(
+            target,
+            renamed,
+            aimVector=[0, 0, -1],
+            upVector=[0, 1, 0],
+            worldUpType="scene",
+        )
+        assert con
+    finally:
+        real_maya.playbackOptions(min=min_time, max=max_time)
+        for name in ("GEO_stub_target", "GEO_stub_probe_renamed"):
+            if real_maya.objExists(name):
+                real_maya.delete(name)
+
+
 def _injection_unit():
     """Exec the real _mcp_scene payload shape in mayapy: the big file's source
     plus all four extra files concatenated into one namespace - the same bytes
