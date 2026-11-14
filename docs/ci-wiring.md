@@ -284,7 +284,9 @@ legal precisely because they carry no merge veto).
 已保护 (verified on this repository, API evidence above):
 
 1. A PR into `main` cannot merge without a `ci` check run reporting success,
-   and only the GitHub Actions app (15368) can produce one.
+   and only the GitHub Actions app (15368) can produce one. One documented
+   exception cuts against this: a skipped job reports `Success` and does
+   not block a merge even as a required check (未保护 item 4).
 2. Force push to and deletion of `main` are blocked.
 3. PR conversations must be resolved before merge.
 
@@ -304,19 +306,26 @@ legal precisely because they carry no merge veto).
    past a red or missing check, and every protection setting is editable by
    an admin at any time. Per #221 no claim is made against anyone with that
    authority.
+4. **Skip counts as success.** GitHub's documentation states that a skipped
+   job reports its status as `Success` and does not prevent a pull request
+   from merging, even as a required check. The unchanged workflow cannot
+   skip `ci` — the wiring gate requires `if: always()` on the summary — but
+   a PR that rewrites ci.yml can, the same content-swap family as item 1.
 
 未验证 (`human_verify`-tagged; doc-inferred; needs a disposable-PR experiment
 this ticket was not authorized to run):
 
 1. The merge button's actual verdict when context `ci` never reports
-   (whole workflow deleted, the `ci` job renamed or skipped, or a fork PR
-   whose workflow has not been approved to run): GitHub documents
+   (whole workflow deleted, the `ci` job renamed, an invalid workflow such
+   as a deleted job still referenced by `needs:`, or a fork PR whose
+   workflow has not been approved to run): GitHub documents
    "Expected — Waiting for status to be reported" holding the merge; not
    merge-tested here. A rename is fail-closed for the same reason — the old
    context stops reporting — but the untested part is GitHub's hold on an
    ordinary PR.
-2. Whether a `skipped` conclusion on the required check is treated as
-   not-success: doc-inferred.
+2. The skipped verdict is documented, not measured on this repository: the
+   GitHub documentation behind 未保护 item 4 says a skipped job reports
+   `Success` and does not prevent merging as a required check.
 
 Ruleset-scope edge: no ruleset applies today, so there is no ruleset that can
 silently narrow. If a maintainer later adds one, its target-pattern change
@@ -327,13 +336,17 @@ above (`rules/branches/main`) is the re-check, and checklist step 1 covers it.
 
 Acceptance for #228 is "critical checks cannot be silently skipped or
 removed", not one required check per CI sub-job. The smallest change that
-closes the content-swap gap:
+narrows the content-swap gap:
 
 - **Add `ruff budget gate` and `mypy baseline gate` as additional required
   status checks** on `main`. A coordinated rewrite that fakes the `ci`
   aggregate then still leaves those two contexts unreported, and the merge
-  holds. The four `pytest (…)` leg names are dynamic and churn on Python
-  version bumps; leaving them to the aggregate is the deliberate trade-off.
+  holds. This is partial mitigation: a PR can keep both names and replace
+  their steps with commands that only succeed, so the checks report success
+  without running the tools — closing that needs checks that actually run
+  the tools or a maintainer-side ruleset (未保护 item 1). The four
+  `pytest (…)` leg names are dynamic and churn on Python version bumps;
+  leaving them to the aggregate is the deliberate trade-off.
 
 Human checklist (maintainer; no code needed; changing branch settings needs
 its own explicit approval per #221):
@@ -344,11 +357,16 @@ its own explicit approval per #221):
    exactly `ci` (Actions); add `ruff budget gate` and `mypy baseline gate`.
 3. Decide on `enforce_admins` (currently `false`); enabling it binds the
    owner too, so it is an owner-only decision.
-4. Optional measured test (disposable branch + PR, nothing else): remove the
-   `mypy` job on a test branch, open a PR, confirm the merge button is held
-   with "Expected — Waiting for status to be reported", close the PR and
-   delete the branch, confirm no rule was left changed. This upgrades the
-   two 未验证 rows to measured.
+4. Optional measured tests (disposable branch + PR each, nothing else; one
+   phenomenon per experiment): (a) delete the whole workflow file — or just
+   the `ci` job — on a test branch, open a PR, confirm the merge button is
+   held with "Expected — Waiting for status to be reported"; (b) on another
+   test branch make the `ci` job skip outright (for example `if: false`) to
+   observe the documented skip-reports-`Success` behavior on this
+   repository. Close each PR and delete its branch; confirm no rule was
+   left changed. Each 未验证 row becomes measured only by its own
+   experiment — deleting the `mypy` job alone tests neither: with `ci`
+   still listing `mypy` in `needs`, the workflow is simply invalid.
 
 Per #228's acceptance criteria, the end-to-end "cannot silently disappear"
 guarantee is NOT declared accepted while that merge-path experiment remains
