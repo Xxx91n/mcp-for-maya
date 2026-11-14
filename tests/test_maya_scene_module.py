@@ -487,6 +487,12 @@ class TestAestheticsScoreContract:
     pinned: the remaining per-object silhouette rows and the top_colors and
     issues lists. No hand-derived expectation covers those, so a change there
     would pass this test.
+
+    The total is the one value with a tolerance. Its weighted sum is exactly
+    53.05, which sits on the round-half boundary, and CPython 3.12 changed
+    float ``sum()`` to compensated summation: 3.9/3.10 land just above the
+    boundary and round to 53.1, 3.13 lands just below and rounds to 53.0.
+    Measured on 3.9.25, 3.10.20 and 3.13.13; every other value was identical.
     """
 
     def test_same_fixture_keeps_every_dimension_and_total(self, maya_env):
@@ -501,7 +507,7 @@ class TestAestheticsScoreContract:
 
         res = maya_env.module.analyze_aesthetics()
 
-        assert res["overall_score"] == 53.0
+        assert res["overall_score"] == pytest.approx(53.05, abs=0.1)
         assert res["grade"] == "D"
         assert res["dimensions"] == {
             "color_theory": 73.8,
