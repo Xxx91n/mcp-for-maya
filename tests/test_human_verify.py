@@ -127,3 +127,23 @@ def test_callform_checklist_mayapy_tier():
         "cmds.about(batch=True) -> True under mayapy",
     )
     pytest.skip("mayapy env-blocked on this box — booked, not claimed")
+
+
+def test_stub_mismatch_call_forms_real_maya():
+    """#229: call forms where `types-maya-strict` disagrees with the call.
+
+    The stub types `rename` as `-> None`, `xform` without its `q`/`ws`/`t`/`ro`
+    short flags, `aimConstraint` vectors as tuples only, and `MSpace.kWorld`
+    as `int` while `getPoint` wants an `MSpace`. The shipped calls were kept
+    as they are — a stub disagreement is not evidence against a working call —
+    so these four forms still need a live session to confirm them."""
+    _steps(
+        "cmds.rename(transform, new_name) -> the new name string, not None",
+        "cmds.xform(node, q=True, ws=True, t=True) -> world-space [x, y, z]",
+        "cmds.xform(node, q=True, ws=True, ro=True) -> world-space rotation",
+        "cmds.aimConstraint(a, b, aimVector=[0, 0, -1], upVector=[0, 1, 0])",
+        "  builds the constraint (a list of three numbers is accepted)",
+        "MFnMesh(dag).getPoint(i, om2.MSpace.kWorld) -> world-space point;",
+        "  compare against cmds.pointPosition on the same vertex",
+    )
+    pytest.skip("human-eye check — steps printed above")

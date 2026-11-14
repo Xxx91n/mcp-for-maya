@@ -119,7 +119,9 @@ orientation (verticalFlip), WYSIWYG HUD/selection match, VP2 non-black
 (2025/2026 = partial), render_preview framing vs requested camera,
 multi-client ImageContent rendering (non-Devin seats blocked on user
 env), modelPanel -camera call form on 2025/2026 (partial — only 2024
-verified locally).
+verified locally), and the four call forms whose third-party stub
+disagrees with the call (#229: `rename` return value, `xform` short
+flags, `aimConstraint` list vectors, `getPoint` + `MSpace.kWorld`).
 
 ### Call-form checklist (D-056②)
 
