@@ -821,6 +821,24 @@ class TestThreeAxisScreening:
         assert all(c["size_status"] == "unverified" for c in zone["unverified_candidates"])
         json.dumps(recs, allow_nan=False)
 
+        # Ensure non-finite hits actually reach unverified_candidates without cap eviction.
+        nonfinite_search, _ = make_search(
+            [
+                chair_hit("chair_nan", dims=[float("nan"), 0.8, 0.6]),
+                chair_hit("chair_inf", dims=[float("inf"), 0.8, 0.6]),
+            ]
+        )
+        recs_nf = gather_recommendations(
+            make_geometry(unit="cm", zones=[self.SINGLE_CHAIR_CM]),
+            nonfinite_search,
+        )
+        nf_cands = recs_nf["zones"][0]["unverified_candidates"]
+        assert [c["asset_id"] for c in nf_cands] == ["chair_nan", "chair_inf"]
+        assert all(c["reason_code"] == "invalid_dimensions" for c in nf_cands)
+        assert all("non-finite" in c["match_reason"] for c in nf_cands)
+        assert all(c["dimensions_m"] is None for c in nf_cands)
+        json.dumps(recs_nf, allow_nan=False)
+
     def test_objective_never_crosses_the_search_seam(self):
         search, calls = make_search([chair_hit("chair_ok", dims=[1.0, 0.8, 0.6])])
         gather_recommendations(
@@ -918,4 +936,35 @@ class TestThreeAxisScreening:
         recs_dead = gather_recommendations(make_geometry(zones=[zone_dead]), search)
         block_dead = format_recommend_cos(recs_dead)
         assert "furniture: skipped (unmeasurable_target) objects=2 unmeasured=2" in block_dead
+        assert "target=zone_bbox fallback=no_explicit_target" in block_dead
         assert "tolerance_band" not in recs_dead["policy"]
+
+        recs_dead_matched = gather_recommendations(
+            make_geometry(zones=[zone_dead]),
+            search,
+            objective="replace GEO_broken_a",
+        )
+        block_matched = format_recommend_cos(recs_dead_matched)
+        assert "target=zone_bbox fallback=matched_target_unmeasurable" in block_matched
+
+        zone_dead_dup = {
+            "name": "furniture",
+            "bbox_min": None,
+            "bbox_max": None,
+            "size": None,
+            "object_count": 2,
+            "unmeasured_count": 2,
+            "objects": [
+                {"name": "|GRP_l|GEO_chair", "size": None},
+                {"name": "|GRP_r|GEO_chair", "size": None},
+            ],
+        }
+        recs_dead_dup = gather_recommendations(
+            make_geometry(zones=[zone_dead_dup]),
+            search,
+            objective="replace GEO_chair",
+        )
+        assert (
+            "fallback=ambiguous_short_name(|GRP_l|GEO_chair,|GRP_r|GEO_chair)"
+            in format_recommend_cos(recs_dead_dup)
+        )

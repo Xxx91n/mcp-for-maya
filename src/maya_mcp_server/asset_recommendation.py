@@ -733,6 +733,17 @@ def _fmt_dims(dims: Any) -> str:
     return "x".join(f"{float(v):g}" for v in dims)
 
 
+def _fallback_suffix(target: dict[str, Any]) -> str:
+    fb = target.get("fallback_reason")
+    if not fb:
+        return ""
+    suffix = f" fallback={fb}"
+    amb = target.get("ambiguous_matches")
+    if amb:
+        suffix += f"({','.join(amb)})"
+    return suffix
+
+
 def format_recommend_cos(recs: dict[str, Any]) -> str:
     """Short RECOMMEND block for scene_plan's CoS output (opt-in only).
 
@@ -768,6 +779,14 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
             if obj_count is not None:
                 unmeasured = target.get("unmeasured_count")
                 line += f" objects={obj_count} unmeasured={0 if unmeasured is None else unmeasured}"
+            source = target.get("source")
+            if source:
+                line += (
+                    f" target={source}({target.get('name')})"
+                    if source != "zone_bbox" and target.get("name")
+                    else f" target={source}"
+                )
+            line += _fallback_suffix(target)
             lines.append(line)
             continue
         target = zone.get("target", {})
@@ -777,14 +796,8 @@ def format_recommend_cos(recs: dict[str, Any]) -> str:
             target_line = (
                 f"    {zone.get('zone')}: target=zone_bbox "
                 f"{_fmt_dims(target.get('size_m'))}m meas={target.get('measurement')} "
-                f"complete={complete_yn}"
+                f"complete={complete_yn}{_fallback_suffix(target)}"
             )
-            fb = target.get("fallback_reason")
-            if fb:
-                target_line += f" fallback={fb}"
-                amb = target.get("ambiguous_matches")
-                if amb:
-                    target_line += f"({','.join(amb)})"
         else:
             target_line = (
                 f"    {zone.get('zone')}: target={source}({target.get('name')}) "
