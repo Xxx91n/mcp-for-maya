@@ -23,9 +23,157 @@ from typing import Any, TypedDict
 
 
 # Container shapes shared by the aesthetic scoring chain.
-_Objs = list[dict[str, Any]]
 _Bounds = dict[str, list[float]]
-_Zones = dict[str, Any]
+
+
+class ObjectPayload(TypedDict):
+    """One entry of ``analyze_aesthetics``'s objects payload.
+
+    The scorer reads these fields by name, so a typo in ``bbox_size`` or
+    ``is_focal`` used to pass unnoticed; declaring them here makes mypy
+    read the same field list the scorer does.
+    """
+
+    name: str
+    position: list[float]
+    bbox_size: list[float]
+    size: float
+    # No shader assignment and no matching material entry are both normal:
+    # the payload keeps going with an empty colour and material name.
+    color: list[float] | None
+    material: str | None
+    is_focal: bool
+
+
+class LightCore(TypedDict):
+    """The fields both light producers write: the frame every lighting read needs."""
+
+    name: str
+    type: str
+    color: list[float]
+    intensity: float
+    position: list[float]
+    decay: int
+    shadow: bool
+
+
+class LightPayload(LightCore, total=False):
+    """A light payload; the scene review check leaves the richer fields out."""
+
+    rotation: list[float]
+    cone_angle: float | None
+    penumbra: float | None
+    area_size: list[float] | None
+    diffuse: bool
+    specular: bool
+
+
+class MaterialPayload(TypedDict):
+    """One entry of the material mapping's materials list."""
+
+    name: str
+    color: list[float]
+    objects: list[str]
+    object_count: int
+    shader_group: str
+
+
+class DimensionScore(TypedDict):
+    """Shape every design-dimension score shares: the number plus its parts."""
+
+    score: float
+    sub_scores: dict[str, float]
+
+
+class ColorTheoryScore(DimensionScore, total=False):
+    """Color theory result; ``detail`` replaces the numbers when nothing is scorable."""
+
+    detail: str
+    top_colors: list[dict[str, Any]]
+
+
+class ProportionScore(DimensionScore, total=False):
+    """Proportion result; carries the scale problems it found, if any."""
+
+    issues: list[dict[str, Any]]
+
+
+class LightingScore(DimensionScore, total=False):
+    """Lighting result; ``detail`` marks an empty scene, the rest describe the setup."""
+
+    detail: str
+    layer_breakdown: dict[str, int]
+    mood: str
+    fill_ratio: float | None
+    temp_consistency: str
+
+
+class ScoredResult(TypedDict):
+    """The one number every research helper always returns."""
+
+    score: float
+
+
+class SilhouetteResult(TypedDict):
+    """Silhouette analysis: the clarity average plus the per-object rows."""
+
+    avg_clarity: float
+    details: list[dict[str, Any]]
+
+
+class CurvatureResult(ScoredResult, total=False):
+    """Curvature analysis; ``detail`` replaces the numbers when data is short."""
+
+    detail: str
+    size_cv: float
+    avg_size: float
+    interpretation: str
+
+
+class RhythmResult(ScoredResult, total=False):
+    """Rhythm analysis; ``detail`` marks too few objects to read a pattern."""
+
+    detail: str
+    repeating_groups: int
+    patterns_found: int
+
+
+class StyleConsistencyResult(ScoredResult, total=False):
+    """Style consistency; ``detail`` marks too few objects to compare."""
+
+    detail: str
+    form_consistency: float
+    size_hierarchy: float
+    material_consistency: float
+
+
+class ZoneCore(TypedDict):
+    """Zone record as ``get_zone_map`` first builds it, before any object is filed.
+
+    Mirrors ``spatial_types.ZoneInfo`` as a plain dict on purpose: this one
+    crosses into Maya as the JSON payload of ``get_zone_map``.
+    """
+
+    name: str
+    pattern_matched: str
+    objects: list[str]
+    bbox_min: list[float]
+    bbox_max: list[float]
+
+
+class ZoneRecord(ZoneCore, total=False):
+    """Finished zone record: count and center only exist once a zone has objects."""
+
+    object_count: int
+    center: list[float]
+
+
+class ShotSpec(TypedDict):
+    """One ``SHOT_TYPES`` entry: the framing numbers ``create_camera_shot`` reads."""
+
+    distance_mult: float
+    focal_length: int
+    desc: str
 
 
 class MayaStandards(TypedDict):
