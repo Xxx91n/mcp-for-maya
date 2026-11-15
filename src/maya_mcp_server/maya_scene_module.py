@@ -1843,9 +1843,13 @@ def create_orbit_camera(
 
 if TYPE_CHECKING:  # type-only; annotations stay lazy strings at Maya runtime
     from .scene_module_types import (
+        AestheticDimensions,
+        AestheticScore,
+        AestheticScoreResult,
         ColorTheoryScore,
         CurvatureResult,
         DimensionScore,
+        ImprovementSuggestion,
         LightingScore,
         LightPayload,
         MaterialPayload,
@@ -1853,6 +1857,7 @@ if TYPE_CHECKING:  # type-only; annotations stay lazy strings at Maya runtime
         ObjectPayload,
         ProportionScore,
         RhythmResult,
+        SamplingInfo,
         ShotSpec,
         SilhouetteResult,
         StyleConsistencyResult,
@@ -1907,7 +1912,7 @@ _MAYA_STANDARDS: MayaStandards = {
 }
 
 
-def analyze_aesthetics() -> dict[str, Any]:
+def analyze_aesthetics() -> AestheticScoreResult:
     """Score the scene's look on 5 design dimensions.
 
     Dimensions:
@@ -2081,13 +2086,13 @@ def analyze_aesthetics() -> dict[str, Any]:
     else:
         scene_bounds = {"min": [0, 0, 0], "max": [100, 100, 100]}
 
-    result = _compute_full_aesthetic_score(materials, objects, scene_bounds, lights)
-    result["sampling"] = {
+    score = _compute_full_aesthetic_score(materials, objects, scene_bounds, lights)
+    sampling: SamplingInfo = {
         "checked": len(sampled),
         "skipped": len(transforms) - len(sampled),
         "object_limit": _SAMPLE_AESTHETICS,
     }
-    return result
+    return {**score, "sampling": sampling}
 
 
 def _compute_full_aesthetic_score(
@@ -2095,16 +2100,9 @@ def _compute_full_aesthetic_score(
     objects: list[ObjectPayload],
     scene_bounds: _Bounds,
     lights: list[LightPayload],
-) -> dict[str, Any]:
+) -> AestheticScore:
     """Compute comprehensive aesthetic score across 5 dimensions."""
     PHI = 1.618033988749895
-
-    dimensions: dict[str, Any] = {}
-    dimensions["color_theory"] = _score_color_theory(materials)
-    dimensions["spatial_composition"] = _score_spatial_composition(objects, scene_bounds, PHI)
-    dimensions["proportion_scale"] = _score_proportion_scale(objects)
-    dimensions["lighting_quality"] = _score_lighting_quality(lights)
-    dimensions["visual_flow"] = _score_visual_flow(objects)
 
     # Research-based enhancements (Aesthetic3D, arXiv 2016, Tripo3D)
     silhouette = _analyze_silhouette_quality(objects)
@@ -2112,11 +2110,18 @@ def _compute_full_aesthetic_score(
     rhythm = _analyze_spatial_rhythm_enhanced(objects)
     style = _analyze_style_consistency(objects, materials)
 
-    # Integrate into existing dimensions
-    dimensions["proportion_scale"]["silhouette"] = silhouette
-    dimensions["proportion_scale"]["curvature"] = curvature
-    dimensions["visual_flow"]["rhythm_enhanced"] = rhythm
-    dimensions["color_theory"]["style_consistency"] = style
+    # Only three dimensions gain a read, each a different one (AestheticDimensions).
+    dimensions: AestheticDimensions = {
+        "color_theory": {**_score_color_theory(materials), "style_consistency": style},
+        "spatial_composition": _score_spatial_composition(objects, scene_bounds, PHI),
+        "proportion_scale": {
+            **_score_proportion_scale(objects),
+            "silhouette": silhouette,
+            "curvature": curvature,
+        },
+        "lighting_quality": _score_lighting_quality(lights),
+        "visual_flow": {**_score_visual_flow(objects), "rhythm_enhanced": rhythm},
+    }
 
     weights = {
         "color_theory": 0.25,
@@ -2125,7 +2130,14 @@ def _compute_full_aesthetic_score(
         "lighting_quality": 0.15,
         "visual_flow": 0.15,
     }
-    overall = sum(dimensions[d]["score"] * weights[d] for d in dimensions)
+    scores = {
+        "color_theory": dimensions["color_theory"]["score"],
+        "spatial_composition": dimensions["spatial_composition"]["score"],
+        "proportion_scale": dimensions["proportion_scale"]["score"],
+        "lighting_quality": dimensions["lighting_quality"]["score"],
+        "visual_flow": dimensions["visual_flow"]["score"],
+    }
+    overall = sum(scores[d] * weights[d] for d in scores)
 
     if overall >= 90:
         grade = "S"
@@ -2140,21 +2152,21 @@ def _compute_full_aesthetic_score(
     else:
         grade = "F"
 
-    suggestions = []
-    for name, data in sorted(dimensions.items(), key=lambda x: x[1]["score"]):
-        if data["score"] < 70:
+    suggestions: list[ImprovementSuggestion] = []
+    for name, dim_score in sorted(scores.items(), key=lambda x: x[1]):
+        if dim_score < 70:
             suggestions.append(
                 {
                     "dimension": name,
-                    "score": data["score"],
-                    "priority": "high" if data["score"] < 50 else "medium",
+                    "score": dim_score,
+                    "priority": "high" if dim_score < 50 else "medium",
                 }
             )
 
     return {
         "overall_score": round(overall, 1),
         "grade": grade,
-        "dimensions": {k: v["score"] for k, v in dimensions.items()},
+        "dimensions": scores,
         "detail": dimensions,
         "improvement_suggestions": suggestions[:3],
     }

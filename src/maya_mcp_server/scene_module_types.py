@@ -147,6 +147,80 @@ class StyleConsistencyResult(ScoredResult, total=False):
     material_consistency: float
 
 
+class MergedColorTheory(ColorTheoryScore):
+    """Color theory as the merge leaves it: the score plus the style read folded in."""
+
+    style_consistency: StyleConsistencyResult
+
+
+class MergedProportion(ProportionScore):
+    """Proportion as the merge leaves it: the scale numbers plus the two shape reads."""
+
+    silhouette: SilhouetteResult
+    curvature: CurvatureResult
+
+
+class MergedVisualFlow(DimensionScore):
+    """Visual flow as the merge leaves it: the score plus the rhythm read."""
+
+    rhythm_enhanced: RhythmResult
+
+
+class AestheticDimensions(TypedDict):
+    """The five dimension records after the research helpers are folded in.
+
+    Five exact shapes, not one wide optional-key dict. Only three dimensions
+    gain a research read, and each gains a different one, so a single
+    optional-key type would mark always-present keys optional and still could
+    not say which dimension carries which read. Building this in one literal
+    at the merge step also means a forgotten read is a missing-key error, not
+    a key that quietly never appears in the payload.
+    """
+
+    color_theory: MergedColorTheory
+    spatial_composition: DimensionScore
+    proportion_scale: MergedProportion
+    lighting_quality: LightingScore
+    visual_flow: MergedVisualFlow
+
+
+class ImprovementSuggestion(TypedDict):
+    """One entry of the result's ``improvement_suggestions`` list."""
+
+    dimension: str
+    score: float
+    priority: str
+
+
+class AestheticScore(TypedDict):
+    """What ``_compute_full_aesthetic_score`` produces, before sampling counts.
+
+    ``dimensions`` is the flat name-to-score view the review reads;
+    ``detail`` keeps each dimension's full record, whose extra keys differ
+    per dimension.
+    """
+
+    overall_score: float
+    grade: str
+    dimensions: dict[str, float]
+    detail: AestheticDimensions
+    improvement_suggestions: list[ImprovementSuggestion]
+
+
+class SamplingInfo(TypedDict):
+    """How much of the scene the sampled pass actually looked at."""
+
+    checked: int
+    skipped: int
+    object_limit: int
+
+
+class AestheticScoreResult(AestheticScore):
+    """Public ``analyze_aesthetics`` output: the score plus the sampling counts."""
+
+    sampling: SamplingInfo
+
+
 class ZoneCore(TypedDict):
     """Zone record as ``get_zone_map`` first builds it, before any object is filed.
 
