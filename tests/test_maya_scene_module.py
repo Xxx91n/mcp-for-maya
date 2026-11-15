@@ -281,9 +281,9 @@ class TestSceneReviewLightingPayload:
 
     The review check had no score assertion before #276; only its "no lights"
     and "too few lights" branches were tested. These numbers were measured on
-    this fixture after the builder moved. The total gets a tolerance because
-    its weighted sum is 67.75, a round-half boundary that can land on either
-    side across Python versions; the sub-scores are exact.
+    this fixture after the builder moved. The total gets a small tolerance
+    because its weighted sum sits on a rounding boundary; the sub-scores are
+    exact.
     """
 
     def test_review_lighting_score_and_subscores(self, maya_env):
