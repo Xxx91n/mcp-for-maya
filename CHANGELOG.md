@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
   Evidence:
   `tests/test_maya_scene_module.py::TestCameraShotUnits::test_metre_scene_frames_the_target`,
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_metre_scene_adds_the_target_offset`,
   `tests/test_maya_scene_module.py::TestCameraShotUnits::test_centimetre_scene_output_is_unchanged`,
   `tests/test_maya_scene_module.py::TestCameraShotUnits::test_inch_scene_is_no_coarser_than_cm`,
   `tests/test_maya_scene_module.py::TestCameraShotUnits::test_aim_fallback_aims_in_both_units`.

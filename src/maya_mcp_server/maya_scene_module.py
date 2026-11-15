@@ -1555,9 +1555,9 @@ def create_camera_shot(
         )
 
     shot = SHOT_TYPES[shot_type]
-    # Centimetres -> working unit, same bridge as _zone_unit_scale (no cross-file call)
+    # Same bridge as _zone_unit_scale; inlined because mypy cannot see across files.
     unit_scale = float(om2.MDistance(1.0).asUnits(om2.MDistance.uiUnit()))
-    decimals = max(0, math.ceil(1 - math.log10(unit_scale)))  # keep 0.1 cm resolution
+    decimals = max(0, math.ceil(1 - math.log10(unit_scale)))  # no coarser than 0.1 cm
 
     # Get target position and size
     try:

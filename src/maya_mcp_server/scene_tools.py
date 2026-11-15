@@ -919,8 +919,8 @@ result
 
         Returns:
             Camera info with position, focal length, and distance. ``position``
-            and ``distance`` are in the scene's working linear unit, the unit
-            Maya's ``MDistance.uiUnit`` reports.
+            and ``distance`` are in the scene's working unit (centimetres in a
+            default scene), the one Maya's ``MDistance.uiUnit`` reports.
         """
         from maya_mcp_server.server import get_session_manager
 

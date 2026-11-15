@@ -824,6 +824,20 @@ class TestCameraShotUnits:
         # The camera must actually aim at the door, not just sit near it.
         assert scene.constraints[-1]["target"] == scene.resolve(name).name
 
+    def test_metre_scene_adds_the_target_offset(self, maya_env):
+        """The target's own position is converted too, not just its size."""
+        scene = maya_env.scene
+        name = self._door(maya_env, "m")
+        maya_env.cmds.move(2, 1, 3, name)
+
+        res = maya_env.module.create_camera_shot(name, shot_type="medium")
+
+        expected = [v + off for v, off in zip(self.EXPECTED_POSITION, (2, 1, 3))]
+        assert res["position"] == pytest.approx(expected, abs=1e-3)
+        world_cm = scene.world_position(scene.resolve(res["camera"]))
+        world_m = [v * scene.working_unit_scale() for v in world_cm]
+        assert world_m == pytest.approx(expected, abs=1e-3)
+
     def test_centimetre_scene_output_is_unchanged(self, maya_env):
         scene = maya_env.scene
         name = self._door(maya_env, "cm")
