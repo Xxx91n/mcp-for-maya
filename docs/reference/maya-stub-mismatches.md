@@ -99,7 +99,11 @@ keeps raw output out of the repo and admits only frozen evidence with
 provenance. The command above reproduces both on the base commit and on this
 one, and the `mypy-baseline.txt` diff is the in-repo record of what left.
 
-## What the remaining 67 baseline entries are
+## What the remaining 67 baseline entries were
+
+The split below is the snapshot from the stub-disagreement batch (#229, commit
+`e019954`), not the current count: #252 then took it to 45, #251 to 20, and
+#255 to 10 — that last one is the section after this.
 
 - 54 missing annotations: `no-untyped-def` 31, `no-untyped-call` 23.
 - 13 container/inference findings with local causes, not stub causes:
@@ -111,6 +115,40 @@ one, and the `mypy-baseline.txt` diff is the in-repo record of what left.
 - Keeping the baseline is still reasonable: the remaining errors are local
   typing gaps with no evidence of runtime faults, and the stub disputes are
   now either cast or ignored at single points, each with the reason above.
+
+## After #255 (2026-11-15): the container group is gone
+
+`_MAYA_STANDARDS` now has a declared shape (`scene_module_types.MayaStandards`,
+a `TypedDict`), so the dict literal no longer infers `dict[str, object]`. That
+one annotation removed all 10 container findings still in the baseline:
+`operator` 6, `str-format` 3, `attr-defined` 1. `var-annotated` and
+`assignment` had already left with the scoring-chain work (#251, #252), so the
+ticket's historical 7/3/1/1/1 split was down to 6/3/0/0/1 when measured on
+main at `983c496`.
+
+Which value reaches which output, for the keys `scene_review` actually reads:
+
+| Key | Allowed value | Where it ends up |
+|---|---|---|
+| `max_objects_soft`, `max_objects_hard` | `int` | compared with `len(transforms)`; the message prints that measured count |
+| `max_cameras_keep` | `int` | compared with `cam_count`; the message prints that measured count |
+| `min_lights` | `int` | compared with `light_count`, and printed as the required minimum |
+| `forbidden_prefixes` | `list[str]` | iterated, each entry goes to `str.startswith` |
+| `max_nesting_depth` | `int` | compared with the sampled depth, `+ 2` against the full depth, printed as the allowed maximum, and compared against the full depth again in the organization health score |
+
+The soft object-count warning, the camera, light, naming and nesting messages
+are pinned by `tests/test_maya_scene_module.py::TestSceneReviewStandards`. The
+hard object-count error (`Excessive objects`, past 2000 transforms) has no test
+in this batch and is not covered by that class.
+
+Related check (ticket AC 5): #245 (`finite_float` in `numeric.py`, merged as
+`34966c5`) is untouched. This batch changes only how the constants dict is
+typed, not how any number is validated or converted, so no numeric-validation
+code is rebuilt here.
+
+What is left is the annotation lane only: `no-untyped-def` 9 and
+`no-untyped-call` 1, all in `maya_scene_module.py`, baseline 20 lines -> 10.
+Those stay for the convergence ticket; they are not part of #255.
 
 ## When the stub is upgraded
 
