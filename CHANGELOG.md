@@ -253,8 +253,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two cannot drift. The review path gains the shape fields it used to drop,
   reports world position rounded to 0.1 as the aesthetic path already did, and
   treats a light with neither shadow attribute as shadowing rather than not.
-  In a scene with duplicate short names it now measures the light by its full
-  transform path instead of the short name, which reads the intended node.
+  It queries the light transform by its full path instead of the short name.
   Evidence:
   `tests/test_scene_light_module.py::TestOneSharedPayload::test_both_consumers_call_the_shared_builder`,
   `tests/test_scene_light_module.py::TestOneSharedPayload::test_the_payload_carries_every_field_for_every_light_type`,

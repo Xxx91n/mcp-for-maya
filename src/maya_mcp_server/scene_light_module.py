@@ -40,8 +40,7 @@ def build_light_payload(shape_name: str) -> LightPayload | None:
     names the light by its transform, reports world position and rotation,
     and fills the shape-specific fields only for the light type that has
     them. A light whose attributes cannot be read is skipped by the caller:
-    one broken light must not hide the rest, which is how both previous
-    copies behaved.
+    one broken light must not hide the rest.
     """
     try:
         parent = cmds.listRelatives(shape_name, parent=True, fullPath=True) or [shape_name]
