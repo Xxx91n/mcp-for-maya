@@ -191,7 +191,7 @@ def _world_bbox(dag: om2.MDagPath) -> om2.MBoundingBox:
 # --- Public API ---
 
 
-def get_scene_graph(detail_level="compact") -> dict[str, Any]:
+def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
     """Return complete scene spatial description in one call.
 
     Args:
@@ -320,7 +320,7 @@ def get_scene_graph(detail_level="compact") -> dict[str, Any]:
     return result
 
 
-def get_zone_map(patterns=None) -> dict[str, Any]:
+def get_zone_map(patterns: dict[str, str] | None = None) -> dict[str, Any]:
     """Group objects into zones by name keywords; 7 built-in zones.
     Args:
         patterns: dict of zone_name -> regex_pattern. If None, uses the
@@ -342,13 +342,13 @@ def get_zone_map(patterns=None) -> dict[str, Any]:
 
     # Compile patterns
     compiled = {}
-    for zone_name, pat in patterns.items():
-        compiled[zone_name] = re.compile(pat, re.IGNORECASE)
+    for zone_name, pattern_text in patterns.items():
+        compiled[zone_name] = re.compile(pattern_text, re.IGNORECASE)
 
     # Get all transforms
     transforms = cmds.ls(type="transform", long=True) or []
 
-    zones = {}
+    zones: dict[str, ZoneRecord] = {}
     for zone_name in compiled:
         zones[zone_name] = {
             "name": zone_name,
@@ -415,7 +415,7 @@ def get_zone_map(patterns=None) -> dict[str, Any]:
     }
 
 
-def get_spatial_index(max_neighbors=8, max_distance=None) -> dict[str, Any]:
+def get_spatial_index(max_neighbors: int = 8, max_distance: float | None = None) -> dict[str, Any]:
     """Build spatial index with neighbor relationships.
 
     Args:
@@ -519,7 +519,7 @@ def get_spatial_index(max_neighbors=8, max_distance=None) -> dict[str, Any]:
     return {"pairs": pairs, "objects": names, "threshold": _round3(max_distance), "count": n}
 
 
-def measure(obj_a, obj_b, mode="center") -> dict[str, Any]:
+def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
     """Measure spatial relationship between two objects.
 
     Args:
@@ -530,7 +530,7 @@ def measure(obj_a, obj_b, mode="center") -> dict[str, Any]:
     Returns:
         JSON string with measurement result.
     """
-    result = {
+    result: dict[str, Any] = {
         "obj_a": obj_a,
         "obj_b": obj_b,
         "mode": mode,
@@ -656,7 +656,7 @@ def get_material_map() -> dict[str, Any]:
     Returns:
         JSON string with materials list, each having name, color, objects.
     """
-    materials = {}
+    materials: dict[str, MaterialPayload] = {}
 
     # Get all shading engines
     shading_engines = cmds.ls(type="shadingEngine") or []
@@ -725,7 +725,7 @@ def get_unit_info() -> dict[str, Any]:
     return info
 
 
-def assert_scene_state(expectations_json) -> dict[str, Any]:
+def assert_scene_state(expectations_json: str) -> dict[str, Any]:
     """Verify scene state matches expectations.
 
     Args:
@@ -737,7 +737,7 @@ def assert_scene_state(expectations_json) -> dict[str, Any]:
         JSON string with pass/fail result and mismatches.
     """
     expectations = json.loads(expectations_json)
-    mismatches = []
+    mismatches: list[dict[str, Any]] = []
     checked = 0
     passed = 0
 
@@ -888,7 +888,7 @@ def assert_scene_state(expectations_json) -> dict[str, Any]:
 # ============================================================
 
 
-def check_constraints(rules):
+def check_constraints(rules: list[dict[str, Any]]) -> dict[str, Any]:
     """Check scene against spatial constraints.
 
     Args:
@@ -901,7 +901,7 @@ def check_constraints(rules):
     Returns:
         dict with violations list and summary.
     """
-    violations = []
+    violations: list[dict[str, Any]] = []
     checked = 0
     pairs_checked = 0
     pairs_total = 0
@@ -1519,7 +1519,7 @@ def rollback_to_checkpoint(filename: str, discard_current_state: bool = False) -
 # P1: Camera / Shot Planning
 # ============================================================
 
-SHOT_TYPES = {
+SHOT_TYPES: dict[str, ShotSpec] = {
     "extreme_wide": {"distance_mult": 8.0, "focal_length": 18, "desc": "极远景 - 建立环境"},
     "wide": {"distance_mult": 5.0, "focal_length": 24, "desc": "远景 - 展示全貌"},
     "medium": {"distance_mult": 3.0, "focal_length": 35, "desc": "中景 - 展示动作"},
@@ -1531,7 +1531,12 @@ SHOT_TYPES = {
 }
 
 
-def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
+def create_camera_shot(
+    target: str,
+    shot_type: str = "medium",
+    name: str = "CAM_shot",
+    angle: dict[str, float] | None = None,
+) -> dict[str, Any]:
     """Create a camera positioned for a specific shot type.
 
     Args:
@@ -1632,7 +1637,9 @@ def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
     }
 
 
-def create_orbit_camera(center, radius=500, frames=120, name="CAM_orbit"):
+def create_orbit_camera(
+    center: list[float], radius: float = 500, frames: int = 120, name: str = "CAM_orbit"
+) -> dict[str, Any]:
     """Create a camera that orbits around a point using keyframes.
 
     Args:
@@ -1704,7 +1711,23 @@ def create_orbit_camera(center, radius=500, frames=120, name="CAM_orbit"):
 # ============================================================
 
 if TYPE_CHECKING:  # type-only; annotations stay lazy strings at Maya runtime
-    from .scene_module_types import MayaStandards, _Bounds, _Objs, _Zones
+    from .scene_module_types import (
+        ColorTheoryScore,
+        CurvatureResult,
+        DimensionScore,
+        LightingScore,
+        LightPayload,
+        MaterialPayload,
+        MayaStandards,
+        ObjectPayload,
+        ProportionScore,
+        RhythmResult,
+        ShotSpec,
+        SilhouetteResult,
+        StyleConsistencyResult,
+        ZoneRecord,
+        _Bounds,
+    )
 
 # Maya production standards (unified, no duplicates)
 _MAYA_STANDARDS: MayaStandards = {
@@ -1769,9 +1792,9 @@ def analyze_aesthetics() -> dict[str, Any]:
     transforms = cmds.ls(type="transform", long=True) or []
 
     mat_data = get_material_map()
-    materials = mat_data.get("materials", [])
+    materials: list[MaterialPayload] = mat_data.get("materials", [])
 
-    objects = []
+    objects: list[ObjectPayload] = []
     scene_min = [float("inf")] * 3
     scene_max = [float("-inf")] * 3
 
@@ -1836,7 +1859,7 @@ def analyze_aesthetics() -> dict[str, Any]:
             pass
 
     light_shapes = cmds.ls(type="light") or []
-    lights = []
+    lights: list[LightPayload] = []
     for ls_name in light_shapes:
         try:
             parent = cmds.listRelatives(ls_name, parent=True, fullPath=True) or [ls_name]
@@ -1927,15 +1950,7 @@ def analyze_aesthetics() -> dict[str, Any]:
     else:
         scene_bounds = {"min": [0, 0, 0], "max": [100, 100, 100]}
 
-    zone_map = None
-    try:
-        zone_data = get_zone_map()
-        if isinstance(zone_data, dict):
-            zone_map = zone_data
-    except Exception:
-        pass
-
-    result = _compute_full_aesthetic_score(materials, objects, scene_bounds, lights, zone_map)
+    result = _compute_full_aesthetic_score(materials, objects, scene_bounds, lights)
     result["sampling"] = {
         "checked": len(sampled),
         "skipped": len(transforms) - len(sampled),
@@ -1945,17 +1960,20 @@ def analyze_aesthetics() -> dict[str, Any]:
 
 
 def _compute_full_aesthetic_score(
-    materials: _Objs, objects: _Objs, scene_bounds: _Bounds, lights: _Objs, zone_map: _Zones | None
+    materials: list[MaterialPayload],
+    objects: list[ObjectPayload],
+    scene_bounds: _Bounds,
+    lights: list[LightPayload],
 ) -> dict[str, Any]:
     """Compute comprehensive aesthetic score across 5 dimensions."""
     PHI = 1.618033988749895
 
-    dimensions = {}
+    dimensions: dict[str, Any] = {}
     dimensions["color_theory"] = _score_color_theory(materials)
     dimensions["spatial_composition"] = _score_spatial_composition(objects, scene_bounds, PHI)
     dimensions["proportion_scale"] = _score_proportion_scale(objects)
     dimensions["lighting_quality"] = _score_lighting_quality(lights)
-    dimensions["visual_flow"] = _score_visual_flow(objects, zone_map)
+    dimensions["visual_flow"] = _score_visual_flow(objects)
 
     # Research-based enhancements (Aesthetic3D, arXiv 2016, Tripo3D)
     silhouette = _analyze_silhouette_quality(objects)
@@ -2056,7 +2074,7 @@ def _wcag_luminance(r: float, g: float, b: float) -> float:
     return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
 
 
-def _score_color_theory(materials: _Objs) -> dict[str, Any]:
+def _score_color_theory(materials: list[MaterialPayload]) -> ColorTheoryScore:
     """Dimension 1: Color Theory analysis."""
     active = [m for m in materials if m.get("object_count", 0) > 0]
     if not active:
@@ -2076,7 +2094,7 @@ def _score_color_theory(materials: _Objs) -> dict[str, Any]:
     else:
         sub_scores["60_30_10"] = 40
 
-    warm_w, cool_w = 0, 0
+    warm_w, cool_w = 0.0, 0.0
     for c in colors:
         temp = _color_temp_k(c["color"][0], c["color"][1], c["color"][2])
         if temp < 3700:
@@ -2154,7 +2172,9 @@ def _score_color_theory(materials: _Objs) -> dict[str, Any]:
     }
 
 
-def _score_spatial_composition(objects: _Objs, scene_bounds: _Bounds, PHI: float) -> dict[str, Any]:
+def _score_spatial_composition(
+    objects: list[ObjectPayload], scene_bounds: _Bounds, PHI: float
+) -> DimensionScore:
     """Dimension 2: Spatial Composition analysis."""
     sub_scores = {}
     bmin = scene_bounds["min"]
@@ -2187,8 +2207,8 @@ def _score_spatial_composition(objects: _Objs, scene_bounds: _Bounds, PHI: float
         tol = min(span_x, span_z) * 0.10
         grid_x = [bmin[0] + span_x / 3, bmin[0] + span_x * 2 / 3]
         grid_z = [bmin[2] + span_z / 3, bmin[2] + span_z * 2 / 3]
-        aligned_weight = 0
-        total_weight = 0
+        aligned_weight = 0.0
+        total_weight = 0.0
         for obj in objects:
             w = obj["size"]
             total_weight += w
@@ -2204,7 +2224,7 @@ def _score_spatial_composition(objects: _Objs, scene_bounds: _Bounds, PHI: float
         sub_scores["rule_of_thirds"] = 50
 
     if objects:
-        quads = [0, 0, 0, 0]
+        quads = [0.0, 0.0, 0.0, 0.0]
         for obj in objects:
             px, pz = obj["position"][0], obj["position"][2]
             w = obj["size"] * (1.5 if obj.get("is_focal") else 1.0)
@@ -2234,7 +2254,7 @@ def _score_spatial_composition(objects: _Objs, scene_bounds: _Bounds, PHI: float
     }
 
 
-def _score_proportion_scale(objects: _Objs) -> dict[str, Any]:
+def _score_proportion_scale(objects: list[ObjectPayload]) -> ProportionScore:
     """Dimension 3: Proportion & Scale analysis."""
     HUMAN_EYE_HEIGHT = 150.0
     HUMAN_REACH_HEIGHT = 200.0
@@ -2286,7 +2306,7 @@ def _score_proportion_scale(objects: _Objs) -> dict[str, Any]:
     }
 
 
-def _score_lighting_quality(lights: _Objs) -> dict[str, Any]:
+def _score_lighting_quality(lights: list[LightPayload]) -> LightingScore:
     """Dimension 4: Professional Lighting Quality Analysis.
 
     Sub-analyses:
@@ -2319,7 +2339,9 @@ def _score_lighting_quality(lights: _Objs) -> dict[str, Any]:
         }
 
     # --- Layer classification ---
-    layers: dict[str, _Objs] = {"key": [], "fill": [], "rim": [], "accent": [], "other": []}
+    layers: dict[str, list[LightPayload]] = {
+        name: [] for name in ("key", "fill", "rim", "accent", "other")
+    }
     for light in lights:
         name_l = light["name"].lower()
         if any(kw in name_l for kw in ["key", "main", "primary", "hero"]):
@@ -2537,7 +2559,7 @@ def _score_lighting_quality(lights: _Objs) -> dict[str, Any]:
     }
 
 
-def _score_visual_flow(objects: _Objs, zone_map: _Zones | None) -> dict[str, Any]:
+def _score_visual_flow(objects: list[ObjectPayload]) -> DimensionScore:
     """Dimension 5: Visual Flow analysis."""
     sub_scores = {}
 
@@ -2646,7 +2668,7 @@ def _score_visual_flow(objects: _Objs, zone_map: _Zones | None) -> dict[str, Any
 # ============================================================
 
 
-def _analyze_silhouette_quality(objects: _Objs) -> dict[str, Any]:
+def _analyze_silhouette_quality(objects: list[ObjectPayload]) -> SilhouetteResult:
     """Analyze silhouette quality of objects.
 
     Research basis: Aesthetic3D (ACM 2026) shows that silhouette recognition
@@ -2704,7 +2726,7 @@ def _analyze_silhouette_quality(objects: _Objs) -> dict[str, Any]:
     }
 
 
-def _analyze_curvature_distribution(objects: _Objs) -> dict[str, Any]:
+def _analyze_curvature_distribution(objects: list[ObjectPayload]) -> CurvatureResult:
     """Analyze geometric curvature distribution for aesthetic quality.
 
     Research basis: "A Perceptual Aesthetics Measure for 3D Shapes" (arXiv 2016)
@@ -2745,7 +2767,7 @@ def _analyze_curvature_distribution(objects: _Objs) -> dict[str, Any]:
     }
 
 
-def _analyze_spatial_rhythm_enhanced(objects: _Objs) -> dict[str, Any]:
+def _analyze_spatial_rhythm_enhanced(objects: list[ObjectPayload]) -> RhythmResult:
     """Enhanced spatial rhythm analysis with compression/release patterns.
 
     Research basis: "Narrative Through Level Design" (2025) and
@@ -2831,7 +2853,9 @@ def _analyze_spatial_rhythm_enhanced(objects: _Objs) -> dict[str, Any]:
     }
 
 
-def _analyze_style_consistency(objects: _Objs, materials: _Objs) -> dict[str, Any]:
+def _analyze_style_consistency(
+    objects: list[ObjectPayload], materials: list[MaterialPayload]
+) -> StyleConsistencyResult:
     """Analyze style consistency across the scene.
 
     Research basis: Tripo3D "Smart Mesh Building" guide emphasizes that
@@ -2904,7 +2928,7 @@ def _analyze_style_consistency(objects: _Objs, materials: _Objs) -> dict[str, An
     }
 
 
-def scene_review(checks=None):
+def scene_review(checks: list[str] | None = None) -> dict[str, Any]:
     """Check a whole Maya scene, including looks and lighting.
 
     Runs after MCP operations. Finds spatial clashes, naming problems,
@@ -3432,7 +3456,7 @@ def scene_review(checks=None):
                 )
             else:
                 # Gather light data for analysis
-                lights_data = []
+                lights_data: list[LightPayload] = []
                 for ls_name in light_shapes:
                     try:
                         parent = cmds.listRelatives(ls_name, parent=True, fullPath=True) or [
