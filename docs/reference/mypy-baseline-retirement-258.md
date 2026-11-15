@@ -9,8 +9,9 @@ be checked from facts instead of a moving error count.
 
 **What it is not:** a claim that the type checker cannot be cheated. #256 recorded
 that a same-named check can be replaced by a fake success and closed by accepting
-that risk. The evidence here says the current required check blocks a genuine type
-error; it does not make that check unforgeable.
+that risk. The gate and its pytest pins block a genuine type error; the real
+required-check run is recorded after it happens. None of that makes the check
+unforgeable.
 
 ## Measured environment
 
@@ -41,6 +42,19 @@ holds only those three plus `python_version`, and there is no overrides table an
 no suppression flag. The gate script checks all of that before running mypy, so
 "zero errors" was not bought by relaxing the configuration.
 
+## How the earlier error categories ended
+
+#213's tentative inventory was 100 missing local annotations, 66 local
+container/inference findings, 17 possible third-party Maya stub mismatches and
+1 mixed finding (184 total). The batches recorded in #222 took the raw report
+down as 184 -> 168 -> 152 -> 85 -> 67 -> 45 -> 20 -> 10 -> 0. The last 10 were
+all `no-untyped-def` / `no-untyped-call` annotation gaps, cleared by #257
+(PR #274). No category is carried by the baseline because the baseline is empty.
+`docs/reference/type-precision-inventory-257.md` lists the remaining weaker
+`dict[str, Any]`, `cast(Any, ...)` and local `ignore` uses; those are a review
+concern, not hidden errors. #253's record covers the six call forms whose stub
+disagreed; those fixes are in the tree, and #258 changes no Maya code.
+
 ## What changed
 
 - Deleted the expired `mypy-baseline.txt`.
@@ -51,10 +65,11 @@ no suppression flag. The gate script checks all of that before running mypy, so
   verified as well-formed, with the first error lines printed as evidence.
 - The `[tool.mypy-baseline]` config table is still refused. The filter is gone,
   so the table can only be a reintroduction behind the gate's back.
-- The CI job keeps the display name `mypy baseline gate` because branch
-  protection pins that exact required-check context (#256 recorded the setting).
-  Renaming the job would change the required check; that is a protection change,
-  not part of this ticket.
+- The CI job keeps the display name `mypy baseline gate` because the recorded
+  branch-protection setting pins that exact required-check context. That read is
+  from 2026-11-14; #256 later got a 403 and recorded the current value as
+  unverified. Renaming the job would change the required check, which is a
+  protection change and not part of this ticket.
 - Tests updated: the gate's pytest pins now cover a well-formed error report
   being red, and the old baseline-file and filter-fault pins are gone.
 
@@ -88,6 +103,7 @@ and `docs/evidence/probes/probe-253-six-callforms-gui-maya2024-v2.json`.
 | Baseline and its dependency removed by a separately reviewed change | Yes: this ticket's own PR; no code cleanup is bundled into it |
 | Normal CI and fault injection pass | Recorded on the pull request |
 | No branch-protection edits in this ticket | Yes: protection stayed untouched; the job name stayed as it was |
+| #222 exit rule: a separate CI guard proves the check cannot silently disappear | Not met: #256 was closed `not planned` and the owner accepted that residual risk. Recorded as unmet, not as a pass |
 | Remaining risk stated | The required check can still be replaced by a same-named fake success, as #256 accepted |
 
 Result text for the parent spec: **baseline retired, strict gate retained.**

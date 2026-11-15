@@ -8,11 +8,11 @@ python -m maya_mcp_server -vv
 uv run python -m pytest tests/ -q          # fake Maya test layer
 uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json          # lint report: red findings must not fail the shell
 python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint gate: per-rule budget that only goes down
-uv run python .github/scripts/run_mypy_gate.py   # type-check gate: runs mypy and fails closed on a crash, an empty/garbage report (empty baseline included), a module dropping out of src/, or a weakened strict config; baseline filter verdict passes through
+uv run python .github/scripts/run_mypy_gate.py   # type-check gate: runs unfiltered strict mypy and fails closed on a crash, an empty/garbage report, a module dropping out of src/, a weakened strict config, or any type error
 uv run pre-commit run --all-files          # hook sweep (the why is in CONTRIBUTING's dev setup)
 
 ## Gates
-A "governance gate" is any check a job runs in `.github/workflows/ci.yml`; `.github/gate-registry.yaml` indexes every enforced one with its pins, and `check_gate_registry.py` fails an unregistered or unwired entry, so neither list can rot quietly. To see what CI actually runs, read the `run:` lines: `grep -E 'run: python .github/scripts' .github/workflows/ci.yml`. Each of the three baseline files has its own rule — see the "Don't touch" list below. The ruff error budget and the big single-file module's line cap are `lint` steps; the mypy error baseline is its own job.
+A "governance gate" is any check a job runs in `.github/workflows/ci.yml`; `.github/gate-registry.yaml` indexes every enforced one with its pins, and `check_gate_registry.py` fails an unregistered or unwired entry, so neither list can rot quietly. To see what CI actually runs, read the `run:` lines: `grep -E 'run: python .github/scripts' .github/workflows/ci.yml`. Each budget file has its own rule — see the "Don't touch" list below. The ruff error budget and the big single-file module's line cap are `lint` steps; the strict mypy gate is its own job.
 
 ## Don't touch
 - `src/maya_mcp_server/maya_scene_module.py` is line-capped by `.github/monolith-budget.json`; new Maya-side capability goes in a separate file that is injected together with it.

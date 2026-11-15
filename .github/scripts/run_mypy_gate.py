@@ -477,17 +477,15 @@ def run_mypy(root: Path) -> tuple[int, str, str]:
     return completed.returncode, completed.stdout, completed.stderr
 
 
-def verify_report(
-    rc: int, report_text: str, stderr: str, scope_count: int
-) -> tuple[str, int, list[str]]:
+def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> tuple[str, int]:
     """Judge the mypy report against the exit code's claim.
 
-    Returns ``(summary line, checked count, error lines)``. `error lines` is
-    empty on a clean run; a nonempty list is a well-formed type-error report,
-    which ``main`` turns into a red. Raises ``GateError`` when the output does
-    not support the exit code's claim at all. This is where an empty or garbage
-    report dies even though the exit code looks survivable. ``stderr`` rides
-    along so every fault message carries the checker's own evidence.
+    Returns ``(summary line, checked count)``; raises ``GateError`` when the
+    output does not support the exit code's claim at all. This is where an
+    empty or garbage report dies even though the exit code looks survivable,
+    and where a well-formed error report becomes a hard ``type_fault`` red.
+    ``stderr`` rides along so every fault message carries the checker's own
+    evidence.
     """
     lines = [line for line in report_text.splitlines() if line.strip()]
     summary_matches = [
@@ -515,6 +513,7 @@ def verify_report(
             f"audited config entirely. stderr:\n{stderr.strip()}"
         )
 
+    type_errors: list[str] = []
     if rc == 0:
         if not lines:
             raise GateError(
@@ -545,8 +544,7 @@ def verify_report(
             )
         checked = int(success.group(1))
         verdict = lines[-1]
-        error_lines: list[str] = []
-    if rc == 1:
+    else:
         if not lines:
             raise GateError(
                 "execution_fault -- mypy exited 1 (type errors claimed) but "
@@ -563,8 +561,8 @@ def verify_report(
         # An error line must be a well-formed diagnostic with ``error`` as
         # its severity token; a note line whose MESSAGE contains ": error: "
         # does not make this an error report.
-        error_lines = [line for line in lines if _ERROR_DIAGNOSTIC_LINE.match(line)]
-        if not error_lines:
+        type_errors = [line for line in lines if _ERROR_DIAGNOSTIC_LINE.match(line)]
+        if not type_errors:
             raise GateError(
                 "execution_fault -- mypy exited 1 but the report carries no "
                 f"'error:' line; the output is not a mypy error report. {stderr_note}"
@@ -583,10 +581,10 @@ def verify_report(
         # Cross-check the summary's own count against the error lines it
         # summarizes; a summary that disagrees with the body is not evidence.
         found_match = re.search(r"^Found (\d+) errors?", summary_matches[-1].group(0))
-        if found_match and int(found_match.group(1)) != len(error_lines):
+        if found_match and int(found_match.group(1)) != len(type_errors):
             raise GateError(
                 f"execution_fault -- the summary claims {found_match.group(1)} "
-                f"errors but the report carries {len(error_lines)} 'error:' "
+                f"errors but the report carries {len(type_errors)} 'error:' "
                 f"lines; the counts disagree. {stderr_note}"
             )
         checked = int(summary_matches[-1].group(1))
@@ -598,7 +596,20 @@ def verify_report(
             f"holds {scope_count}; a module dropped out of the checked set. "
             "Narrowing the checked scope must not look green."
         )
-    return verdict, checked, error_lines
+    if type_errors:
+        # The baseline was retired in #258: any type error is now a hard red
+        # on the report itself, with the first lines carried as evidence. No
+        # filter sits between the checker and this verdict.
+        shown = min(len(type_errors), 5)
+        more = len(type_errors) - shown
+        raise GateError(
+            f"type_fault -- mypy exited 1 with {len(type_errors)} type "
+            "error(s); the strict check is not clean and no baseline "
+            "absorbs them. First errors:\n"
+            + "\n".join(type_errors[:5])
+            + (f"\n... and {more} more" if more else "")
+        )
+    return verdict, checked
 
 
 def main() -> int:
@@ -619,26 +630,12 @@ def main() -> int:
         except OSError as e:
             raise GateError(f"execution_fault -- cannot write {REPORT_FILENAME}: {e}") from e
 
-        verdict, checked, error_lines = verify_report(rc, stdout, stderr, scope_count)
+        verdict, _checked = verify_report(rc, stdout, stderr, scope_count)
         # Evidence discipline, on green too: the exit code, the report size
         # and anything the checker said on stderr stay visible, so a future
         # reader does not have to trust the word OK.
         if stderr.strip():
             print(f"mypy stderr: {stderr.strip()}")
-
-        if error_lines:
-            # The baseline was retired in #258: any type error is now a hard
-            # red on the report itself, with the first lines carried as
-            # evidence. No filter sits between the checker and this verdict.
-            shown = len(error_lines[:5])
-            more = len(error_lines) - shown
-            raise GateError(
-                f"type_fault -- mypy exited 1 with {len(error_lines)} type "
-                "error(s); the strict check is not clean and no baseline "
-                "absorbs them. First errors:\n"
-                + "\n".join(error_lines[:5])
-                + (f"\n... and {more} more" if more else "")
-            )
 
         print(
             f"mypy gate OK: mypy exited {rc}; report: {len(stdout.splitlines())} "

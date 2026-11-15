@@ -97,8 +97,10 @@ jobs:
         # out of the checked src/ scope, or when the strict config is
         # weakened. The baseline was retired in #258, so any type error is a
         # hard red with no filter in between. The job name stays "mypy
-        # baseline gate" because branch protection requires that exact
-        # context; renaming it is a protection change owned by #256.
+        # baseline gate" because the recorded branch-protection setting pins
+        # that context (last read 2026-11-14; #256 later got a 403, so the
+        # current value is unverified). Renaming it is a protection change,
+        # not part of #258.
         run: uv run python .github/scripts/run_mypy_gate.py
 
   test:
