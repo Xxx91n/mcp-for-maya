@@ -1,7 +1,8 @@
 """Regression tests for maya_scene_module running on the Maya fake.
 
-Each test pins a P0/P1 fix from the grill handoff (rui.txt). The fake's
-matrix/bbox math is verified independently in test_maya_stub.py, so
+Most tests pin a P0/P1 fix from the grill handoff (rui.txt); the scene-review
+standards test (#255) pins the branches that the production thresholds drive.
+The fake's matrix/bbox math is verified independently in test_maya_stub.py, so
 failures here mean the production module is wrong — not the harness.
 """
 
@@ -222,6 +223,52 @@ class TestWorldBbox:
         res = maya_env.module.scene_review(["conflicts"])
         conflicts = res["checks"]["conflicts"]
         assert conflicts["count"] >= 1, "rotated-object penetration must be detected via world bbox"
+
+
+# ------------------------------------------------------------
+# #255: scene_review branches that read _MAYA_STANDARDS
+# ------------------------------------------------------------
+
+
+class TestSceneReviewStandards:
+    """The shipped thresholds drive real branches, not only comparisons.
+
+    #255 gave _MAYA_STANDARDS a declared shape, which is a type-only change.
+    This test pins the branches those values feed: a reworded message, or a
+    value change that flips one of them, shows up here as well as in the mypy
+    run. The >2000 "Excessive objects" branch has no test in this batch.
+    """
+
+    def test_thresholds_drive_the_review_branches(self, maya_env):
+        scene = maya_env.scene
+        # Deeper than max_nesting_depth (4) plus its +2 tolerance.
+        group = scene.add_group("GRP_root")
+        for level in range(6):
+            group = scene.add_group(f"GRP_level_{level}", parent=group)
+        scene.add_mesh("GEO_deep", parent=group)
+        # Default-prefixed names: the forbidden_prefixes list.
+        for i in range(12):
+            scene.add_mesh(f"pCube{i + 1}", t=(i * 50, 0, 0))
+        # Past max_cameras_keep (10).
+        for i in range(12):
+            scene.add_camera(f"CAM_shot_{i}", t=(0, 0, i * 10))
+        # Below min_lights (3).
+        scene.add_light("LGT_key", t=(0, 100, 0))
+        scene.add_light("LGT_fill", t=(100, 100, 0))
+        # Past max_objects_soft (500) but under max_objects_hard (2000).
+        for i in range(500):
+            scene.add_mesh(f"GEO_fill_{i}", t=(i * 3, 0, 40))
+
+        messages = {issue["msg"] for issue in maya_env.module.scene_review()["issues"]}
+
+        transforms = maya_env.cmds.ls(type="transform", long=True) or []
+        assert len(transforms) > 500, "the soft object-count branch needs a scene past it"
+        assert f"High object count ({len(transforms)}). Consider instancing." in messages
+        assert "Excess cameras (12). Clean test shots." in messages
+        assert "Only 2 lights. Need 3+." in messages
+        assert "12 objects with default names." in messages
+        assert "Nesting depth 8 exceeds 4." in messages
+        assert "Scene hierarchy too deep (8 levels). Flatten to 4 max." in messages
 
 
 # ------------------------------------------------------------

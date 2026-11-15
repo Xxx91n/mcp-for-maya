@@ -1704,13 +1704,11 @@ def create_orbit_camera(center, radius=500, frames=120, name="CAM_orbit"):
 # P1: Aesthetic Analysis (Enhanced Professional Engine)
 # ============================================================
 
-if TYPE_CHECKING:  # type-only aliases; annotations stay lazy strings at Maya runtime
-    _Objs = list[dict[str, Any]]
-    _Bounds = dict[str, list[float]]
-    _Zones = dict[str, Any]
+if TYPE_CHECKING:  # type-only; annotations stay lazy strings at Maya runtime
+    from .scene_module_types import MayaStandards, _Bounds, _Objs, _Zones
 
 # Maya production standards (unified, no duplicates)
-_MAYA_STANDARDS = {
+_MAYA_STANDARDS: MayaStandards = {
     # Naming
     "forbidden_prefixes": [
         "pCube",
@@ -3883,7 +3881,7 @@ def _check_organization(transforms: list[str]) -> dict[str, Any]:
         score -= min(20, stats["default_names"] * 3)
     if stats["empty_groups"] > 0:
         score -= min(10, stats["empty_groups"] * 2)
-    if stats["max_depth"] > cast(int, _MAYA_STANDARDS["max_nesting_depth"]):
+    if stats["max_depth"] > _MAYA_STANDARDS["max_nesting_depth"]:
         score -= 10
 
     return {
