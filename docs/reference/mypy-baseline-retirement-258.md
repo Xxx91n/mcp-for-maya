@@ -1,6 +1,7 @@
 # The mypy baseline retired (#258)
 
-**Decision: `baseline retired, strict gate retained`.**
+**Decision: `baseline retired, strict gate retained`.** The local criteria are
+met; the pull-request and remote rows below are still pending.
 
 **What this file is:** the closing record for ticket #258 under the type-checking
 spec #222. It states what was measured, which branch of the ticket applied, what
@@ -46,8 +47,8 @@ no suppression flag. The gate script checks all of that before running mypy, so
 
 #213's tentative inventory was 100 missing local annotations, 66 local
 container/inference findings, 17 possible third-party Maya stub mismatches and
-1 mixed finding (184 total). The batches tracked under #222 and its follow-ups
-(see CONTRIBUTING's drift trail) took the raw report down as
+1 mixed finding (184 total). The counts recorded in CONTRIBUTING at the ticket
+start took the raw report down as
 184 -> 168 -> 152 -> 85 -> 67 -> 45 -> 20 -> 10 -> 0. The last 10 were
 all `no-untyped-def` / `no-untyped-call` annotation gaps, cleared by #257
 (PR #274). No category is carried by the baseline because the baseline is empty.
@@ -108,7 +109,7 @@ and `docs/evidence/probes/probe-253-six-callforms-gui-maya2024-v2.json`.
 | Baseline and its dependency removed by a separately reviewed change | Pending: the change is committed on its own branch; the reviewed pull request is the remaining step |
 | Normal CI and fault injection pass | Pending: recorded after the pull request runs |
 | No branch-protection edits in this ticket | Yes: protection stayed untouched; the job name stayed as it was |
-| #222 exit rule: a separate CI guard proves the check cannot silently disappear | Not met: #256 was closed `not planned`; its closeout records the owner accepting the residual risk, not the guard being implemented. Recorded as unmet, not as a pass |
+| #222 exit rule: a separate CI guard proves the check cannot silently disappear | Not met: #256 was closed `not planned`; its [closeout comment](https://github.com/Xxx91n/mcp-for-maya/issues/256#issuecomment-6890139942) records the owner accepting the residual risk, not the guard being implemented. Recorded as unmet, not as a pass |
 | Remaining risk stated | The required check can still be replaced by a same-named fake success, as #256 accepted |
 
 Result text for the parent spec: **baseline retired, strict gate retained.**
