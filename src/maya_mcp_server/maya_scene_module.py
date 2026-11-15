@@ -1541,7 +1541,7 @@ def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
         angle: Optional dict with "azimuth" and "elevation" in degrees.
 
     Returns:
-        dict with camera info.
+        dict with camera info; position and distance are in the scene's working unit.
     """
     if shot_type not in SHOT_TYPES:
         return _err(
@@ -1550,6 +1550,9 @@ def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
         )
 
     shot = SHOT_TYPES[shot_type]
+    # Centimetres -> working unit, same bridge as _zone_unit_scale (no cross-file call)
+    unit_scale = float(om2.MDistance(1.0).asUnits(om2.MDistance.uiUnit()))
+    decimals = max(0, math.ceil(1 - math.log10(unit_scale)))  # keep 0.1 cm resolution
 
     # Get target position and size
     try:
@@ -1560,11 +1563,11 @@ def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
         bbox = fn.boundingBox
         wm = dag.inclusiveMatrix()
 
-        target_pos = [wm[12], wm[13], wm[14]]
+        target_pos = [wm[12] * unit_scale, wm[13] * unit_scale, wm[14] * unit_scale]
         target_size = max(
-            abs(bbox.max[0] - bbox.min[0]),
-            abs(bbox.max[1] - bbox.min[1]),
-            abs(bbox.max[2] - bbox.min[2]),
+            abs(bbox.max[0] - bbox.min[0]) * unit_scale,
+            abs(bbox.max[1] - bbox.min[1]) * unit_scale,
+            abs(bbox.max[2] - bbox.min[2]) * unit_scale,
         )
     except Exception as e:
         return _err(
@@ -1577,8 +1580,6 @@ def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
     distance = target_size * shot["distance_mult"]
     azimuth = (angle or {}).get("azimuth", 30)
     elevation = (angle or {}).get("elevation", 15)
-
-    import math
 
     az_rad = math.radians(azimuth)
     el_rad = math.radians(elevation)
@@ -1608,8 +1609,6 @@ def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
         )
     except Exception:
         # Fallback: calculate rotation manually
-        import math
-
         dx = target_pos[0] - cam_x
         dy = target_pos[1] - cam_y
         dz = target_pos[2] - cam_z
@@ -1625,9 +1624,9 @@ def create_camera_shot(target, shot_type="medium", name="CAM_shot", angle=None):
         "camera": cam_transform,
         "shot_type": shot_type,
         "description": shot["desc"],
-        "position": [round(cam_x, 1), round(cam_y, 1), round(cam_z, 1)],
+        "position": [round(cam_x, decimals), round(cam_y, decimals), round(cam_z, decimals)],
         "focal_length": shot["focal_length"],
-        "distance": round(distance, 1),
+        "distance": round(distance, decimals),
         "target": target,
     }
 

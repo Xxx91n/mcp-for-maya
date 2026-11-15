@@ -781,3 +781,97 @@ class TestOrbitCamera:
         assert len(maya_env.scene.keyed) >= 3
         assert all(node == cam.name for node, _attr in maya_env.scene.keyed)
         assert len(maya_env.scene.keyed) >= 3
+
+
+# ------------------------------------------------------------
+# #272: camera framing must speak the scene's working unit
+# ------------------------------------------------------------
+
+
+class TestCameraShotUnits:
+    """OpenMaya hands back centimetres; cmds.move reads working units.
+
+    In a centimetre scene the two agree, which is why this stayed green.
+    In a metre scene the raw centimetre numbers put the camera 100x too far.
+    """
+
+    # The same numbers in every unit system: 2.2 units tall, medium = 3x,
+    # azimuth 30 / elevation 15.
+    EXPECTED_POSITION = [3.1876, 1.7082, 5.5210]
+
+    @staticmethod
+    def _door(maya_env, unit):
+        """One 1.3 x 2.2 x 0.12 door in the requested working unit."""
+        maya_env.scene.linear_unit = unit
+        name = "door_" + unit
+        maya_env.cmds.polyCube(w=1.3, h=2.2, d=0.12, name=name)
+        return name
+
+    def test_metre_scene_frames_the_target(self, maya_env):
+        scene = maya_env.scene
+        name = self._door(maya_env, "m")
+
+        res = maya_env.module.create_camera_shot(name, shot_type="medium")
+        assert "error" not in res
+
+        assert res["distance"] == pytest.approx(6.6, abs=1e-3)
+        assert res["position"] == pytest.approx(self.EXPECTED_POSITION, abs=1e-3)
+
+        cam = scene.resolve(res["camera"])
+        world_cm = scene.world_position(cam)
+        world_m = [v * scene.working_unit_scale() for v in world_cm]
+        assert world_m == pytest.approx(self.EXPECTED_POSITION, abs=1e-3)
+        # The camera must actually aim at the door, not just sit near it.
+        assert scene.constraints[-1]["target"] == scene.resolve(name).name
+
+    def test_centimetre_scene_output_is_unchanged(self, maya_env):
+        scene = maya_env.scene
+        name = self._door(maya_env, "cm")
+
+        res = maya_env.module.create_camera_shot(name, shot_type="medium")
+
+        # Default scene: the reported numbers must stay exactly as before.
+        assert res["position"] == [3.2, 1.7, 5.5]
+        assert res["distance"] == 6.6
+        cam = scene.resolve(res["camera"])
+        # Byte-identical landing: the factor is exactly 1.0, so the stored
+        # centimetres are the same floats the old code produced.
+        assert cam.t == [3.187555226753925, 1.708205697676637, 5.521007604669533]
+
+    def test_inch_scene_is_no_coarser_than_cm(self, maya_env):
+        """A non-cm scene reports no coarser than 0.1 cm."""
+        name = self._door(maya_env, "in")
+
+        res = maya_env.module.create_camera_shot(name, shot_type="medium")
+
+        assert res["distance"] == pytest.approx(6.6, abs=1e-3)
+        assert res["position"] == [round(v, 2) for v in self.EXPECTED_POSITION]
+
+    @pytest.mark.parametrize("unit", ["cm", "m"])
+    def test_aim_fallback_aims_in_both_units(self, maya_env, monkeypatch, unit):
+        """A failed constraint must not change the manual aim between units."""
+        scene = maya_env.scene
+        name = self._door(maya_env, unit)
+
+        def boom(*a, **k):
+            raise RuntimeError("constraint engine down")
+
+        monkeypatch.setattr(maya_env.cmds, "aimConstraint", boom)
+        res = maya_env.module.create_camera_shot(name, shot_type="medium")
+        assert "error" not in res
+
+        cam = scene.resolve(res["camera"])
+        assert cam.r == pytest.approx([-15.0, 30.0, 0.0], abs=1e-6)
+
+        # The -Z axis of a Maya camera is its view direction; it must point
+        # from the camera to the door at the origin.
+        cam_pos = [v * scene.working_unit_scale() for v in scene.world_position(cam)]
+        norm = math.sqrt(sum(v * v for v in cam_pos))
+        to_target = [-v / norm for v in cam_pos]
+        rx, ry = math.radians(cam.r[0]), math.radians(cam.r[1])
+        forward = [
+            -math.cos(rx) * math.sin(ry),
+            math.sin(rx),
+            -math.cos(rx) * math.cos(ry),
+        ]
+        assert forward == pytest.approx(to_target, abs=1e-6)
