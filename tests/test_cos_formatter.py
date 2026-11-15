@@ -116,6 +116,14 @@ class TestFormatInspectCos:
         assert "MAT: mat_dark" in result
         assert "24v 6f" in result
 
+    def test_cm_inspect_keeps_no_unit_suffix(self):
+        obj = {"name": "a", "type": "mesh", "position": [0, 0, 0], "unit": "cm"}
+        assert "UNIT=" not in format_inspect_cos(obj)
+
+    def test_metre_inspect_names_the_unit(self):
+        obj = {"name": "a", "type": "mesh", "position": [0, 0, 0], "unit": "m"}
+        assert "INSPECT: a[mesh]@(0,0,0) UNIT=m" in format_inspect_cos(obj)
+
     def test_with_neighbors(self):
         """Neighbors shown with distances."""
         obj = {"name": "obj_a", "type": "mesh", "position": [0, 0, 0]}
@@ -230,3 +238,17 @@ class TestFormatZoneMapCos:
         assert "ZONES[2]" in result
         assert "entrance: 5obj" in result
         assert "display: 10obj" in result
+        assert "UNIT=" not in result
+
+    def test_converted_zone_names_the_unit(self):
+        zones = [
+            {
+                "name": "entrance",
+                "object_count": 1,
+                "center": [2.5, 0.5, 0.5],
+                "pattern_matched": "entrance",
+                "unit": "m",
+            }
+        ]
+        result = format_zone_map_cos(zones)
+        assert "entrance: 1obj @(2.5,0.5,0.5) [entrance] UNIT=m" in result

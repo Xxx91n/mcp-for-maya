@@ -91,9 +91,11 @@ def format_inspect_cos(
     verts = obj_data.get("vertex_count")
     faces = obj_data.get("face_count")
 
-    # Object header
+    # Object header. A centimetre scene keeps its old bytes; a converted one
+    # names the unit so the numbers are not ambiguous.
+    unit_suffix = _unit_suffix(obj_data.get("unit"))
     px, py, pz = _r3(pos[0]), _r3(pos[1]), _r3(pos[2])
-    lines.append(f"INSPECT: {name}[{ntype}]@({px},{py},{pz})")
+    lines.append(f"INSPECT: {name}[{ntype}]@({px},{py},{pz}){unit_suffix}")
 
     # BBox as WxHxD
     if bbox:
@@ -183,8 +185,9 @@ def format_zone_map_cos(zones: list[dict[str, Any]], stats: dict[str, Any] | Non
         count = zone.get("object_count", 0)
         center = zone.get("center", [0, 0, 0])
         pattern = zone.get("pattern_matched", "")
+        unit_suffix = _unit_suffix(zone.get("unit"))
         cx, cy, cz = _r3(center[0]), _r3(center[1]), _r3(center[2])
-        lines.append(f"  {name}: {count}obj @({cx},{cy},{cz}) [{pattern}]")
+        lines.append(f"  {name}: {count}obj @({cx},{cy},{cz}) [{pattern}]{unit_suffix}")
 
         # List top objects in zone
         obj_names = zone.get("objects", [])[:5]
@@ -198,6 +201,11 @@ def format_zone_map_cos(zones: list[dict[str, Any]], stats: dict[str, Any] | Non
 
 
 # --- Internal helpers ---
+
+
+def _unit_suffix(unit: str | None) -> str:
+    """Name the unit only when the view was converted out of centimetres."""
+    return "" if unit in (None, "cm") else f" UNIT={unit}"
 
 
 def _r3(val: float) -> str:

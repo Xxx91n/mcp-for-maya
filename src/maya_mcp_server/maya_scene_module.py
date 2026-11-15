@@ -38,19 +38,24 @@ def _round3(val: float) -> float:
     return round(float(val), 3)
 
 
-def _round3_list(vals: Any) -> list[float]:
-    """Round a list of floats."""
-    return [_round3(v) for v in vals]
-
-
 def _vec3_to_list(p: om2.MPoint | om2.MVector) -> list[float]:
     """Convert MPoint/MVector to [x,y,z]."""
     return [_round3(p[0]), _round3(p[1]), _round3(p[2])]
 
 
-def _matrix_to_pos(matrix: om2.MMatrix) -> list[float]:
-    """Extract translation from MMatrix."""
-    return [_round3(matrix[12]), _round3(matrix[13]), _round3(matrix[14])]
+def _matrix_to_pos(matrix: om2.MMatrix, scale: float) -> list[float]:
+    """Extract translation from MMatrix, converted and rounded."""
+    return [_round3(matrix[12 + i] * scale) for i in range(3)]
+
+
+def _cm_to_unit_factor() -> float:
+    """Factor from OpenMaya centimetres to the working unit (1.0 in cm)."""
+    return float(om2.MDistance(1.0).asUnits(om2.MDistance.uiUnit()))
+
+
+def _cm_to_unit_xyz(values: Any, scale: float) -> list[float]:
+    """Convert an xyz length from centimetres, then round each component."""
+    return [_round3(values[i] * scale) for i in range(3)]
 
 
 def _classify_node(dag: om2.MDagPath) -> str:
@@ -133,17 +138,6 @@ def _get_mesh_stats(dag: om2.MDagPath) -> dict[str, int]:
         return {"v": 0, "f": 0}
 
 
-def _get_bbox_size(bbox: om2.MBoundingBox) -> list[float]:
-    """Get [w, h, d] from MBoundingBox."""
-    mn = bbox.min
-    mx = bbox.max
-    return [
-        _round3(abs(mx[0] - mn[0])),
-        _round3(abs(mx[1] - mn[1])),
-        _round3(abs(mx[2] - mn[2])),
-    ]
-
-
 def _point_distance(a: om2.MPoint, b: om2.MPoint) -> float:
     """Euclidean distance between two MPoints."""
     dx = a[0] - b[0]
@@ -201,6 +195,7 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
         JSON string with objects list, stats, unit, up_axis.
     """
     result: dict[str, Any] = {"objects": [], "stats": {}, "unit": "cm", "up_axis": "y"}
+    unit_scale = _cm_to_unit_factor()
 
     # Get scene unit
     try:
@@ -244,8 +239,9 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
         # World-space box via the cached bbox (fast, 8 corners transformed)
         try:
             bbox = _world_bbox(dag)
-            bbox_min = _vec3_to_list(bbox.min)
-            bbox_max = _vec3_to_list(bbox.max)
+            # OpenMaya lengths are centimetres; the payload's unit is not.
+            bbox_min = _cm_to_unit_xyz(bbox.min, unit_scale)
+            bbox_max = _cm_to_unit_xyz(bbox.max, unit_scale)
         except Exception:
             bbox_min = [0, 0, 0]
             bbox_max = [0, 0, 0]
@@ -253,7 +249,7 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
         # Get world position from inclusive matrix
         try:
             world_matrix = dag.inclusiveMatrix()
-            pos = _matrix_to_pos(world_matrix)
+            pos = _matrix_to_pos(world_matrix, unit_scale)
         except Exception:
             pos = [0, 0, 0]
 
@@ -301,7 +297,7 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
                 verts = []
                 for i in range(min(mesh_fn.numVertices, 100)):
                     pt = mesh_fn.getPoint(i, cast(om2.MSpace, om2.MSpace.kWorld))
-                    verts.extend(_round3_list([pt[0], pt[1], pt[2]]))
+                    verts.extend(_cm_to_unit_xyz(pt, unit_scale))
                 obj["verts"] = verts
             except Exception:
                 pass
@@ -320,11 +316,16 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
     return result
 
 
-def get_zone_map(patterns: dict[str, str] | None = None) -> dict[str, Any]:
+def get_zone_map(
+    patterns: dict[str, str] | None = None, display_units: bool = False
+) -> dict[str, Any]:
     """Group objects into zones by name keywords; 7 built-in zones.
     Args:
         patterns: dict of zone_name -> regex_pattern. If None, uses the
                   built-in 7-zone set for a pop-up store.
+        display_units: report zone centers and boxes in the scene's working
+                  linear unit instead of Maya's internal centimetres. The
+                  default keeps the numbers other Maya-side callers rely on.
 
     Returns:
         JSON string with zones list.
@@ -391,17 +392,22 @@ def get_zone_map(patterns: dict[str, str] | None = None) -> dict[str, Any]:
 
     # Finalize zones
     result_zones = []
+    unit_scale = _cm_to_unit_factor() if display_units else 1.0
+    # A centimetre scene keeps its old payload, so only a converted zone
+    # carries a unit label; there the numbers would otherwise be ambiguous.
+    unit_name = cmds.currentUnit(query=True, linear=True) if unit_scale != 1.0 else None
     for zone_name, zone in zones.items():
         if not zone["objects"]:
             continue
         zone["object_count"] = len(zone["objects"])
         # Compute center
         if zone["bbox_min"][0] != float("inf"):
-            zone["center"] = [
-                _round3((zone["bbox_min"][i] + zone["bbox_max"][i]) / 2) for i in range(3)
-            ]
-            zone["bbox_min"] = _round3_list(zone["bbox_min"])
-            zone["bbox_max"] = _round3_list(zone["bbox_max"])
+            center = [(zone["bbox_min"][i] + zone["bbox_max"][i]) / 2 for i in range(3)]
+            zone["center"] = _cm_to_unit_xyz(center, unit_scale)
+            zone["bbox_min"] = _cm_to_unit_xyz(zone["bbox_min"], unit_scale)
+            zone["bbox_max"] = _cm_to_unit_xyz(zone["bbox_max"], unit_scale)
+            if unit_name is not None:
+                zone["unit"] = unit_name
         else:
             zone["center"] = [0, 0, 0]
             zone["bbox_min"] = [0, 0, 0]
@@ -420,14 +426,19 @@ def get_spatial_index(max_neighbors: int = 8, max_distance: float | None = None)
 
     Args:
         max_neighbors: Maximum neighbors per object (default 8).
-        max_distance: Max distance for neighbor inclusion. If None, auto-calculated.
+        max_distance: Max neighbor distance in the scene's working linear
+            unit. If None, auto-calculated from the internal centimetres.
 
     Returns:
-        JSON string with adjacency list: [[obj_a_idx, obj_b_idx, distance], ...]
+        Adjacency list [[obj_a_idx, obj_b_idx, distance], ...]; distances and
+        threshold are in the scene's working linear unit (#271).
     """
     transforms = cmds.ls(type="transform", long=True) or []
     if not transforms:
         return {"pairs": [], "objects": [], "threshold": 0}
+    unit_scale = _cm_to_unit_factor()
+    if max_distance is not None:
+        max_distance = max_distance / unit_scale
 
     # Collect positions and names
     positions = []
@@ -485,7 +496,7 @@ def get_spatial_index(max_neighbors: int = 8, max_distance: float | None = None)
                     dists.append((dist, j))
             dists.sort()
             for dist, j in dists[:max_neighbors]:
-                pairs.append([i, j, _round3(dist)])
+                pairs.append([i, j, _round3(dist * unit_scale)])
     else:
         # Spatial hashing for large scenes
         cell_size = max_distance
@@ -514,18 +525,28 @@ def get_spatial_index(max_neighbors: int = 8, max_distance: float | None = None)
                                 dists.append((d, j))
             dists.sort()
             for dist, j in dists[:max_neighbors]:
-                pairs.append([i, j, _round3(dist)])
+                pairs.append([i, j, _round3(dist * unit_scale)])
 
-    return {"pairs": pairs, "objects": names, "threshold": _round3(max_distance), "count": n}
+    return {
+        "pairs": pairs,
+        "objects": names,
+        "threshold": _round3(max_distance * unit_scale),
+        "count": n,
+    }
 
 
-def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
+def measure(
+    obj_a: str, obj_b: str, mode: str = "center", native_cm: bool = False
+) -> dict[str, Any]:
     """Measure spatial relationship between two objects.
 
     Args:
         obj_a: Name of first object.
         obj_b: Name of second object.
         mode: "center" | "surface" | "clearance" | "bbox"
+        native_cm: internal callers only — return Maya's internal centimetres
+            instead of the working unit, so a threshold comparison keeps the
+            centimetre precision the displayed value has already rounded away.
 
     Returns:
         JSON string with measurement result.
@@ -538,6 +559,7 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
         "bbox_overlap": False,
         "unit": "cm",
     }
+    unit_scale = 1.0 if native_cm else _cm_to_unit_factor()
 
     try:
         # Get unit
@@ -581,10 +603,10 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
     )
 
     if mode == "center":
-        result["distance"] = _round3(_point_distance(center_a, center_b))
+        result["distance"] = _round3(_point_distance(center_a, center_b) * unit_scale)
         result["details"] = {
-            "center_a": _vec3_to_list(center_a),
-            "center_b": _vec3_to_list(center_b),
+            "center_a": _cm_to_unit_xyz(center_a, unit_scale),
+            "center_b": _cm_to_unit_xyz(center_b, unit_scale),
         }
 
     elif mode == "bbox":
@@ -600,7 +622,7 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
         gaps = []
         for i in range(3):
             gap = max(0, max(world_min_a[i], world_min_b[i]) - min(world_max_a[i], world_max_b[i]))
-            gaps.append(_round3(gap))
+            gaps.append(_round3(gap * unit_scale))
         result["details"] = {"gaps_xyz": gaps, "overlapping": overlap}
 
         if overlap:
@@ -608,7 +630,7 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
             overlap_dims = []
             for i in range(3):
                 dim = min(world_max_a[i], world_max_b[i]) - max(world_min_a[i], world_min_b[i])
-                overlap_dims.append(max(0, _round3(dim)))
+                overlap_dims.append(max(0, _round3(dim * unit_scale)))
             result["details"]["overlap_dims"] = overlap_dims
             result["distance"] = 0.0
         else:
@@ -626,10 +648,10 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
             max(world_min_b[1], min(center_a[1], world_max_b[1])),
             max(world_min_b[2], min(center_a[2], world_max_b[2])),
         )
-        result["distance"] = _round3(_point_distance(closest_a, closest_b))
+        result["distance"] = _round3(_point_distance(closest_a, closest_b) * unit_scale)
         result["details"] = {
-            "surface_a": _vec3_to_list(closest_a),
-            "surface_b": _vec3_to_list(closest_b),
+            "surface_a": _cm_to_unit_xyz(closest_a, unit_scale),
+            "surface_b": _cm_to_unit_xyz(closest_b, unit_scale),
         }
 
     elif mode == "clearance":
@@ -643,9 +665,9 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
             dist = math.sqrt(sum(max(0.0, g) ** 2 for g in gaps))
         else:
             dist = max(gaps)  # all negative: least-penetrating axis
-        result["distance"] = _round3(dist)
+        result["distance"] = _round3(dist * unit_scale)
         result["bbox_overlap"] = all(g < 0 for g in gaps)
-        result["details"] = {"clearances_xyz": [_round3(g) for g in gaps]}
+        result["details"] = {"clearances_xyz": _cm_to_unit_xyz(gaps, unit_scale)}
 
     return result
 
@@ -767,7 +789,7 @@ def assert_scene_state(expectations_json: str) -> dict[str, Any]:
             checked += 1
             try:
                 world_matrix = dag.inclusiveMatrix()
-                actual_pos = _matrix_to_pos(world_matrix)
+                actual_pos = _matrix_to_pos(world_matrix, 1.0)
                 exp_pos = expected["position"]
                 # Allow 1 unit tolerance
                 if any(abs(a - e) > 1.0 for a, e in zip(actual_pos, exp_pos)):
@@ -895,7 +917,8 @@ def check_constraints(rules: list[dict[str, Any]]) -> dict[str, Any]:
         rules: List of constraint dicts, each with:
             - type: "min_clearance" | "max_objects" | "no_overlap" | "min_height" | "max_height"
             - zone: optional zone name to limit check
-            - value: threshold value
+            - value: threshold value; length thresholds are in Maya internal
+              centimetres, the unit the other constraint checks use
             - objects: optional list of object names to check
 
     Returns:
@@ -913,7 +936,9 @@ def check_constraints(rules: list[dict[str, Any]]) -> dict[str, Any]:
         obj_list = rule.get("objects")
 
         if rtype == "min_clearance":
-            # Check minimum clearance between objects
+            # Check minimum clearance between objects. native_cm keeps the
+            # comparison in internal centimetres, the unit the rule value uses,
+            # without the rounding the displayed working-unit value has.
             transforms = cmds.ls(type="transform", long=True) or []
             if zone:
                 zone_data = get_zone_map()
@@ -930,7 +955,10 @@ def check_constraints(rules: list[dict[str, Any]]) -> dict[str, Any]:
                     pairs_checked += 1
                     try:
                         m = measure(
-                            transforms[i].split("|")[-1], transforms[j].split("|")[-1], "clearance"
+                            transforms[i].split("|")[-1],
+                            transforms[j].split("|")[-1],
+                            "clearance",
+                            native_cm=True,
                         )
                         checked += 1
                         # Negative clearance = penetration — that IS a violation.
@@ -1555,8 +1583,7 @@ def create_camera_shot(
         )
 
     shot = SHOT_TYPES[shot_type]
-    # Same bridge as _zone_unit_scale; inlined because mypy cannot see across files.
-    unit_scale = float(om2.MDistance(1.0).asUnits(om2.MDistance.uiUnit()))
+    unit_scale = _cm_to_unit_factor()
     decimals = max(0, math.ceil(1 - math.log10(unit_scale)))  # no coarser than 0.1 cm
 
     # Get target position and size

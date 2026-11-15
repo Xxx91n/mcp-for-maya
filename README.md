@@ -148,7 +148,7 @@ Every scene edit follows **ICEV**: look at the scene, work out the change, make 
 
 | Capability | Tools | Notes |
 |------------|-------|-------|
-| 🧊 **Spatial awareness** | `scene_snapshot` `scene_inspect` `scene_measure` | One call gets the objects, their types, world positions, and sizes. `scene_snapshot` gives the world-space bounding box, so moving or scaling an object changes the number; `scene_inspect` gives the node's own box without its ancestors' transforms. `scene_measure` works in world-space axis-aligned boxes: overlapping boxes can belong to shapes that do not touch, and rotated or concave shapes measure looser than they look. The default CoS output picks a listing cap that fits the scene size (50 on a small scene up to 1000 on a huge one), so in practice it drops nothing until the scene passes 1000 objects; past that it adds a `... N more objects` line before the `STATS:` line. `format="json"` has no cap, but the result is much bigger |
+| 🧊 **Spatial awareness** | `scene_snapshot` `scene_inspect` `scene_measure` | One call gets the objects, their types, world positions, and sizes. `scene_snapshot` gives the world-space bounding box, so moving or scaling an object changes the number; `scene_inspect` gives the node's own box without its ancestors' transforms. `scene_measure` works in world-space axis-aligned boxes: overlapping boxes can belong to shapes that do not touch, and rotated or concave shapes measure looser than they look. These tools report object positions, box corners, sizes, neighbor distances and zone centers/boxes in the scene's current linear unit (cm, m or mm). Centimetre output keeps its previous shape; non-centimetre JSON results and CoS views name the unit. The default CoS output picks a listing cap that fits the scene size (50 on a small scene up to 1000 on a huge one), so in practice it drops nothing until the scene passes 1000 objects; past that it adds a `... N more objects` line before the `STATS:` line. `format="json"` has no cap, but the result is much bigger |
 | 🎨 **Look quality** | `scene_aesthetics` | 5 dimensions: color balance (60-30-10), spatial composition (golden ratio / rule of thirds), proportion & scale (ergonomics), lighting quality (three-point setup, fill ratio, color temperature, decay), visual flow |
 | 🎬 **Cameras** | `camera_create` `camera_orbit` | 8 built-in shot types + orbit animation |
 | 🛡️ **Disaster recovery** | `scene_checkpoint` `scene_rollback` `scene_checkpoint_list` | Writes the scene to a `.ma` file on disk under `checkpoints/`; rollback opens that file and points the scene back at its original path |
@@ -178,7 +178,9 @@ scene_inspect(target="wall_entrance", include_neighbors=True)
 scene_measure(obj_a="wall_north", obj_b="counter_A", mode="clearance")
 
 # Verify scene state
-scene_assert(expectations='{"wall": {"exists": true, "position": [0,0,500]}}')
+scene_assert(
+    expectations='{"wall": {"exists": true, "position": [0,0,500]}}'
+)  # position in internal centimetres
 ```
 
 ### Scene checks
@@ -188,7 +190,7 @@ scene_assert(expectations='{"wall": {"exists": true, "position": [0,0,500]}}')
 scene_review()
 
 # Spatial constraint validation
-scene_validate(rules='[{"type": "min_clearance", "value": 180}]')
+scene_validate(rules='[{"type": "min_clearance", "value": 180}]')  # value in internal centimetres
 ```
 
 ### Cameras

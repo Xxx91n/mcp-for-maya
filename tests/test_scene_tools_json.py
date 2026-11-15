@@ -1559,3 +1559,99 @@ class TestRollbackSceneModifiedBefore:
             await tools.fns["scene_rollback"](filename="cp_x.ma")
 
         assert opened == [], "a flag nobody could read must not be guessed at, and must stop first"
+
+
+# ------------------------------------------------------------
+# #271: tool payloads declare the working unit, so every length
+# they report has to leave OpenMaya's internal centimetres.
+# ------------------------------------------------------------
+
+
+class TestToolWorkingUnitOutput:
+    async def test_scene_snapshot_json_uses_working_unit(self, tools):
+        scene = tools.env.scene
+        scene.linear_unit = "m"
+        scene.add_mesh("GEO_door", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6))
+        scene.add_mesh("GEO_door_b", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6), t=(200, 0, 0))
+
+        res = json.loads(await tools.fns["scene_snapshot"](format="json"))
+        door = next(obj for obj in res["scene"]["objects"] if obj["n"] == "GEO_door")
+        door_b = next(obj for obj in res["scene"]["objects"] if obj["n"] == "GEO_door_b")
+        entrance = next(zone for zone in res["zones"] if zone["name"] == "entrance")
+
+        assert res["scene"]["unit"] == "m"
+        assert door["p"] == pytest.approx([0.0, 0.0, 0.0])
+        assert door["b"] == pytest.approx([-0.65, -1.1, -0.06, 0.65, 1.1, 0.06])
+        assert door_b["p"] == pytest.approx([2.0, 0.0, 0.0])
+        assert door_b["b"] == pytest.approx([1.35, -1.1, -0.06, 2.65, 1.1, 0.06])
+        assert entrance["center"] == pytest.approx([1.0, 0.0, 0.0])
+
+    async def test_scene_inspect_json_uses_working_unit(self, tools):
+        scene = tools.env.scene
+        scene.linear_unit = "m"
+        scene.add_mesh("GEO_door", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6))
+        scene.add_mesh("GEO_other", bbox_min=(0, 0, 0), bbox_max=(10, 10, 10), t=(100, 0, 0))
+
+        res = json.loads(
+            await tools.fns["scene_inspect"](
+                target="GEO_door", include_neighbors=True, format="json"
+            )
+        )
+        obj = res["object"]
+
+        assert obj["unit"] == "m"
+        assert obj["position"] == pytest.approx([0.0, 0.0, 0.0])
+        assert obj["bbox"]["min"] == pytest.approx([-0.65, -1.1, -0.06])
+        assert obj["bbox"]["max"] == pytest.approx([0.65, 1.1, 0.06])
+        assert obj["size"] == pytest.approx([1.3, 2.2, 0.12])
+        neighbor = next(item for item in res["neighbors"] if item["name"] == "GEO_other")
+        assert neighbor["distance"] == pytest.approx(1.0)
+
+        other = json.loads(await tools.fns["scene_inspect"](target="GEO_other", format="json"))
+        assert other["object"]["position"] == pytest.approx([1.0, 0.0, 0.0])
+
+    async def test_scene_inspect_rebuilds_neighbor_distances_after_a_unit_change(self, tools):
+        scene = tools.env.scene
+        scene.linear_unit = "m"
+        scene.add_mesh("GEO_door", bbox_min=(0, 0, 0), bbox_max=(50, 50, 50))
+        scene.add_mesh("GEO_other", bbox_min=(0, 0, 0), bbox_max=(50, 50, 50), t=(100, 0, 0))
+
+        metre = json.loads(
+            await tools.fns["scene_inspect"](
+                target="GEO_door", include_neighbors=True, format="json"
+            )
+        )
+        scene.linear_unit = "cm"
+        centimetre = json.loads(
+            await tools.fns["scene_inspect"](
+                target="GEO_door", include_neighbors=True, format="json"
+            )
+        )
+
+        metre_neighbor = next(item for item in metre["neighbors"] if item["name"] == "GEO_other")
+        cm_neighbor = next(item for item in centimetre["neighbors"] if item["name"] == "GEO_other")
+        assert metre_neighbor["distance"] == pytest.approx(1.0)
+        assert cm_neighbor["distance"] == pytest.approx(100.0)
+
+    async def test_scene_inspect_zone_json_uses_working_unit(self, tools):
+        scene = tools.env.scene
+        scene.linear_unit = "m"
+        scene.add_mesh("GEO_door", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(200, 0, 0))
+
+        res = json.loads(await tools.fns["scene_inspect"](target="entrance", format="json"))
+
+        assert res["zone"]["center"] == pytest.approx([2.5, 0.5, 0.5])
+        assert res["zone"]["bbox_min"] == pytest.approx([2.0, 0.0, 0.0])
+        assert res["zone"]["bbox_max"] == pytest.approx([3.0, 1.0, 1.0])
+        assert res["zone"]["unit"] == "m"
+
+    async def test_scene_inspect_cos_names_a_converted_unit(self, tools):
+        scene = tools.env.scene
+        scene.linear_unit = "m"
+        scene.add_mesh("GEO_aisle", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+
+        obj_text = await tools.fns["scene_inspect"](target="GEO_aisle", include_neighbors=False)
+        zone_text = await tools.fns["scene_inspect"](target="path")
+
+        assert "UNIT=m" in obj_text
+        assert "UNIT=m" in zone_text

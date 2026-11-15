@@ -313,6 +313,10 @@ def register_scene_tools(mcp: FastMCP) -> None:
         is read again on every call and never comes from the cache, while the
         object list may be a few seconds old.
 
+        Object positions, box corners and zone centers/boxes are in the
+        scene's current linear unit (cm, m or mm); JSON and the CoS header
+        name that unit.
+
         Boundary: Disambiguated from scene_inspect (deep-dive inspection of
         specific objects or zones) and scene_nodes (granular DAG/DG node
         name discovery with pagination).
@@ -354,7 +358,7 @@ def register_scene_tools(mcp: FastMCP) -> None:
         # Also get zone map
         zone_data = await _execute_scene_code(
             client,
-            module_call("_mcp_scene", "get_zone_map"),
+            module_call("_mcp_scene", "get_zone_map", display_units=True),
             session_key,
             use_cache=True,
             cache_key="zone_map",
@@ -402,6 +406,12 @@ def register_scene_tools(mcp: FastMCP) -> None:
         Returns detailed properties including transform, BBox, material, mesh stats,
         and optionally nearby objects with distances.
 
+        Object positions, box corners, sizes, neighbor distances and zone
+        centers/boxes are in the scene's current linear unit (cm, m or mm).
+        JSON object results name that unit. Centimetre output keeps its
+        previous shape; non-centimetre zone results and the CoS view add the
+        unit.
+
         Boundary: Disambiguated from scene_snapshot (broad whole-scene
         spatial overview) and scene_describe (API-level attribute metadata,
         types, and connection wiring).
@@ -430,7 +440,7 @@ def register_scene_tools(mcp: FastMCP) -> None:
         # First try as a zone name
         zone_data = await _execute_scene_code(
             client,
-            module_call("_mcp_scene", "get_zone_map"),
+            module_call("_mcp_scene", "get_zone_map", display_units=True),
             session_key,
             use_cache=True,
             cache_key="zone_map",
@@ -463,16 +473,19 @@ try:
     fn = om2.MFnDagNode(dag)
     bbox = fn.boundingBox
     world = dag.inclusiveMatrix()
+    scale = _mcp_scene._cm_to_unit_factor()
 
     result = {{
         "name": fn.name(),
         "type": _mcp_scene._classify_node(dag),
-        "position": _mcp_scene._matrix_to_pos(world),
+        "position": _mcp_scene._matrix_to_pos(world, scale),
         "bbox": {{
-            "min": _mcp_scene._vec3_to_list(bbox.min),
-            "max": _mcp_scene._vec3_to_list(bbox.max),
+            "min": _mcp_scene._cm_to_unit_xyz(bbox.min, scale),
+            "max": _mcp_scene._cm_to_unit_xyz(bbox.max, scale),
         }},
-        "size": _mcp_scene._get_bbox_size(bbox),
+        "size": _mcp_scene._cm_to_unit_xyz(
+            [abs(bbox.max[i] - bbox.min[i]) for i in range(3)], scale
+        ),
         "material": _mcp_scene._get_material_for_dag(dag),
         "unit": cmds.currentUnit(query=True, linear=True),
         "parent": None,
@@ -513,7 +526,9 @@ result
                 spatial_code,
                 session_key,
                 use_cache=True,
-                cache_key="spatial_index",
+                # Distances are in the unit that was current when the index
+                # was built, so a unit switch must not reuse the old entry.
+                cache_key=f"spatial_index:{obj_data.get('unit', 'cm')}",
             )
 
             # Find neighbors for this object
@@ -645,6 +660,7 @@ result
             expectations: JSON string defining expected state.
                 Format: {"obj_name": {"position": [x,y,z], "bbox_max": [x,y,z], ...}}
                 Supported properties: position, bbox_max, bbox_min, exists, material.
+                Position and bbox values are in Maya's internal centimetres.
             format: Output format - "cos" or "json".
             session_key: Maya session key.
 
@@ -705,6 +721,8 @@ result
                  {"type": "no_overlap", "objects": ["wall_a", "shelf_b"]},
                  {"type": "min_height", "objects": ["door"], "value": 250}]
                 Types: min_clearance, max_objects, no_overlap, min_height, max_height
+                Length thresholds are in Maya internal centimetres, the same
+                unit as the actual values in a violation.
             format: Output format - "cos" or "json".
             session_key: Maya session key.
 
