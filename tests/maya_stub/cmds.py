@@ -635,15 +635,21 @@ def scale(x, y, z, *objects, **kwargs):
 
 
 def xform(ref, query=False, q=False, ws=False, t=False, ro=False, **kw):
-    """cmds.xform — a translation query answers in the working unit (#266)."""
+    """cmds.xform — a translation query answers in the working unit (#266).
+
+    The real command accepts both flag spellings; the production wrapper uses
+    the long names (query/worldSpace/translation) because those are the ones
+    the Maya type stub declares, while older callers use q/ws/t. The world-
+    space flag makes no difference here: the fake has no local/world split.
+    """
     sc = _s()
     node = sc.resolve(ref)
     if q or query:
-        if t:
+        if t or kw.get("translation"):
             m = sc.inclusive_matrix(node)
             scale = sc.working_unit_scale()  # internal cm -> working unit
             return [m[12] * scale, m[13] * scale, m[14] * scale]
-        if ro:
+        if ro or kw.get("rotation"):
             return list(sc.world_rotation(node))
     return None
 
