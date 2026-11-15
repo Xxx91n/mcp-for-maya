@@ -244,6 +244,7 @@ class TestFragmentAssembly:
                 scene_tools._VALIDATOR_FRAGMENT,
                 scene_tools._ZONE_GEOMETRY_FRAGMENT,
                 scene_tools._SCENE_STATE_FRAGMENT,
+                scene_tools._LIGHT_FRAGMENT,
             )
         )
         assert shipped == expected
