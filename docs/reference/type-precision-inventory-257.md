@@ -162,10 +162,11 @@ point-in-time record, and an open item belongs in GitHub once someone files it.
 
 ## Still open when this record was written
 
-- Remote CI has not run for this batch: the branch was not pushed and no pull
-  request existed, so "full CI green" is not claimed here. What is claimed is
-  the local gate output quoted above plus the test run below. The CI result is
-  the missing acceptance line.
+- Remote CI for this batch is recorded on pull request #274: the ruff budget
+  gate, the mypy baseline gate, all four pytest legs (ubuntu and windows on
+  3.10 and 3.13), coverage, semgrep and CodeRabbit finished green at
+  `e055a12f`, and CodeRabbit reported no actionable comments. The local gate
+  output above is what the same scripts do before pushing.
 - The follow-up groups above are candidates; no tracker issue has been filed
   for them yet.
 - The `_score_visual_flow` deletion is the one line of this batch a reviewer may
