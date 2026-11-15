@@ -109,7 +109,7 @@ def load_scene_module():
 
     Mirrors the production payload assembly (D-095): maya_scene_module.py
     + introspect_module.py + validator_module.py + zone_geometry_module.py
-    + scene_state_module.py
+    + scene_state_module.py + scene_light_module.py
     concatenated into ONE module namespace - the same bytes the host ships
     via write_module/mkstemp. A __future__ import or syntax slip in any of
     these files fails here exactly like it would inside Maya. __mcp_payload__
@@ -122,6 +122,7 @@ def load_scene_module():
         "validator_module",
         "zone_geometry_module",
         "scene_state_module",
+        "scene_light_module",
     ):
         sys.modules.pop(f"maya_mcp_server.{_frag}", None)
     src_dir = Path(__file__).resolve().parents[2] / "src" / "maya_mcp_server"
@@ -133,6 +134,7 @@ def load_scene_module():
         "validator_module.py",
         "zone_geometry_module.py",
         "scene_state_module.py",
+        "scene_light_module.py",
     ):
         source += "\n\n" + (src_dir / frag_name).read_text(encoding="utf-8")
     mod = types.ModuleType("maya_mcp_server.maya_scene_module")

@@ -1863,92 +1863,11 @@ def analyze_aesthetics() -> AestheticScoreResult:
         except Exception:
             pass
 
-    light_shapes = cmds.ls(type="light") or []
-    lights: list[LightPayload] = []
-    for ls_name in light_shapes:
-        try:
-            parent = cmds.listRelatives(ls_name, parent=True, fullPath=True) or [ls_name]
-            light_transform = parent[0]
-            ltype = cmds.nodeType(ls_name)
-
-            color = (
-                cmds.getAttr(f"{ls_name}.color")[0]
-                if cmds.objExists(f"{ls_name}.color")
-                else [1, 1, 1]
-            )
-            intensity = (
-                cmds.getAttr(f"{ls_name}.intensity")
-                if cmds.objExists(f"{ls_name}.intensity")
-                else 1.0
-            )
-
-            # Position from transform
-            pos = cast(Any, cmds.xform)(light_transform, q=True, ws=True, t=True) or [0, 0, 0]
-            # Rotation from transform (direction)
-            rot = cast(Any, cmds.xform)(light_transform, q=True, ws=True, ro=True) or [0, 0, 0]
-
-            # Decay type (0=None, 1=Linear, 2=Quadratic, 3=Cubic)
-            decay = 0
-            if cmds.objExists(f"{ls_name}.decayRate"):
-                decay = cmds.getAttr(f"{ls_name}.decayRate")
-
-            # Shadow
-            shadow_on = True
-            if cmds.objExists(f"{ls_name}.useDepthMapShadow"):
-                shadow_on = bool(cmds.getAttr(f"{ls_name}.useDepthMapShadow"))
-            elif cmds.objExists(f"{ls_name}.useRayTraceShadows"):
-                shadow_on = bool(cmds.getAttr(f"{ls_name}.useRayTraceShadows"))
-
-            # Spotlight cone angle (degrees)
-            cone_angle = None
-            penumbra = None
-            if ltype in ("spotLight",) and cmds.objExists(f"{ls_name}.coneAngle"):
-                cone_angle = cmds.getAttr(f"{ls_name}.coneAngle")
-                if cmds.objExists(f"{ls_name}.penumbraAngle"):
-                    penumbra = cmds.getAttr(f"{ls_name}.penumbraAngle")
-
-            # Area light size
-            area_size = None
-            if ltype in ("areaLight",) and cmds.objExists(f"{ls_name}.areaWidth"):
-                aw = cmds.getAttr(f"{ls_name}.areaWidth")
-                ah = (
-                    cmds.getAttr(f"{ls_name}.areaHeight")
-                    if cmds.objExists(f"{ls_name}.areaHeight")
-                    else aw
-                )
-                area_size = [aw, ah]
-
-            # Diffuse/Specular contribution
-            diffuse = (
-                cmds.getAttr(f"{ls_name}.emitDiffuse")
-                if cmds.objExists(f"{ls_name}.emitDiffuse")
-                else True
-            )
-            specular = (
-                cmds.getAttr(f"{ls_name}.emitSpecular")
-                if cmds.objExists(f"{ls_name}.emitSpecular")
-                else True
-            )
-
-            lights.append(
-                {
-                    "name": light_transform.split("|")[-1],
-                    "type": ltype,
-                    "color": list(color),
-                    "intensity": intensity,
-                    "position": [round(v, 1) for v in pos],
-                    "rotation": [round(v, 1) for v in rot],
-                    "decay": decay,
-                    "shadow": shadow_on,
-                    "cone_angle": round(cone_angle, 1) if cone_angle else None,
-                    "penumbra": round(penumbra, 1) if penumbra else None,
-                    "area_size": area_size,
-                    "diffuse": bool(diffuse),
-                    "specular": bool(specular),
-                }
-            )
-        except Exception:
-            pass
+    # One payload shape for both consumers (#276). The builder is a separate
+    # file of this same injected module, reached through globals() because
+    # mypy checks each file on its own and a direct name would read as
+    # undefined.
+    lights: list[LightPayload] = globals()["collect_light_payloads"]()
 
     if scene_min[0] != float("inf"):
         scene_bounds = {"min": scene_min, "max": scene_max}
@@ -3467,49 +3386,9 @@ def scene_review(checks: list[str] | None = None) -> dict[str, Any]:
                     }
                 )
             else:
-                # Gather light data for analysis
-                lights_data: list[LightPayload] = []
-                for ls_name in light_shapes:
-                    try:
-                        parent = cmds.listRelatives(ls_name, parent=True, fullPath=True) or [
-                            ls_name
-                        ]
-                        lt = parent[0].split("|")[-1]
-                        ltype = cmds.nodeType(ls_name)
-                        color = (
-                            cmds.getAttr("%s.color" % ls_name)[0]
-                            if cmds.objExists("%s.color" % ls_name)
-                            else [1, 1, 1]
-                        )
-                        intensity = (
-                            cmds.getAttr("%s.intensity" % ls_name)
-                            if cmds.objExists("%s.intensity" % ls_name)
-                            else 1.0
-                        )
-                        pos = cast(Any, cmds.xform)(lt, q=True, ws=True, t=True) or [0, 0, 0]
-                        decay = (
-                            cmds.getAttr("%s.decayRate" % ls_name)
-                            if cmds.objExists("%s.decayRate" % ls_name)
-                            else 0
-                        )
-                        shadow = (
-                            bool(cmds.getAttr("%s.useDepthMapShadow" % ls_name))
-                            if cmds.objExists("%s.useDepthMapShadow" % ls_name)
-                            else False
-                        )
-                        lights_data.append(
-                            {
-                                "name": lt,
-                                "type": ltype,
-                                "color": list(color),
-                                "intensity": intensity,
-                                "position": list(pos),
-                                "decay": decay,
-                                "shadow": shadow,
-                            }
-                        )
-                    except Exception:
-                        pass
+                # Same builder as analyze_aesthetics (#276): the lighting
+                # check scores the same payload the aesthetic dimension does.
+                lights_data: list[LightPayload] = globals()["collect_light_payloads"]()
 
                 # Use the lighting quality scorer
                 lq = _score_lighting_quality(lights_data)

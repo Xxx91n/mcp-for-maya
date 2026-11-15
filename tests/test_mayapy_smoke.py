@@ -259,7 +259,7 @@ def test_callform_stub_disagreement_forms(real_maya):
 
 def _injection_unit():
     """Exec the real _mcp_scene payload shape in mayapy: the big file's source
-    plus all four extra files concatenated into one namespace - the same bytes
+    plus all five extra files concatenated into one namespace - the same bytes
     the host ships via write_module (D-095). A __future__ slip or py-unsafe
     syntax in any of them fails here exactly as in Maya. __mcp_payload__ is
     test-only metadata for the byte-parity check."""
@@ -277,6 +277,7 @@ def _injection_unit():
         "validator_module.py",
         "zone_geometry_module.py",
         "scene_state_module.py",
+        "scene_light_module.py",
     ):
         source += "\n\n" + (src_dir / frag_name).read_text(encoding="utf-8")
     mod = types.ModuleType("_mcp_scene")

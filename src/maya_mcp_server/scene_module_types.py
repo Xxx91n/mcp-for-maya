@@ -57,8 +57,13 @@ class LightCore(TypedDict):
     shadow: bool
 
 
-class LightPayload(LightCore, total=False):
-    """A light payload; the scene review check leaves the richer fields out."""
+class LightPayload(LightCore):
+    """The one light payload both producers build (issue #276).
+
+    Every field is required. The scene review check used to carry only the
+    seven LightCore fields, and the missing shape fields were the drift #276
+    removed: one builder now writes all of them for both consumers.
+    """
 
     rotation: list[float]
     cone_angle: float | None
