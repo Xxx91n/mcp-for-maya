@@ -219,7 +219,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_run_mypy_gate.py::test_garbage_report_with_error_exit_is_red`,
   `tests/test_run_mypy_gate.py::test_an_excluded_module_is_red`,
   `tests/test_run_mypy_gate.py::test_removing_strict_is_red`,
-  `tests/test_run_mypy_gate.py::test_baseline_matched_errors_stay_green`,
+  `tests/test_run_mypy_gate.py::test_a_well_formed_type_error_report_is_red`,
   `tests/test_run_mypy_gate.py::test_cli_green_control_runs_real_mypy_over_this_repo`.
 - **`scene_plan` recommendations cover all 7 built-in zones with word-level filtering, dedup, and rank-band ordering (#218)** —
   `ZONE_SEARCH_QUERIES` now maps `entrance` (`door`, `sign`), `display`
@@ -347,6 +347,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`.
 
 ### Changed
+
+- **The strict-mypy baseline is gone; the type check is a plain zero-error gate
+  (#258)** — the raw strict run over `src/` exits 0 (`Success: no issues found
+  in 34 source files`) with the strict trio and the full live scope unchanged,
+  so the empty historical baseline file and the `mypy-baseline` dependency were
+  deleted. `run_mypy_gate.py` no longer requires a baseline file and no longer
+  runs a filter: a well-formed report carrying any type error is a hard
+  `type_fault` red, while the empty/garbage report, scope and config guards
+  stay. The CI job keeps the name `mypy baseline gate` because branch
+  protection pins that required-check context. The closing measurement and the
+  #222 criteria mapping are in
+  `docs/reference/mypy-baseline-retirement-258.md`.
+  Evidence:
+  `tests/test_run_mypy_gate.py::test_a_well_formed_type_error_report_is_red`,
+  `tests/test_run_mypy_gate.py::test_a_clean_run_is_green`,
+  `tests/test_run_mypy_gate.py::test_cli_green_control_runs_real_mypy_over_this_repo`,
+  `docs/reference/mypy-baseline-retirement-258.md`.
 
 - **One light payload for the aesthetic and review paths (#276)** —
   `analyze_aesthetics()` and `scene_review()`'s lighting check read the same
