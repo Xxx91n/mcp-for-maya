@@ -165,6 +165,34 @@ class TestZoneGeometry:
         assert res["unit"] == "m"
         assert res["up_axis"] == "z"
 
+    def test_sizes_are_in_the_working_unit_the_result_declares(self, maya_env):
+        """OpenMaya lengths are always centimetres; the reported unit is not.
+
+        A 1.3 m door is 130 internal cm, so a metre scene must report 1.3,
+        not 130 (issue #266 bug C).
+        """
+        maya_env.scene.add_mesh(
+            "GEO_door_a", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6), t=(0, 0, 0)
+        )
+        maya_env.scene.linear_unit = "m"
+
+        zone = maya_env.module.get_zone_geometry()["zones"][0]
+
+        assert zone["name"] == "entrance"
+        assert zone["size"] == pytest.approx([1.3, 2.2, 0.12], abs=1e-3)
+        assert zone["bbox_min"] == pytest.approx([-0.65, -1.1, -0.06], abs=1e-3)
+        assert zone["bbox_max"] == pytest.approx([0.65, 1.1, 0.06], abs=1e-3)
+        assert zone["objects"][0]["name"] == "|GEO_door_a"
+        assert zone["objects"][0]["size"] == pytest.approx([1.3, 2.2, 0.12], abs=1e-3)
+
+    def test_centimetre_scenes_keep_their_numbers(self, maya_env):
+        maya_env.scene.add_mesh("GEO_door_a", bbox_min=(-65, 0, 0), bbox_max=(65, 220, 12))
+
+        zone = maya_env.module.get_zone_geometry()["zones"][0]
+
+        assert zone["size"] == [130, 220, 12]
+        assert zone["objects"][0]["size"] == [130, 220, 12]
+
     def test_query_failure_uses_the_domain_error_shape(self, maya_env, monkeypatch):
         def boom(*args, **kwargs):
             raise RuntimeError("scene list failed")

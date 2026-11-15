@@ -816,17 +816,66 @@ class TestRecommendAssetsTargetAndSizing:
         )
         assert "fallback=ambiguous_short_name(|GRP_left|GEO_chair,|GRP_right|GEO_chair)" in cos_amb
 
+    async def test_zone_bbox_metres_fields_match_the_geometry(self, tools, monkeypatch):
+        """bbox_min_m / bbox_max_m are the zone box in metres (#266).
+
+        Two chairs in the furniture zone: world x 100..360, y 0..90, z 0..60 cm,
+        so the zone box is 1.0..3.6 x 0..0.9 x 0..0.6 m.
+        """
+        scene = tools.env.scene
+        scene.add_mesh("GEO_chair_a", bbox_min=(0, 0, 0), bbox_max=(50, 80, 50), t=(100, 0, 0))
+        scene.add_mesh("GEO_chair_b", bbox_min=(0, 0, 0), bbox_max=(60, 90, 60), t=(300, 0, 0))
+        monkeypatch.setattr(
+            "maya_mcp_server.polyhaven.search_assets",
+            TestRecommendAssets._fake_search([self._chair("chair_any", [2.6, 0.9, 0.6])]),
+        )
+
+        res = json.loads(await tools.fns["scene_plan"](format="json", recommend_assets=True))
+        zone = next(z for z in res["recommendations"]["zones"] if z["zone"] == "furniture")
+        target = zone["target"]
+
+        assert target["source"] == "zone_bbox"
+        assert target["bbox_min_m"] == pytest.approx([1.0, 0.0, 0.0], abs=1e-3)
+        assert target["bbox_max_m"] == pytest.approx([3.6, 0.9, 0.6], abs=1e-3)
+        assert target["size_m"] == pytest.approx([2.6, 0.9, 0.6], abs=1e-3)
+
+    async def test_zone_bbox_metres_fields_in_a_metre_scene(self, tools, monkeypatch):
+        """The same geometry in a metre scene reports the same metres (#266).
+
+        Scene geometry stays in Maya's internal centimetres, so a metre scene
+        must not shrink the box by 100x.
+        """
+        scene = tools.env.scene
+        scene.linear_unit = "m"
+        scene.add_mesh("GEO_chair_a", bbox_min=(0, 0, 0), bbox_max=(50, 80, 50), t=(100, 0, 0))
+        scene.add_mesh("GEO_chair_b", bbox_min=(0, 0, 0), bbox_max=(60, 90, 60), t=(300, 0, 0))
+        monkeypatch.setattr(
+            "maya_mcp_server.polyhaven.search_assets",
+            TestRecommendAssets._fake_search([self._chair("chair_any", [2.6, 0.9, 0.6])]),
+        )
+
+        res = json.loads(await tools.fns["scene_plan"](format="json", recommend_assets=True))
+        zone = next(z for z in res["recommendations"]["zones"] if z["zone"] == "furniture")
+        target = zone["target"]
+
+        assert target["source"] == "zone_bbox"
+        assert target["bbox_min_m"] == pytest.approx([1.0, 0.0, 0.0], abs=1e-3)
+        assert target["bbox_max_m"] == pytest.approx([3.6, 0.9, 0.6], abs=1e-3)
+        assert target["size_m"] == pytest.approx([2.6, 0.9, 0.6], abs=1e-3)
+
     async def test_unique_object_rotated_world_aabb_and_linear_units(self, tools, monkeypatch):
         import math
 
         tools.env.scene.linear_unit = "m"
-        parent = tools.env.scene.add_transform("GRP_rot", t=(5, 0, 0))
+        parent = tools.env.scene.add_transform("GRP_rot", t=(500, 0, 0))
         parent.r = [0, 45, 0]
-        # 2m x 1m x 1m rotated 45 deg around Y -> world AABB ~ [2.121, 1.0, 2.121] m
+        # 2m x 1m x 1m rotated 45 deg around Y -> world AABB ~ [2.121, 1.0, 2.121] m.
+        # Scene geometry is stored in Maya's internal centimetres, so in this
+        # metre scene the same object is 200 x 100 x 100 (issue #266).
         tools.env.scene.add_mesh(
             "GEO_chair_rot",
             bbox_min=(0, 0, 0),
-            bbox_max=(2, 1, 1),
+            bbox_max=(200, 100, 100),
             parent=parent,
         )
         side = round(math.sqrt(2) + math.sqrt(2) / 2, 3)

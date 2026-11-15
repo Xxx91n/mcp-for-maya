@@ -2,7 +2,7 @@
   "baseline_meta": {
     "collected_on": "Maya 2024 GUI session via framed channel",
     "collector": ".scratch/maya-mcp-grill/harness/gui_verify.py::collect_signatures",
-    "note": "mayapy tier blocked on this box (import maya.standalone -> AV). cmds builtins carry no inspect.signature — presence + method lists are the auditable contract. Renamed signature-baseline->presence-baseline (D-056): the file never carried signatures. Extended 2026-09-23 (T-19a): +10 cmds symbols probed live on the same Maya 2024 GUI session via commandPort hasattr(). Re-collected 2026-09-24 (T-22/D-085③): +2 cmds symbols (polyCube, undoInfo) probed live on the same Maya 2024 GUI session via commandPort hasattr()/callable() — clears the two provisional allowlist entries.",
+    "note": "mayapy tier blocked on this box (import maya.standalone -> AV). cmds builtins carry no inspect.signature — presence + method lists are the auditable contract. Renamed signature-baseline->presence-baseline (D-056): the file never carried signatures. Extended 2026-09-23 (T-19a): +10 cmds symbols probed live on the same Maya 2024 GUI session via commandPort hasattr(). Re-collected 2026-09-24 (T-22/D-085③): +2 cmds symbols (polyCube, undoInfo) probed live on the same Maya 2024 GUI session via commandPort hasattr()/callable() — clears the two provisional allowlist entries. Extended 2026-11-15 (#266): +2 om symbols (MDistance, MFn) dir()-probed on the same Maya 2024 GUI session via commandPort; the run is recorded in docs/evidence/probes/probe-266-world-bbox-units-gui-maya2024.json.",
     "content_type": "presence-callable"
   },
   "symbols": {
@@ -230,6 +230,29 @@
         "set": null,
         "transform": null
       }
+    },
+    "om.MDistance": {
+      "exists": true,
+      "methods": {
+        "asCentimeters": null,
+        "asFeet": null,
+        "asInches": null,
+        "asKilometers": null,
+        "asMeters": null,
+        "asMiles": null,
+        "asMillimeters": null,
+        "asUnits": null,
+        "asYards": null,
+        "internalToUI": null,
+        "internalUnit": null,
+        "setUIUnit": null,
+        "uiToInternal": null,
+        "uiUnit": null
+      }
+    },
+    "om.MFn": {
+      "exists": true,
+      "methods": {}
     },
     "om.MFnDagNode": {
       "exists": true,

@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **World bounding boxes match Maya's own for the reported cases, and zone
+  geometry reports the working unit it declares (#266, Refs #263, Refs #31,
+  Refs #177)** —
+  `_world_bbox()` multiplied `MFnDagNode.boundingBox` by the inclusive matrix,
+  but on a transform that box is already in parent space (it carries the
+  node's own translate/rotate), so every node's transform landed twice: a
+  100 cm cube at (200, 50, 300) came back at 350..450 instead of 150..250, and
+  a 45° rotation measured 200 wide instead of 141.421. Transform paths now use
+  `exclusiveMatrix()` and shape paths keep `inclusiveMatrix()`, told apart by
+  `dag.hasFn(kTransform)`. The same helper fixes `scene_snapshot`'s `b` field
+  and `scene_assert`'s `bbox_min`/`bbox_max`, which reported parent-space boxes
+  next to a world position. `get_zone_geometry()` now converts OpenMaya
+  centimetres to the working unit it declares, so a metre scene no longer
+  feeds sizes 100x too large into `scene_plan(recommend_assets=True)`.
+  Reading the cached box cannot un-rotate it: a rotation above the node can
+  only over-approximate, so the result is exact for every case in the issue
+  (translate-only chains, and box-shaped geometry) and conservative for
+  rotated geometry that does not fill its own box.
+  Broken version: 0.7.0 and earlier for the double transform, the zone
+  geometry read is unreleased; fixed version: [Unreleased].
+  Evidence:
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_translate_is_applied_once`,
+  `tests/test_maya_scene_module.py::TestReportedBoxIsWorldSpace::test_scene_graph_reports_the_world_box_of_a_nested_object`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_rotation_gives_the_same_extents_as_the_exact_box`,
+  `tests/test_zone_geometry_module.py::TestZoneGeometry::test_sizes_are_in_the_working_unit_the_result_declares`,
+  `tests/test_scene_tools_json.py::TestRecommendAssetsTargetAndSizing::test_zone_bbox_metres_fields_match_the_geometry`,
+  `tests/test_scene_tools_json.py::TestRecommendAssetsTargetAndSizing::test_zone_bbox_metres_fields_in_a_metre_scene`,
+  `docs/evidence/probes/probe-266-world-bbox-units-gui-maya2024.json`,
+  `docs/evidence/probes/probe-266-fivezone-recommendations-gui-maya2024.json`.
+
 - **`scene_plan` recommendations no longer drop candidates against a partially measured zone envelope (#262, Refs #31, Refs #177)** —
   when a zone's bounding box is built from partially measured objects
   (`unmeasured_count > 0`, `target.measurement="partial_zone_envelope"`), models

@@ -612,11 +612,14 @@ def workspace(**kwargs):
 
 
 def move(x, y=None, z=None, *objects, **kwargs):
+    """cmds.move — the arguments are working-unit values, like the real
+    command, and the scene stores internal centimetres (#266)."""
     sc = _s()
     if y is None and z is None:
         x, y, z = x
+    scale = sc.working_unit_scale()
     for o in objects or sc.selection:
-        sc.resolve(o).t = [x, y, z]
+        sc.resolve(o).t = [x / scale, y / scale, z / scale]
 
 
 def rotate(x, y, z, *objects, **kwargs):
@@ -632,12 +635,14 @@ def scale(x, y, z, *objects, **kwargs):
 
 
 def xform(ref, query=False, q=False, ws=False, t=False, ro=False, **kw):
+    """cmds.xform — a translation query answers in the working unit (#266)."""
     sc = _s()
     node = sc.resolve(ref)
     if q or query:
         if t:
             m = sc.inclusive_matrix(node)
-            return [m[12], m[13], m[14]]
+            scale = sc.working_unit_scale()  # internal cm -> working unit
+            return [m[12] * scale, m[13] * scale, m[14] * scale]
         if ro:
             return list(sc.world_rotation(node))
     return None
@@ -656,11 +661,14 @@ def polyCube(**kw):
 
     constructionHistory=False skips the upstream polyCube history node
     (modeled: none is ever created in the stub either way).
+    Width/height/depth are working-unit values like the real command, so they
+    are converted to internal centimetres before they reach the scene (#266).
     """
     sc = _s()
-    w = float(kw.get("w", kw.get("width", 1.0)))
-    h = float(kw.get("h", kw.get("height", 1.0)))
-    d = float(kw.get("d", kw.get("depth", 1.0)))
+    scale = sc.working_unit_scale()  # working unit -> internal cm
+    w = float(kw.get("w", kw.get("width", 1.0))) / scale
+    h = float(kw.get("h", kw.get("height", 1.0))) / scale
+    d = float(kw.get("d", kw.get("depth", 1.0))) / scale
     name = kw.get("name") or kw.get("n") or "pCube1"
     tr = sc.add_mesh(
         name,
@@ -1123,4 +1131,5 @@ def exactWorldBoundingBox(*refs, **kwargs):
                 )
     if box is None or box.is_empty:
         return [0.0] * 6
-    return [box.min.x, box.min.y, box.min.z, box.max.x, box.max.y, box.max.z]
+    scale = sc.working_unit_scale()  # cmds lengths follow currentUnit
+    return [v * scale for v in (box.min.x, box.min.y, box.min.z, box.max.x, box.max.y, box.max.z)]

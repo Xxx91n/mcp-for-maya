@@ -167,17 +167,16 @@ _SAMPLE_DEPTH = 30
 def _world_bbox(dag: om2.MDagPath) -> om2.MBoundingBox:
     """World-space AABB for a DAG node.
 
-    Transforms all 8 corners of the object-space bounding box by the
-    inclusive (world) matrix. This is the ONLY correct way to get a world
-    AABB under rotation/scale — transforming just min and max produces
-    wrong bounds for any non-axis-aligned object.
-
-    Returns:
-        om2.MBoundingBox in world space.
+    MFnDagNode.boundingBox is in PARENT space for a transform (it already
+    includes the node's own translate/rotate) and in object space for a
+    shape, so the exclusive matrix is right for a transform path and the
+    inclusive one for a shape path. All 8 corners are transformed: that is
+    what keeps the box axis-aligned under rotation. The cached box is already
+    an AABB, so a rotation above it can only over-approximate, never under.
     """
     fn = om2.MFnDagNode(dag)
     bbox = fn.boundingBox
-    wm = dag.inclusiveMatrix()
+    wm = dag.exclusiveMatrix() if dag.hasFn(om2.MFn.kTransform) else dag.inclusiveMatrix()
     out = om2.MBoundingBox()
     for i in range(8):
         corner = om2.MPoint(
@@ -242,9 +241,9 @@ def get_scene_graph(detail_level="compact") -> dict[str, Any]:
             except Exception:
                 pass
 
-        # Get bounding box (direct C++ access, fast)
+        # World-space box via the cached bbox (fast, 8 corners transformed)
         try:
-            bbox = fn.boundingBox
+            bbox = _world_bbox(dag)
             bbox_min = _vec3_to_list(bbox.min)
             bbox_max = _vec3_to_list(bbox.max)
         except Exception:
@@ -732,6 +731,7 @@ def assert_scene_state(expectations_json) -> dict[str, Any]:
     Args:
         expectations_json: JSON string defining expected state.
             Format: {"obj_name": {"position": [x,y,z], "bbox_max": [x,y,z], ...}, ...}
+            bbox values are world space, in Maya internal centimetres like position.
 
     Returns:
         JSON string with pass/fail result and mismatches.
@@ -746,7 +746,6 @@ def assert_scene_state(expectations_json) -> dict[str, Any]:
             sel_list = om2.MSelectionList()
             sel_list.add(obj_name)
             dag = sel_list.getDagPath(0)
-            fn = om2.MFnDagNode(dag)
         except Exception:
             checked += 1
             if expected.get("exists") is False:
@@ -795,7 +794,7 @@ def assert_scene_state(expectations_json) -> dict[str, Any]:
         if "bbox_max" in expected:
             checked += 1
             try:
-                bbox = fn.boundingBox
+                bbox = _world_bbox(dag)
                 actual_max = _vec3_to_list(bbox.max)
                 exp_max = expected["bbox_max"]
                 if any(abs(a - e) > 1.0 for a, e in zip(actual_max, exp_max)):
@@ -822,7 +821,7 @@ def assert_scene_state(expectations_json) -> dict[str, Any]:
         if "bbox_min" in expected:
             checked += 1
             try:
-                bbox = fn.boundingBox
+                bbox = _world_bbox(dag)
                 actual_min = _vec3_to_list(bbox.min)
                 exp_min = expected["bbox_min"]
                 if any(abs(a - e) > 1.0 for a, e in zip(actual_min, exp_min)):

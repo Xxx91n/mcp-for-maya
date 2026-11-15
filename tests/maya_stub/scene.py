@@ -20,6 +20,23 @@ LIGHT_TYPES = {
 }
 SHAPE_TYPES = LIGHT_TYPES | {"mesh", "camera", "locator", "nurbsCurve", "joint"}
 
+# Maya stores linear values in centimetres; currentUnit only changes how the
+# cmds layer shows them (OpenMaya keeps centimetres, issue #266). One table,
+# shared with the fake MDistance, so the two cannot drift apart. Commands
+# modeled as working-unit aware: exactWorldBoundingBox, polyCube, move and
+# xform's translation query. Scene.add_* store internal cm. setAttr stores raw
+# values too — a stub divergence, since real Maya converts distance attributes
+# from the working unit.
+CM_PER_UNIT = {
+    "mm": 0.1,
+    "cm": 1.0,
+    "m": 100.0,
+    "km": 100000.0,
+    "in": 2.54,
+    "ft": 30.48,
+    "yd": 91.44,
+}
+
 # Type-defined attrs the stub seeds on creation - objExists("n.attr")
 # answers like real Maya only if the type's standard attrs exist.
 # Live-probe pinned (D-082e, docs/evidence/probes/probe-displacement.json):
@@ -584,6 +601,14 @@ class Scene:
             acc = acc * self.local_matrix(n)
         return acc
 
+    def exclusive_matrix(self, node):
+        """The matrix of the PARENT: p_parent * this = p_world."""
+        chain = node.path_nodes()  # [root .. self]
+        acc = MMatrix()
+        for n in chain[-2::-1]:  # skip self, keep L_parent ... L_root
+            acc = acc * self.local_matrix(n)
+        return acc
+
     def world_position(self, node):
         m = self.inclusive_matrix(node)
         return (m[12], m[13], m[14])
@@ -591,39 +616,56 @@ class Scene:
     def world_rotation(self, node):
         return euler_from_matrix(self.inclusive_matrix(node))
 
+    def working_unit_scale(self):
+        """Factor from internal centimetres to the scene's working unit."""
+        return 1.0 / CM_PER_UNIT.get(self.linear_unit, 1.0)
+
     def object_bbox(self, node):
-        """MFnDagNode.boundingBox: shape -> stored; transform -> union of
-        descendant shape bboxes transformed into this node's local space."""
+        """MFnDagNode.boundingBox: shape -> object space; transform -> PARENT
+        space (real Maya already folds in the node's own translate/rotate)."""
         box = MBoundingBox()
         if node.type in SHAPE_TYPES and node.bbox is not None:
             box.expand(MPoint(*node.bbox[0]))
             box.expand(MPoint(*node.bbox[1]))
             return box
 
-        # transform: gather descendant shapes into node-local space
-        def walk(n, m_to_node):
+        # transform: gather descendant shapes into this node's PARENT space,
+        # i.e. its own local matrix is applied but its parent's is not.
+        def walk(n, m_to_parent):
             for c in n.children:
-                rel = m_to_node  # matrix mapping c-local -> node-local
-                c_local = self.local_matrix(c)
-                c2node = c_local * rel  # p * L_c * (rest)
+                c2parent = self.local_matrix(c) * m_to_parent
                 if c.type in SHAPE_TYPES and c.bbox is not None:
                     cb = MBoundingBox(*c.bbox)
                     for corner in cb._corners():
-                        box.expand(corner * c2node)
-                walk(c, c2node)
+                        box.expand(corner * c2parent)
+                walk(c, c2parent)
 
-        walk(node, MMatrix())
+        walk(node, self.local_matrix(node))
         return box
 
     def world_bbox(self, node):
-        """exactWorldBoundingBox equivalent: object_bbox corners x world."""
+        """exactWorldBoundingBox equivalent, kept deliberately independent of
+        the cached-box path: every shape's own box is walked to world space
+        individually, so this is a real oracle for object_bbox/world_bbox
+        rather than the same assumption twice (issue #266)."""
         box = MBoundingBox()
-        local = self.object_bbox(node)
-        if local.is_empty:
+        if node.type in SHAPE_TYPES:
+            if node.bbox is None:
+                return box
+            m = self.inclusive_matrix(node)
+            for corner in MBoundingBox(*node.bbox)._corners():
+                box.expand(corner * m)
             return box
-        m = self.inclusive_matrix(node)
-        for corner in local._corners():
-            box.expand(corner * m)
+
+        def walk(n, m_to_world):
+            for c in n.children:
+                c2world = self.local_matrix(c) * m_to_world
+                if c.type in SHAPE_TYPES and c.bbox is not None:
+                    for corner in MBoundingBox(*c.bbox)._corners():
+                        box.expand(corner * c2world)
+                walk(c, c2world)
+
+        walk(node, self.inclusive_matrix(node))
         return box
 
     # ---- persistence (stub cmds.file exportAll/open) ----
