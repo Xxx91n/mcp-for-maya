@@ -158,27 +158,126 @@ _SAMPLE_CONSTRAINT_WINDOW = 20
 _SAMPLE_DEPTH = 30
 
 
-def _world_bbox(dag: om2.MDagPath) -> om2.MBoundingBox:
-    """World-space AABB for a DAG node.
+def _expand_box(out: om2.MBoundingBox, bbox: om2.MBoundingBox, matrix: om2.MMatrix) -> None:
+    """Grow `out` with the 8 corners of `bbox` put through `matrix`.
 
-    MFnDagNode.boundingBox is in PARENT space for a transform (it already
-    includes the node's own translate/rotate) and in object space for a
-    shape, so the exclusive matrix is right for a transform path and the
-    inclusive one for a shape path. All 8 corners are transformed: that is
-    what keeps the box axis-aligned under rotation. The cached box is already
-    an AABB, so a rotation above it can only over-approximate, never under.
+    All 8 corners, not just min/max: that is what keeps a transformed box
+    axis-aligned under rotation.
     """
-    fn = om2.MFnDagNode(dag)
-    bbox = fn.boundingBox
-    wm = dag.exclusiveMatrix() if dag.hasFn(om2.MFn.kTransform) else dag.inclusiveMatrix()
-    out = om2.MBoundingBox()
     for i in range(8):
         corner = om2.MPoint(
             bbox.min[0] if i & 1 else bbox.max[0],
             bbox.min[1] if i & 2 else bbox.max[1],
             bbox.min[2] if i & 4 else bbox.max[2],
         )
-        out.expand(corner * wm)
+        out.expand(corner * matrix)
+
+
+def _box_is_default(bbox: om2.MBoundingBox) -> bool:
+    """True when the box is Maya's untouched default: all six values zero.
+
+    A shape with no geometry answers (0,0,0)..(0,0,0) in object space, and
+    Maya 2024's MBoundingBox has no isEmpty() (GUI probe, #273), so that
+    reading is the only signal available.
+    """
+    return bool(
+        bbox.min[0] == 0.0
+        and bbox.min[1] == 0.0
+        and bbox.min[2] == 0.0
+        and bbox.max[0] == 0.0
+        and bbox.max[1] == 0.0
+        and bbox.max[2] == 0.0
+    )
+
+
+def _shape_has_no_geometry(shape_path: om2.MDagPath, shape_box: om2.MBoundingBox) -> bool:
+    """True when a shape carries nothing worth measuring.
+
+    A default box is not proof by itself: one vertex sitting on the object
+    origin also reads all zeros. A mesh is therefore checked by vertex count
+    (0 means no geometry, 1 or more keeps its point), and any other shape
+    type with a default box counts as empty — that is the cached-box
+    behaviour the module had before the walk. MFnMesh refuses a mesh node
+    with no geometry data (Maya 2024 raises ValueError there), so
+    polyEvaluate is the fallback; if neither can answer, the error reaches
+    the caller rather than calling real geometry empty.
+    """
+    if not _box_is_default(shape_box):
+        return False
+    if om2.MFnDagNode(shape_path).typeName == "mesh":
+        try:
+            return int(om2.MFnMesh(shape_path).numVertices) == 0
+        except Exception:
+            name = om2.MFnDagNode(shape_path).fullPathName()
+            return int(cmds.polyEvaluate(name, vertex=True)) == 0
+    return True
+
+
+def _shape_dag_paths(dag: om2.MDagPath) -> list[om2.MDagPath]:
+    """Shape paths at or below `dag`, intermediate objects left out.
+
+    A shape path carries its whole transform chain (a shape has no transform
+    of its own), so its inclusive matrix is the one matrix its object-space
+    box needs. An instanced shape comes back once per path, which is right:
+    each instance sits somewhere else. Read failures are not swallowed here:
+    they reach the caller, because skipping a shape would silently shrink the
+    box.
+    """
+    shapes: list[om2.MDagPath] = []
+    stack = [dag]
+    while stack:
+        cur = stack.pop()
+        if cur.hasFn(om2.MFn.kTransform):
+            for i in range(cur.childCount()):
+                child = cur.child(i)
+                # MDagPath.child() hands back an MObject on Maya 2024, not a
+                # path. Extend the path we are on instead of asking for a
+                # fresh one, so an instanced child stays on this instance.
+                if not isinstance(child, om2.MDagPath):
+                    child_path = om2.MDagPath(cur)
+                    child_path.push(child)
+                    child = child_path
+                stack.append(child)
+            continue
+        if om2.MFnDagNode(cur).isIntermediateObject:
+            continue
+        shapes.append(cur)
+    return shapes
+
+
+def _world_bbox(dag: om2.MDagPath) -> om2.MBoundingBox:
+    """World-space AABB for a DAG node.
+
+    Each shape at or below the node contributes its own object-space
+    boundingBox, put through that shape path's inclusive matrix. The shape's
+    box has not been stretched by any rotation yet, so the only axis
+    alignment left is the last one: error does not compound down the
+    hierarchy (#273). The old path read the transform's cached box, which is
+    already an AABB in parent space — no matrix can un-rotate it, so a child
+    rotation under a rotated parent over-reported 10 as 18.66.
+
+    A node with no readable shape (a plain group, a joint, empty geometry)
+    keeps the cached-box read: there MFnDagNode.boundingBox is PARENT space,
+    so it pairs with the exclusive matrix, never the inclusive one. Geometry
+    that does not fill its own box can still come out too big once, but no
+    longer by layer.
+    """
+    shape_union = om2.MBoundingBox()
+    measured = False
+    for shape_path in _shape_dag_paths(dag):
+        shape_box = om2.MFnDagNode(shape_path).boundingBox
+        if _shape_has_no_geometry(shape_path, shape_box):
+            continue
+        _expand_box(shape_union, shape_box, shape_path.inclusiveMatrix())
+        measured = True
+    if measured:
+        return shape_union
+
+    fn = om2.MFnDagNode(dag)
+    bbox = fn.boundingBox
+    wm = dag.exclusiveMatrix() if dag.hasFn(om2.MFn.kTransform) else dag.inclusiveMatrix()
+    out = om2.MBoundingBox()
+    _expand_box(out, bbox, wm)
     return out
 
 
@@ -236,7 +335,7 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
             except Exception:
                 pass
 
-        # World-space box via the cached bbox (fast, 8 corners transformed)
+        # World-space box: shape boxes walked and transformed once each (#273)
         try:
             bbox = _world_bbox(dag)
             # OpenMaya lengths are centimetres; the payload's unit is not.
@@ -372,7 +471,7 @@ def get_zone_map(
 
         if matched_zone:
             zones[matched_zone]["objects"].append(short_name)
-            # Update zone bbox (world space — 8-corner transform)
+            # Update zone bbox (world space, each shape's box transformed once)
             try:
                 sel_list = om2.MSelectionList()
                 sel_list.add(tname)
@@ -584,7 +683,7 @@ def measure(
         }
         return result
 
-    # World-space AABBs via all 8 local-bbox corners (rotation-safe)
+    # World-space AABBs: each shape's own box, 8 corners transformed (#273)
     wb_a = _world_bbox(dag_a)
     wb_b = _world_bbox(dag_b)
     world_min_a, world_max_a = wb_a.min, wb_a.max
@@ -749,6 +848,12 @@ def get_unit_info() -> dict[str, Any]:
 
 def assert_scene_state(expectations_json: str) -> dict[str, Any]:
     """Verify scene state matches expectations.
+
+    The bbox values compared here are world-axis boxes built from each
+    shape's own box, transformed once. A rotated parent therefore no longer
+    widens them layer by layer, but geometry that does not fill its own box
+    (an L-shape, a character mesh) can still read up to one axis-alignment
+    too wide.
 
     Args:
         expectations_json: JSON string defining expected state.
@@ -4510,7 +4615,7 @@ def _predict_conflicts(transforms: list[str]) -> list[dict[str, Any]]:
     """Predict potential spatial conflicts before they happen."""
     conflicts: list[dict[str, Any]] = []
 
-    # Get bounds for all objects (world-space via 8-corner transform)
+    # Get bounds for all objects (world-space, shape boxes transformed once)
     obj_bounds: dict[str, dict[str, Any]] = {}
     for t in transforms[:_SAMPLE_CONFLICTS]:
         try:

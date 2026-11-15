@@ -288,7 +288,9 @@ class TestWorldBboxMatchesExactBox:
     Feeding the inclusive matrix to a transform path lands that transform
     twice. The hardcoded numbers are the real pin — comparing against
     cmds.exactWorldBoundingBox only catches the fake drifting away from the
-    module, because both sides of that comparison are the fake.
+    module, because both sides of that comparison are the fake. Since #273
+    the module walks the shapes and transforms each object-space box once,
+    so the cached transform box is only read for nodes with no shape.
     """
 
     def test_translate_is_applied_once(self, maya_env):
@@ -320,6 +322,28 @@ class TestWorldBboxMatchesExactBox:
         # A 100 cube at 45 deg is 141.421 wide, not 200.
         assert size[0] == pytest.approx(100 * math.sqrt(2), abs=1e-3)
         assert size[1] == pytest.approx(100, abs=1e-3)
+
+    def test_child_rotation_cancelling_the_parent_reports_the_true_width(self, maya_env):
+        """#273: the cached box is already widened by the child's own -30 deg
+        before the parent's +30 deg reaches it, so the old read could not
+        un-rotate it and reported 18.66 for a true 10 cube. Walking the
+        shapes transforms each object-space box exactly once."""
+        parent = maya_env.scene.add_transform("GRP_p")
+        parent.r = [0, 30, 0]
+        maya_env.scene.add_mesh(
+            "GEO_c", bbox_min=(-5, -5, -5), bbox_max=(5, 5, 5), r=(0, -30, 0), parent=parent
+        )
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, "GEO_c"))
+        exact = maya_env.cmds.exactWorldBoundingBox("GEO_c")
+        size = [box.max[i] - box.min[i] for i in range(3)]
+
+        # The two rotations cancel in world space, so this is the 10 cube.
+        assert size == pytest.approx([10, 10, 10], abs=1e-3)
+        assert [box.min[i] for i in range(3)] == pytest.approx([-5, -5, -5], abs=1e-3)
+        assert [box.max[i] for i in range(3)] == pytest.approx([5, 5, 5], abs=1e-3)
+        assert [box.min[i] for i in range(3)] == pytest.approx(exact[:3], abs=1e-3)
+        assert [box.max[i] for i in range(3)] == pytest.approx(exact[3:], abs=1e-3)
 
     def test_nested_child_under_a_moved_parent(self, maya_env):
         parent = maya_env.scene.add_transform("GRP_root", t=(500, 0, 0))
@@ -354,6 +378,83 @@ class TestWorldBboxMatchesExactBox:
         )
         assert [box.min[i] for i in range(3)] == pytest.approx(exact[:3], abs=1e-3)
         assert [box.max[i] for i in range(3)] == pytest.approx(exact[3:], abs=1e-3)
+
+    def test_a_group_without_shapes_keeps_the_cached_read(self, maya_env):
+        """Nothing to walk: a shape-less group answers through the cached box.
+        The stub represents an empty box as inf/-inf, so compare against the
+        cached box itself rather than pinning the representation (real Maya
+        reads 0..0 there; the GUI probe records it)."""
+        group = maya_env.scene.add_transform("GRP_empty")
+        cached = maya_env.scene.object_bbox(group)
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, "GRP_empty"))
+
+        assert [box.min[i] for i in range(3)] == [cached.min[i] for i in range(3)]
+        assert [box.max[i] for i in range(3)] == [cached.max[i] for i in range(3)]
+
+    def test_intermediate_shapes_are_left_out_of_the_walk(self, maya_env):
+        """Intermediate objects are history, not geometry to measure; the
+        cached aggregate ignored them too."""
+        mesh = maya_env.scene.add_mesh("GEO_hist", bbox_min=(0, 0, 0), bbox_max=(1, 1, 1))
+        mesh.children[0].intermediate = True
+
+        assert maya_env.module._shape_dag_paths(_dag_path(maya_env, "GEO_hist")) == []
+
+    def test_a_default_box_shape_is_skipped_but_a_real_point_is_kept(self, maya_env):
+        """Maya 2024's MBoundingBox has no isEmpty(), and a shape with no
+        geometry reads (0,0,0)..(0,0,0) in object space (GUI probe #273).
+        Merging that would stretch a far-away union to the origin, so the
+        default reading is skipped. A zero-extent box anywhere else is real
+        geometry (a single vertex) and stays."""
+        parent = maya_env.scene.add_transform("GRP_mix")
+        maya_env.scene.add_mesh(
+            "GEO_empty",
+            bbox_min=(0, 0, 0),
+            bbox_max=(0, 0, 0),
+            num_vertices=0,
+            parent=parent,
+        )
+        maya_env.scene.add_mesh("GEO_point", bbox_min=(5, 0, 0), bbox_max=(5, 0, 0), parent=parent)
+        maya_env.scene.add_mesh(
+            "GEO_far",
+            bbox_min=(0, 0, 0),
+            bbox_max=(10, 10, 10),
+            t=(1000, 0, 0),
+            parent=parent,
+        )
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, "GRP_mix"))
+
+        assert box.min.x == pytest.approx(5.0, abs=1e-3)  # the point survived
+        assert box.max.x == pytest.approx(1010.0, abs=1e-3)
+
+    def test_an_empty_mesh_and_a_vertex_on_the_object_origin_are_told_apart(self, maya_env):
+        """A single vertex on the object origin also reads a default box, so
+        the vertex count decides: 0 is empty, 1 is a real point at the node's
+        world position (moved to x=100 here; an empty mesh sits at x=200 and
+        must not widen the union)."""
+        parent = maya_env.scene.add_transform("GRP_points")
+        maya_env.scene.add_mesh(
+            "GEO_vertex",
+            bbox_min=(0, 0, 0),
+            bbox_max=(0, 0, 0),
+            t=(100, 0, 0),
+            num_vertices=1,
+            parent=parent,
+        )
+        maya_env.scene.add_mesh(
+            "GEO_no_verts",
+            bbox_min=(0, 0, 0),
+            bbox_max=(0, 0, 0),
+            t=(200, 0, 0),
+            num_vertices=0,
+            parent=parent,
+        )
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, "GRP_points"))
+
+        assert box.min.x == pytest.approx(100.0, abs=1e-3)
+        assert box.max.x == pytest.approx(100.0, abs=1e-3)
 
 
 class TestReportedBoxIsWorldSpace:

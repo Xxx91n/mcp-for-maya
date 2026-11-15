@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **World bounding boxes no longer widen layer by layer when a rotated child
+  sits under a rotated parent (#273, Refs #266)** —
+  `_world_bbox()` read `MFnDagNode.boundingBox` on the node itself. On a
+  transform that box is already axis-aligned and already widened by each
+  child's own rotation, so a rotation above it could only add more; nothing
+  could un-rotate it. A 10 cm cube with a +30° parent and a -30° child (the
+  two rotations cancel in world space) measured 18.66. The helper now walks
+  the shapes at or below the node and puts each shape's object-space box
+  through that shape path's inclusive matrix: every box is transformed once,
+  so the looseness no longer compounds with depth. Nodes with no readable
+  shape keep the cached-box read. `MDagPath.child()` hands back an MObject on
+  Maya 2024, so the walk extends the path it is on with `push()` instead of
+  assuming a path; `MBoundingBox` there has no `isEmpty()`, so a shape whose
+  box reads Maya's default (0,0,0)..(0,0,0) in object space is checked by
+  vertex count (`MFnMesh.numVertices`, with `polyEvaluate` as the fallback
+  because `MFnMesh` refuses a mesh node with no geometry data): 0 vertices is
+  empty and is skipped,
+  one vertex on the object origin is real and is kept (an empty mesh would
+  otherwise pull a far-away union back to the origin). Live
+  Maya 2024 reports the case as 10 (old: 18.66), equal to
+  `cmds.exactWorldBoundingBox`; `get_scene_graph` measured 10.21 ms at 115
+  objects and 86.57–151.01 ms at 1015 across four runs, while one 200-deep
+  chain (216 objects) took 145–373 ms — the O(depth^2) shape a nested
+  hierarchy costs, outside the object-count target. Geometry that does not
+  fill
+  its own box can
+  still measure up to one axis-alignment too wide, but no longer by layer;
+  the `scene_snapshot`, `scene_measure`, `scene_assert` and `scene_inspect`
+  tool descriptions state that boundary.
+  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Evidence:
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_child_rotation_cancelling_the_parent_reports_the_true_width`,
+  `tests/test_maya_stub.py::TestSceneGraph::test_cached_box_is_loose_but_the_module_walks_shapes`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_translate_is_applied_once`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_nested_child_under_a_moved_parent`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_shape_path_still_matches_the_exact_box`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_a_default_box_shape_is_skipped_but_a_real_point_is_kept`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_an_empty_mesh_and_a_vertex_on_the_object_origin_are_told_apart`,
+  `docs/evidence/probes/probe-273-world-bbox-shape-walk-gui-maya2024.json`.
+
 - **Error messages redact UNC shares and absolute Unix paths (security audit
   VULN-003)** —
   `sanitize_error_message` matched drive-letter paths and `/home`/`/Users`
@@ -45,7 +85,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_maya_scene_module.py::TestCameraShotUnits::test_centimetre_scene_output_is_unchanged`,
   `tests/test_maya_scene_module.py::TestCameraShotUnits::test_inch_scene_is_no_coarser_than_cm`,
   `tests/test_maya_scene_module.py::TestCameraShotUnits::test_aim_fallback_aims_in_both_units`.
-
 - **World bounding boxes match Maya's own for the reported cases, and zone
   geometry reports the working unit it declares (#266, Refs #263, Refs #31,
   Refs #177)** —
