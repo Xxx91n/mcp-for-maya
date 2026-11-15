@@ -24,13 +24,30 @@
 # annotations` governs the assembled unit and keeps every annotation a string.
 # Do NOT exec/import this file standalone on py3.9.
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 import maya.cmds as cmds
 
 
 if TYPE_CHECKING:
     from .scene_module_types import LightPayload
+
+
+def _xform_world_values(node: str, *, rotation: bool = False) -> list[float]:
+    """World-space translation or rotation values of one transform, as floats.
+
+    A live Maya 2024 answers a ``q/ws`` translation or rotation query with a
+    list of three floats, the same under the short and long flag spellings
+    (docs/evidence/probes/probe-277-xform-shape-gui-maya2024.json). The
+    installed Maya stub declares the long spellings and an ``Any`` return, so
+    this helper is the one place that names the real shape; callers get a
+    plain three-number list and never an Any.
+    """
+    if rotation:
+        values = cmds.xform(node, query=True, worldSpace=True, rotation=True)
+    else:
+        values = cmds.xform(node, query=True, worldSpace=True, translation=True)
+    return [float(value) for value in values] if values else [0, 0, 0]
 
 
 def build_light_payload(shape_name: str) -> LightPayload | None:
@@ -59,8 +76,8 @@ def build_light_payload(shape_name: str) -> LightPayload | None:
         )
 
         # Position and rotation come from the transform, in world space.
-        pos = cast(Any, cmds.xform)(light_transform, q=True, ws=True, t=True) or [0, 0, 0]
-        rot = cast(Any, cmds.xform)(light_transform, q=True, ws=True, ro=True) or [0, 0, 0]
+        pos = _xform_world_values(light_transform)
+        rot = _xform_world_values(light_transform, rotation=True)
 
         # Decay type (0=None, 1=Linear, 2=Quadratic, 3=Cubic)
         decay = 0

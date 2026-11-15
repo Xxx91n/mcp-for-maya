@@ -8,10 +8,13 @@ justified, and which typing work is still owed. It exists so the decision about
 retiring `mypy-baseline.txt` can be made from facts instead of a count that
 moved in the meantime.
 
-**What it is not:** proof of live Maya behaviour. No Maya session was run for
-this batch. The behaviour evidence is the fake-Maya test layer and the existing
-tool-contract tests, which prove the calls match the fake, not the real command.
-Any claim that would need a real interpreter is labelled `human_verify` below.
+**What it is not:** proof of live Maya behaviour from the #257 batch alone. No
+Maya session was run for that mypy batch; its behaviour evidence is the
+fake-Maya test layer and the existing tool-contract tests, which prove the calls
+match the fake, not the real command. Any claim that would need a real
+interpreter is labelled `human_verify` below. The later #277 follow-up did run a
+live GUI probe (dated note under the `xform` bullet), and that note is separate
+from this batch's evidence.
 
 **Measured environment:** `mypy==2.3.1` (compiled) and `types-maya-strict` from
 the repo's uv-managed venv, Python 3.10 target, run as `mypy src`. Ticket start
@@ -76,10 +79,19 @@ records, the five dimension scores, `SHOT_TYPES`).
   playback range). Each names the narrower code and the reason: the stub wants a
   tuple where the call passes a list, or the flag spelling the stub does not
   declare. None is a blanket ignore.
-- Three `cast(Any, cmds.xform)` calls. The stub types `xform` so that
+- Three `cast(Any, cmds.xform)` calls at the close of this record. The stub
+  types `xform` so that
   `q=True, t=True` does not return the list the code unpacks. Replacing the cast
   with a precise annotation needs one real Maya session to confirm the return
   shape — `human_verify`.
+  **2026-11-16 (#277), the real-machine check is done:** the probe
+  (`docs/reference/probe_277_xform_shape.py`, recorded output
+  `docs/evidence/probes/probe-277-xform-shape-gui-maya2024.json`) shows Maya
+  2024 answers both flag spellings with a list of three floats. The #276 merge
+  moved the builder to `scene_light_module.py` and folded the third call site
+  into the shared builder, so two casts remained; both now go through
+  `_xform_world_values()`, which uses the stub's long flag names and returns
+  `list[float]`. No `cast(Any, cmds.xform)` is left in `src/`.
 - `dimensions: dict[str, Any]` in `_compute_full_aesthetic_score`. This merge
   container stays loose on purpose: mypy refuses to assign the narrower
   dimension TypedDicts into a wider optional-key TypedDict (measured: five
@@ -91,14 +103,17 @@ records, the five dimension scores, `SHOT_TYPES`).
   `detail` reason or their extra numbers, so each type says `detail` is
   optional and nothing else is invented.
 
-**Needs a real machine to go further:** only the `cast(Any, cmds.xform)` trio.
+**Needed a real machine to go further when this record closed:** the
+`cast(Any, cmds.xform)` trio (done in #277; see the dated note above).
 
 ## What the types check, and what they do not
 
 The payload types catch a wrong **field name** and a wrong place that reads it;
 they do not make the values themselves safer. Most payload values come from
-`cmds.getAttr` or the `xform` cast and arrive as `Any`, so a field declared
-`float` is only as precise as its source. That is the honest limit of this
+`cmds.getAttr` and arrive as `Any`, so a field declared
+`float` is only as precise as its source. The light vectors used to come from
+the `xform` cast; since #277 they pass through a typed wrapper, but its numbers
+also start at that same Maya stub boundary. That is the honest limit of this
 batch: the shape is now written down, the value provenance still starts at the
 Maya stub boundary.
 
@@ -144,10 +159,11 @@ point-in-time record, and an open item belongs in GitHub once someone files it.
    lighting check build the same dict twice; one helper would serve both.
    Shortest route: extract the builder into `scene_module_types`-adjacent host
    code or a new injected module, because `maya_scene_module.py` is at its cap.
-3. `cast(Any, cmds.xform)` trio: needs a real Maya session to record the return
-   shape first (`human_verify`), then a typed wrapper. Shortest route: one
-   `human_verify` probe recording what `xform(q=True, ws=True, t=True)` returns,
-   then replace the three casts with one helper.
+3. `cast(Any, cmds.xform)` trio: it needed a real Maya session to record the
+   return shape first (`human_verify`), then a typed wrapper. Shortest route:
+   one `human_verify` probe recording what `xform(q=True, ws=True, t=True)`
+   returns, then replace the remaining casts (two after #276) with one helper.
+   **Done in #277** — probe and wrapper are recorded in the dated note above.
 4. Tool JSON envelopes: type one tool's envelope at a time, with its contract
    test, rather than in a single sweep. Shortest route: start with
    `get_scene_graph`, whose output test already pins the keys.

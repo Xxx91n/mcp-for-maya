@@ -1,0 +1,92 @@
+{
+  "meta": {
+    "claim_boundary": "Proves the return shape and flag equivalence on Maya 2024 on this box only. The probe read |persp, an unparented transform, so the world-space flag cannot be distinguished from local space here; a parented transform is not verified. Maya 2025/2026 is not installed on this host. The driver issues only query calls (about, ls, listRelatives, xform with query=True, getAttr, file query, currentUnit query). It recorded node count 8 before and after, currentUnit cm before and after, and modified=False before and after, so the run created or removed nothing and changed no scene setting.",
+    "date": "2026-11-16",
+    "env": "Autodesk Maya 2024 GUI (apiVersion 20240000, cutIdentifier 202302170737-4500172811) on Windows 11 x64; scene linear unit cm at rest; maya.exe pid 16856; launched with -script (no commandPort); fresh default scene with no file on disk",
+    "human_verify_note": "Ticket #277 asks for a human_verify record; this is a live GUI run recorded by the operator on the real Maya install. The pytest human_verify marker only prints manual steps and always skips, so it is not this record.",
+    "mayapy_blocker": {
+      "command": "mayapy.exe docs/reference/probe_277_xform_shape.py (PowerShell); mayapy.exe -c \"import maya.standalone\" (Git Bash)",
+      "error": "ImportError: DLL load failed while importing standalone: 动态链接库(DLL)初始化例程失败。",
+      "exit_code": "1 (PowerShell); 139/SIGSEGV (Git Bash)",
+      "note": "Same lane failure docs/testing.md Tier 2 records. Fallback was a throwaway GUI session started with -script."
+    },
+    "parent": "#257 closeout item 3; spec #222",
+    "provenance": {
+      "coverage": "every field under raw_driver_output is copied unchanged from the driver's out.json. meta is authored prose; the measured values it quotes come from raw_driver_output, except versions.os (the host's OS version, not read by the driver) and versions.maya_python (the 3.10.8 prefix of raw python_version).",
+      "driver": "docs/reference/probe_277_xform_shape.py",
+      "driver_sha256_at_run": "38f0c57fb60da8ba8783ca2d2b60617253eda24527026bcbb7ff4753902b0084",
+      "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
+      "maya_pid": 16856,
+      "transport": "maya.exe -script run_probe.mel; the MEL wrapper runs the driver once through python() at GUI startup, then evalDeferred quit -f"
+    },
+    "purpose": "Record the real return shape of cmds.xform world-space translation and rotation queries. This is the ticket's human_verify step: a live run on the operator's real Maya install, not the pytest human_verify marker.",
+    "ticket": "Xxx91n/mcp-for-maya#277",
+    "verdict": "Both flag spellings return a Python list of exactly three floats. Translation [288.0, 216.0, 288.0] and rotation [-27.93835272960232, 45.00000000000001, -2.248991783197472e-15] agree with the transform's own translate/rotate attributes apart from floating-point noise in the last decimal.",
+    "versions": {
+      "api_version": 20240000,
+      "build": "202302170737-4500172811",
+      "maya": "2024",
+      "maya_python": "3.10.8",
+      "os": "Windows 11 x64 (10.0.26100)"
+    }
+  },
+  "raw_driver_output": {
+    "api_version": 20240000,
+    "batch": false,
+    "call_sites": {
+      "long_flags_rotation": {
+        "element_types": ["float", "float", "float"],
+        "length": 3,
+        "python_type": "list",
+        "values": [-27.93835272960232, 45.00000000000001, -2.248991783197472e-15]
+      },
+      "long_flags_translation": {
+        "element_types": ["float", "float", "float"],
+        "length": 3,
+        "python_type": "list",
+        "values": [288.0, 216.0, 288.0]
+      },
+      "short_flags_rotation": {
+        "element_types": ["float", "float", "float"],
+        "length": 3,
+        "python_type": "list",
+        "values": [-27.93835272960232, 45.00000000000001, -2.248991783197472e-15]
+      },
+      "short_flags_translation": {
+        "element_types": ["float", "float", "float"],
+        "length": 3,
+        "python_type": "list",
+        "values": [288.0, 216.0, 288.0]
+      }
+    },
+    "driver_sha256": "38f0c57fb60da8ba8783ca2d2b60617253eda24527026bcbb7ff4753902b0084",
+    "maya_build": "202302170737-4500172811",
+    "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
+    "maya_pid": 16856,
+    "maya_version": "2024",
+    "node_count_after": 8,
+    "node_count_before": 8,
+    "python_version": "3.10.8 (tags/v3.10.8:aaaf517, Oct 11 2022, 16:50:30) [MSC v.1933 64 bit (AMD64)]",
+    "scene_modified": false,
+    "scene_modified_after_probe": false,
+    "scene_name": "",
+    "status": "ok",
+    "target_transform": "|persp",
+    "transform_attributes": {
+      "rotate": {
+        "element_types": ["tuple"],
+        "length": 1,
+        "python_type": "list",
+        "values": [[-27.938352729602325, 45.00000000000001, 2.923689318156714e-14]]
+      },
+      "translate": {
+        "element_types": ["tuple"],
+        "length": 1,
+        "python_type": "list",
+        "values": [[288.0, 216.0, 288.0]]
+      }
+    },
+    "unit_after": "cm",
+    "unit_before": "cm"
+  }
+}

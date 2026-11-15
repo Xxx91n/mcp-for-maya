@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 
 _LIGHT_PAYLOAD_KEYS = {
     "name",
@@ -110,3 +112,49 @@ class TestOneSharedPayload:
         review = maya_env.module.scene_review(["lighting"])
 
         assert review["checks"]["lighting"] == aesthetic["detail"]["lighting_quality"]
+
+
+class TestWorldVectorQuery:
+    """The typed xform wrapper that replaced the two ``cast(Any, ...)`` calls.
+
+    A live Maya 2024 answer was recorded in
+    docs/evidence/probes/probe-277-xform-shape-gui-maya2024.json: a list of
+    three floats, identical under the short and long flag spellings. These
+    tests pin the wrapper's contract on the fake layer: pass the real numbers
+    through and turn an empty answer into a zero vector.
+    """
+
+    def test_the_query_returns_the_transform_numbers(self, maya_env):
+        maya_env.scene.add_light("LGT_vec", t=(1.25, 2.5, -3.75), r=(10, 20, 30))
+
+        assert maya_env.module._xform_world_values("LGT_vec") == [1.25, 2.5, -3.75]
+        assert maya_env.module._xform_world_values("LGT_vec", rotation=True) == pytest.approx(
+            [10.0, 20.0, 30.0]
+        )
+
+    def test_an_empty_answer_becomes_a_zero_vector(self, maya_env, monkeypatch):
+        monkeypatch.setattr(maya_env.cmds, "xform", lambda *args, **kwargs: None)
+
+        assert maya_env.module._xform_world_values("LGT_vec") == [0, 0, 0]
+        assert maya_env.module._xform_world_values("LGT_vec", rotation=True) == [0, 0, 0]
+
+    def test_the_helper_queries_with_the_stub_declared_long_flags(self, maya_env, monkeypatch):
+        calls: list[dict[str, object]] = []
+        real_xform = maya_env.cmds.xform
+
+        def spy(*args, **kwargs):
+            calls.append(kwargs)
+            return real_xform(*args, **kwargs)
+
+        monkeypatch.setattr(maya_env.cmds, "xform", spy)
+        maya_env.scene.add_light("LGT_vec", t=(1, 2, 3))
+
+        maya_env.module._xform_world_values("LGT_vec")
+        maya_env.module._xform_world_values("LGT_vec", rotation=True)
+
+        assert calls[0]["query"] is True
+        assert calls[0]["worldSpace"] is True
+        assert calls[0]["translation"] is True
+        assert calls[1]["query"] is True
+        assert calls[1]["worldSpace"] is True
+        assert calls[1]["rotation"] is True

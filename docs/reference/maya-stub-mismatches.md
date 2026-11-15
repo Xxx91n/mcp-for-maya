@@ -62,6 +62,16 @@ it silences one call's flag checking, keeps the same values, and adds no
 module-level name. The other four stub gaps sit on short lines, so they carry
 the ignore with its error code.
 
+**Live status (2026-11-16, issue #277):** the `xform` row's table cells above
+are batch-time history. A live Maya 2024 GUI probe
+(`docs/evidence/probes/probe-277-xform-shape-gui-maya2024.json`) recorded that
+both flag spellings return a list of three floats, so the code now uses the
+stub's long flag names and one typed wrapper, `_xform_world_values()`; no
+`cast(Any, cmds.xform)` is left in `src/`. The #276 refactor had already folded
+the third call site into the shared light builder, so two casts were replaced,
+not three. The fake layer's `xform` accepts the long spellings too. The other
+five rows are unchanged.
+
 ## Before and after
 
 ```
