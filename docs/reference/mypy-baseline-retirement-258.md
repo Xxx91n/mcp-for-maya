@@ -46,14 +46,19 @@ no suppression flag. The gate script checks all of that before running mypy, so
 
 #213's tentative inventory was 100 missing local annotations, 66 local
 container/inference findings, 17 possible third-party Maya stub mismatches and
-1 mixed finding (184 total). The batches recorded in #222 took the raw report
-down as 184 -> 168 -> 152 -> 85 -> 67 -> 45 -> 20 -> 10 -> 0. The last 10 were
+1 mixed finding (184 total). The batches tracked under #222 and its follow-ups
+(see CONTRIBUTING's drift trail) took the raw report down as
+184 -> 168 -> 152 -> 85 -> 67 -> 45 -> 20 -> 10 -> 0. The last 10 were
 all `no-untyped-def` / `no-untyped-call` annotation gaps, cleared by #257
 (PR #274). No category is carried by the baseline because the baseline is empty.
 `docs/reference/type-precision-inventory-257.md` lists the remaining weaker
-`dict[str, Any]`, `cast(Any, ...)` and local `ignore` uses; those are a review
-concern, not hidden errors. #253's record covers the six call forms whose stub
-disagreed; those fixes are in the tree, and #258 changes no Maya code.
+`dict[str, Any]` and local `ignore` uses; those are a review concern, not hidden
+errors. #253's record covers the six call forms whose stub disagreed; those
+fixes are in the tree, and #258 changes no Maya code.
+
+Local behaviour evidence for this change: `pytest tests/` on the locked
+environment gave 1599 passed and 28 skipped. Remote CI is recorded after the
+pull request opens.
 
 ## What changed
 
@@ -85,9 +90,9 @@ Two checks show that a new type error cannot pass:
   with no usable report is still red.
 
 A real required-check run is exercised on a throwaway pull request that adds one
-type error on top of this branch; its result is linked from ticket #258 and from
-the pull request for this change. That line is filled in only after the check
-has actually run.
+type error on top of this branch. That run and the normal CI result do not exist
+yet at this commit; both are recorded on the pull request and ticket #258 once
+they run. This file does not claim them before they do.
 
 No Maya code changed in this ticket, so the Maya real-machine evidence is the
 existing #253 record: `docs/testing.md` (six call forms measured on Maya 2024)
@@ -99,11 +104,11 @@ and `docs/evidence/probes/probe-253-six-callforms-gui-maya2024-v2.json`.
 | --- | --- |
 | Raw strict mypy over the intended scope exits 0 | Yes: exit 0, 34 of 34 files, commit `2bb371ee` |
 | Zero errors is not bought by weaker config or narrower scope | Yes: strict trio unchanged, whitelist guard unchanged, live scope enumeration unchanged |
-| A new type error is stopped | Gate pytest pin red on a well-formed error report; the remote required-check result is recorded after it runs |
-| Baseline and its dependency removed by a separately reviewed change | Yes: this ticket's own PR; no code cleanup is bundled into it |
-| Normal CI and fault injection pass | Recorded on the pull request |
+| A new type error is stopped | Gate pytest pin red on a well-formed error report; the remote required-check result is pending the pull request |
+| Baseline and its dependency removed by a separately reviewed change | Pending: the change is committed on its own branch; the reviewed pull request is the remaining step |
+| Normal CI and fault injection pass | Pending: recorded after the pull request runs |
 | No branch-protection edits in this ticket | Yes: protection stayed untouched; the job name stayed as it was |
-| #222 exit rule: a separate CI guard proves the check cannot silently disappear | Not met: #256 was closed `not planned` and the owner accepted that residual risk. Recorded as unmet, not as a pass |
+| #222 exit rule: a separate CI guard proves the check cannot silently disappear | Not met: #256 was closed `not planned`; its closeout records the owner accepting the residual risk, not the guard being implemented. Recorded as unmet, not as a pass |
 | Remaining risk stated | The required check can still be replaced by a same-named fake success, as #256 accepted |
 
 Result text for the parent spec: **baseline retired, strict gate retained.**

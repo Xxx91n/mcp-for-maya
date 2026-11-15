@@ -189,24 +189,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The mypy gate fails closed on untrustworthy execution** — the mypy CI job
   now runs `.github/scripts/run_mypy_gate.py` instead of piping mypy straight
-  into the baseline filter. The gate classifies mypy's exit code instead of
+  into the baseline filter. (Update #258: that baseline and its filter were
+  later retired; the baseline-file guard and the filter no longer exist, and a
+  well-formed error report is a hard red. The text below is the #226 record.)
+  The gate classifies mypy's exit code instead of
   thresholding it, requires a well-formed report on both the clean and the
-  error branch (empty or garbage output is red even with an empty baseline —
+  error branch (empty or garbage output is red even when the baseline was empty —
   the hole #214 measured, where the old pipe returned success for `fix 0 /
   new 0`), cross-checks the summary's error count against the report body,
   compares mypy's `checked` count against a live enumeration of
   `src/**/*.py` so an excluded module is red while a legitimately added module
-  needs no gate edit, and fails closed on a weakened strict trio or a missing
-  baseline file. The baseline filter runs on both branches, so its nonzero
-  "resolved violations" exit still forces a baseline sync when the historic
-  errors are fixed. mypy is invoked with `--config-file pyproject.toml`, so
+  needs no gate edit, and fails closed on a weakened strict trio. The baseline
+  filter ran on both branches, so its nonzero
+  "resolved violations" exit forced a baseline sync when the historic
+  errors were fixed. mypy is invoked with `--config-file pyproject.toml`, so
   it reads the same configuration the strict guard audits rather than an ini
   file that out-prioritizes it; a `mypy: error` on stderr is a config fault
   even with a healthy exit code.
   Fault verdicts carry the exit code and stderr as evidence.
   The check requires `strict`, `warn_unused_ignores` and
-  `warn_unused_configs` in `[tool.mypy]`; retiring the baseline later means
-  editing this gate, not deleting the file. Limits: the guard enforces a
+  `warn_unused_configs` in `[tool.mypy]`; retiring the baseline took a gate
+  edit, not a file deletion, and #258 made that edit. Limits: the guard enforces a
   WHITELIST on the first `[tool.mypy]` table — only the trio plus
   `python_version` may appear (four review rounds found one weakening key
   after another: strict sub-flags, `ignore_errors`, `disable_error_code`,
@@ -355,9 +358,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleted. `run_mypy_gate.py` no longer requires a baseline file and no longer
   runs a filter: a well-formed report carrying any type error is a hard
   `type_fault` red, while the empty/garbage report, scope and config guards
-  stay. The CI job keeps the name `mypy baseline gate` because branch
-  protection pins that required-check context. The closing measurement and the
-  #222 criteria mapping are in
+  stay. The CI job keeps the name `mypy baseline gate` because the recorded
+  branch-protection setting pins that required-check context (last read
+  2026-11-14; the current value was not re-verified). The closing measurement
+  and the #222 criteria mapping are in
   `docs/reference/mypy-baseline-retirement-258.md`.
   Evidence:
   `tests/test_run_mypy_gate.py::test_a_well_formed_type_error_report_is_red`,

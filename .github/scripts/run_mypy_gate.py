@@ -477,15 +477,14 @@ def run_mypy(root: Path) -> tuple[int, str, str]:
     return completed.returncode, completed.stdout, completed.stderr
 
 
-def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> tuple[str, int]:
+def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> str:
     """Judge the mypy report against the exit code's claim.
 
-    Returns ``(summary line, checked count)``; raises ``GateError`` when the
-    output does not support the exit code's claim at all. This is where an
-    empty or garbage report dies even though the exit code looks survivable,
-    and where a well-formed error report becomes a hard ``type_fault`` red.
-    ``stderr`` rides along so every fault message carries the checker's own
-    evidence.
+    Returns the summary line; raises ``GateError`` when the output does not
+    support the exit code's claim at all. This is where an empty or garbage
+    report dies even though the exit code looks survivable, and where a
+    well-formed error report becomes a hard ``type_fault`` red. ``stderr``
+    rides along so every fault message carries the checker's own evidence.
     """
     lines = [line for line in report_text.splitlines() if line.strip()]
     summary_matches = [
@@ -609,7 +608,7 @@ def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> t
             + "\n".join(type_errors[:5])
             + (f"\n... and {more} more" if more else "")
         )
-    return verdict, checked
+    return verdict
 
 
 def main() -> int:
@@ -630,7 +629,7 @@ def main() -> int:
         except OSError as e:
             raise GateError(f"execution_fault -- cannot write {REPORT_FILENAME}: {e}") from e
 
-        verdict, _checked = verify_report(rc, stdout, stderr, scope_count)
+        verdict = verify_report(rc, stdout, stderr, scope_count)
         # Evidence discipline, on green too: the exit code, the report size
         # and anything the checker said on stderr stay visible, so a future
         # reader does not have to trust the word OK.
