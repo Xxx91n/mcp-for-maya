@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Error messages redact UNC shares and absolute Unix paths (security audit
+  VULN-003)** —
+  `sanitize_error_message` matched drive-letter paths and `/home`/`/Users`
+  only, so `/opt/...`, `/var` or `\\server\share\...` in an exception text
+  reached the MCP client verbatim and disclosed the host directory layout.
+  Absolute paths are now redacted wherever they appear: one-segment Unix
+  paths, both slash forms of a UNC share, `file:`/`smb:` URLs, and URL text,
+  which loses its host along with its path. A path run ends at whitespace or a
+  quote, so punctuation straight after a path is swallowed with it. A
+  directory name containing a space keeps its tail; that is the shape still
+  visible. The drive-letter rule gained a path boundary: it read the `s://` in
+  `https://host/a` as drive `s:` and mangled URLs in error text.
+  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Evidence:
+  `tests/test_security.py::TestSanitizeErrorMessagePaths::test_absolute_unix_path_outside_home`,
+  `tests/test_security.py::TestSanitizeErrorMessagePaths::test_single_segment_absolute_path`,
+  `tests/test_security.py::TestSanitizeErrorMessagePaths::test_unc_share_path`,
+  `tests/test_security.py::TestSanitizeErrorMessagePaths::test_forward_slash_share_path`.
 - **Camera framing converts to the scene's working unit before placing the
   camera (#272, Refs #266)** —
   `create_camera_shot` computed the target size and camera position from

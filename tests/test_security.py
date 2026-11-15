@@ -764,6 +764,77 @@ class TestSanitizeErrorMessagePaths:
         out = sanitize_error_message(msg)
         assert "C:\\tmp" not in out
 
+    def test_unc_share_path(self) -> None:
+        """Audit VULN-003: a UNC share has no drive letter and used to pass through."""
+        msg = r"copy \\fileserver\share\secret.ma failed"
+        out = sanitize_error_message(msg)
+        assert "fileserver" not in out
+        assert "secret.ma" not in out
+
+    def test_absolute_unix_path_outside_home(self) -> None:
+        """Audit VULN-003: only /home and /Users were redacted before."""
+        msg = "cannot read /opt/app/config.yaml"
+        out = sanitize_error_message(msg)
+        assert "/opt/app" not in out
+        assert "<path>" in out
+
+    def test_single_segment_absolute_path(self) -> None:
+        """The audit names /var and /opt; both are one segment."""
+        out = sanitize_error_message("cannot write /var")
+        assert "/var" not in out
+
+    def test_forward_slash_share_path(self) -> None:
+        msg = "copy //fileserver/share/secret.ma failed"
+        out = sanitize_error_message(msg)
+        assert "fileserver" not in out
+        assert "secret.ma" not in out
+
+    def test_file_url_host_path_is_redacted(self) -> None:
+        """file: names a host path, unlike a public https link."""
+        out = sanitize_error_message("open file:///opt/app/x.ma failed")
+        assert out == "open file:<path> failed"
+
+    def test_smb_url_host_path_is_redacted(self) -> None:
+        out = sanitize_error_message("mount smb://fileserver/share/secret.ma failed")
+        assert out == "mount smb:<path> failed"
+
+    def test_path_inside_url_text_is_redacted(self) -> None:
+        msg = "see https://example.com/x,/opt/app/y.ma"
+        out = sanitize_error_message(msg)
+        assert "example.com" not in out
+        assert "/opt/app" not in out
+
+    def test_path_with_punctuation_is_fully_redacted(self) -> None:
+        """A segment's punctuation must not leave the tail of the path visible."""
+        for msg in (
+            "cannot read /opt/app@1.2/x.ma",
+            "cannot read /opt/app(x86)/x.ma",
+            "cannot read /data/a,b/x.ma",
+        ):
+            out = sanitize_error_message(msg)
+            assert "/opt/" not in out
+            assert "/data/" not in out
+            assert "x.ma" not in out
+
+    def test_escaped_slash_is_redacted(self) -> None:
+        """JSON error text can carry a backslash-escaped slash."""
+        out = sanitize_error_message(r'{"path": "\/opt\/app\/x.ma"}')
+        assert "/opt" not in out
+        assert "x.ma" not in out
+
+    def test_nul_bytes_pass_through(self) -> None:
+        msg = "bad \x000\x00 value"
+        assert sanitize_error_message(msg) == msg
+
+    def test_url_host_is_redacted(self) -> None:
+        """A URL in error text is redacted with its path, host included."""
+        out = sanitize_error_message("GET https://example.com/assets/a.ma failed")
+        assert out == "GET https:<path> failed"
+
+    def test_fraction_untouched(self) -> None:
+        msg = "ratio 3/4 exceeded"
+        assert sanitize_error_message(msg) == msg
+
 
 class TestFileTraversalPrecision:
     """F-4: file-traversal blocks only '../'-style sequences — the rule
