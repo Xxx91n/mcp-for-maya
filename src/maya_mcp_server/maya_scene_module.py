@@ -3519,7 +3519,9 @@ def scene_review(checks: list[str] | None = None) -> dict[str, Any]:
             else:
                 # Same builder as analyze_aesthetics (#276): the lighting
                 # check scores the same payload the aesthetic dimension does.
-                lights_data: list[LightPayload] = globals()["collect_light_payloads"]()
+                # The already-read shape list goes in, so this does not list
+                # the lights a second time.
+                lights_data: list[LightPayload] = globals()["collect_light_payloads"](light_shapes)
 
                 # Use the lighting quality scorer
                 lq = _score_lighting_quality(lights_data)

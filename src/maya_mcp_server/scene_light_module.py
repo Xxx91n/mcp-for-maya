@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from .scene_module_types import LightPayload
 
 
-def build_light_payload(ls_name: str) -> LightPayload | None:
+def build_light_payload(shape_name: str) -> LightPayload | None:
     """Build one light's payload from its shape node; None when a read fails.
 
     The shape name is what ``cmds.ls(type="light")`` returns. The payload
@@ -44,15 +44,19 @@ def build_light_payload(ls_name: str) -> LightPayload | None:
     copies behaved.
     """
     try:
-        parent = cmds.listRelatives(ls_name, parent=True, fullPath=True) or [ls_name]
+        parent = cmds.listRelatives(shape_name, parent=True, fullPath=True) or [shape_name]
         light_transform = parent[0]
-        ltype = cmds.nodeType(ls_name)
+        ltype = cmds.nodeType(shape_name)
 
         color = (
-            cmds.getAttr(f"{ls_name}.color")[0] if cmds.objExists(f"{ls_name}.color") else [1, 1, 1]
+            cmds.getAttr(f"{shape_name}.color")[0]
+            if cmds.objExists(f"{shape_name}.color")
+            else [1, 1, 1]
         )
         intensity = (
-            cmds.getAttr(f"{ls_name}.intensity") if cmds.objExists(f"{ls_name}.intensity") else 1.0
+            cmds.getAttr(f"{shape_name}.intensity")
+            if cmds.objExists(f"{shape_name}.intensity")
+            else 1.0
         )
 
         # Position and rotation come from the transform, in world space.
@@ -61,46 +65,46 @@ def build_light_payload(ls_name: str) -> LightPayload | None:
 
         # Decay type (0=None, 1=Linear, 2=Quadratic, 3=Cubic)
         decay = 0
-        if cmds.objExists(f"{ls_name}.decayRate"):
-            decay = cmds.getAttr(f"{ls_name}.decayRate")
+        if cmds.objExists(f"{shape_name}.decayRate"):
+            decay = cmds.getAttr(f"{shape_name}.decayRate")
 
         # Depth-map shadows are the common case; a ray-traced light reports
         # the other flag. A light with neither attribute counts as shadowing,
         # which is the reading the aesthetic engine already used.
         shadow_on = True
-        if cmds.objExists(f"{ls_name}.useDepthMapShadow"):
-            shadow_on = bool(cmds.getAttr(f"{ls_name}.useDepthMapShadow"))
-        elif cmds.objExists(f"{ls_name}.useRayTraceShadows"):
-            shadow_on = bool(cmds.getAttr(f"{ls_name}.useRayTraceShadows"))
+        if cmds.objExists(f"{shape_name}.useDepthMapShadow"):
+            shadow_on = bool(cmds.getAttr(f"{shape_name}.useDepthMapShadow"))
+        elif cmds.objExists(f"{shape_name}.useRayTraceShadows"):
+            shadow_on = bool(cmds.getAttr(f"{shape_name}.useRayTraceShadows"))
 
         # Spotlight cone angle (degrees) and soft edge.
         cone_angle = None
         penumbra = None
-        if ltype in ("spotLight",) and cmds.objExists(f"{ls_name}.coneAngle"):
-            cone_angle = cmds.getAttr(f"{ls_name}.coneAngle")
-            if cmds.objExists(f"{ls_name}.penumbraAngle"):
-                penumbra = cmds.getAttr(f"{ls_name}.penumbraAngle")
+        if ltype in ("spotLight",) and cmds.objExists(f"{shape_name}.coneAngle"):
+            cone_angle = cmds.getAttr(f"{shape_name}.coneAngle")
+            if cmds.objExists(f"{shape_name}.penumbraAngle"):
+                penumbra = cmds.getAttr(f"{shape_name}.penumbraAngle")
 
         # Area light size; Maya reports width and height as separate attrs.
         area_size = None
-        if ltype in ("areaLight",) and cmds.objExists(f"{ls_name}.areaWidth"):
-            aw = cmds.getAttr(f"{ls_name}.areaWidth")
+        if ltype in ("areaLight",) and cmds.objExists(f"{shape_name}.areaWidth"):
+            aw = cmds.getAttr(f"{shape_name}.areaWidth")
             ah = (
-                cmds.getAttr(f"{ls_name}.areaHeight")
-                if cmds.objExists(f"{ls_name}.areaHeight")
+                cmds.getAttr(f"{shape_name}.areaHeight")
+                if cmds.objExists(f"{shape_name}.areaHeight")
                 else aw
             )
             area_size = [aw, ah]
 
         # Diffuse/Specular contribution.
         diffuse = (
-            cmds.getAttr(f"{ls_name}.emitDiffuse")
-            if cmds.objExists(f"{ls_name}.emitDiffuse")
+            cmds.getAttr(f"{shape_name}.emitDiffuse")
+            if cmds.objExists(f"{shape_name}.emitDiffuse")
             else True
         )
         specular = (
-            cmds.getAttr(f"{ls_name}.emitSpecular")
-            if cmds.objExists(f"{ls_name}.emitSpecular")
+            cmds.getAttr(f"{shape_name}.emitSpecular")
+            if cmds.objExists(f"{shape_name}.emitSpecular")
             else True
         )
 
@@ -123,16 +127,23 @@ def build_light_payload(ls_name: str) -> LightPayload | None:
         return None
 
 
-def collect_light_payloads() -> list[LightPayload]:
+def collect_light_payloads(shape_names: list[str] | None = None) -> list[LightPayload]:
     """Build the payload for every light in the scene, skipping unreadable ones.
 
     This is the one entry both consumers call: analyze_aesthetics() for the
     lighting dimension and scene_review() for its lighting check. They get the
     same list, so a field added here reaches both and the two cannot drift.
+
+    shape_names is the list the caller already read with ``cmds.ls``; passing
+    it saves the second Maya query in scene_review, which needs the list first
+    to tell an empty scene from an unreadable one. Omit it when no list is at
+    hand and this function lists the lights itself.
     """
+    if shape_names is None:
+        shape_names = cmds.ls(type="light") or []
     lights: list[LightPayload] = []
-    for ls_name in cmds.ls(type="light") or []:
-        payload = build_light_payload(ls_name)
+    for shape_name in shape_names:
+        payload = build_light_payload(shape_name)
         if payload is not None:
             lights.append(payload)
     return lights
