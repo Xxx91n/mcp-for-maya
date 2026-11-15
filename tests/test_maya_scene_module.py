@@ -272,6 +272,50 @@ class TestSceneReviewStandards:
 
 
 # ------------------------------------------------------------
+# #276: the review lighting check reads the shared light payload
+# ------------------------------------------------------------
+
+
+class TestSceneReviewLightingPayload:
+    """Pin the review path's lighting result on the shared 13-field payload.
+
+    The review check had no score assertion before #276; only its "no lights"
+    and "too few lights" branches were tested. These numbers were measured on
+    this fixture after the builder moved. The total gets a tolerance because
+    its weighted sum is 67.75, a round-half boundary that can land on either
+    side across Python versions; the sub-scores are exact.
+    """
+
+    def test_review_lighting_score_and_subscores(self, maya_env):
+        maya_env.scene.add_light("LGT_key", t=(0, 100, 0))
+        maya_env.scene.add_light("LGT_fill", t=(100, 100, 0))
+
+        lighting = maya_env.module.scene_review(["lighting"])["checks"]["lighting"]
+
+        assert lighting["score"] == pytest.approx(67.8, abs=0.1)
+        assert lighting["sub_scores"] == {
+            "layers": 75,
+            "three_point": 70,
+            "fill_ratio": 70,
+            "shadow_quality": 70,
+            "temperature": 90,
+            "coverage": 65,
+            "decay": 30.0,
+            "intensity_dist": 65,
+        }
+        assert lighting["layer_breakdown"] == {
+            "key": 1,
+            "fill": 1,
+            "rim": 0,
+            "accent": 0,
+            "other": 0,
+        }
+        assert lighting["mood"] == "cool_dramatic"
+        assert lighting["fill_ratio"] == 1.0
+        assert lighting["temp_consistency"] == "very_consistent"
+
+
+# ------------------------------------------------------------
 # #266: the eight-corner transform must match cmds.exactWorldBoundingBox
 # ------------------------------------------------------------
 
