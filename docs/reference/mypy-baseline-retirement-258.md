@@ -1,7 +1,6 @@
 # The mypy baseline retired (#258)
 
-**Decision: `baseline retired, strict gate retained`.** The local criteria are
-met; the pull-request and remote rows below are still pending.
+**Decision: `baseline retired, strict gate retained`.**
 
 **What this file is:** the closing record for ticket #258 under the type-checking
 spec #222. It states what was measured, which branch of the ticket applied, what
@@ -10,9 +9,9 @@ be checked from facts instead of a moving error count.
 
 **What it is not:** a claim that the type checker cannot be cheated. #256 recorded
 that a same-named check can be replaced by a fake success and closed by accepting
-that risk. The gate and its pytest pins block a genuine type error; the real
-required-check run is recorded after it happens. None of that makes the check
-unforgeable.
+that risk. The gate and its pytest pins block a genuine type error, and a real
+throwaway pull request proved the required check goes red. None of that makes the
+check unforgeable.
 
 ## Measured environment
 
@@ -90,10 +89,19 @@ Two checks show that a new type error cannot pass:
   garbage-report siblings keep the #214 holes closed: a successful exit code
   with no usable report is still red.
 
-A real required-check run is exercised on a throwaway pull request that adds one
-type error on top of this branch. That run and the normal CI result do not exist
-yet at this commit; both are recorded on the pull request and ticket #258 once
-they run. This file does not claim them before they do.
+A real required-check run was exercised on throwaway pull request #287, which
+adds `INJECTED: int = "not an int"` on top of this branch. The
+`mypy baseline gate` check failed with
+`type_fault -- mypy exited 1 with 1 type error(s)` naming
+`src/maya_mcp_server/_injected_258.py:1`, and the PR reported
+`mergeStateStatus: BLOCKED`. The PR was closed without merging and its branch was
+deleted. Run:
+`https://github.com/Xxx91n/mcp-for-maya/actions/runs/43750680182/job/132923715156`.
+
+Normal CI on pull request #286 at `b488e7b3` finished green: the mypy gate, the
+ruff budget, `ci`, coverage and all four pytest legs (ubuntu and windows on
+3.10 and 3.13). Run:
+`https://github.com/Xxx91n/mcp-for-maya/actions/runs/43750629052`.
 
 No Maya code changed in this ticket, so the Maya real-machine evidence is the
 existing #253 record: `docs/testing.md` (six call forms measured on Maya 2024)
@@ -105,9 +113,9 @@ and `docs/evidence/probes/probe-253-six-callforms-gui-maya2024-v2.json`.
 | --- | --- |
 | Raw strict mypy over the intended scope exits 0 | Yes: exit 0, 34 of 34 files, commit `2bb371ee` |
 | Zero errors is not bought by weaker config or narrower scope | Yes: strict trio unchanged, whitelist guard unchanged, live scope enumeration unchanged |
-| A new type error is stopped | Gate pytest pin red on a well-formed error report; the remote required-check result is pending the pull request |
-| Baseline and its dependency removed by a separately reviewed change | Pending: the change is committed on its own branch; the reviewed pull request is the remaining step |
-| Normal CI and fault injection pass | Pending: recorded after the pull request runs |
+| A new type error is stopped | Yes: gate pytest pin, plus throwaway PR #287 where the required check failed and the PR was `BLOCKED` |
+| Baseline and its dependency removed by a separately reviewed change | Yes: pull request #286; no code cleanup is bundled into it |
+| Normal CI and fault injection pass | Yes: PR #286 green at `b488e7b3`; PR #287 red on the mypy gate as designed |
 | No branch-protection edits in this ticket | Yes: protection stayed untouched; the job name stayed as it was |
 | #222 exit rule: a separate CI guard proves the check cannot silently disappear | Not met: #256 was closed `not planned`; its [closeout comment](https://github.com/Xxx91n/mcp-for-maya/issues/256#issuecomment-6890139942) records the owner accepting the residual risk, not the guard being implemented. Recorded as unmet, not as a pass |
 | Remaining risk stated | The required check can still be replaced by a same-named fake success, as #256 accepted |
