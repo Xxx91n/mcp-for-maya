@@ -122,9 +122,11 @@ The split below is the snapshot from the stub-disagreement batch (#229, commit
 a `TypedDict`), so the dict literal no longer infers `dict[str, object]`. That
 one annotation removed all 10 container findings still in the baseline:
 `operator` 6, `str-format` 3, `attr-defined` 1. `var-annotated` and
-`assignment` had already left with the scoring-chain work (#251, #252), so the
-ticket's historical 7/3/1/1/1 split was down to 6/3/0/0/1 when measured on
-main at `983c496`.
+`assignment` had already left with the scoring-chain work (#251, #252). In the
+ticket's own order — operator, str-format, var-annotated, assignment,
+attr-defined — the historical 7/3/1/1/1 split therefore reads 6/3/0/0/1 when
+measured on main at `983c496`: the single 1 is `attr-defined`, and both
+`var-annotated` and `assignment` are at 0.
 
 Which value reaches which output, for the keys `scene_review` actually reads:
 
