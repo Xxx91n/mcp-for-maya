@@ -162,10 +162,15 @@ class ZoneCore(TypedDict):
 
 
 class ZoneRecord(ZoneCore, total=False):
-    """Finished zone record: count and center only exist once a zone has objects."""
+    """Finished zone record: count and center only exist once a zone has objects.
+
+    ``unit`` is present only when the record was converted out of Maya's
+    internal centimetres for display.
+    """
 
     object_count: int
     center: list[float]
+    unit: str
 
 
 class ShotSpec(TypedDict):

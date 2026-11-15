@@ -58,6 +58,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/evidence/probes/probe-266-world-bbox-units-gui-maya2024.json`,
   `docs/evidence/probes/probe-266-fivezone-recommendations-gui-maya2024.json`.
 
+- **Query payloads label the working unit and now report lengths in it
+  (#271, Refs #266)** —
+  `scene_snapshot`, `scene_measure` and `scene_inspect` read lengths from
+  OpenMaya, which always returns internal centimetres, but printed them next
+  to the unit `currentUnit` names. A metre scene therefore showed 130 for a
+  1.3 m door. Every reported length now converts once, before rounding:
+  object positions, box corners, sizes, measure distances/gaps/overlaps,
+  neighbor distances, full-detail vertex positions and zone centers/boxes.
+  `scene_validate`'s `min_clearance` keeps its internal-centimetre rule values
+  and reports `actual` in the same centimetres. Centimetre scenes keep their
+  exact previous numbers.
+  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Evidence:
+  `tests/test_maya_scene_module.py::TestWorkingUnitLengths::test_scene_graph_reports_working_unit_lengths`,
+  `tests/test_maya_scene_module.py::TestWorkingUnitLengths::test_measure_modes_convert_every_length`,
+  `tests/test_maya_scene_module.py::TestWorkingUnitLengths::test_full_detail_vertex_positions_follow_the_working_unit`,
+  `tests/test_maya_scene_module.py::TestWorkingUnitLengths::test_zone_map_display_units_scales_boxes`,
+  `tests/test_maya_scene_module.py::TestConstraints::test_min_clearance_keeps_centimetre_thresholds_in_a_metre_scene`,
+  `tests/test_maya_scene_module.py::TestConstraints::test_min_clearance_keeps_precision_below_the_display_rounding`,
+  `tests/test_scene_tools_json.py::TestToolWorkingUnitOutput::test_scene_snapshot_json_uses_working_unit`,
+  `tests/test_scene_tools_json.py::TestToolWorkingUnitOutput::test_scene_inspect_json_uses_working_unit`,
+  `tests/test_scene_tools_json.py::TestToolWorkingUnitOutput::test_scene_inspect_cos_names_a_converted_unit`,
+  `tests/test_scene_tools_json.py::TestToolWorkingUnitOutput::test_scene_inspect_rebuilds_neighbor_distances_after_a_unit_change`,
+  `tests/test_scene_tools_json.py::TestToolWorkingUnitOutput::test_scene_inspect_zone_json_uses_working_unit`,
+  `tests/test_cos_formatter.py::TestFormatInspectCos::test_metre_inspect_names_the_unit`,
+  `tests/test_cos_formatter.py::TestFormatZoneMapCos::test_converted_zone_names_the_unit`.
+
 - **`scene_plan` recommendations no longer drop candidates against a partially measured zone envelope (#262, Refs #31, Refs #177)** —
   when a zone's bounding box is built from partially measured objects
   (`unmeasured_count > 0`, `target.measurement="partial_zone_envelope"`), models

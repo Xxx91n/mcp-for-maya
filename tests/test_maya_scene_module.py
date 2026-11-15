@@ -453,6 +453,35 @@ class TestConstraints:
         res = maya_env.module.check_constraints([{"type": "min_clearance", "value": 10}])
         assert res["passed"] is True
 
+    def test_min_clearance_keeps_centimetre_thresholds_in_a_metre_scene(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(200, 0, 0)
+        )
+
+        tight = maya_env.module.check_constraints([{"type": "min_clearance", "value": 150}])
+        loose = maya_env.module.check_constraints([{"type": "min_clearance", "value": 50}])
+
+        violation = next(v for v in tight["violations"] if v["type"] == "min_clearance")
+        assert violation["actual"] == pytest.approx(100.0)
+        assert violation["required"] == 150
+        assert loose["passed"] is True
+
+    def test_min_clearance_keeps_precision_below_the_display_rounding(self, maya_env):
+        """99.96 cm is below 100 cm; the displayed 0.9996 m rounds to 1.0 m,
+        so comparing the display value would wrongly pass this rule."""
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(199.96, 0, 0)
+        )
+
+        res = maya_env.module.check_constraints([{"type": "min_clearance", "value": 100}])
+
+        violation = next(v for v in res["violations"] if v["type"] == "min_clearance")
+        assert violation["actual"] == pytest.approx(99.96)
+
     def test_sampling_disclosed(self, maya_env):
         # 30 transforms -> pair window (i+20) truncates some pairs
         for i in range(30):
@@ -889,3 +918,136 @@ class TestCameraShotUnits:
             -math.cos(rx) * math.cos(ry),
         ]
         assert forward == pytest.approx(to_target, abs=1e-6)
+
+
+# ------------------------------------------------------------
+# #271: query payloads declare the working unit, so their lengths
+# must be converted out of OpenMaya's internal centimetres.
+# ------------------------------------------------------------
+
+
+class TestWorkingUnitLengths:
+    """OpenMaya always hands back centimetres; `unit` names the working unit."""
+
+    def test_scene_graph_reports_working_unit_lengths(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh(
+            "GEO_door", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6), t=(0, 0, 0)
+        )
+
+        graph = maya_env.module.get_scene_graph()
+        door = next(obj for obj in graph["objects"] if obj["n"] == "GEO_door")
+
+        assert graph["unit"] == "m"
+        assert door["p"] == [0.0, 0.0, 0.0]
+        assert door["b"] == pytest.approx([-0.65, -1.1, -0.06, 0.65, 1.1, 0.06])
+
+    def test_scene_graph_keeps_centimetre_numbers(self, maya_env):
+        maya_env.scene.add_mesh(
+            "GEO_door", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6), t=(0, 0, 0)
+        )
+
+        graph = maya_env.module.get_scene_graph()
+        door = next(obj for obj in graph["objects"] if obj["n"] == "GEO_door")
+
+        assert graph["unit"] == "cm"
+        assert door["p"] == [0.0, 0.0, 0.0]
+        assert door["b"] == [-65.0, -110.0, -6.0, 65.0, 110.0, 6.0]
+
+    def test_measure_reports_working_unit_lengths(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh(
+            "GEO_door", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6), t=(0, 0, 0)
+        )
+
+        result = maya_env.module.measure("GEO_door", "GEO_door", mode="bbox")
+
+        assert result["unit"] == "m"
+        assert result["details"]["overlap_dims"] == pytest.approx([1.3, 2.2, 0.12])
+        assert result["distance"] == 0.0
+
+    def test_measure_modes_convert_every_length(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(200, 0, 0)
+        )
+
+        center = maya_env.module.measure("GEO_a", "GEO_b", mode="center")
+        assert center["distance"] == pytest.approx(2.0)
+        assert center["details"]["center_a"] == pytest.approx([0.5, 0.5, 0.5])
+        assert center["details"]["center_b"] == pytest.approx([2.5, 0.5, 0.5])
+
+        surface = maya_env.module.measure("GEO_a", "GEO_b", mode="surface")
+        assert surface["distance"] == pytest.approx(1.0)
+        assert surface["details"]["surface_a"] == pytest.approx([1.0, 0.5, 0.5])
+        assert surface["details"]["surface_b"] == pytest.approx([2.0, 0.5, 0.5])
+
+        clearance = maya_env.module.measure("GEO_a", "GEO_b", mode="clearance")
+        assert clearance["distance"] == pytest.approx(1.0)
+        assert clearance["details"]["clearances_xyz"] == pytest.approx([1.0, -1.0, -1.0])
+
+    def test_measure_keeps_centimetre_numbers(self, maya_env):
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(200, 0, 0)
+        )
+
+        result = maya_env.module.measure("GEO_a", "GEO_b", mode="clearance")
+
+        assert result["distance"] == 100.0
+        assert result["details"]["clearances_xyz"] == [100.0, -100.0, -100.0]
+
+    def test_spatial_index_distances_follow_the_working_unit(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(0, 0, 0), bbox_max=(10, 10, 10))
+        maya_env.scene.add_mesh("GEO_b", bbox_min=(0, 0, 0), bbox_max=(10, 10, 10), t=(100, 0, 0))
+
+        index = maya_env.module.get_spatial_index(max_distance=2.0)
+
+        assert index["threshold"] == pytest.approx(2.0)
+        assert index["pairs"] == [[0, 1, pytest.approx(1.0)]]
+
+    def test_full_detail_vertex_positions_follow_the_working_unit(self, maya_env, monkeypatch):
+        class FakeMesh:
+            numVertices = 1  # noqa: N815 - mirrors Maya's API
+            numPolygons = 1  # noqa: N815 - mirrors Maya's API
+
+            def __init__(self, dag):
+                pass
+
+            def getPoint(self, index, space):  # noqa: N802 - mirrors Maya's API
+                return maya_env.om2.MPoint(100, 50, 25)
+
+        monkeypatch.setattr(maya_env.om2, "MFnMesh", FakeMesh)
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh("GEO_cube", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+
+        graph = maya_env.module.get_scene_graph(detail_level="full")
+        cube = next(obj for obj in graph["objects"] if obj["n"] == "GEO_cube")
+
+        assert cube["verts"] == pytest.approx([1.0, 0.5, 0.25])
+
+    def test_zone_map_display_units_scales_boxes(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh(
+            "GEO_door", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(200, 0, 0)
+        )
+
+        display = next(
+            zone
+            for zone in maya_env.module.get_zone_map(display_units=True)["zones"]
+            if zone["name"] == "entrance"
+        )
+        internal = next(
+            zone for zone in maya_env.module.get_zone_map()["zones"] if zone["name"] == "entrance"
+        )
+
+        assert display["center"] == pytest.approx([2.5, 0.5, 0.5])
+        assert display["bbox_min"] == pytest.approx([2.0, 0.0, 0.0])
+        assert display["bbox_max"] == pytest.approx([3.0, 1.0, 1.0])
+        assert display["unit"] == "m"
+        assert internal["center"] == [250.0, 50.0, 50.0]
+        assert internal["bbox_min"] == [200.0, 0.0, 0.0]
+        assert internal["bbox_max"] == [300.0, 100.0, 100.0]
+        assert "unit" not in internal
