@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Camera framing converts to the scene's working unit before placing the
+  camera (#272, Refs #266)** —
+  `create_camera_shot` computed the target size and camera position from
+  OpenMaya centimetres, then handed them to `cmds.move`, which reads the
+  scene's working unit. A centimetre scene made the two agree, so the default
+  scene never showed it; in a metre scene the camera landed 100x too far and
+  the target never entered the frame. The position and box size now convert
+  once through `MDistance`, `position`/`distance` come back in the working
+  unit, and the `camera_create` description names it. A centimetre scene keeps
+  its old numbers and 0.1 cm rounding; other units report no coarser than
+  0.1 cm.
+  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Evidence:
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_metre_scene_frames_the_target`,
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_metre_scene_adds_the_target_offset`,
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_centimetre_scene_output_is_unchanged`,
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_inch_scene_is_no_coarser_than_cm`,
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_aim_fallback_aims_in_both_units`.
+
 - **World bounding boxes match Maya's own for the reported cases, and zone
   geometry reports the working unit it declares (#266, Refs #263, Refs #31,
   Refs #177)** —
