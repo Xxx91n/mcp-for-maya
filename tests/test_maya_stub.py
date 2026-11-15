@@ -5,6 +5,7 @@ runs against a fake maya.cmds, not a live session)."""
 from __future__ import annotations
 
 import math
+import sys
 
 import maya_stub
 import pytest
@@ -285,11 +286,12 @@ class TestSceneGraph:
         assert cmds.xform(cube, q=True, ws=True, t=True) == pytest.approx([5, 0, 0])
         assert scene.object_bbox(scene.resolve(cube)).max.x == pytest.approx(600.0)
 
-    def test_cached_box_cannot_be_un_rotated(self, scene):
-        """Known limitation, pinned so nobody 'fixes' it by accident or claims
-        it away: a child whose own rotation cancels the parent's has a loose
-        cached parent-space box, and multiplying it by the parent matrix keeps
-        the looseness. exactWorldBoundingBox walks the shapes and stays right.
+    def test_cached_box_is_loose_but_the_module_walks_shapes(self, scene):
+        """The stub still models Maya's loose cached box — a child whose own
+        rotation cancels the parent's gets a widened parent-space box, and no
+        matrix can un-rotate it (#273). Since #273 the module does not read
+        that box: it walks the shapes, so the reported width is the true 10,
+        not the 18.66 the layered read used to give.
         """
         parent = scene.add_transform("GRP_p")
         parent.r = [0, 30, 0]
@@ -299,6 +301,17 @@ class TestSceneGraph:
 
         assert scene.world_bbox(child).max.x == pytest.approx(5.0)  # world rotation is identity
         assert scene.object_bbox(child).max.x > 5.0  # the cached box is loose
+
+        module = maya_stub.load_scene_module()
+        try:
+            om = __import__("maya.api.OpenMaya", fromlist=["x"])
+            sel = om.MSelectionList()
+            sel.add("GEO_c")
+            box = module._world_bbox(sel.getDagPath(0))
+        finally:
+            sys.modules.pop("maya_mcp_server.maya_scene_module", None)
+
+        assert [box.max[i] - box.min[i] for i in range(3)] == pytest.approx([10, 10, 10], abs=1e-3)
 
 
 class TestOpenMayaStub:

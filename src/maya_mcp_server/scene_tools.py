@@ -304,6 +304,11 @@ def register_scene_tools(mcp: FastMCP) -> None:
         Returns a structured description of ALL objects with positions, sizes, and types.
         Call this once at the start of each task to see the whole scene before changing it.
 
+        Sizes are world-axis bounding boxes. Each shape's own box is
+        transformed once, so a rotated parent no longer widens a size layer
+        by layer; geometry that does not fill its own box (an L-shape, a
+        character mesh) can still read up to one axis-alignment too wide.
+
         The first line ends with MODIFIED=y or MODIFIED=n. y means the scene
         has changes that were never saved; n means it has none. This is
         Maya's own flag for the whole scene, so it says nothing about which
@@ -412,6 +417,11 @@ def register_scene_tools(mcp: FastMCP) -> None:
         previous shape; non-centimetre zone results and the CoS view add the
         unit.
 
+        An object's BBox is the node's own box, without its ancestors'
+        transforms. The zone branch reports world-axis boxes built from each
+        shape's own box transformed once, so a rotated parent no longer
+        widens them layer by layer; geometry that does not fill its own box
+        can still read up to one axis-alignment too wide.
         Boundary: Disambiguated from scene_snapshot (broad whole-scene
         spatial overview) and scene_describe (API-level attribute metadata,
         types, and connection wiring).
@@ -576,7 +586,11 @@ result
         Requires an active Maya session.
 
         Every mode measures world-space AABBs, not the mesh surface and not
-        the object origin. The modes differ in what the number means:
+        the object origin. Each shape's own box is transformed once, so a
+        rotated parent no longer widens the result layer by layer; geometry
+        that does not fill its own box (an L-shape, a character mesh) can
+        still measure up to one axis-alignment too wide. The modes differ in
+        what the number means:
           center     distance between the AABB midpoints.
           surface    distance between the closest facing AABB corners — an
                      axis-aligned approximation, so it over-reports clearance
@@ -651,6 +665,12 @@ result
 
         Use this after modifications to confirm the scene is in the desired state.
         This is the check step (the last of ICEV's four steps).
+
+        bbox_min/bbox_max compare world-axis boxes built from each shape's
+        own box, transformed once: a rotated parent no longer widens them
+        layer by layer, but geometry that does not fill its own box (an
+        L-shape, a character mesh) can still read up to one axis-alignment
+        too wide.
 
         Boundary: Disambiguated from scene_validate (checks relational
         spatial constraints across zones rather than exact expected values
@@ -1200,7 +1220,9 @@ result
         zone geometry (after auto_fix completes when auto_fix=True), resolves
         a target object per zone from objective (full DAG path, unique short
         name, or single measurable zone object; otherwise falls back to the
-        zone's world-axis bounding box), searches the models index in a
+        zone's world-axis bounding box, built from shape boxes transformed
+        once, so a rotated parent no longer widens it by layer), searches
+        the models index in a
         worker thread under a 5s soft time budget reusing the 300s models
         index cache, checks words, deduplicates (capped at 3 per zone and 12
         total), and screens candidates in metres (0.5x-1.5x per sorted axis
