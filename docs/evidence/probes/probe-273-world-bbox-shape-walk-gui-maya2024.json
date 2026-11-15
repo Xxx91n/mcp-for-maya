@@ -1,0 +1,613 @@
+{
+  "meta": {
+    "date": "2026-11-15",
+    "ticket": "Xxx91n/mcp-for-maya#273",
+    "parent": "#266 (the cached-box fix this ticket tightens)",
+    "env": "Autodesk Maya 2024 GUI (apiVersion 20240000, cutIdentifier 202302170737-4500172811, Qt 5.15.2) on Windows 11 IoT Enterprise LTSC 10.0.26100 x64; scene linear unit cm at rest; maya.exe pid 788; launched with -script (no commandPort); the launcher created one unsaved node before the driver ran",
+    "purpose": "Run the shipped maya_scene_module.py from the #273 branch on live Maya 2024 and compare its world boxes with cmds.exactWorldBoundingBox, then time the analysis path at 100 flat objects, 1000 flat objects and one 200-deep chain.",
+    "verdict": "The +30 parent / -30 child case reports the true 10 cube (the old cached-box read reports 18.66) and equals cmds.exactWorldBoundingBox; the four #266 cases still match; an empty mesh inside the measured group does not drag the union to the origin (a negative control without the filter does include it); the driver left the session open and its unsaved bystander in place; get_scene_graph took 10.21 ms at 115 objects, 106.23 ms at 1015 and 186.91 ms on one 200-deep chain (216 objects). The runs also caught three real-API facts the fake layer had wrong: MDagPath.child() returns an MObject, MBoundingBox has no isEmpty()/is_empty with a default box of min=max=(0,0,0), and MFnMesh refuses a mesh node with no geometry data (polyEvaluate is the vertex-count fallback).",
+    "claim_boundary": "Proves the mechanism and the timings on Maya 2024 on this box only. It does NOT prove Maya 2025/2026, and it does not exercise the MCP tool wrapper: the driver execs the shipped module source (sha256 in env.module_sha256). The 100/1000 scenes are flat (one shape per transform). The chain row is outside the object-count target: at depth 200 the walk is O(depth^2), so a pathological deep hierarchy can exceed 200 ms even though flat 1000-object scenes did not in these runs. Timing varies run to run on a GUI session; the spread is recorded under performance.timing_variance.",
+    "mayapy_blocker": {
+      "command": "mayapy.exe check_standalone.py",
+      "exit_code": 1,
+      "error": "ImportError: DLL load failed while importing standalone: \u52a8\u6001\u94fe\u63a5\u5e93(DLL)\u521d\u59cb\u5316\u4f8b\u7a0b\u5931\u8d25\u3002",
+      "note": "Same lane failure docs/testing.md Tier 2 records. Fallback was a GUI session started with -script, which runs the driver once at startup."
+    },
+    "provenance": {
+      "maya_executable": "D:\\maya2024\\Maya2024\\bin\\maya.exe",
+      "maya_pid": 788,
+      "transport": "maya.exe -script run_probe.mel; the MEL wrapper runs the driver through python() at GUI startup and the driver writes out.json. Quitting is opt-in (MAYA273_QUIT=1); these runs left the process up and closed it with Stop-Process after out.json was complete.",
+      "driver": "docs/reference/probe_273_acceptance_gui_driver.py",
+      "module_source_at_run": "the worktree ticket-273-world-bbox: the driver exec's src/maya_mcp_server/maya_scene_module.py and records its sha256 in env.module_sha256 (e2361ab91c1cddb5c482d875304da030ddd3e7fa2d0ac4eac8e3e6e2ba1e5366)",
+      "coverage": "every measured cell in rows and performance is copied from raw_driver_output; the claim and setup strings are authored for this file, and 'old_' numbers come from the driver's replica of the pre-#273 algorithm (old_world_bbox), not from a checkout of the base commit",
+      "old_number_provenance": "the 18.6602 old size matches the shipped pre-#273 code recorded in docs/evidence/probes/probe-266-world-bbox-units-gui-maya2024.json (row known_limitation_cancelled_rotation), so the replica and the base commit agree on this case",
+      "stub_divergence": "tests/maya_stub represents an empty box as min=+inf/max=-inf; Maya 2024 reads 0..0 with no isEmpty(). Both make expand() work from the first point, and the product decides emptiness with its own 'measured' flag, but the stub cannot reproduce the real representation. A mesh is therefore classified by vertex count, not by its box alone.",
+      "scene_safety": "Only triage273_-prefixed nodes were created and are deleted in a finally block; the launcher's triage273_bystander node is NOT deleted by the driver; currentUnit is restored; leftover is empty and restored_unit is cm; file(new=True) was never called.",
+      "driver_sha256_at_run": "2901eef2f3789be9db63ab30760cff2edb75e54c2604a2fbbcf78da1b97cbd0f",
+      "driver_sha256_current": "2901eef2f3789be9db63ab30760cff2edb75e54c2604a2fbbcf78da1b97cbd0f",
+      "driver_revision_note": "The committed driver is the file that ran (same sha256). Review rounds parented the empty mesh into the measured group, added the unfiltered negative control, guarded the status write, made quitting opt-in, and recorded a launcher-created bystander so a run can show it neither quits nor touches an unsaved scene.",
+      "run_history": [
+        "run 1 (pid 14492, 18:49): AttributeError: 'OpenMaya.MObject' object has no attribute 'inclusiveMatrix' inside _world_bbox. MDagPath.child() returns an MObject on Maya 2024; the pushed helper assumed a path. This is the product defect the probe was written to find.",
+        "run 2 (pid 21472, 18:52): the helper fix (MObject -> path.push) worked, but the probe zeroed the child's local rotation after parenting, so the 'cancelled rotation' row had world rotation Y30 and measured 13.66. Probe bug, not product.",
+        "run 3 (pid 11308, 18:53): setup corrected; cancelled case measured 10 against exact 10 (old 18.66); the run then errored on MBoundingBox.isEmpty(), which Maya 2024 does not have; the default box measured min=max=(0,0,0).",
+        "run 4 (pid 5932, 18:56): errored on a removed helper name (probe only).",
+        "run 5 (pid 10604, 18:57): complete; first full pass, but its empty-mesh row measured a group the empty mesh was not parented under.",
+        "run 6a (pid 13292, 19:11): errored because cmds.about(build=True) rejects the flag; cutIdentifier works.",
+        "run 6 (pid 13064, 19:12): complete; flat 1000-object get_scene_graph 86.57 ms, chain 145.1 ms. Its empty-mesh row was still vacuous; code review caught the missing parent.",
+        "run 7 (pid 19264, 19:35): after parenting the empty mesh into the group and adding the negative control; flat 1000 108.91 ms, chain 373.03 ms.",
+        "run 8 (pid 16572, 19:36): the final run, same bytes; flat 1000 151.01 ms, chain 283.91 ms. raw_driver_output below is this run.",
+        "run 9 (pid 17088, 19:57): the module crashed with ValueError: object is incompatible with MFnMesh constructor on the geometry-less mesh shape. Real-Maya fact 3: MFnMesh cannot be constructed for a mesh node with no data; polyEvaluate is now the fallback. The session survived with the bystander and the modified flag, which is the quit evidence, but the measurements after that point are missing.",
+        "run 10 (pid 788, 19:59): complete on the final source with the polyEvaluate fallback; flat 1000 106.23 ms, chain 186.91 ms, bystander and modified flag present at the end. raw_driver_output below is this run."
+      ]
+    }
+  },
+  "rows": [
+    {
+      "claim": "MDagPath.child() returns an MObject in API 2.0, not a path; MDagPath.push(child) extends the current path",
+      "setup": "a cube transform path",
+      "child_is_dag_path": false,
+      "child_returns": "MObject",
+      "mdagpath_has_push": true,
+      "push_then_name": "triage273_apiShape"
+    },
+    {
+      "claim": "MBoundingBox has no isEmpty()/is_empty in Maya 2024; a default-constructed box reads min=max=(0,0,0)",
+      "setup": "om2.MBoundingBox()",
+      "fresh_max": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "fresh_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "has_isEmpty": false,
+      "has_is_empty": false
+    },
+    {
+      "claim": "The issue's own case: parent rot Y30, child local rot -30, true 10 cube. New walk reports 10; the old cached-box read reports 18.66",
+      "case": "cancelled_rotation",
+      "exact_world_bbox": [
+        -5.0,
+        -5.0,
+        -5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "local_rotation": [
+        0.0,
+        -30.0,
+        0.0
+      ],
+      "new_size": [
+        10.0,
+        10.0,
+        10.0
+      ],
+      "new_world_bbox": [
+        -5.0,
+        -5.0,
+        -5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "old_size": [
+        18.6602,
+        10.0,
+        18.6602
+      ],
+      "setup": "group rot Y30, child local rot -30 (world rotation identity), 10 cube",
+      "world_rotation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "claim": "Top-level translate: the four #266 cases still match exactWorldBoundingBox",
+      "case": "translate",
+      "exact_world_bbox": [
+        150.0,
+        0.0,
+        250.0,
+        250.0,
+        100.0,
+        350.0
+      ],
+      "new_world_bbox": [
+        150.0,
+        0.0,
+        250.0,
+        250.0,
+        100.0,
+        350.0
+      ],
+      "setup": "100 cube at (200, 50, 300)"
+    },
+    {
+      "claim": "Top-level 45 degree rotation: 141.4214 wide, equal to the exact box",
+      "case": "rotation",
+      "exact_world_bbox": [
+        129.2893,
+        0.0,
+        229.2893,
+        270.7107,
+        100.0,
+        370.7107
+      ],
+      "new_size": [
+        141.4214,
+        100.0,
+        141.4214
+      ],
+      "new_world_bbox": [
+        129.2893,
+        0.0,
+        229.2893,
+        270.7107,
+        100.0,
+        370.7107
+      ],
+      "setup": "same 100 cube rotated 45 deg about Y"
+    },
+    {
+      "claim": "Nested child with its own translate under a moved parent",
+      "case": "nested_moved_parent",
+      "exact_world_bbox": [
+        505.0,
+        -5.0,
+        -5.0,
+        515.0,
+        5.0,
+        5.0
+      ],
+      "new_world_bbox": [
+        505.0,
+        -5.0,
+        -5.0,
+        515.0,
+        5.0,
+        5.0
+      ],
+      "setup": "group (500,0,0); child local translate (10,0,0); 10 cube"
+    },
+    {
+      "claim": "Nested child under a rotated parent",
+      "case": "nested_rotated_parent",
+      "exact_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "new_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "setup": "group (500,0,0) rot Y30; child local translate (10,0,0); 10 cube"
+    },
+    {
+      "claim": "Shape dag path",
+      "case": "shape_path",
+      "exact_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "new_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "setup": "|triage273_nested_grp|triage273_nested|triage273_nestedShape"
+    },
+    {
+      "claim": "A group with no shape keeps the cached-box read; both paths answer the same zero box",
+      "case": "empty_group",
+      "cached_fn_bbox": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "has_no_extent": true,
+      "max": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "min_gt_max": false,
+      "setup": "empty group (no shape anywhere below)"
+    },
+    {
+      "claim": "An intermediate shape is left out of the walk",
+      "case": "intermediate",
+      "setup": "triage273_interShape intermediateObject=1",
+      "skipped": true,
+      "walk_returns": []
+    },
+    {
+      "claim": "An empty mesh inside the measured group does not widen the union to the origin; without the filter the same union reports 0..1005",
+      "case": "empty_mesh_mix",
+      "empty_shape_bbox": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "exact_world_bbox": [
+        995.0,
+        -5.0,
+        -5.0,
+        1005.0,
+        5.0,
+        5.0
+      ],
+      "new_world_bbox": [
+        995.0,
+        -5.0,
+        -5.0,
+        1005.0,
+        5.0,
+        5.0
+      ],
+      "origin_inside": false,
+      "setup": "group holds a 10 cube at (1000,0,0) and a mesh with no vertices",
+      "unfiltered_bbox": [
+        0.0,
+        -5.0,
+        -5.0,
+        1005.0,
+        5.0,
+        5.0
+      ],
+      "unfiltered_includes_origin": true
+    },
+    {
+      "claim": "The driver leaves the session open and an unsaved launcher-created node in place; the scene stayed modified and the node existed after cleanup",
+      "setup": "launcher created triage273_bystander (unsaved) before the driver ran",
+      "bystander_at_end": true,
+      "bystander_at_start": true,
+      "modified_at_end": true,
+      "modified_at_start": true
+    }
+  ],
+  "performance": {
+    "note": "milliseconds, best of 3 per run; objects = all transform paths the module loops over; old_* is the driver's replica of the pre-#273 cached-box algorithm",
+    "recorded_run": {
+      "100_flat": {
+        "get_scene_graph_ms": 10.21,
+        "new_shape_walk_loop_ms": 4.81,
+        "objects": 115,
+        "old_cached_box_loop_ms": 3.13
+      },
+      "1000_flat": {
+        "get_scene_graph_ms": 106.23,
+        "new_shape_walk_loop_ms": 48.96,
+        "objects": 1015,
+        "old_cached_box_loop_ms": 111.12
+      },
+      "chain_depth_200": {
+        "get_scene_graph_ms": 186.91,
+        "new_shape_walk_loop_ms": 90.8,
+        "objects": 216,
+        "old_cached_box_loop_ms": 5.83
+      }
+    },
+    "timing_variance": {
+      "get_scene_graph_1000_flat_ms": [
+        86.57,
+        108.91,
+        151.01,
+        106.23
+      ],
+      "get_scene_graph_chain_depth_200_ms": [
+        145.1,
+        373.03,
+        283.91,
+        186.91
+      ],
+      "note": "GUI runs on the same box; a fresh session and machine load move these, so treat them as an order of magnitude, not a bench"
+    }
+  },
+  "raw_driver_output": {
+    "api": {
+      "child_is_dag_path": false,
+      "child_returns": "MObject",
+      "mdagpath_has_push": true,
+      "push_then_name": "triage273_apiShape"
+    },
+    "cancelled_rotation": {
+      "exact_world_bbox": [
+        -5.0,
+        -5.0,
+        -5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "local_rotation": [
+        0.0,
+        -30.0,
+        0.0
+      ],
+      "match": true,
+      "new_size": [
+        10.0,
+        10.0,
+        10.0
+      ],
+      "new_world_bbox": [
+        -5.0,
+        -5.0,
+        -5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "old_size": [
+        18.6602,
+        10.0,
+        18.6602
+      ],
+      "setup": "group rot Y30, child local rot -30 (world rotation identity), 10 cube",
+      "world_rotation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "empty_box_api": {
+      "fresh_max": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "fresh_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "has_isEmpty": false,
+      "has_is_empty": false
+    },
+    "empty_group": {
+      "cached_fn_bbox": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "has_no_extent": true,
+      "max": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "min_gt_max": false,
+      "setup": "empty group (no shape anywhere below)"
+    },
+    "empty_mesh_mix": {
+      "empty_shape_bbox": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "exact_world_bbox": [
+        995.0,
+        -5.0,
+        -5.0,
+        1005.0,
+        5.0,
+        5.0
+      ],
+      "match": true,
+      "new_world_bbox": [
+        995.0,
+        -5.0,
+        -5.0,
+        1005.0,
+        5.0,
+        5.0
+      ],
+      "origin_inside": false,
+      "setup": "group holds a 10 cube at (1000,0,0) and a mesh with no vertices",
+      "unfiltered_bbox": [
+        0.0,
+        -5.0,
+        -5.0,
+        1005.0,
+        5.0,
+        5.0
+      ],
+      "unfiltered_includes_origin": true
+    },
+    "env": {
+      "api_version": 20240000,
+      "build": null,
+      "cutIdentifier": "202302170737-4500172811",
+      "maya_version": "2024",
+      "module_sha256": "e2361ab91c1cddb5c482d875304da030ddd3e7fa2d0ac4eac8e3e6e2ba1e5366",
+      "module_source": "C:\\Users\\Administrator\\.gitbutler-worktrees\\maya-mcp-server\\ticket-273-world-bbox\\src\\maya_mcp_server\\maya_scene_module.py",
+      "qt": "5.15.2"
+    },
+    "intermediate": {
+      "setup": "triage273_interShape intermediateObject=1",
+      "skipped": true,
+      "walk_returns": []
+    },
+    "leftover": [],
+    "loaded": [
+      "_world_bbox",
+      "get_scene_graph"
+    ],
+    "nested_moved_parent": {
+      "exact_world_bbox": [
+        505.0,
+        -5.0,
+        -5.0,
+        515.0,
+        5.0,
+        5.0
+      ],
+      "match": true,
+      "new_world_bbox": [
+        505.0,
+        -5.0,
+        -5.0,
+        515.0,
+        5.0,
+        5.0
+      ],
+      "setup": "group (500,0,0); child local translate (10,0,0); 10 cube"
+    },
+    "nested_rotated_parent": {
+      "exact_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "match": true,
+      "new_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "setup": "group (500,0,0) rot Y30; child local translate (10,0,0); 10 cube"
+    },
+    "ok": true,
+    "perf_100": {
+      "get_scene_graph_ms": 10.21,
+      "new_shape_walk_loop_ms": 4.81,
+      "objects": 115,
+      "old_cached_box_loop_ms": 3.13
+    },
+    "perf_1000": {
+      "get_scene_graph_ms": 106.23,
+      "new_shape_walk_loop_ms": 48.96,
+      "objects": 1015,
+      "old_cached_box_loop_ms": 111.12
+    },
+    "perf_chain": {
+      "get_scene_graph_ms": 186.91,
+      "new_shape_walk_loop_ms": 90.8,
+      "objects": 216,
+      "old_cached_box_loop_ms": 5.83
+    },
+    "restored_angle": "deg",
+    "restored_unit": "cm",
+    "rotation": {
+      "exact_world_bbox": [
+        129.2893,
+        0.0,
+        229.2893,
+        270.7107,
+        100.0,
+        370.7107
+      ],
+      "match": true,
+      "new_size": [
+        141.4214,
+        100.0,
+        141.4214
+      ],
+      "new_world_bbox": [
+        129.2893,
+        0.0,
+        229.2893,
+        270.7107,
+        100.0,
+        370.7107
+      ],
+      "setup": "same 100 cube rotated 45 deg about Y"
+    },
+    "session": {
+      "bystander_at_end": true,
+      "bystander_at_start": true,
+      "modified_at_end": true,
+      "modified_at_start": true
+    },
+    "shape_path": {
+      "exact_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "match": true,
+      "new_world_bbox": [
+        501.8301,
+        -5.0,
+        -11.8301,
+        515.4904,
+        5.0,
+        1.8301
+      ],
+      "setup": "|triage273_nested_grp|triage273_nested|triage273_nestedShape"
+    },
+    "stage": "cleanup",
+    "translate": {
+      "exact_world_bbox": [
+        150.0,
+        0.0,
+        250.0,
+        250.0,
+        100.0,
+        350.0
+      ],
+      "match": true,
+      "new_world_bbox": [
+        150.0,
+        0.0,
+        250.0,
+        250.0,
+        100.0,
+        350.0
+      ],
+      "setup": "100 cube at (200, 50, 300)"
+    }
+  }
+}

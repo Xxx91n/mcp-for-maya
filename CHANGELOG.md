@@ -9,6 +9,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **World bounding boxes no longer widen layer by layer when a rotated child
+  sits under a rotated parent (#273, Refs #266)** —
+  `_world_bbox()` read `MFnDagNode.boundingBox` on the node itself. On a
+  transform that box is already axis-aligned and already widened by each
+  child's own rotation, so a rotation above it could only add more; nothing
+  could un-rotate it. A 10 cm cube with a +30° parent and a -30° child (the
+  two rotations cancel in world space) measured 18.66. The helper now walks
+  the shapes at or below the node and puts each shape's object-space box
+  through that shape path's inclusive matrix: every box is transformed once,
+  so the looseness no longer compounds with depth. Nodes with no readable
+  shape keep the cached-box read. `MDagPath.child()` hands back an MObject on
+  Maya 2024, so the walk extends the path it is on with `push()` instead of
+  assuming a path; `MBoundingBox` there has no `isEmpty()`, so a shape whose
+  box reads Maya's default (0,0,0)..(0,0,0) in object space is checked by
+  vertex count (`MFnMesh.numVertices`, with `polyEvaluate` as the fallback
+  because `MFnMesh` refuses a mesh node with no geometry data): 0 vertices is
+  empty and is skipped,
+  one vertex on the object origin is real and is kept (an empty mesh would
+  otherwise pull a far-away union back to the origin). Live
+  Maya 2024 reports the case as 10 (old: 18.66), equal to
+  `cmds.exactWorldBoundingBox`; `get_scene_graph` measured 10.21 ms at 115
+  objects and 86.57–151.01 ms at 1015 across four runs, while one 200-deep
+  chain (216 objects) took 145–373 ms — the O(depth^2) shape a nested
+  hierarchy costs, outside the object-count target. Geometry that does not
+  fill
+  its own box can
+  still measure up to one axis-alignment too wide, but no longer by layer;
+  the `scene_snapshot`, `scene_measure`, `scene_assert` and `scene_inspect`
+  tool descriptions state that boundary.
+  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Evidence:
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_child_rotation_cancelling_the_parent_reports_the_true_width`,
+  `tests/test_maya_stub.py::TestSceneGraph::test_cached_box_is_loose_but_the_module_walks_shapes`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_translate_is_applied_once`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_nested_child_under_a_moved_parent`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_shape_path_still_matches_the_exact_box`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_a_default_box_shape_is_skipped_but_a_real_point_is_kept`,
+  `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_an_empty_mesh_and_a_vertex_on_the_object_origin_are_told_apart`,
+  `docs/evidence/probes/probe-273-world-bbox-shape-walk-gui-maya2024.json`.
+
+- **Error messages redact UNC shares and absolute Unix paths (security audit
+  VULN-003)** —
+  `sanitize_error_message` matched drive-letter paths and `/home`/`/Users`
+  only, so `/opt/...`, `/var` or `\\server\share\...` in an exception text
+  reached the MCP client verbatim and disclosed the host directory layout.
+  Absolute paths are now redacted wherever they appear: one-segment Unix
+  paths, both slash forms of a UNC share, `file:`/`smb:` URLs, and URL text,
+  which loses its host along with its path. A path run ends at whitespace or a
+  quote, so punctuation straight after a path is swallowed with it. A
+  directory name containing a space keeps its tail; that is the shape still
+  visible. The drive-letter rule gained a path boundary: it read the `s://` in
+  `https://host/a` as drive `s:` and mangled URLs in error text.
+  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Evidence:
+  `tests/test_security.py::TestSanitizeErrorMessagePaths::test_absolute_unix_path_outside_home`,
+  `tests/test_security.py::TestSanitizeErrorMessagePaths::test_single_segment_absolute_path`,
+  `tests/test_security.py::TestSanitizeErrorMessagePaths::test_unc_share_path`,
+  `tests/test_security.py::TestSanitizeErrorMessagePaths::test_forward_slash_share_path`.
+- **Camera framing converts to the scene's working unit before placing the
+  camera (#272, Refs #266)** —
+  `create_camera_shot` computed the target size and camera position from
+  OpenMaya centimetres, then handed them to `cmds.move`, which reads the
+  scene's working unit. A centimetre scene made the two agree, so the default
+  scene never showed it; in a metre scene the camera landed 100x too far and
+  the target never entered the frame. The position and box size now convert
+  once through `MDistance`, `position`/`distance` come back in the working
+  unit, and the `camera_create` description names it. A centimetre scene keeps
+  its old numbers and 0.1 cm rounding; other units report no coarser than
+  0.1 cm.
+  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Evidence:
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_metre_scene_frames_the_target`,
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_metre_scene_adds_the_target_offset`,
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_centimetre_scene_output_is_unchanged`,
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_inch_scene_is_no_coarser_than_cm`,
+  `tests/test_maya_scene_module.py::TestCameraShotUnits::test_aim_fallback_aims_in_both_units`.
 - **World bounding boxes match Maya's own for the reported cases, and zone
   geometry reports the working unit it declares (#266, Refs #263, Refs #31,
   Refs #177)** —
@@ -38,6 +114,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_scene_tools_json.py::TestRecommendAssetsTargetAndSizing::test_zone_bbox_metres_fields_in_a_metre_scene`,
   `docs/evidence/probes/probe-266-world-bbox-units-gui-maya2024.json`,
   `docs/evidence/probes/probe-266-fivezone-recommendations-gui-maya2024.json`.
+
+- **Query payloads label the working unit and now report lengths in it
+  (#271, Refs #266)** —
+  `scene_snapshot`, `scene_measure` and `scene_inspect` read lengths from
+  OpenMaya, which always returns internal centimetres, but printed them next
+  to the unit `currentUnit` names. A metre scene therefore showed 130 for a
+  1.3 m door. Every reported length now converts once, before rounding:
+  object positions, box corners, sizes, measure distances/gaps/overlaps,
+  neighbor distances, full-detail vertex positions and zone centers/boxes.
+  `scene_validate`'s `min_clearance` keeps its internal-centimetre rule values
+  and reports `actual` in the same centimetres. Centimetre scenes keep their
+  exact previous numbers.
+  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Evidence:
+  `tests/test_maya_scene_module.py::TestWorkingUnitLengths::test_scene_graph_reports_working_unit_lengths`,
+  `tests/test_maya_scene_module.py::TestWorkingUnitLengths::test_measure_modes_convert_every_length`,
+  `tests/test_maya_scene_module.py::TestWorkingUnitLengths::test_full_detail_vertex_positions_follow_the_working_unit`,
+  `tests/test_maya_scene_module.py::TestWorkingUnitLengths::test_zone_map_display_units_scales_boxes`,
+  `tests/test_maya_scene_module.py::TestConstraints::test_min_clearance_keeps_centimetre_thresholds_in_a_metre_scene`,
+  `tests/test_maya_scene_module.py::TestConstraints::test_min_clearance_keeps_precision_below_the_display_rounding`,
+  `tests/test_scene_tools_json.py::TestToolWorkingUnitOutput::test_scene_snapshot_json_uses_working_unit`,
+  `tests/test_scene_tools_json.py::TestToolWorkingUnitOutput::test_scene_inspect_json_uses_working_unit`,
+  `tests/test_scene_tools_json.py::TestToolWorkingUnitOutput::test_scene_inspect_cos_names_a_converted_unit`,
+  `tests/test_scene_tools_json.py::TestToolWorkingUnitOutput::test_scene_inspect_rebuilds_neighbor_distances_after_a_unit_change`,
+  `tests/test_scene_tools_json.py::TestToolWorkingUnitOutput::test_scene_inspect_zone_json_uses_working_unit`,
+  `tests/test_cos_formatter.py::TestFormatInspectCos::test_metre_inspect_names_the_unit`,
+  `tests/test_cos_formatter.py::TestFormatZoneMapCos::test_converted_zone_names_the_unit`.
 
 - **`scene_plan` recommendations no longer drop candidates against a partially measured zone envelope (#262, Refs #31, Refs #177)** —
   when a zone's bounding box is built from partially measured objects

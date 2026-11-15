@@ -22,6 +22,9 @@ _Avoid_: Chain-of-Symbol 记号化、token 压缩格式、CoS 格式
 **Zone**: 按物体名字里的关键词分区域；`get_zone_map()` 实际认 7 组，`scene_plan` 另用 8 个名字。
 _Avoid_: 九组、nine zones、9 zones、功能分区、分区
 
+**工作单位（working unit）**: 场景当前用的长度单位，`MDistance.uiUnit()` 报的那一个，默认厘米；`cmds` 收发的长度按它算，OpenMaya 给的永远是内部厘米。
+_Avoid_: 场景单位（含糊）、UI 单位、working-unit
+
 **模型推荐**: `scene_plan(recommend_assets=True)` 在规划结果里附上 Poly Haven 的模型推荐：先等 `auto_fix` 整理完成再读取各区最新尺寸，在后台线程里按 5 秒软超时、复用 300 秒模型索引缓存搜索入口、展示、家具、灯光这四个区（`shell`、`ip_core`、`path` 跳过不搜），做按词核对、去重排序，并在超时或断网时降级为 `partial`/`offline`（不断掉原本的规划）；只是参考，不下载、不导入。
 _Avoid_: 智能推荐、AI 推荐、推荐引擎
 

@@ -149,7 +149,7 @@ AI 会调用 `scene_snapshot()` 看一遍场景，然后建模，再用 `scene_r
 
 | 能力 | 工具 | 说明 |
 |------|------|------|
-| 🧊 **空间感知** | `scene_snapshot` `scene_inspect` `scene_measure` | 一次调用拿到物体、类型、世界位置和大小。`scene_snapshot` 给的是世界坐标下的包围盒，物体一动、一缩放，这个数字就跟着变；`scene_inspect` 给的是节点自己的盒子，不含祖先的变换。`scene_measure` 按世界坐标的轴对齐包围盒算：两个形状没碰到，盒子也可能重叠；转过的或凹进去的形状，量出来会比看上去松。默认 CoS 输出按场景大小自己挑一个列出上限（小场景 50 个，超大场景 1000 个），所以实际上 1000 个以内一个都不会漏；超过 1000 才会在 `STATS:` 那行前面多出一行 `... N more objects`。要完全不设上限用 `format="json"`，但结果大很多 |
+| 🧊 **空间感知** | `scene_snapshot` `scene_inspect` `scene_measure` | 一次调用拿到物体、类型、世界位置和大小。`scene_snapshot` 给的是世界坐标下的包围盒，物体一动、一缩放，这个数字就跟着变；`scene_inspect` 给的是节点自己的盒子，不含祖先的变换。`scene_measure` 按世界坐标的轴对齐包围盒算：两个形状没碰到，盒子也可能重叠；转过的或凹进去的形状，量出来会比看上去松。这三个工具报的物体位置、包围盒角、尺寸、邻居距离和区域中心/区域盒子，都用场景当前线性单位（cm、m 或 mm）。厘米场景保持原来的输出形状；不是厘米的 JSON 结果和 CoS 输出会写明单位。默认 CoS 输出按场景大小自己挑一个列出上限（小场景 50 个，超大场景 1000 个），所以实际上 1000 个以内一个都不会漏；超过 1000 才会在 `STATS:` 那行前面多出一行 `... N more objects`。要完全不设上限用 `format="json"`，但结果大很多 |
 | 🎨 **画面质量** | `scene_aesthetics` | 5 维分析：色彩理论(60-30-10)、空间构成(黄金比例/三分法)、比例尺度(人体工学)、光照质量(三点照明/填充比/色温/衰减)、视觉动线 |
 | 🎬 **相机** | `camera_create` `camera_orbit` | 8 种内置镜头类型 + 环绕动画 |
 | 🛡️ **存档与读档** | `scene_checkpoint` `scene_rollback` `scene_checkpoint_list` | 把场景导出成磁盘上的 `.ma` 文件，放在 `checkpoints/`；读档时打开这个文件，再把场景指回原路径 |
@@ -179,7 +179,9 @@ scene_inspect(target="wall_entrance", include_neighbors=True)
 scene_measure(obj_a="wall_north", obj_b="counter_A", mode="clearance")
 
 # 验证场景状态
-scene_assert(expectations='{"wall": {"exists": true, "position": [0,0,500]}}')
+scene_assert(
+    expectations='{"wall": {"exists": true, "position": [0,0,500]}}'
+)  # 位置按 Maya 内部厘米算
 ```
 
 ### 场景检查
@@ -189,7 +191,7 @@ scene_assert(expectations='{"wall": {"exists": true, "position": [0,0,500]}}')
 scene_review()
 
 # 空间约束验证
-scene_validate(rules='[{"type": "min_clearance", "value": 180}]')
+scene_validate(rules='[{"type": "min_clearance", "value": 180}]')  # 数值按 Maya 内部厘米算
 ```
 
 ### 相机

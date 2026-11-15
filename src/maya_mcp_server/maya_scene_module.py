@@ -38,19 +38,24 @@ def _round3(val: float) -> float:
     return round(float(val), 3)
 
 
-def _round3_list(vals: Any) -> list[float]:
-    """Round a list of floats."""
-    return [_round3(v) for v in vals]
-
-
 def _vec3_to_list(p: om2.MPoint | om2.MVector) -> list[float]:
     """Convert MPoint/MVector to [x,y,z]."""
     return [_round3(p[0]), _round3(p[1]), _round3(p[2])]
 
 
-def _matrix_to_pos(matrix: om2.MMatrix) -> list[float]:
-    """Extract translation from MMatrix."""
-    return [_round3(matrix[12]), _round3(matrix[13]), _round3(matrix[14])]
+def _matrix_to_pos(matrix: om2.MMatrix, scale: float) -> list[float]:
+    """Extract translation from MMatrix, converted and rounded."""
+    return [_round3(matrix[12 + i] * scale) for i in range(3)]
+
+
+def _cm_to_unit_factor() -> float:
+    """Factor from OpenMaya centimetres to the working unit (1.0 in cm)."""
+    return float(om2.MDistance(1.0).asUnits(om2.MDistance.uiUnit()))
+
+
+def _cm_to_unit_xyz(values: Any, scale: float) -> list[float]:
+    """Convert an xyz length from centimetres, then round each component."""
+    return [_round3(values[i] * scale) for i in range(3)]
 
 
 def _classify_node(dag: om2.MDagPath) -> str:
@@ -133,17 +138,6 @@ def _get_mesh_stats(dag: om2.MDagPath) -> dict[str, int]:
         return {"v": 0, "f": 0}
 
 
-def _get_bbox_size(bbox: om2.MBoundingBox) -> list[float]:
-    """Get [w, h, d] from MBoundingBox."""
-    mn = bbox.min
-    mx = bbox.max
-    return [
-        _round3(abs(mx[0] - mn[0])),
-        _round3(abs(mx[1] - mn[1])),
-        _round3(abs(mx[2] - mn[2])),
-    ]
-
-
 def _point_distance(a: om2.MPoint, b: om2.MPoint) -> float:
     """Euclidean distance between two MPoints."""
     dx = a[0] - b[0]
@@ -164,27 +158,126 @@ _SAMPLE_CONSTRAINT_WINDOW = 20
 _SAMPLE_DEPTH = 30
 
 
-def _world_bbox(dag: om2.MDagPath) -> om2.MBoundingBox:
-    """World-space AABB for a DAG node.
+def _expand_box(out: om2.MBoundingBox, bbox: om2.MBoundingBox, matrix: om2.MMatrix) -> None:
+    """Grow `out` with the 8 corners of `bbox` put through `matrix`.
 
-    MFnDagNode.boundingBox is in PARENT space for a transform (it already
-    includes the node's own translate/rotate) and in object space for a
-    shape, so the exclusive matrix is right for a transform path and the
-    inclusive one for a shape path. All 8 corners are transformed: that is
-    what keeps the box axis-aligned under rotation. The cached box is already
-    an AABB, so a rotation above it can only over-approximate, never under.
+    All 8 corners, not just min/max: that is what keeps a transformed box
+    axis-aligned under rotation.
     """
-    fn = om2.MFnDagNode(dag)
-    bbox = fn.boundingBox
-    wm = dag.exclusiveMatrix() if dag.hasFn(om2.MFn.kTransform) else dag.inclusiveMatrix()
-    out = om2.MBoundingBox()
     for i in range(8):
         corner = om2.MPoint(
             bbox.min[0] if i & 1 else bbox.max[0],
             bbox.min[1] if i & 2 else bbox.max[1],
             bbox.min[2] if i & 4 else bbox.max[2],
         )
-        out.expand(corner * wm)
+        out.expand(corner * matrix)
+
+
+def _box_is_default(bbox: om2.MBoundingBox) -> bool:
+    """True when the box is Maya's untouched default: all six values zero.
+
+    A shape with no geometry answers (0,0,0)..(0,0,0) in object space, and
+    Maya 2024's MBoundingBox has no isEmpty() (GUI probe, #273), so that
+    reading is the only signal available.
+    """
+    return bool(
+        bbox.min[0] == 0.0
+        and bbox.min[1] == 0.0
+        and bbox.min[2] == 0.0
+        and bbox.max[0] == 0.0
+        and bbox.max[1] == 0.0
+        and bbox.max[2] == 0.0
+    )
+
+
+def _shape_has_no_geometry(shape_path: om2.MDagPath, shape_box: om2.MBoundingBox) -> bool:
+    """True when a shape carries nothing worth measuring.
+
+    A default box is not proof by itself: one vertex sitting on the object
+    origin also reads all zeros. A mesh is therefore checked by vertex count
+    (0 means no geometry, 1 or more keeps its point), and any other shape
+    type with a default box counts as empty — that is the cached-box
+    behaviour the module had before the walk. MFnMesh refuses a mesh node
+    with no geometry data (Maya 2024 raises ValueError there), so
+    polyEvaluate is the fallback; if neither can answer, the error reaches
+    the caller rather than calling real geometry empty.
+    """
+    if not _box_is_default(shape_box):
+        return False
+    if om2.MFnDagNode(shape_path).typeName == "mesh":
+        try:
+            return int(om2.MFnMesh(shape_path).numVertices) == 0
+        except Exception:
+            name = om2.MFnDagNode(shape_path).fullPathName()
+            return int(cmds.polyEvaluate(name, vertex=True)) == 0
+    return True
+
+
+def _shape_dag_paths(dag: om2.MDagPath) -> list[om2.MDagPath]:
+    """Shape paths at or below `dag`, intermediate objects left out.
+
+    A shape path carries its whole transform chain (a shape has no transform
+    of its own), so its inclusive matrix is the one matrix its object-space
+    box needs. An instanced shape comes back once per path, which is right:
+    each instance sits somewhere else. Read failures are not swallowed here:
+    they reach the caller, because skipping a shape would silently shrink the
+    box.
+    """
+    shapes: list[om2.MDagPath] = []
+    stack = [dag]
+    while stack:
+        cur = stack.pop()
+        if cur.hasFn(om2.MFn.kTransform):
+            for i in range(cur.childCount()):
+                child = cur.child(i)
+                # MDagPath.child() hands back an MObject on Maya 2024, not a
+                # path. Extend the path we are on instead of asking for a
+                # fresh one, so an instanced child stays on this instance.
+                if not isinstance(child, om2.MDagPath):
+                    child_path = om2.MDagPath(cur)
+                    child_path.push(child)
+                    child = child_path
+                stack.append(child)
+            continue
+        if om2.MFnDagNode(cur).isIntermediateObject:
+            continue
+        shapes.append(cur)
+    return shapes
+
+
+def _world_bbox(dag: om2.MDagPath) -> om2.MBoundingBox:
+    """World-space AABB for a DAG node.
+
+    Each shape at or below the node contributes its own object-space
+    boundingBox, put through that shape path's inclusive matrix. The shape's
+    box has not been stretched by any rotation yet, so the only axis
+    alignment left is the last one: error does not compound down the
+    hierarchy (#273). The old path read the transform's cached box, which is
+    already an AABB in parent space — no matrix can un-rotate it, so a child
+    rotation under a rotated parent over-reported 10 as 18.66.
+
+    A node with no readable shape (a plain group, a joint, empty geometry)
+    keeps the cached-box read: there MFnDagNode.boundingBox is PARENT space,
+    so it pairs with the exclusive matrix, never the inclusive one. Geometry
+    that does not fill its own box can still come out too big once, but no
+    longer by layer.
+    """
+    shape_union = om2.MBoundingBox()
+    measured = False
+    for shape_path in _shape_dag_paths(dag):
+        shape_box = om2.MFnDagNode(shape_path).boundingBox
+        if _shape_has_no_geometry(shape_path, shape_box):
+            continue
+        _expand_box(shape_union, shape_box, shape_path.inclusiveMatrix())
+        measured = True
+    if measured:
+        return shape_union
+
+    fn = om2.MFnDagNode(dag)
+    bbox = fn.boundingBox
+    wm = dag.exclusiveMatrix() if dag.hasFn(om2.MFn.kTransform) else dag.inclusiveMatrix()
+    out = om2.MBoundingBox()
+    _expand_box(out, bbox, wm)
     return out
 
 
@@ -201,6 +294,7 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
         JSON string with objects list, stats, unit, up_axis.
     """
     result: dict[str, Any] = {"objects": [], "stats": {}, "unit": "cm", "up_axis": "y"}
+    unit_scale = _cm_to_unit_factor()
 
     # Get scene unit
     try:
@@ -241,11 +335,12 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
             except Exception:
                 pass
 
-        # World-space box via the cached bbox (fast, 8 corners transformed)
+        # World-space box: shape boxes walked and transformed once each (#273)
         try:
             bbox = _world_bbox(dag)
-            bbox_min = _vec3_to_list(bbox.min)
-            bbox_max = _vec3_to_list(bbox.max)
+            # OpenMaya lengths are centimetres; the payload's unit is not.
+            bbox_min = _cm_to_unit_xyz(bbox.min, unit_scale)
+            bbox_max = _cm_to_unit_xyz(bbox.max, unit_scale)
         except Exception:
             bbox_min = [0, 0, 0]
             bbox_max = [0, 0, 0]
@@ -253,7 +348,7 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
         # Get world position from inclusive matrix
         try:
             world_matrix = dag.inclusiveMatrix()
-            pos = _matrix_to_pos(world_matrix)
+            pos = _matrix_to_pos(world_matrix, unit_scale)
         except Exception:
             pos = [0, 0, 0]
 
@@ -301,7 +396,7 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
                 verts = []
                 for i in range(min(mesh_fn.numVertices, 100)):
                     pt = mesh_fn.getPoint(i, cast(om2.MSpace, om2.MSpace.kWorld))
-                    verts.extend(_round3_list([pt[0], pt[1], pt[2]]))
+                    verts.extend(_cm_to_unit_xyz(pt, unit_scale))
                 obj["verts"] = verts
             except Exception:
                 pass
@@ -320,11 +415,16 @@ def get_scene_graph(detail_level: str = "compact") -> dict[str, Any]:
     return result
 
 
-def get_zone_map(patterns: dict[str, str] | None = None) -> dict[str, Any]:
+def get_zone_map(
+    patterns: dict[str, str] | None = None, display_units: bool = False
+) -> dict[str, Any]:
     """Group objects into zones by name keywords; 7 built-in zones.
     Args:
         patterns: dict of zone_name -> regex_pattern. If None, uses the
                   built-in 7-zone set for a pop-up store.
+        display_units: report zone centers and boxes in the scene's working
+                  linear unit instead of Maya's internal centimetres. The
+                  default keeps the numbers other Maya-side callers rely on.
 
     Returns:
         JSON string with zones list.
@@ -371,7 +471,7 @@ def get_zone_map(patterns: dict[str, str] | None = None) -> dict[str, Any]:
 
         if matched_zone:
             zones[matched_zone]["objects"].append(short_name)
-            # Update zone bbox (world space — 8-corner transform)
+            # Update zone bbox (world space, each shape's box transformed once)
             try:
                 sel_list = om2.MSelectionList()
                 sel_list.add(tname)
@@ -391,17 +491,22 @@ def get_zone_map(patterns: dict[str, str] | None = None) -> dict[str, Any]:
 
     # Finalize zones
     result_zones = []
+    unit_scale = _cm_to_unit_factor() if display_units else 1.0
+    # A centimetre scene keeps its old payload, so only a converted zone
+    # carries a unit label; there the numbers would otherwise be ambiguous.
+    unit_name = cmds.currentUnit(query=True, linear=True) if unit_scale != 1.0 else None
     for zone_name, zone in zones.items():
         if not zone["objects"]:
             continue
         zone["object_count"] = len(zone["objects"])
         # Compute center
         if zone["bbox_min"][0] != float("inf"):
-            zone["center"] = [
-                _round3((zone["bbox_min"][i] + zone["bbox_max"][i]) / 2) for i in range(3)
-            ]
-            zone["bbox_min"] = _round3_list(zone["bbox_min"])
-            zone["bbox_max"] = _round3_list(zone["bbox_max"])
+            center = [(zone["bbox_min"][i] + zone["bbox_max"][i]) / 2 for i in range(3)]
+            zone["center"] = _cm_to_unit_xyz(center, unit_scale)
+            zone["bbox_min"] = _cm_to_unit_xyz(zone["bbox_min"], unit_scale)
+            zone["bbox_max"] = _cm_to_unit_xyz(zone["bbox_max"], unit_scale)
+            if unit_name is not None:
+                zone["unit"] = unit_name
         else:
             zone["center"] = [0, 0, 0]
             zone["bbox_min"] = [0, 0, 0]
@@ -420,14 +525,19 @@ def get_spatial_index(max_neighbors: int = 8, max_distance: float | None = None)
 
     Args:
         max_neighbors: Maximum neighbors per object (default 8).
-        max_distance: Max distance for neighbor inclusion. If None, auto-calculated.
+        max_distance: Max neighbor distance in the scene's working linear
+            unit. If None, auto-calculated from the internal centimetres.
 
     Returns:
-        JSON string with adjacency list: [[obj_a_idx, obj_b_idx, distance], ...]
+        Adjacency list [[obj_a_idx, obj_b_idx, distance], ...]; distances and
+        threshold are in the scene's working linear unit (#271).
     """
     transforms = cmds.ls(type="transform", long=True) or []
     if not transforms:
         return {"pairs": [], "objects": [], "threshold": 0}
+    unit_scale = _cm_to_unit_factor()
+    if max_distance is not None:
+        max_distance = max_distance / unit_scale
 
     # Collect positions and names
     positions = []
@@ -485,7 +595,7 @@ def get_spatial_index(max_neighbors: int = 8, max_distance: float | None = None)
                     dists.append((dist, j))
             dists.sort()
             for dist, j in dists[:max_neighbors]:
-                pairs.append([i, j, _round3(dist)])
+                pairs.append([i, j, _round3(dist * unit_scale)])
     else:
         # Spatial hashing for large scenes
         cell_size = max_distance
@@ -514,18 +624,28 @@ def get_spatial_index(max_neighbors: int = 8, max_distance: float | None = None)
                                 dists.append((d, j))
             dists.sort()
             for dist, j in dists[:max_neighbors]:
-                pairs.append([i, j, _round3(dist)])
+                pairs.append([i, j, _round3(dist * unit_scale)])
 
-    return {"pairs": pairs, "objects": names, "threshold": _round3(max_distance), "count": n}
+    return {
+        "pairs": pairs,
+        "objects": names,
+        "threshold": _round3(max_distance * unit_scale),
+        "count": n,
+    }
 
 
-def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
+def measure(
+    obj_a: str, obj_b: str, mode: str = "center", native_cm: bool = False
+) -> dict[str, Any]:
     """Measure spatial relationship between two objects.
 
     Args:
         obj_a: Name of first object.
         obj_b: Name of second object.
         mode: "center" | "surface" | "clearance" | "bbox"
+        native_cm: internal callers only — return Maya's internal centimetres
+            instead of the working unit, so a threshold comparison keeps the
+            centimetre precision the displayed value has already rounded away.
 
     Returns:
         JSON string with measurement result.
@@ -538,6 +658,7 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
         "bbox_overlap": False,
         "unit": "cm",
     }
+    unit_scale = 1.0 if native_cm else _cm_to_unit_factor()
 
     try:
         # Get unit
@@ -562,7 +683,7 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
         }
         return result
 
-    # World-space AABBs via all 8 local-bbox corners (rotation-safe)
+    # World-space AABBs: each shape's own box, 8 corners transformed (#273)
     wb_a = _world_bbox(dag_a)
     wb_b = _world_bbox(dag_b)
     world_min_a, world_max_a = wb_a.min, wb_a.max
@@ -581,10 +702,10 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
     )
 
     if mode == "center":
-        result["distance"] = _round3(_point_distance(center_a, center_b))
+        result["distance"] = _round3(_point_distance(center_a, center_b) * unit_scale)
         result["details"] = {
-            "center_a": _vec3_to_list(center_a),
-            "center_b": _vec3_to_list(center_b),
+            "center_a": _cm_to_unit_xyz(center_a, unit_scale),
+            "center_b": _cm_to_unit_xyz(center_b, unit_scale),
         }
 
     elif mode == "bbox":
@@ -600,7 +721,7 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
         gaps = []
         for i in range(3):
             gap = max(0, max(world_min_a[i], world_min_b[i]) - min(world_max_a[i], world_max_b[i]))
-            gaps.append(_round3(gap))
+            gaps.append(_round3(gap * unit_scale))
         result["details"] = {"gaps_xyz": gaps, "overlapping": overlap}
 
         if overlap:
@@ -608,7 +729,7 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
             overlap_dims = []
             for i in range(3):
                 dim = min(world_max_a[i], world_max_b[i]) - max(world_min_a[i], world_min_b[i])
-                overlap_dims.append(max(0, _round3(dim)))
+                overlap_dims.append(max(0, _round3(dim * unit_scale)))
             result["details"]["overlap_dims"] = overlap_dims
             result["distance"] = 0.0
         else:
@@ -626,10 +747,10 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
             max(world_min_b[1], min(center_a[1], world_max_b[1])),
             max(world_min_b[2], min(center_a[2], world_max_b[2])),
         )
-        result["distance"] = _round3(_point_distance(closest_a, closest_b))
+        result["distance"] = _round3(_point_distance(closest_a, closest_b) * unit_scale)
         result["details"] = {
-            "surface_a": _vec3_to_list(closest_a),
-            "surface_b": _vec3_to_list(closest_b),
+            "surface_a": _cm_to_unit_xyz(closest_a, unit_scale),
+            "surface_b": _cm_to_unit_xyz(closest_b, unit_scale),
         }
 
     elif mode == "clearance":
@@ -643,9 +764,9 @@ def measure(obj_a: str, obj_b: str, mode: str = "center") -> dict[str, Any]:
             dist = math.sqrt(sum(max(0.0, g) ** 2 for g in gaps))
         else:
             dist = max(gaps)  # all negative: least-penetrating axis
-        result["distance"] = _round3(dist)
+        result["distance"] = _round3(dist * unit_scale)
         result["bbox_overlap"] = all(g < 0 for g in gaps)
-        result["details"] = {"clearances_xyz": [_round3(g) for g in gaps]}
+        result["details"] = {"clearances_xyz": _cm_to_unit_xyz(gaps, unit_scale)}
 
     return result
 
@@ -728,6 +849,12 @@ def get_unit_info() -> dict[str, Any]:
 def assert_scene_state(expectations_json: str) -> dict[str, Any]:
     """Verify scene state matches expectations.
 
+    The bbox values compared here are world-axis boxes built from each
+    shape's own box, transformed once. A rotated parent therefore no longer
+    widens them layer by layer, but geometry that does not fill its own box
+    (an L-shape, a character mesh) can still read up to one axis-alignment
+    too wide.
+
     Args:
         expectations_json: JSON string defining expected state.
             Format: {"obj_name": {"position": [x,y,z], "bbox_max": [x,y,z], ...}, ...}
@@ -767,7 +894,7 @@ def assert_scene_state(expectations_json: str) -> dict[str, Any]:
             checked += 1
             try:
                 world_matrix = dag.inclusiveMatrix()
-                actual_pos = _matrix_to_pos(world_matrix)
+                actual_pos = _matrix_to_pos(world_matrix, 1.0)
                 exp_pos = expected["position"]
                 # Allow 1 unit tolerance
                 if any(abs(a - e) > 1.0 for a, e in zip(actual_pos, exp_pos)):
@@ -895,7 +1022,8 @@ def check_constraints(rules: list[dict[str, Any]]) -> dict[str, Any]:
         rules: List of constraint dicts, each with:
             - type: "min_clearance" | "max_objects" | "no_overlap" | "min_height" | "max_height"
             - zone: optional zone name to limit check
-            - value: threshold value
+            - value: threshold value; length thresholds are in Maya internal
+              centimetres, the unit the other constraint checks use
             - objects: optional list of object names to check
 
     Returns:
@@ -913,7 +1041,9 @@ def check_constraints(rules: list[dict[str, Any]]) -> dict[str, Any]:
         obj_list = rule.get("objects")
 
         if rtype == "min_clearance":
-            # Check minimum clearance between objects
+            # Check minimum clearance between objects. native_cm keeps the
+            # comparison in internal centimetres, the unit the rule value uses,
+            # without the rounding the displayed working-unit value has.
             transforms = cmds.ls(type="transform", long=True) or []
             if zone:
                 zone_data = get_zone_map()
@@ -930,7 +1060,10 @@ def check_constraints(rules: list[dict[str, Any]]) -> dict[str, Any]:
                     pairs_checked += 1
                     try:
                         m = measure(
-                            transforms[i].split("|")[-1], transforms[j].split("|")[-1], "clearance"
+                            transforms[i].split("|")[-1],
+                            transforms[j].split("|")[-1],
+                            "clearance",
+                            native_cm=True,
                         )
                         checked += 1
                         # Negative clearance = penetration — that IS a violation.
@@ -1546,7 +1679,7 @@ def create_camera_shot(
         angle: Optional dict with "azimuth" and "elevation" in degrees.
 
     Returns:
-        dict with camera info.
+        dict with camera info; position and distance are in the scene's working unit.
     """
     if shot_type not in SHOT_TYPES:
         return _err(
@@ -1555,6 +1688,8 @@ def create_camera_shot(
         )
 
     shot = SHOT_TYPES[shot_type]
+    unit_scale = _cm_to_unit_factor()
+    decimals = max(0, math.ceil(1 - math.log10(unit_scale)))  # no coarser than 0.1 cm
 
     # Get target position and size
     try:
@@ -1565,11 +1700,11 @@ def create_camera_shot(
         bbox = fn.boundingBox
         wm = dag.inclusiveMatrix()
 
-        target_pos = [wm[12], wm[13], wm[14]]
+        target_pos = [wm[12] * unit_scale, wm[13] * unit_scale, wm[14] * unit_scale]
         target_size = max(
-            abs(bbox.max[0] - bbox.min[0]),
-            abs(bbox.max[1] - bbox.min[1]),
-            abs(bbox.max[2] - bbox.min[2]),
+            abs(bbox.max[0] - bbox.min[0]) * unit_scale,
+            abs(bbox.max[1] - bbox.min[1]) * unit_scale,
+            abs(bbox.max[2] - bbox.min[2]) * unit_scale,
         )
     except Exception as e:
         return _err(
@@ -1582,8 +1717,6 @@ def create_camera_shot(
     distance = target_size * shot["distance_mult"]
     azimuth = (angle or {}).get("azimuth", 30)
     elevation = (angle or {}).get("elevation", 15)
-
-    import math
 
     az_rad = math.radians(azimuth)
     el_rad = math.radians(elevation)
@@ -1613,8 +1746,6 @@ def create_camera_shot(
         )
     except Exception:
         # Fallback: calculate rotation manually
-        import math
-
         dx = target_pos[0] - cam_x
         dy = target_pos[1] - cam_y
         dz = target_pos[2] - cam_z
@@ -1630,9 +1761,9 @@ def create_camera_shot(
         "camera": cam_transform,
         "shot_type": shot_type,
         "description": shot["desc"],
-        "position": [round(cam_x, 1), round(cam_y, 1), round(cam_z, 1)],
+        "position": [round(cam_x, decimals), round(cam_y, decimals), round(cam_z, decimals)],
         "focal_length": shot["focal_length"],
-        "distance": round(distance, 1),
+        "distance": round(distance, decimals),
         "target": target,
     }
 
@@ -4496,7 +4627,7 @@ def _predict_conflicts(transforms: list[str]) -> list[dict[str, Any]]:
     """Predict potential spatial conflicts before they happen."""
     conflicts: list[dict[str, Any]] = []
 
-    # Get bounds for all objects (world-space via 8-corner transform)
+    # Get bounds for all objects (world-space, shape boxes transformed once)
     obj_bounds: dict[str, dict[str, Any]] = {}
     for t in transforms[:_SAMPLE_CONFLICTS]:
         try:

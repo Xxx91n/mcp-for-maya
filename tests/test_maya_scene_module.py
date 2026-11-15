@@ -288,7 +288,9 @@ class TestWorldBboxMatchesExactBox:
     Feeding the inclusive matrix to a transform path lands that transform
     twice. The hardcoded numbers are the real pin — comparing against
     cmds.exactWorldBoundingBox only catches the fake drifting away from the
-    module, because both sides of that comparison are the fake.
+    module, because both sides of that comparison are the fake. Since #273
+    the module walks the shapes and transforms each object-space box once,
+    so the cached transform box is only read for nodes with no shape.
     """
 
     def test_translate_is_applied_once(self, maya_env):
@@ -320,6 +322,28 @@ class TestWorldBboxMatchesExactBox:
         # A 100 cube at 45 deg is 141.421 wide, not 200.
         assert size[0] == pytest.approx(100 * math.sqrt(2), abs=1e-3)
         assert size[1] == pytest.approx(100, abs=1e-3)
+
+    def test_child_rotation_cancelling_the_parent_reports_the_true_width(self, maya_env):
+        """#273: the cached box is already widened by the child's own -30 deg
+        before the parent's +30 deg reaches it, so the old read could not
+        un-rotate it and reported 18.66 for a true 10 cube. Walking the
+        shapes transforms each object-space box exactly once."""
+        parent = maya_env.scene.add_transform("GRP_p")
+        parent.r = [0, 30, 0]
+        maya_env.scene.add_mesh(
+            "GEO_c", bbox_min=(-5, -5, -5), bbox_max=(5, 5, 5), r=(0, -30, 0), parent=parent
+        )
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, "GEO_c"))
+        exact = maya_env.cmds.exactWorldBoundingBox("GEO_c")
+        size = [box.max[i] - box.min[i] for i in range(3)]
+
+        # The two rotations cancel in world space, so this is the 10 cube.
+        assert size == pytest.approx([10, 10, 10], abs=1e-3)
+        assert [box.min[i] for i in range(3)] == pytest.approx([-5, -5, -5], abs=1e-3)
+        assert [box.max[i] for i in range(3)] == pytest.approx([5, 5, 5], abs=1e-3)
+        assert [box.min[i] for i in range(3)] == pytest.approx(exact[:3], abs=1e-3)
+        assert [box.max[i] for i in range(3)] == pytest.approx(exact[3:], abs=1e-3)
 
     def test_nested_child_under_a_moved_parent(self, maya_env):
         parent = maya_env.scene.add_transform("GRP_root", t=(500, 0, 0))
@@ -354,6 +378,83 @@ class TestWorldBboxMatchesExactBox:
         )
         assert [box.min[i] for i in range(3)] == pytest.approx(exact[:3], abs=1e-3)
         assert [box.max[i] for i in range(3)] == pytest.approx(exact[3:], abs=1e-3)
+
+    def test_a_group_without_shapes_keeps_the_cached_read(self, maya_env):
+        """Nothing to walk: a shape-less group answers through the cached box.
+        The stub represents an empty box as inf/-inf, so compare against the
+        cached box itself rather than pinning the representation (real Maya
+        reads 0..0 there; the GUI probe records it)."""
+        group = maya_env.scene.add_transform("GRP_empty")
+        cached = maya_env.scene.object_bbox(group)
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, "GRP_empty"))
+
+        assert [box.min[i] for i in range(3)] == [cached.min[i] for i in range(3)]
+        assert [box.max[i] for i in range(3)] == [cached.max[i] for i in range(3)]
+
+    def test_intermediate_shapes_are_left_out_of_the_walk(self, maya_env):
+        """Intermediate objects are history, not geometry to measure; the
+        cached aggregate ignored them too."""
+        mesh = maya_env.scene.add_mesh("GEO_hist", bbox_min=(0, 0, 0), bbox_max=(1, 1, 1))
+        mesh.children[0].intermediate = True
+
+        assert maya_env.module._shape_dag_paths(_dag_path(maya_env, "GEO_hist")) == []
+
+    def test_a_default_box_shape_is_skipped_but_a_real_point_is_kept(self, maya_env):
+        """Maya 2024's MBoundingBox has no isEmpty(), and a shape with no
+        geometry reads (0,0,0)..(0,0,0) in object space (GUI probe #273).
+        Merging that would stretch a far-away union to the origin, so the
+        default reading is skipped. A zero-extent box anywhere else is real
+        geometry (a single vertex) and stays."""
+        parent = maya_env.scene.add_transform("GRP_mix")
+        maya_env.scene.add_mesh(
+            "GEO_empty",
+            bbox_min=(0, 0, 0),
+            bbox_max=(0, 0, 0),
+            num_vertices=0,
+            parent=parent,
+        )
+        maya_env.scene.add_mesh("GEO_point", bbox_min=(5, 0, 0), bbox_max=(5, 0, 0), parent=parent)
+        maya_env.scene.add_mesh(
+            "GEO_far",
+            bbox_min=(0, 0, 0),
+            bbox_max=(10, 10, 10),
+            t=(1000, 0, 0),
+            parent=parent,
+        )
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, "GRP_mix"))
+
+        assert box.min.x == pytest.approx(5.0, abs=1e-3)  # the point survived
+        assert box.max.x == pytest.approx(1010.0, abs=1e-3)
+
+    def test_an_empty_mesh_and_a_vertex_on_the_object_origin_are_told_apart(self, maya_env):
+        """A single vertex on the object origin also reads a default box, so
+        the vertex count decides: 0 is empty, 1 is a real point at the node's
+        world position (moved to x=100 here; an empty mesh sits at x=200 and
+        must not widen the union)."""
+        parent = maya_env.scene.add_transform("GRP_points")
+        maya_env.scene.add_mesh(
+            "GEO_vertex",
+            bbox_min=(0, 0, 0),
+            bbox_max=(0, 0, 0),
+            t=(100, 0, 0),
+            num_vertices=1,
+            parent=parent,
+        )
+        maya_env.scene.add_mesh(
+            "GEO_no_verts",
+            bbox_min=(0, 0, 0),
+            bbox_max=(0, 0, 0),
+            t=(200, 0, 0),
+            num_vertices=0,
+            parent=parent,
+        )
+
+        box = maya_env.module._world_bbox(_dag_path(maya_env, "GRP_points"))
+
+        assert box.min.x == pytest.approx(100.0, abs=1e-3)
+        assert box.max.x == pytest.approx(100.0, abs=1e-3)
 
 
 class TestReportedBoxIsWorldSpace:
@@ -452,6 +553,35 @@ class TestConstraints:
         maya_env.scene.add_mesh("GEO_b", t=(1000, 0, 0))
         res = maya_env.module.check_constraints([{"type": "min_clearance", "value": 10}])
         assert res["passed"] is True
+
+    def test_min_clearance_keeps_centimetre_thresholds_in_a_metre_scene(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(200, 0, 0)
+        )
+
+        tight = maya_env.module.check_constraints([{"type": "min_clearance", "value": 150}])
+        loose = maya_env.module.check_constraints([{"type": "min_clearance", "value": 50}])
+
+        violation = next(v for v in tight["violations"] if v["type"] == "min_clearance")
+        assert violation["actual"] == pytest.approx(100.0)
+        assert violation["required"] == 150
+        assert loose["passed"] is True
+
+    def test_min_clearance_keeps_precision_below_the_display_rounding(self, maya_env):
+        """99.96 cm is below 100 cm; the displayed 0.9996 m rounds to 1.0 m,
+        so comparing the display value would wrongly pass this rule."""
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(199.96, 0, 0)
+        )
+
+        res = maya_env.module.check_constraints([{"type": "min_clearance", "value": 100}])
+
+        violation = next(v for v in res["violations"] if v["type"] == "min_clearance")
+        assert violation["actual"] == pytest.approx(99.96)
 
     def test_sampling_disclosed(self, maya_env):
         # 30 transforms -> pair window (i+20) truncates some pairs
@@ -781,3 +911,244 @@ class TestOrbitCamera:
         assert len(maya_env.scene.keyed) >= 3
         assert all(node == cam.name for node, _attr in maya_env.scene.keyed)
         assert len(maya_env.scene.keyed) >= 3
+
+
+# ------------------------------------------------------------
+# #272: camera framing must speak the scene's working unit
+# ------------------------------------------------------------
+
+
+class TestCameraShotUnits:
+    """OpenMaya hands back centimetres; cmds.move reads working units.
+
+    In a centimetre scene the two agree, which is why this stayed green.
+    In a metre scene the raw centimetre numbers put the camera 100x too far.
+    """
+
+    # The same numbers in every unit system: 2.2 units tall, medium = 3x,
+    # azimuth 30 / elevation 15.
+    EXPECTED_POSITION = [3.1876, 1.7082, 5.5210]
+
+    @staticmethod
+    def _door(maya_env, unit):
+        """One 1.3 x 2.2 x 0.12 door in the requested working unit."""
+        maya_env.scene.linear_unit = unit
+        name = "door_" + unit
+        maya_env.cmds.polyCube(w=1.3, h=2.2, d=0.12, name=name)
+        return name
+
+    def test_metre_scene_frames_the_target(self, maya_env):
+        scene = maya_env.scene
+        name = self._door(maya_env, "m")
+
+        res = maya_env.module.create_camera_shot(name, shot_type="medium")
+        assert "error" not in res
+
+        assert res["distance"] == pytest.approx(6.6, abs=1e-3)
+        assert res["position"] == pytest.approx(self.EXPECTED_POSITION, abs=1e-3)
+
+        cam = scene.resolve(res["camera"])
+        world_cm = scene.world_position(cam)
+        world_m = [v * scene.working_unit_scale() for v in world_cm]
+        assert world_m == pytest.approx(self.EXPECTED_POSITION, abs=1e-3)
+        # The camera must actually aim at the door, not just sit near it.
+        assert scene.constraints[-1]["target"] == scene.resolve(name).name
+
+    def test_metre_scene_adds_the_target_offset(self, maya_env):
+        """The target's own position is converted too, not just its size."""
+        scene = maya_env.scene
+        name = self._door(maya_env, "m")
+        maya_env.cmds.move(2, 1, 3, name)
+
+        res = maya_env.module.create_camera_shot(name, shot_type="medium")
+
+        expected = [v + off for v, off in zip(self.EXPECTED_POSITION, (2, 1, 3))]
+        assert res["position"] == pytest.approx(expected, abs=1e-3)
+        world_cm = scene.world_position(scene.resolve(res["camera"]))
+        world_m = [v * scene.working_unit_scale() for v in world_cm]
+        assert world_m == pytest.approx(expected, abs=1e-3)
+
+    def test_centimetre_scene_output_is_unchanged(self, maya_env):
+        scene = maya_env.scene
+        name = self._door(maya_env, "cm")
+
+        res = maya_env.module.create_camera_shot(name, shot_type="medium")
+
+        # Default scene: the reported numbers must stay exactly as before.
+        assert res["position"] == [3.2, 1.7, 5.5]
+        assert res["distance"] == 6.6
+        cam = scene.resolve(res["camera"])
+        # Byte-identical landing: the factor is exactly 1.0, so the stored
+        # centimetres are the same floats the old code produced.
+        assert cam.t == [3.187555226753925, 1.708205697676637, 5.521007604669533]
+
+    def test_inch_scene_is_no_coarser_than_cm(self, maya_env):
+        """A non-cm scene reports no coarser than 0.1 cm."""
+        name = self._door(maya_env, "in")
+
+        res = maya_env.module.create_camera_shot(name, shot_type="medium")
+
+        assert res["distance"] == pytest.approx(6.6, abs=1e-3)
+        assert res["position"] == [round(v, 2) for v in self.EXPECTED_POSITION]
+
+    @pytest.mark.parametrize("unit", ["cm", "m"])
+    def test_aim_fallback_aims_in_both_units(self, maya_env, monkeypatch, unit):
+        """A failed constraint must not change the manual aim between units."""
+        scene = maya_env.scene
+        name = self._door(maya_env, unit)
+
+        def boom(*a, **k):
+            raise RuntimeError("constraint engine down")
+
+        monkeypatch.setattr(maya_env.cmds, "aimConstraint", boom)
+        res = maya_env.module.create_camera_shot(name, shot_type="medium")
+        assert "error" not in res
+
+        cam = scene.resolve(res["camera"])
+        assert cam.r == pytest.approx([-15.0, 30.0, 0.0], abs=1e-6)
+
+        # The -Z axis of a Maya camera is its view direction; it must point
+        # from the camera to the door at the origin.
+        cam_pos = [v * scene.working_unit_scale() for v in scene.world_position(cam)]
+        norm = math.sqrt(sum(v * v for v in cam_pos))
+        to_target = [-v / norm for v in cam_pos]
+        rx, ry = math.radians(cam.r[0]), math.radians(cam.r[1])
+        forward = [
+            -math.cos(rx) * math.sin(ry),
+            math.sin(rx),
+            -math.cos(rx) * math.cos(ry),
+        ]
+        assert forward == pytest.approx(to_target, abs=1e-6)
+
+
+# ------------------------------------------------------------
+# #271: query payloads declare the working unit, so their lengths
+# must be converted out of OpenMaya's internal centimetres.
+# ------------------------------------------------------------
+
+
+class TestWorkingUnitLengths:
+    """OpenMaya always hands back centimetres; `unit` names the working unit."""
+
+    def test_scene_graph_reports_working_unit_lengths(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh(
+            "GEO_door", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6), t=(0, 0, 0)
+        )
+
+        graph = maya_env.module.get_scene_graph()
+        door = next(obj for obj in graph["objects"] if obj["n"] == "GEO_door")
+
+        assert graph["unit"] == "m"
+        assert door["p"] == [0.0, 0.0, 0.0]
+        assert door["b"] == pytest.approx([-0.65, -1.1, -0.06, 0.65, 1.1, 0.06])
+
+    def test_scene_graph_keeps_centimetre_numbers(self, maya_env):
+        maya_env.scene.add_mesh(
+            "GEO_door", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6), t=(0, 0, 0)
+        )
+
+        graph = maya_env.module.get_scene_graph()
+        door = next(obj for obj in graph["objects"] if obj["n"] == "GEO_door")
+
+        assert graph["unit"] == "cm"
+        assert door["p"] == [0.0, 0.0, 0.0]
+        assert door["b"] == [-65.0, -110.0, -6.0, 65.0, 110.0, 6.0]
+
+    def test_measure_reports_working_unit_lengths(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh(
+            "GEO_door", bbox_min=(-65, -110, -6), bbox_max=(65, 110, 6), t=(0, 0, 0)
+        )
+
+        result = maya_env.module.measure("GEO_door", "GEO_door", mode="bbox")
+
+        assert result["unit"] == "m"
+        assert result["details"]["overlap_dims"] == pytest.approx([1.3, 2.2, 0.12])
+        assert result["distance"] == 0.0
+
+    def test_measure_modes_convert_every_length(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(200, 0, 0)
+        )
+
+        center = maya_env.module.measure("GEO_a", "GEO_b", mode="center")
+        assert center["distance"] == pytest.approx(2.0)
+        assert center["details"]["center_a"] == pytest.approx([0.5, 0.5, 0.5])
+        assert center["details"]["center_b"] == pytest.approx([2.5, 0.5, 0.5])
+
+        surface = maya_env.module.measure("GEO_a", "GEO_b", mode="surface")
+        assert surface["distance"] == pytest.approx(1.0)
+        assert surface["details"]["surface_a"] == pytest.approx([1.0, 0.5, 0.5])
+        assert surface["details"]["surface_b"] == pytest.approx([2.0, 0.5, 0.5])
+
+        clearance = maya_env.module.measure("GEO_a", "GEO_b", mode="clearance")
+        assert clearance["distance"] == pytest.approx(1.0)
+        assert clearance["details"]["clearances_xyz"] == pytest.approx([1.0, -1.0, -1.0])
+
+    def test_measure_keeps_centimetre_numbers(self, maya_env):
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+        maya_env.scene.add_mesh(
+            "GEO_b", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(200, 0, 0)
+        )
+
+        result = maya_env.module.measure("GEO_a", "GEO_b", mode="clearance")
+
+        assert result["distance"] == 100.0
+        assert result["details"]["clearances_xyz"] == [100.0, -100.0, -100.0]
+
+    def test_spatial_index_distances_follow_the_working_unit(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh("GEO_a", bbox_min=(0, 0, 0), bbox_max=(10, 10, 10))
+        maya_env.scene.add_mesh("GEO_b", bbox_min=(0, 0, 0), bbox_max=(10, 10, 10), t=(100, 0, 0))
+
+        index = maya_env.module.get_spatial_index(max_distance=2.0)
+
+        assert index["threshold"] == pytest.approx(2.0)
+        assert index["pairs"] == [[0, 1, pytest.approx(1.0)]]
+
+    def test_full_detail_vertex_positions_follow_the_working_unit(self, maya_env, monkeypatch):
+        class FakeMesh:
+            numVertices = 1  # noqa: N815 - mirrors Maya's API
+            numPolygons = 1  # noqa: N815 - mirrors Maya's API
+
+            def __init__(self, dag):
+                pass
+
+            def getPoint(self, index, space):  # noqa: N802 - mirrors Maya's API
+                return maya_env.om2.MPoint(100, 50, 25)
+
+        monkeypatch.setattr(maya_env.om2, "MFnMesh", FakeMesh)
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh("GEO_cube", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100))
+
+        graph = maya_env.module.get_scene_graph(detail_level="full")
+        cube = next(obj for obj in graph["objects"] if obj["n"] == "GEO_cube")
+
+        assert cube["verts"] == pytest.approx([1.0, 0.5, 0.25])
+
+    def test_zone_map_display_units_scales_boxes(self, maya_env):
+        maya_env.scene.linear_unit = "m"
+        maya_env.scene.add_mesh(
+            "GEO_door", bbox_min=(0, 0, 0), bbox_max=(100, 100, 100), t=(200, 0, 0)
+        )
+
+        display = next(
+            zone
+            for zone in maya_env.module.get_zone_map(display_units=True)["zones"]
+            if zone["name"] == "entrance"
+        )
+        internal = next(
+            zone for zone in maya_env.module.get_zone_map()["zones"] if zone["name"] == "entrance"
+        )
+
+        assert display["center"] == pytest.approx([2.5, 0.5, 0.5])
+        assert display["bbox_min"] == pytest.approx([2.0, 0.0, 0.0])
+        assert display["bbox_max"] == pytest.approx([3.0, 1.0, 1.0])
+        assert display["unit"] == "m"
+        assert internal["center"] == [250.0, 50.0, 50.0]
+        assert internal["bbox_min"] == [200.0, 0.0, 0.0]
+        assert internal["bbox_max"] == [300.0, 100.0, 100.0]
+        assert "unit" not in internal

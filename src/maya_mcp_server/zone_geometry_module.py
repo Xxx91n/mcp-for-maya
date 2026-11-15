@@ -3,9 +3,12 @@
 # scene_tools._ensure_module_injected appends this file after
 # validator_module.py and injects the whole assembly as _mcp_scene.
 # It is not a separate injected module. The assembled namespace provides
-# get_zone_map(), get_unit_info() and _world_bbox(); this file deliberately
-# reuses them so zone membership and the eight-corner world bbox stay the
-# same as the existing scene queries.
+# get_zone_map(), get_unit_info(), _world_bbox() and _cm_to_unit_factor();
+# this file deliberately reuses them so zone membership and the eight-corner
+# world bbox stay the same as the existing scene queries. get_zone_map() here
+# is called without display_units, so its boxes stay in internal centimetres
+# and this file applies the factor itself: scaling both corners before they
+# are rounded keeps size = high - low exact instead of rounding twice.
 #
 # Not wired up yet: #177 connects the host helper to the recommendation pass.
 # scene_plan does not call this file, so its default output stays unchanged.
@@ -42,16 +45,6 @@ def _zone_size(low: Any, high: Any) -> list[float] | None:
     return _zone_vector([round(abs(hi - lo), 3) for lo, hi in zip(mn, mx)])
 
 
-def _zone_unit_scale() -> float:
-    """Centimetres -> the working linear unit (1.0 in a centimetre scene).
-
-    OpenMaya hands back internal centimetres whatever currentUnit says, so
-    every length this file reports has to be converted before it is labelled
-    with the scene's unit. #266: skipping this made metre scenes 100x too big.
-    """
-    return float(OpenMaya.MDistance(1.0).asUnits(OpenMaya.MDistance.uiUnit()))
-
-
 def _zone_scaled(values: list[float] | None, scale: float) -> list[float] | None:
     """Apply the unit factor to a length vector, keeping nulls null."""
     if values is None:
@@ -78,7 +71,7 @@ def get_zone_geometry() -> dict[str, Any]:
         unit_info = globals()["get_unit_info"]()
         transforms = cmds.ls(type="transform", long=True) or []
         world_bbox = globals()["_world_bbox"]
-        scale = _zone_unit_scale()
+        scale = globals()["_cm_to_unit_factor"]()
 
         # get_zone_map stores short names. A leaf name always maps to the same
         # zone because the same regex matched it; resolving the full path below

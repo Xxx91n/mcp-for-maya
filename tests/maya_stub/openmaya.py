@@ -107,11 +107,19 @@ class MDagPath:
             self._path = self._path[:-1]
             self._node = self._path[-1] if self._path else None
 
+    def push(self, node):
+        """Extend this path by one child node (real API takes an MObject)."""
+        self._path = [*self._path, node]
+        self._node = node
+
     def childCount(self):
         return len(self.node().children)
 
     def child(self, i):
-        return MDagPath(self.node().children[i])
+        """Maya 2024 API 2.0 returns an MObject from child(), not a path; the
+        stub's Node stands in for it (probe: #273 GUI run saw
+        "'OpenMaya.MObject' object has no attribute 'inclusiveMatrix'")."""
+        return self.node().children[i]
 
 
 class _NonDagNode:

@@ -304,6 +304,11 @@ def register_scene_tools(mcp: FastMCP) -> None:
         Returns a structured description of ALL objects with positions, sizes, and types.
         Call this once at the start of each task to see the whole scene before changing it.
 
+        Sizes are world-axis bounding boxes. Each shape's own box is
+        transformed once, so a rotated parent no longer widens a size layer
+        by layer; geometry that does not fill its own box (an L-shape, a
+        character mesh) can still read up to one axis-alignment too wide.
+
         The first line ends with MODIFIED=y or MODIFIED=n. y means the scene
         has changes that were never saved; n means it has none. This is
         Maya's own flag for the whole scene, so it says nothing about which
@@ -312,6 +317,10 @@ def register_scene_tools(mcp: FastMCP) -> None:
         carries the same fact as the top-level scene_modified field. The flag
         is read again on every call and never comes from the cache, while the
         object list may be a few seconds old.
+
+        Object positions, box corners and zone centers/boxes are in the
+        scene's current linear unit (cm, m or mm); JSON and the CoS header
+        name that unit.
 
         Boundary: Disambiguated from scene_inspect (deep-dive inspection of
         specific objects or zones) and scene_nodes (granular DAG/DG node
@@ -354,7 +363,7 @@ def register_scene_tools(mcp: FastMCP) -> None:
         # Also get zone map
         zone_data = await _execute_scene_code(
             client,
-            module_call("_mcp_scene", "get_zone_map"),
+            module_call("_mcp_scene", "get_zone_map", display_units=True),
             session_key,
             use_cache=True,
             cache_key="zone_map",
@@ -402,6 +411,17 @@ def register_scene_tools(mcp: FastMCP) -> None:
         Returns detailed properties including transform, BBox, material, mesh stats,
         and optionally nearby objects with distances.
 
+        Object positions, box corners, sizes, neighbor distances and zone
+        centers/boxes are in the scene's current linear unit (cm, m or mm).
+        JSON object results name that unit. Centimetre output keeps its
+        previous shape; non-centimetre zone results and the CoS view add the
+        unit.
+
+        An object's BBox is the node's own box, without its ancestors'
+        transforms. The zone branch reports world-axis boxes built from each
+        shape's own box transformed once, so a rotated parent no longer
+        widens them layer by layer; geometry that does not fill its own box
+        can still read up to one axis-alignment too wide.
         Boundary: Disambiguated from scene_snapshot (broad whole-scene
         spatial overview) and scene_describe (API-level attribute metadata,
         types, and connection wiring).
@@ -430,7 +450,7 @@ def register_scene_tools(mcp: FastMCP) -> None:
         # First try as a zone name
         zone_data = await _execute_scene_code(
             client,
-            module_call("_mcp_scene", "get_zone_map"),
+            module_call("_mcp_scene", "get_zone_map", display_units=True),
             session_key,
             use_cache=True,
             cache_key="zone_map",
@@ -463,16 +483,19 @@ try:
     fn = om2.MFnDagNode(dag)
     bbox = fn.boundingBox
     world = dag.inclusiveMatrix()
+    scale = _mcp_scene._cm_to_unit_factor()
 
     result = {{
         "name": fn.name(),
         "type": _mcp_scene._classify_node(dag),
-        "position": _mcp_scene._matrix_to_pos(world),
+        "position": _mcp_scene._matrix_to_pos(world, scale),
         "bbox": {{
-            "min": _mcp_scene._vec3_to_list(bbox.min),
-            "max": _mcp_scene._vec3_to_list(bbox.max),
+            "min": _mcp_scene._cm_to_unit_xyz(bbox.min, scale),
+            "max": _mcp_scene._cm_to_unit_xyz(bbox.max, scale),
         }},
-        "size": _mcp_scene._get_bbox_size(bbox),
+        "size": _mcp_scene._cm_to_unit_xyz(
+            [abs(bbox.max[i] - bbox.min[i]) for i in range(3)], scale
+        ),
         "material": _mcp_scene._get_material_for_dag(dag),
         "unit": cmds.currentUnit(query=True, linear=True),
         "parent": None,
@@ -513,7 +536,9 @@ result
                 spatial_code,
                 session_key,
                 use_cache=True,
-                cache_key="spatial_index",
+                # Distances are in the unit that was current when the index
+                # was built, so a unit switch must not reuse the old entry.
+                cache_key=f"spatial_index:{obj_data.get('unit', 'cm')}",
             )
 
             # Find neighbors for this object
@@ -561,7 +586,11 @@ result
         Requires an active Maya session.
 
         Every mode measures world-space AABBs, not the mesh surface and not
-        the object origin. The modes differ in what the number means:
+        the object origin. Each shape's own box is transformed once, so a
+        rotated parent no longer widens the result layer by layer; geometry
+        that does not fill its own box (an L-shape, a character mesh) can
+        still measure up to one axis-alignment too wide. The modes differ in
+        what the number means:
           center     distance between the AABB midpoints.
           surface    distance between the closest facing AABB corners — an
                      axis-aligned approximation, so it over-reports clearance
@@ -637,6 +666,12 @@ result
         Use this after modifications to confirm the scene is in the desired state.
         This is the check step (the last of ICEV's four steps).
 
+        bbox_min/bbox_max compare world-axis boxes built from each shape's
+        own box, transformed once: a rotated parent no longer widens them
+        layer by layer, but geometry that does not fill its own box (an
+        L-shape, a character mesh) can still read up to one axis-alignment
+        too wide.
+
         Boundary: Disambiguated from scene_validate (checks relational
         spatial constraints across zones rather than exact expected values
         for named objects).
@@ -645,6 +680,7 @@ result
             expectations: JSON string defining expected state.
                 Format: {"obj_name": {"position": [x,y,z], "bbox_max": [x,y,z], ...}}
                 Supported properties: position, bbox_max, bbox_min, exists, material.
+                Position and bbox values are in Maya's internal centimetres.
             format: Output format - "cos" or "json".
             session_key: Maya session key.
 
@@ -705,6 +741,8 @@ result
                  {"type": "no_overlap", "objects": ["wall_a", "shelf_b"]},
                  {"type": "min_height", "objects": ["door"], "value": 250}]
                 Types: min_clearance, max_objects, no_overlap, min_height, max_height
+                Length thresholds are in Maya internal centimetres, the same
+                unit as the actual values in a violation.
             format: Output format - "cos" or "json".
             session_key: Maya session key.
 
@@ -918,7 +956,9 @@ result
             session_key: Maya session key.
 
         Returns:
-            Camera info with position, focal length, and distance.
+            Camera info with position, focal length, and distance. ``position``
+            and ``distance`` are in the scene's working unit (centimetres in a
+            default scene), the one Maya's ``MDistance.uiUnit`` reports.
         """
         from maya_mcp_server.server import get_session_manager
 
@@ -1180,7 +1220,9 @@ result
         zone geometry (after auto_fix completes when auto_fix=True), resolves
         a target object per zone from objective (full DAG path, unique short
         name, or single measurable zone object; otherwise falls back to the
-        zone's world-axis bounding box), searches the models index in a
+        zone's world-axis bounding box, built from shape boxes transformed
+        once, so a rotated parent no longer widens it by layer), searches
+        the models index in a
         worker thread under a 5s soft time budget reusing the 300s models
         index cache, checks words, deduplicates (capped at 3 per zone and 12
         total), and screens candidates in metres (0.5x-1.5x per sorted axis

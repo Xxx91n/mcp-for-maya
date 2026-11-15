@@ -853,11 +853,16 @@ def summarize_params(params: dict[str, Any]) -> str:
 
 def sanitize_error_message(message: str) -> str:
     """Sanitize error messages to avoid leaking internal paths."""
-    # Windows absolute paths (drive letter + separators + filename)
-    sanitized = re.sub(r"[A-Za-z]:[\\/][^\s\"']+", "<path>", message)
-    # Unix home paths
-    sanitized = re.sub(r"/home/[^/]+/", "/.../", sanitized)
-    sanitized = re.sub(r"/Users/[^/]+/", "/.../", sanitized)
+    # Windows absolute paths: a drive letter at a path boundary. The
+    # lookbehind is why "https://host/a" is not read as drive "s:".
+    sanitized = re.sub(r"(?<![A-Za-z])[A-Za-z]:[\\/][^\s\"']+", "<path>", message)
+    # UNC shares carry the same host layout and no drive letter
+    sanitized = re.sub(r"\\\\[^\s\"']+", "<path>", sanitized)
+    # Any absolute Unix path, one segment or more, wherever it appears —
+    # inside URL text, file: and smb: included. A run ends at whitespace or a
+    # quote, so punctuation straight after a path is swallowed with it. The
+    # lookbehind leaves "3/4"-style fractions and identifiers whole.
+    sanitized = re.sub(r"(?<![\w.])/(?:[^\s\"']+/)*[^\s\"']+", "<path>", sanitized)
     return sanitized
 
 
