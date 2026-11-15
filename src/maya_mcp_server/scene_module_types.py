@@ -46,7 +46,7 @@ class ObjectPayload(TypedDict):
 
 
 class LightCore(TypedDict):
-    """The fields both light producers write: the frame every lighting read needs."""
+    """The frame every lighting read needs; LightPayload adds the shape fields."""
 
     name: str
     type: str

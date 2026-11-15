@@ -36,10 +36,10 @@ class TestOneSharedPayload:
         calls = 0
         original = maya_env.module.collect_light_payloads
 
-        def spy():
+        def spy(*args):
             nonlocal calls
             calls += 1
-            return original()
+            return original(*args)
 
         # The call sites reach the builder through globals(), which is the
         # module dict, so replacing the module attribute is what they see.
@@ -87,6 +87,18 @@ class TestOneSharedPayload:
         payloads = maya_env.module.collect_light_payloads()
 
         assert [p["name"] for p in payloads] == ["LGT_ok"]
+
+    def test_a_light_without_shadow_attributes_counts_as_shadowing(self, maya_env):
+        # The shared builder inherited this reading from the aesthetic
+        # engine, which was the richer of the two copies. Real lights carry
+        # one of the two flags; this pins what happens when neither exists.
+        maya_env.scene.add_light("LGT_dark", t=(0, 100, 0))
+        shape = maya_env.scene.resolve("LGT_darkShape")
+        shape.attrs.pop("useDepthMapShadow")
+
+        payloads = maya_env.module.collect_light_payloads()
+
+        assert payloads[0]["shadow"] is True
 
     def test_the_aesthetic_and_review_scores_agree(self, maya_env):
         scene = maya_env.scene

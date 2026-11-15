@@ -34,7 +34,7 @@ stale companions cause integration failures and gate reds.
 | Module modified | Must also update | Reason |
 |-----------------|------------------|--------|
 | `maya_scene_module.py` (scene_plan) | `scene_tools.py`, `server.py`, `README.md`, `README.zh-CN.md` | Scene planning tool needs MCP tool + docs |
-| `maya_scene_module.py` (aesthetic/lighting/scene_review functions) | `scene_tools.py`, `tests/test_maya_scene_module.py` | Inline `_score_*` functions are the sole implementation; tool descriptions + fake-Maya-layer coverage must match |
+| `maya_scene_module.py` (aesthetic/lighting/scene_review functions) | `scene_tools.py`, `tests/test_maya_scene_module.py`, `tests/test_scene_light_module.py` | Inline `_score_*` functions are the sole implementation; tool descriptions + fake-Maya-layer coverage must match. The light payload those functions read is built in `scene_light_module.py` (#276), so its contract tests live beside it |
 | `maya_scene_module.py` (new function) | `scene_tools.py`, `server.py`, `README.md`, `README.zh-CN.md`, `tests/` | Every new Maya function needs an MCP tool, docs, and tests |
 | `maya_scene_module.py` (line-count growth) | `.github/monolith-budget.json` | Only down: growth past the cap fails lint; legitimate additions need a reasoned budget edit in the same PR; new capability goes in a separate file injected together with it, never appended to `maya_scene_module.py` |
 | `visual_module.py` / `visual_tools.py` | `server.py` instructions, `pipeline.py` annotations, `tests/test_visual_tools.py`, READMEs, `docs/threat-model.md` | Capture contract, annotations, and docs must stay in sync |

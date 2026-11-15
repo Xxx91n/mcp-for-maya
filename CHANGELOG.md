@@ -245,6 +245,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One light payload for the aesthetic and review paths (#276)** —
+  `analyze_aesthetics()` and `scene_review()`'s lighting check read the same
+  Maya light attributes but built two dicts: 13 fields for the aesthetic
+  engine, 7 for the review. They now call one builder in
+  `scene_light_module.py`, so a field added for one reaches the other and the
+  two cannot drift. The review path gains the shape fields it used to drop,
+  reports world position rounded to 0.1 as the aesthetic path already did, and
+  treats a light with neither shadow attribute as shadowing rather than not.
+  In a scene with duplicate short names it now measures the light by its full
+  transform path instead of the short name, which reads the intended node.
+  Evidence:
+  `tests/test_scene_light_module.py::TestOneSharedPayload::test_both_consumers_call_the_shared_builder`,
+  `tests/test_scene_light_module.py::TestOneSharedPayload::test_the_payload_carries_every_field_for_every_light_type`,
+  `tests/test_scene_light_module.py::TestOneSharedPayload::test_a_light_without_shadow_attributes_counts_as_shadowing`.
+
 - **Scene and workflow terms now say what they mean** — group 1 of the
   plain-language pass (#188): `ICEV`, `看图复查`, `scene_snapshot`, `CoS`,
   `Zone`, `命名规则`, `scene_review`, `自定义检查项`, `场景存档`, `读档` and
