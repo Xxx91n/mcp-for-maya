@@ -28,7 +28,6 @@ because it is a line range, not a path:
 * ``CHANGELOG.md`` outside the ``[Unreleased]`` section
                             released sections are point-in-time records
 * ``llms.txt``              derived; regenerate it, never hand-edit
-* ``mypy-baseline.txt``     generated
 * ``GLOSSARY.md``           its `_Avoid_` lines are the source, not a target
 * ``Vulnscan_results.md`` and ``.security-review-raw/``
                             security-audit evidence artifacts
@@ -122,7 +121,6 @@ GIT_LOCATORS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECT
 
 SKIP_FILES = (
     "llms.txt",
-    "mypy-baseline.txt",
     "Vulnscan_results.md",
     "GLOSSARY.md",
 )

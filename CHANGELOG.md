@@ -189,24 +189,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The mypy gate fails closed on untrustworthy execution** — the mypy CI job
   now runs `.github/scripts/run_mypy_gate.py` instead of piping mypy straight
-  into the baseline filter. The gate classifies mypy's exit code instead of
+  into the baseline filter. (Update #258: that baseline and its filter were
+  later retired; the baseline-file guard and the filter no longer exist, and a
+  well-formed error report is a hard red. The text below is the #226 record.)
+  The gate classifies mypy's exit code instead of
   thresholding it, requires a well-formed report on both the clean and the
-  error branch (empty or garbage output is red even with an empty baseline —
+  error branch (empty or garbage output is red even when the baseline was empty —
   the hole #214 measured, where the old pipe returned success for `fix 0 /
   new 0`), cross-checks the summary's error count against the report body,
   compares mypy's `checked` count against a live enumeration of
   `src/**/*.py` so an excluded module is red while a legitimately added module
-  needs no gate edit, and fails closed on a weakened strict trio or a missing
-  baseline file. The baseline filter runs on both branches, so its nonzero
-  "resolved violations" exit still forces a baseline sync when the historic
-  errors are fixed. mypy is invoked with `--config-file pyproject.toml`, so
+  needs no gate edit, and fails closed on a weakened strict trio. The baseline
+  filter ran on both branches, so its nonzero
+  "resolved violations" exit forced a baseline sync when the historic
+  errors were fixed. mypy is invoked with `--config-file pyproject.toml`, so
   it reads the same configuration the strict guard audits rather than an ini
   file that out-prioritizes it; a `mypy: error` on stderr is a config fault
   even with a healthy exit code.
   Fault verdicts carry the exit code and stderr as evidence.
   The check requires `strict`, `warn_unused_ignores` and
-  `warn_unused_configs` in `[tool.mypy]`; retiring the baseline later means
-  editing this gate, not deleting the file. Limits: the guard enforces a
+  `warn_unused_configs` in `[tool.mypy]`; retiring the baseline took a gate
+  edit, not a file deletion, and #258 made that edit. Limits: the guard enforces a
   WHITELIST on the first `[tool.mypy]` table — only the trio plus
   `python_version` may appear (four review rounds found one weakening key
   after another: strict sub-flags, `ignore_errors`, `disable_error_code`,
@@ -219,7 +222,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_run_mypy_gate.py::test_garbage_report_with_error_exit_is_red`,
   `tests/test_run_mypy_gate.py::test_an_excluded_module_is_red`,
   `tests/test_run_mypy_gate.py::test_removing_strict_is_red`,
-  `tests/test_run_mypy_gate.py::test_baseline_matched_errors_stay_green`,
+  `tests/test_run_mypy_gate.py::test_a_well_formed_type_error_report_is_red`,
   `tests/test_run_mypy_gate.py::test_cli_green_control_runs_real_mypy_over_this_repo`.
 - **`scene_plan` recommendations cover all 7 built-in zones with word-level filtering, dedup, and rank-band ordering (#218)** —
   `ZONE_SEARCH_QUERIES` now maps `entrance` (`door`, `sign`), `display`
@@ -310,7 +313,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   docstrings, `#` comment lines in TOML/YAML) and skips the records the
   cleanup must not rewrite: the historical shelf under `docs/reference/`,
   `docs/evidence/`, released `CHANGELOG` sections, the derived `llms.txt`,
-  `mypy-baseline.txt`, `GLOSSARY.md` itself, the security-audit artifacts, and
+  `GLOSSARY.md` itself, the security-audit artifacts, and
   the showcase image generators under `.github/assets-src/`. It is not a CI
   gate and has no gate-registry entry; only its tests run in the suite. Evidence:
   `tests/test_check_plain_language.py::test_an_active_doc_with_an_old_word_fails`,
@@ -347,6 +350,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_pipeline.py::TestSafeModeGate::test_rule_matrix_rejects_before_dispatch`.
 
 ### Changed
+
+- **The strict-mypy baseline is gone; the type check is a plain zero-error gate
+  (#258)** — the raw strict run over `src/` exits 0 (`Success: no issues found
+  in 34 source files`) with the strict trio and the full live scope unchanged,
+  so the empty historical baseline file and the `mypy-baseline` dependency were
+  deleted. `run_mypy_gate.py` no longer requires a baseline file and no longer
+  runs a filter: a well-formed report carrying any type error is a hard
+  `type_fault` red, while the empty/garbage report, scope and config guards
+  stay. The CI job keeps the name `mypy baseline gate` because the recorded
+  branch-protection setting pins that required-check context (last read
+  2026-11-14; the current value was not re-verified). The closing measurement
+  and the #222 criteria mapping are in
+  `docs/reference/mypy-baseline-retirement-258.md`.
+  Evidence:
+  `tests/test_run_mypy_gate.py::test_a_well_formed_type_error_report_is_red`,
+  `tests/test_run_mypy_gate.py::test_a_clean_run_is_green`,
+  `tests/test_run_mypy_gate.py::test_cli_green_control_runs_real_mypy_over_this_repo`,
+  `docs/reference/mypy-baseline-retirement-258.md`.
 
 - **One light payload for the aesthetic and review paths (#276)** —
   `analyze_aesthetics()` and `scene_review()`'s lighting check read the same
@@ -517,6 +538,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   true: CI reads all three and never writes them, `mypy-baseline.txt` is
   regenerated by its sync tool, and the lint budget and the big-file line cap are
   maintained by hand and may be tightened in the pull request that earns it.
+  (The mypy baseline was retired in #258; the agent file now states the
+  strict zero-error rule and names the two remaining budget files.)
   Evidence: `32dad67:AGENTS.md:20`.
 - **The two developer FIXMEs read as known limitations** — each comment kept
   the reason the current shape exists and stopped promising a refactor: the

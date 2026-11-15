@@ -1,15 +1,15 @@
 """Pins for .github/scripts/run_mypy_gate.py.
 
 The gate's whole job is one sentence: a mypy run whose EXIT CODE, REPORT
-SHAPE or CHECKED SCOPE cannot be trusted must be red, and a healthy run
-(including the current not-yet-zero baseline) must stay green. The red cases
-below inject the exact faults #214 measured: an empty or garbage report on an
-EMPTY baseline (which the old pipe happily passed), a crashed checker, a
-module that dropped out of the checked set, a weakened strict configuration
-and a missing baseline file.
+SHAPE or CHECKED SCOPE cannot be trusted must be red, and a clean run must stay
+green. The red cases below inject the exact faults #214 measured: an empty or
+garbage report (which the old mypy + baseline pipe happily passed), a crashed
+checker, a module that dropped out of the checked set, a weakened strict
+configuration, and -- since the baseline retired in #258 -- any well-formed
+type-error report at all.
 
-Fake mypy and fake filter verdicts are injected as module functions, so the
-verdict matrix runs in milliseconds against disposable trees. Two tests touch
+Fake mypy verdicts are injected as module functions, so the verdict matrix
+runs in milliseconds against disposable trees. Two tests touch
 the real seam: the CLI red control (no mypy needed -- configuration faults
 fire before mypy starts) and the CLI green control that runs REAL mypy over
 this repository, which is the same command CI runs. Every red asserts the
@@ -22,7 +22,6 @@ import importlib.util
 import subprocess
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -57,14 +56,11 @@ def _make_repo(
     tmp_path: Path,
     *,
     pyproject: str = PYPROJECT,
-    baseline: str = "",
     src_files: tuple[str, ...] = ("pkg/__init__.py", "pkg/app.py"),
 ) -> Path:
     root = tmp_path / "repo"
     (root / "src" / "pkg").mkdir(parents=True)
     (root / "pyproject.toml").write_text(pyproject, encoding="utf-8")
-    if baseline is not None:
-        (root / "mypy-baseline.txt").write_text(baseline, encoding="utf-8")
     for rel in src_files:
         (root / "src" / rel).parent.mkdir(parents=True, exist_ok=True)
         (root / "src" / rel).write_text("", encoding="utf-8")
@@ -86,12 +82,10 @@ def _error_report(count: int, *, with_summary: bool = True) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _run_main(mod, monkeypatch, root: Path, *, mypy=None, filter_output=None):
-    """Invoke main() with injected mypy/filter results; return (rc, cap)."""
+def _run_main(mod, monkeypatch, root: Path, *, mypy=None):
+    """Invoke main() with an injected mypy result; return the exit code."""
     if mypy is not None:
         monkeypatch.setattr(mod, "run_mypy", lambda root: mypy)
-    if filter_output is not None:
-        monkeypatch.setattr(mod, "run_baseline_filter", lambda root, report: filter_output)
     monkeypatch.setattr(sys, "argv", ["run_mypy_gate.py", str(root)])
     return mod.main()
 
@@ -103,45 +97,33 @@ def _run_main(mod, monkeypatch, root: Path, *, mypy=None, filter_output=None):
 
 def test_a_clean_run_is_green(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # empty baseline: the exact state #214 broke
-    rc = _run_main(
-        mod,
-        monkeypatch,
-        root,
-        mypy=(0, _success_report(2), ""),
-        filter_output="",
-    )
+    root = _make_repo(tmp_path)  # the exact state #214 broke
+    rc = _run_main(mod, monkeypatch, root, mypy=(0, _success_report(2), ""))
     assert rc == 0
     out = capsys.readouterr().out
     assert "mypy exited 0" in out
     assert "scope: 2 .py files" in out
 
 
-def test_baseline_matched_errors_stay_green(tmp_path, monkeypatch):
+def test_a_well_formed_type_error_report_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path, baseline="stale entries\n")
-    rc = _run_main(
-        mod,
-        monkeypatch,
-        root,
-        mypy=(1, _error_report(2), ""),
-        filter_output="",
-    )
-    assert rc == 0
+    root = _make_repo(tmp_path)
+    # The baseline is retired: a legal mypy error report is now a hard red on
+    # the report itself, with the first lines carried as evidence.
+    rc = _run_main(mod, monkeypatch, root, mypy=(1, _error_report(2), ""))
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "type_fault" in err
+    assert "2 type error(s)" in err
+    assert "Incompatible types" in err
 
 
 def test_a_new_source_module_is_included_automatically(tmp_path, monkeypatch):
     mod = _load()
     files = ("pkg/__init__.py", "pkg/app.py", "pkg/brand_new.py")
-    root = _make_repo(tmp_path, baseline="stale\n", src_files=files)
+    root = _make_repo(tmp_path, src_files=files)
     # mypy reports three checked files with NO gate edit anywhere.
-    rc = _run_main(
-        mod,
-        monkeypatch,
-        root,
-        mypy=(1, _error_report(3), ""),
-        filter_output="",
-    )
+    rc = _run_main(mod, monkeypatch, root, mypy=(0, _success_report(3), ""))
     assert rc == 0
 
 
@@ -152,7 +134,7 @@ def test_a_new_source_module_is_included_automatically(tmp_path, monkeypatch):
 
 def test_empty_report_with_zero_exit_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # EMPTY baseline: the hole from #214
+    root = _make_repo(tmp_path)  # the hole from #214
     rc = _run_main(mod, monkeypatch, root, mypy=(0, "", ""))
     assert rc == 1
     assert "execution_fault" in capsys.readouterr().err
@@ -160,7 +142,7 @@ def test_empty_report_with_zero_exit_is_red(tmp_path, monkeypatch, capsys):
 
 def test_empty_report_with_error_exit_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # EMPTY baseline
+    root = _make_repo(tmp_path)
     rc = _run_main(mod, monkeypatch, root, mypy=(1, "", ""))
     assert rc == 1
     assert "execution_fault" in capsys.readouterr().err
@@ -168,7 +150,7 @@ def test_empty_report_with_error_exit_is_red(tmp_path, monkeypatch, capsys):
 
 def test_garbage_report_with_zero_exit_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # EMPTY baseline
+    root = _make_repo(tmp_path)
     rc = _run_main(mod, monkeypatch, root, mypy=(0, "hello world\nnot mypy\n", ""))
     assert rc == 1
     assert "execution_fault" in capsys.readouterr().err
@@ -176,7 +158,7 @@ def test_garbage_report_with_zero_exit_is_red(tmp_path, monkeypatch, capsys):
 
 def test_garbage_report_with_error_exit_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # EMPTY baseline
+    root = _make_repo(tmp_path)
     rc = _run_main(mod, monkeypatch, root, mypy=(1, "hello world\nnot mypy\n", ""))
     assert rc == 1
     assert "execution_fault" in capsys.readouterr().err
@@ -184,7 +166,7 @@ def test_garbage_report_with_error_exit_is_red(tmp_path, monkeypatch, capsys):
 
 def test_error_lines_without_a_summary_are_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path, baseline="stale\n")
+    root = _make_repo(tmp_path)
     rc = _run_main(
         mod,
         monkeypatch,
@@ -197,7 +179,7 @@ def test_error_lines_without_a_summary_are_red(tmp_path, monkeypatch, capsys):
 
 def test_garbage_body_with_a_valid_success_summary_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # EMPTY baseline
+    root = _make_repo(tmp_path)
     report = "not mypy\nSuccess: no issues found in 2 source files\n"
     rc = _run_main(mod, monkeypatch, root, mypy=(0, report, ""))
     assert rc == 1
@@ -206,7 +188,7 @@ def test_garbage_body_with_a_valid_success_summary_is_red(tmp_path, monkeypatch,
 
 def test_an_error_line_under_a_success_verdict_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # EMPTY baseline
+    root = _make_repo(tmp_path)
     report = (
         "src/pkg/app.py:1: error: Incompatible types  [assignment]\n"
         "Success: no issues found in 2 source files\n"
@@ -218,9 +200,9 @@ def test_an_error_line_under_a_success_verdict_is_red(tmp_path, monkeypatch, cap
 
 def test_a_summary_disagreeing_with_its_error_lines_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path, baseline="stale\n")
+    root = _make_repo(tmp_path)
     report = _error_report(2).replace("Found 2 errors", "Found 3 errors")
-    rc = _run_main(mod, monkeypatch, root, mypy=(1, report, ""), filter_output="")
+    rc = _run_main(mod, monkeypatch, root, mypy=(1, report, ""))
     assert rc == 1
     assert "counts disagree" in capsys.readouterr().err
 
@@ -229,21 +211,21 @@ def test_an_error_substring_inside_a_note_line_is_not_an_error_report(
     tmp_path, monkeypatch, capsys
 ):
     mod = _load()
-    root = _make_repo(tmp_path, baseline="stale\n")
+    root = _make_repo(tmp_path)
     # Even with the summary count MATCHING the decoy line, a note line whose
     # message contains ": error: " is not an error diagnostic.
     report = (
         "src/pkg/app.py:2: note: expected signature : error: decoy\n"
         "Found 1 errors in 1 file (checked 2 source files)\n"
     )
-    rc = _run_main(mod, monkeypatch, root, mypy=(1, report, ""), filter_output="")
+    rc = _run_main(mod, monkeypatch, root, mypy=(1, report, ""))
     assert rc == 1
     assert "execution_fault" in capsys.readouterr().err
 
 
 def test_a_crashed_checker_is_red_with_evidence(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path, baseline="stale\n")
+    root = _make_repo(tmp_path)
     rc = _run_main(mod, monkeypatch, root, mypy=(2, "", "mypy: internal error: boom"))
     assert rc == 1
     err = capsys.readouterr().err
@@ -268,14 +250,13 @@ def test_an_exit_code_above_one_is_not_the_only_fault(tmp_path, monkeypatch):
 def test_an_excluded_module_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
     files = ("pkg/__init__.py", "pkg/app.py", "pkg/dropped.py")
-    root = _make_repo(tmp_path, baseline="stale\n", src_files=files)
+    root = _make_repo(tmp_path, src_files=files)
     # mypy only claims two checked files although src/ holds three.
     rc = _run_main(
         mod,
         monkeypatch,
         root,
         mypy=(1, _error_report(2), ""),
-        filter_output="",
     )
     assert rc == 1
     assert "scope_fault" in capsys.readouterr().err
@@ -340,14 +321,6 @@ def test_removing_warn_unused_configs_is_red(tmp_path, monkeypatch, capsys):
     assert "config_fault" in capsys.readouterr().err
 
 
-def test_a_missing_baseline_file_is_red(tmp_path, monkeypatch, capsys):
-    mod = _load()
-    root = _make_repo(tmp_path, baseline=None)
-    rc = _run_main(mod, monkeypatch, root, mypy=(0, _success_report(2), ""))
-    assert rc == 1
-    assert "config_fault" in capsys.readouterr().err
-
-
 def test_config_guards_fire_before_mypy_runs(tmp_path, monkeypatch, capsys):
     mod = _load()
     root = _make_repo(tmp_path, pyproject=_without_setting("strict"))
@@ -383,7 +356,7 @@ def test_a_redundant_true_strict_subflag_is_red_too(tmp_path, monkeypatch, capsy
 
 def test_a_mypy_config_error_on_stderr_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # EMPTY baseline
+    root = _make_repo(tmp_path)
     # mypy writes a config-parsing error to stderr and then CONTINUES with
     # its default configuration, exiting 0 with a legal success summary.
     stderr = "mypy: error: bad value for 'module' in overrides: 123"
@@ -445,10 +418,9 @@ def test_a_quoted_strict_subflag_is_red(tmp_path, monkeypatch, capsys):
 
 def test_an_error_line_with_an_empty_message_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # EMPTY baseline
-    # mypy-baseline 0.7.4 refuses to match an empty error message, so this
-    # line would flow through the filter unbaselined; the gate must not
-    # count it as an error report either.
+    root = _make_repo(tmp_path)
+    # A diagnostic with an empty message is not a usable error report; the
+    # gate must not count it as evidence of a clean error set.
     report = "src/pkg/app.py:1: error: \nFound 1 error in 1 file (checked 2 source files)\n"
     rc = _run_main(mod, monkeypatch, root, mypy=(1, report, ""))
     assert rc == 1
@@ -478,8 +450,8 @@ def test_an_unknown_tool_mypy_key_is_red(tmp_path, monkeypatch, capsys):
 
 def test_a_baseline_filter_config_table_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    # mypy-baseline filter reads [tool.mypy-baseline] from pyproject and its
-    # ignore list makes the filter skip matching errors.
+    # The filter was retired in #258; its config table can only mean someone
+    # is reintroducing error-skipping behind the gate's back.
     filtered = PYPROJECT + '\n[tool.mypy-baseline]\nignore = [".*"]\n'
     root = _make_repo(tmp_path, pyproject=filtered)
     rc = _run_main(mod, monkeypatch, root, mypy=(1, _error_report(2), ""))
@@ -534,7 +506,6 @@ def test_a_spaced_tool_mypy_header_still_parses(tmp_path, monkeypatch):
         monkeypatch,
         root,
         mypy=(0, _success_report(2), ""),
-        filter_output="",
     )
     assert rc == 0
 
@@ -575,7 +546,6 @@ def test_a_harmless_multiline_string_does_not_break_the_guard(tmp_path, monkeypa
         monkeypatch,
         root,
         mypy=(0, _success_report(2), ""),
-        filter_output="",
     )
     assert rc == 0
 
@@ -605,7 +575,7 @@ def test_a_quoted_non_boolean_strict_fails_the_guard(tmp_path, monkeypatch, caps
 
 def test_any_stderr_on_a_healthy_exit_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # EMPTY baseline
+    root = _make_repo(tmp_path)
     # mypy's stderr is empty on every healthy run; a config error WITHOUT
     # the "mypy: error" prefix (e.g. strict: Not a boolean) also lands here
     # and can make mypy skip the audited config while exiting 0.
@@ -619,9 +589,9 @@ def test_any_stderr_on_a_healthy_exit_is_red(tmp_path, monkeypatch, capsys):
 
 def test_an_error_line_on_a_non_python_file_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path)  # EMPTY baseline
-    # mypy-baseline 0.7.4 only parses diagnostics for .py/.pyi paths and
-    # passes anything else through unbaselined; the gate must reject it too.
+    root = _make_repo(tmp_path)
+    # mypy only reports .py/.pyi files; an error line on another path is a
+    # report-shape fault, not a reviewable type error.
     report = (
         "src/pkg/app.txt:1: error: broken report\n"
         "Found 1 error in 1 file (checked 2 source files)\n"
@@ -633,72 +603,22 @@ def test_an_error_line_on_a_non_python_file_is_red(tmp_path, monkeypatch, capsys
 
 def test_a_summary_before_the_error_lines_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path, baseline="stale\n")
+    root = _make_repo(tmp_path)
     report = _error_report(2)
     summary = report.splitlines()[-1]
     moved = summary + "\n" + report[: report.rindex(summary)]
-    rc = _run_main(mod, monkeypatch, root, mypy=(1, moved, ""), filter_output="")
+    rc = _run_main(mod, monkeypatch, root, mypy=(1, moved, ""))
     assert rc == 1
     assert "execution_fault" in capsys.readouterr().err
 
 
 def test_a_duplicated_summary_is_red(tmp_path, monkeypatch, capsys):
     mod = _load()
-    root = _make_repo(tmp_path, baseline="stale\n")
+    root = _make_repo(tmp_path)
     report = _error_report(2) + "Found 2 errors in 1 file (checked 2 source files)\n"
-    rc = _run_main(mod, monkeypatch, root, mypy=(1, report, ""), filter_output="")
+    rc = _run_main(mod, monkeypatch, root, mypy=(1, report, ""))
     assert rc == 1
     assert "execution_fault" in capsys.readouterr().err
-
-
-# --------------------------------------------------------------------------
-# Baseline filter faults
-# --------------------------------------------------------------------------
-
-
-def test_a_new_error_outside_the_baseline_is_red_and_named(tmp_path, monkeypatch, capsys):
-    mod = _load()
-    # A parseable baseline that covers NEITHER of the report's two errors, so
-    # the real filter sees both as new and names them in its output.
-    root = _make_repo(tmp_path, baseline="src/pkg/app.py:0: error: an old error  [old-code]\n")
-    rc = _run_main(mod, monkeypatch, root, mypy=(1, _error_report(2), ""))
-    assert rc == 1
-    err = capsys.readouterr().err
-    assert "filter_fault" in err
-    assert "Incompatible types" in err
-
-
-def test_a_failing_filter_exit_is_red(tmp_path, monkeypatch, capsys):
-    mod = _load()
-    root = _make_repo(tmp_path, baseline="stale\n")
-    completed = SimpleNamespace(returncode=100, stdout="new violations", stderr="")
-    calls = iter([completed])
-
-    def fake_run(*args, **kwargs):
-        return next(calls)
-
-    monkeypatch.setattr(mod.subprocess, "run", fake_run)
-    rc = _run_main(mod, monkeypatch, root, mypy=(1, _error_report(2), ""))
-    assert rc == 1
-    assert "filter_fault" in capsys.readouterr().err
-
-
-def test_a_missing_filter_command_is_red(tmp_path, monkeypatch, capsys):
-    mod = _load()
-    root = _make_repo(tmp_path, baseline="stale\n")
-    completed = SimpleNamespace(returncode=1, stdout=_error_report(2), stderr="")
-    calls = iter([completed, FileNotFoundError("no mypy_baseline")])
-
-    def fake_run(*args, **kwargs):
-        step = next(calls)
-        if isinstance(step, Exception):
-            raise step
-        return step
-
-    monkeypatch.setattr(mod.subprocess, "run", fake_run)
-    rc = _run_main(mod, monkeypatch, root)
-    assert rc == 1
-    assert "filter_fault" in capsys.readouterr().err
 
 
 # --------------------------------------------------------------------------
@@ -767,8 +687,8 @@ def test_cli_red_control_exits_one_with_annotation(tmp_path):
 
 
 def test_cli_green_control_runs_real_mypy_over_this_repo():
-    # Same command as the CI mypy job, on the real tree: the not-yet-zero
-    # baseline must stay green, and the checked count must cover src/.
+    # Same command as the CI mypy job, on the real tree: unfiltered strict
+    # mypy must stay green, and the checked count must cover src/.
     completed = subprocess.run(
         [sys.executable, str(SCRIPT)],
         capture_output=True,

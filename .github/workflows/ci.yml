@@ -92,12 +92,15 @@ jobs:
         # first-check if sync misbehaves: UV_PROJECT_ENVIRONMENT.
         run: uv sync --frozen
       - name: mypy execution gate
-        # run_mypy_gate.py (issue #226): fails closed when mypy crashes,
-        # when the report is empty or garbage (empty baseline included), or
-        # when a module drops out of the checked src/ scope, and requires
-        # the strict config trio and a readable baseline file. The plain
-        # mypy + mypy-baseline pipe this replaces passed an empty or
-        # garbage report with an empty baseline.
+        # run_mypy_gate.py (issues #226 and #258): fails closed when mypy
+        # crashes, when the report is empty or garbage, when a module drops
+        # out of the checked src/ scope, or when the strict config is
+        # weakened. The baseline was retired in #258, so any type error is a
+        # hard red with no filter in between. The job name stays "mypy
+        # baseline gate" because the recorded branch-protection setting pins
+        # that context (last read 2026-11-14; #256 later got a 403, so the
+        # current value is unverified). Renaming it is a protection change,
+        # not part of #258.
         run: uv run python .github/scripts/run_mypy_gate.py
 
   test:

@@ -73,20 +73,21 @@ job requires `always()`. Unknown continue-on-error values fail closed.
 
 ## The mypy execution-effect gate (A2, issue #226)
 
-The mypy job no longer pipes mypy straight into `mypy-baseline filter`; it
-runs `.github/scripts/run_mypy_gate.py`, which decides from three signals and
-fails closed when any of them cannot be trusted:
+The mypy job runs `.github/scripts/run_mypy_gate.py` instead of a bare mypy
+call. The gate decides from three signals and fails closed when any of them
+cannot be trusted:
 
-1. **Exit code, classified.** 0 means "claims zero errors", 1 means "reports
-   type errors", anything else is a checker/configuration fault. The exit
-   code is never trusted alone.
+1. **Exit code, classified.** 0 means "claims zero errors"; 1 means "reports
+   type errors", which is a hard red since the baseline retired in #258;
+   anything else is a checker/configuration fault. The exit code is never
+   trusted alone.
 2. **Report shape.** A zero-error run must end with `Success: no issues
    found in N source files`; an error run must be non-empty, carry at least
    one `error:` line, parse line by line as mypy output, carry the
    `Found … (checked N source files)` summary, and the summary's error count
    must agree with the number of `error:` lines in the body. Empty or garbage
-   output is red on BOTH branches — including with an EMPTY baseline, which
-   the old pipe passed silently (`fix 0 / new 0` → exit 0; reproduced
+   output is red on BOTH branches — the old mypy + baseline pipe passed an
+   empty or garbage report silently (`fix 0 / new 0` → exit 0; reproduced
    2026-11-14 on this tree before the fix).
 3. **Scope.** `src/` is enumerated live (every `*.py` under it) and mypy's
    `checked` count must cover it. Excluding a previously clean module is red;
@@ -108,25 +109,23 @@ weakening key after another (strict sub-flags, `ignore_errors`,
 the trio plus `python_version` and any other key is refused (allowing a new
 one requires editing this gate); any mypy overrides table is refused
 outright (the guard cannot audit `ignore_errors`-style per-module silencing
-without re-implementing mypy's config semantics); the baseline filter's own
-config (`[tool.mypy-baseline]`, whose `ignore` list makes the filter skip
-matching errors) is refused too; and `mypy-baseline.txt` must exist and be
-readable. mypy is invoked with `--config-file pyproject.toml`, so it reads
-the same config the guard audits, and a `mypy: error` on stderr is a config
-fault even when the exit code looks healthy (mypy can log a config-parsing
-failure and then continue on defaults). An empty baseline stays legal — that
-transition is exactly what the report-shape checks protect. Retiring the
-baseline later means editing this gate, not deleting the file.
+without re-implementing mypy's config semantics); and a mypy-baseline filter
+config (`[tool.mypy-baseline]`) is refused as a reintroduction tripwire —
+the filter and its dependency were retired in #258. mypy is invoked with
+`--config-file pyproject.toml`, so it reads the same config the guard audits,
+and a `mypy: error` on stderr is a config fault even when the exit code looks
+healthy (mypy can log a config-parsing failure and then continue on defaults).
 
-The baseline filter runs on BOTH branches, exactly as the old pipeline did:
-besides catching new errors, its nonzero "resolved violations" exit still
-forces a baseline sync once the historic errors are actually fixed, so a
-clean mypy run cannot quietly retire that signal.
+The baseline is gone. Unfiltered strict mypy exits 0 over the whole `src/`
+tree, so the gate treats any well-formed error report as a `type_fault` red
+and carries the first error lines as evidence. Nothing sits between the
+checker and the verdict, and re-adding a filter means editing this registered,
+pinned gate.
 
 Every verdict records evidence: mypy's exit code, its stderr, the report line
 count, the summary line and the live scope count. Faults print as `::error`
 with the fault tag (`config_fault`, `checker_fault`, `execution_fault`,
-`scope_fault`, `filter_fault`).
+`scope_fault`, `type_fault`).
 
 Known limits (also in the registry note): the strict guard reads the first
 `[tool.mypy]` table as text and stops at the next header — explicit strict
@@ -149,8 +148,8 @@ uv run python .github/scripts/run_mypy_gate.py
 uv run pytest tests/test_run_mypy_gate.py -q
 ```
 
-Local verification (2026-11-14, locked `.venv`, Windows): the gate's own 30
-tests passed, including the CLI green control that runs real mypy over this
+Historical local verification (2026-11-14, before the baseline retired; locked
+`.venv`, Windows): the gate's own 30 tests passed, including the CLI green control that runs real mypy over this
 tree (`Found 152 errors in 1 file (checked 31 source files)`, zero new after
 the baseline). The #214 holes were reproduced on this tree before the fix:
 with an EMPTY baseline, an empty report and a garbage report both returned

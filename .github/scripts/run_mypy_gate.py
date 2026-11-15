@@ -13,14 +13,15 @@ This gate decides from three independent signals, and a fault on ANY of them
 is red:
 
 1. Exit code, classified rather than thresholded. 0 means "claims zero
-   errors", 1 means "reports type errors", anything else is a checker or
-   configuration fault. An exit code alone is never trusted: the exit code is
-   only a claim about the report, and the report is verified next.
+   errors"; 1 means "reports type errors", which is a hard red now that the
+   baseline is retired; anything else is a checker or configuration fault. An
+   exit code alone is never trusted: it is only a claim about the report, and
+   the report is verified next.
 2. Report shape. A zero-error run must end in mypy's ``Success: no issues
    found in N source files`` line; an error run must be nonempty, contain at
    least one ``error:`` line, parse line by line as mypy output, and carry the
    ``Found ... (checked N source files)`` summary. Empty or garbage output on
-   either branch is an execution fault, so an empty baseline can no longer
+   either branch is an execution fault, so a healthy-looking exit code cannot
    wave it through.
 3. Scope. ``src/`` is enumerated live (every ``*.py`` under it) and the
    ``checked N source files`` count must cover that enumeration. Excluding a
@@ -28,13 +29,18 @@ is red:
    fails; a legitimately added module grows both sides together, so nothing
    is pinned to a stale file count.
 
-Before mypy runs at all, two configuration guards fail closed: ``pyproject``
-must still carry the strict trio (``strict``, ``warn_unused_ignores``,
+Before mypy runs at all, configuration guards fail closed: ``pyproject`` must
+still carry the strict trio (``strict``, ``warn_unused_ignores``,
 ``warn_unused_configs`` -- the last two are what force a silently broadened
-ignore to surface), and ``mypy-baseline.txt`` must exist and be readable. A
-missing baseline is a configuration fault; an EMPTY baseline is legal and is
-exactly the state the report-shape checks protect. When the historic errors
-are gone and the baseline retires, this guard is the one line to revisit.
+ignore to surface), and no mypy overrides table, suppression flag or
+mypy-baseline filter config may appear.
+
+The historic mypy baseline was retired in issue #258: unfiltered strict mypy
+now exits 0 over the whole ``src/`` tree, so there is nothing left to filter
+and the tool is no longer a dependency. An exit code of 1 is therefore a hard
+red on the report itself (``type_fault``); no filter sits between the checker
+and the verdict. Re-introducing baseline filtering is a gate edit, not a
+config tweak.
 
 Every verdict prints its evidence: mypy's exit code, the stderr, the report
 line count, the summary line and the scope count. Faults are printed as
@@ -44,7 +50,7 @@ Wiring: the mypy CI job calls this script, and ``check_ci_wiring.py`` requires
 that call by exact command shape, so the job cannot go back to a bare mypy
 invocation. This script itself is a registered gate (``run_mypy_gate`` in
 ``.github/gate-registry.yaml``), and its pytest pins prove the verdict logic
-against injected fake mypy/filter runs.
+against injected fake mypy runs.
 
 Usage:
     python .github/scripts/run_mypy_gate.py [repo-root]
@@ -85,8 +91,6 @@ Scope honesty, stated so nobody reads more into this than it does:
   enumeration rule must be aligned with mypy's discovery before the count
   comparison can be trusted. An identity-based guarantee would need the
   checked-file set, which mypy's summary does not expose.
-* The baseline filter subprocess is invoked with a fixed argument list; the
-  report text it reads is mypy's own output on stdin, never a shell string.
 """
 
 from __future__ import annotations
@@ -155,7 +159,6 @@ REFUSED_SUPPRESSION_FLAGS = frozenset({"ignore_errors", "disable_error_code"})
 # error messages name the exact threat; this list is the backstop.
 ALLOWED_MYPY_KEYS = frozenset({"python_version", *REQUIRED_MYPY_SETTINGS})
 
-BASELINE_FILENAME = "mypy-baseline.txt"
 REPORT_FILENAME = "mypy-report.txt"
 
 # mypy's two verdict lines. The captured group is the checked-source count
@@ -173,12 +176,10 @@ _SUMMARY_LINE = re.compile(r"^Found \d+ errors? in \d+ files? \(checked (\d+) so
 # change in the same commit.
 _DIAGNOSTIC_LINE = re.compile(r"^\S+:\d+(?::\d+)?: (?:error|note): .*$")
 # An error diagnostic names ``error`` as its severity token and carries a
-# NONEMPTY message on a PYTHON FILE path: mypy-baseline 0.7.4 refuses to
-# match an empty message and only parses diagnostics for .py/.pyi paths, so
-# a line outside that shape would flow through the filter unbaselined while
-# this gate counted it as an error. The path segment excludes colons: a
+# NONEMPTY message on a PYTHON FILE path. The path segment excludes colons: a
 # Windows ABSOLUTE path (drive-letter colon) is judged malformed, i.e. red,
-# which matches CI's relative-path checkout.
+# which matches CI's relative-path checkout. mypy only reports .py/.pyi files,
+# so anything else in an error report is a report-shape fault.
 _ERROR_DIAGNOSTIC_LINE = re.compile(r"^[^\s:]+\.pyi?:\d+(?::\d+)?: error: \S.*$")
 
 
@@ -353,14 +354,13 @@ def check_no_overrides_table(pyproject_text: str) -> None:
 
 
 def check_no_baseline_config(pyproject_text: str) -> None:
-    """Red when the baseline filter's own config section exists.
+    """Red when a mypy-baseline filter config section exists.
 
-    ``mypy-baseline filter`` reads ``[tool.mypy-baseline]`` (or
-    ``[tool.mypy_baseline]``) from pyproject by default, and an ``ignore``
-    list there makes it skip matching errors -- a silent pass that none of
-    the report checks can see. The filter is unconfigured in this repo; if a
-    configuration is ever genuinely needed, that requires editing this
-    registered, pinned gate.
+    The filter was retired in issue #258 along with its dependency. A
+    ``[tool.mypy-baseline]`` (or ``[tool.mypy_baseline]``) table can only mean
+    someone is reintroducing that filtering behind this gate's back, where its
+    ``ignore`` list would skip matching errors invisibly. Re-introducing the
+    filter requires editing this registered, pinned gate.
     """
     for raw_line in _mask_multiline_strings(pyproject_text).splitlines():
         stripped = raw_line.strip()
@@ -372,8 +372,9 @@ def check_no_baseline_config(pyproject_text: str) -> None:
         ):
             raise GateError(
                 "config_fault -- a mypy-baseline config table was found "
-                f"({stripped}); its ignore list makes the baseline filter "
-                "skip matching errors. Adding one requires editing this gate."
+                f"({stripped}); the baseline filter was retired in issue #258, "
+                "so this can only be a reintroduction. Adding one requires "
+                "editing this gate."
             )
 
 
@@ -441,20 +442,6 @@ def check_strict_trio(pyproject_path: Path) -> None:
         )
 
 
-def check_baseline(baseline_path: Path) -> None:
-    """Red when the baseline file is gone; an empty file is legal."""
-    if not baseline_path.is_file():
-        raise GateError(
-            "config_fault -- mypy-baseline.txt is missing; the filter would "
-            "silently pass everything. Retiring the baseline means editing "
-            "this gate, not deleting the file."
-        )
-    try:
-        baseline_path.read_text(encoding="utf-8")
-    except OSError as e:
-        raise GateError(f"config_fault -- cannot read mypy-baseline.txt: {e}") from e
-
-
 def enumerate_scope(root: Path) -> int:
     """Count the live ``*.py`` files under src/. Zero files fails closed."""
     scope_dir = root / SCOPE_DIR
@@ -490,44 +477,14 @@ def run_mypy(root: Path) -> tuple[int, str, str]:
     return completed.returncode, completed.stdout, completed.stderr
 
 
-def run_baseline_filter(root: Path, report_text: str) -> str:
-    """Feed the report to mypy-baseline filter; return its stdout.
-
-    Anything other than exit 0 is red: the filter exits nonzero both for new
-    errors and for the "resolved violations" notice, and this gate must not
-    second-guess it into a pass.
-    """
-    command = [sys.executable, "-m", "mypy_baseline", "filter"]
-    try:
-        completed = subprocess.run(
-            command,
-            cwd=root,
-            input=report_text,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-    except OSError as e:
-        raise GateError(f"filter_fault -- could not start mypy-baseline filter: {e}") from e
-    if completed.returncode != 0:
-        detail = (completed.stdout + completed.stderr).strip()
-        raise GateError(
-            f"filter_fault -- mypy-baseline filter exited {completed.returncode}; "
-            "the report carries errors the baseline does not cover "
-            f"(or the tool refused the input). Filter output:\n{detail}"
-        )
-    return completed.stdout
-
-
-def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> tuple[str, int]:
+def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> str:
     """Judge the mypy report against the exit code's claim.
 
-    Returns ``(summary line, checked count)``; raises ``GateError`` when the
-    output does not support the claim. This is where an empty or garbage
-    report dies even though the exit code looks survivable. ``stderr`` rides
-    along so every fault message carries the checker's own evidence.
+    Returns the summary line; raises ``GateError`` when the output does not
+    support the exit code's claim at all. This is where an empty or garbage
+    report dies even though the exit code looks survivable, and where a
+    well-formed error report becomes a hard ``type_fault`` red. ``stderr``
+    rides along so every fault message carries the checker's own evidence.
     """
     lines = [line for line in report_text.splitlines() if line.strip()]
     summary_matches = [
@@ -555,6 +512,7 @@ def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> t
             f"audited config entirely. stderr:\n{stderr.strip()}"
         )
 
+    type_errors: list[str] = []
     if rc == 0:
         if not lines:
             raise GateError(
@@ -585,11 +543,11 @@ def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> t
             )
         checked = int(success.group(1))
         verdict = lines[-1]
-    if rc == 1:
+    else:
         if not lines:
             raise GateError(
                 "execution_fault -- mypy exited 1 (type errors claimed) but "
-                "the report is EMPTY; nothing can be reviewed or baselined. "
+                "the report is EMPTY; nothing can be reviewed. "
                 f"{stderr_note}"
             )
         if len(summary_matches) != 1 or summary_matches[0].group(0) != lines[-1]:
@@ -602,8 +560,8 @@ def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> t
         # An error line must be a well-formed diagnostic with ``error`` as
         # its severity token; a note line whose MESSAGE contains ": error: "
         # does not make this an error report.
-        error_lines = [line for line in lines if _ERROR_DIAGNOSTIC_LINE.match(line)]
-        if not error_lines:
+        type_errors = [line for line in lines if _ERROR_DIAGNOSTIC_LINE.match(line)]
+        if not type_errors:
             raise GateError(
                 "execution_fault -- mypy exited 1 but the report carries no "
                 f"'error:' line; the output is not a mypy error report. {stderr_note}"
@@ -622,10 +580,10 @@ def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> t
         # Cross-check the summary's own count against the error lines it
         # summarizes; a summary that disagrees with the body is not evidence.
         found_match = re.search(r"^Found (\d+) errors?", summary_matches[-1].group(0))
-        if found_match and int(found_match.group(1)) != len(error_lines):
+        if found_match and int(found_match.group(1)) != len(type_errors):
             raise GateError(
                 f"execution_fault -- the summary claims {found_match.group(1)} "
-                f"errors but the report carries {len(error_lines)} 'error:' "
+                f"errors but the report carries {len(type_errors)} 'error:' "
                 f"lines; the counts disagree. {stderr_note}"
             )
         checked = int(summary_matches[-1].group(1))
@@ -637,7 +595,20 @@ def verify_report(rc: int, report_text: str, stderr: str, scope_count: int) -> t
             f"holds {scope_count}; a module dropped out of the checked set. "
             "Narrowing the checked scope must not look green."
         )
-    return verdict, checked
+    if type_errors:
+        # The baseline was retired in #258: any type error is now a hard red
+        # on the report itself, with the first lines carried as evidence. No
+        # filter sits between the checker and this verdict.
+        shown = min(len(type_errors), 5)
+        more = len(type_errors) - shown
+        raise GateError(
+            f"type_fault -- mypy exited 1 with {len(type_errors)} type "
+            "error(s); the strict check is not clean and no baseline "
+            "absorbs them. First errors:\n"
+            + "\n".join(type_errors[:5])
+            + (f"\n... and {more} more" if more else "")
+        )
+    return verdict
 
 
 def main() -> int:
@@ -650,7 +621,6 @@ def main() -> int:
         # Configuration guards run before mypy: a weakened config must fail
         # even when mypy itself would still exit 0.
         check_strict_trio(root / "pyproject.toml")
-        check_baseline(root / BASELINE_FILENAME)
         scope_count = enumerate_scope(root)
 
         rc, stdout, stderr = run_mypy(root)
@@ -659,23 +629,17 @@ def main() -> int:
         except OSError as e:
             raise GateError(f"execution_fault -- cannot write {REPORT_FILENAME}: {e}") from e
 
-        verdict, checked = verify_report(rc, stdout, stderr, scope_count)
+        verdict = verify_report(rc, stdout, stderr, scope_count)
         # Evidence discipline, on green too: the exit code, the report size
         # and anything the checker said on stderr stay visible, so a future
         # reader does not have to trust the word OK.
         if stderr.strip():
             print(f"mypy stderr: {stderr.strip()}")
 
-        # The filter runs on BOTH branches, as the old pipeline did: besides
-        # catching new errors, its nonzero "resolved violations" exit is what
-        # forces a baseline sync once the historic errors are actually fixed.
-        # Skipping it on a clean run would silently retire that signal.
-        filter_output = run_baseline_filter(root, stdout)
-        sys.stdout.write(filter_output)
         print(
             f"mypy gate OK: mypy exited {rc}; report: {len(stdout.splitlines())} "
             f"lines; {verdict} (scope: {scope_count} .py files); "
-            "new errors after baseline: 0"
+            "type errors: 0"
         )
         return 0
     except GateError as fault:

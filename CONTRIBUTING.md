@@ -13,7 +13,7 @@ uv run pre-commit run --all-files    # hook sweep — CI's lint fallback. doc-cl
 python -m pytest tests/ -q         # fake-Maya test layer (contract tests against the maya.cmds fake)
 uvx ruff@0.17.1 check . --output-format=json --exit-zero > ruff-report.json          # lint pass 1: report only, red findings must not fail the shell
 python .github/scripts/check_ruff_budget.py ruff-report.json .github/ruff-baseline.json   # lint pass 2: per-rule budget that only goes down
-uv run python .github/scripts/run_mypy_gate.py   # type-check gate: runs mypy, verifies the report shape and the checked src/ scope, then the baseline filter; red on a crash, an empty/garbage report, a module dropping out of scope, a weakened strict config, or baseline-new errors
+uv run python .github/scripts/run_mypy_gate.py   # type-check gate: runs unfiltered strict mypy, verifies the report shape and the checked src/ scope; red on a crash, an empty/garbage report, a module dropping out of scope, a weakened strict config, or any type error
 python -m maya_mcp_server -vv      # run with DEBUG logs (-v=INFO, -vv=DEBUG)
 ```
 
@@ -45,8 +45,8 @@ stale companions cause integration failures and gate reds.
 | `zone_geometry_module.py` | `scene_tools.py` (`extra_source_paths` + the internal `get_zone_geometry` host helper, wired to `scene_plan`'s opt-in `recommend_assets`), `tests/maya_stub/__init__.py`, `tests/test_mayapy_smoke.py`, `tests/test_zone_geometry_module.py`, `tests/test_scene_tools_json.py` | Its source is concatenated into the `_mcp_scene` payload after `validator_module.py` (order: `maya_scene_module.py` → introspect → validator → zone geometry → scene state); both fake-Maya-layer assemblers must list it and the assembled bytes must match the host write. Wired by #217: `scene_plan` reads it only with `recommend_assets=True`, so default `scene_plan` output stays unchanged |
 | `asset_recommendation.py` | `scene_tools.py` (`scene_plan` `recommend_assets` wiring after `auto_fix` + worker thread + CoS `RECOMMEND` block), `pipeline.py` (`scene_plan` openWorld annotation), `tests/test_asset_recommendation.py`, `tests/test_scene_tools_json.py`, READMEs, `docs/threat-model.md` | Pure host-side composition: 7-zone → query table, target resolution & world-AABB screening, normalized word-level check, cross-keyword dedup, rank-band + size-difference ordering, 3-per-zone / 12-per-scene caps, 5s monotonic soft budget + `timeout` forwarding, shared-index `network_unavailable` circuit breaker, corrupt metadata guards, and the `recommendations` shape. No new MCP tool; default `scene_plan` output stays byte-identical, and search/network/budget/geometry failures never fail the plan |
 | `scene_tools.py` (new tool) | `server.py` instructions, READMEs, `AGENTS.md` | Tool surface changes require documentation sync |
-| `scene_state_module.py` | `scene_tools.py` (`extra_source_paths` + the `scene_snapshot` and `scene_rollback` tools, and their shared `_read_scene_modified` host helper), `cos_formatter.py` (the `MODIFIED=` marker in the header), `tests/maya_stub/__init__.py`, `tests/test_mayapy_smoke.py`, `tests/test_scene_tools_json.py` (the flag's tool contract), `tests/test_checkpoint_rollback.py` (read-back ignores the flag), `tests/test_cos_formatter.py` + `tests/test_scene_tools.py` (formatter call sites), `tests/test_zone_geometry_module.py` (assembly order), READMEs | Its source is concatenated into the `_mcp_scene` payload after `zone_geometry_module.py` (order: `maya_scene_module.py` → introspect → validator → zone geometry → scene state); both fake-Maya-layer assemblers must list it and the assembled bytes must match the host write. It only reads Maya's unsaved-changes flag: no tool refuses to run because of its value. `scene_rollback` reads the flag on the host side, before the call that swaps the scene, because `maya_scene_module.py` is line-capped, and a call from that file to a function in another file of the same injected module is invisible to mypy, which type-checks each file on its own (it would add a `name-defined` error to the baseline) |
-| `scene_light_module.py` | `scene_tools.py` (`extra_source_paths`), `scene_module_types.py` (`LightPayload`), `tests/maya_stub/__init__.py`, `tests/test_mayapy_smoke.py`, `tests/test_zone_geometry_module.py` (assembly order), `tests/test_scene_light_module.py` | Its source is concatenated into the `_mcp_scene` payload after `scene_state_module.py` (order: `maya_scene_module.py` → introspect → validator → zone geometry → scene state → light payload); both fake-Maya-layer assemblers must list it and the assembled bytes must match the host write. It is the one builder both `analyze_aesthetics` and `scene_review`'s lighting check use, reached from `maya_scene_module.py` through `globals()` for the same mypy reason as the scene-state row: each file is checked on its own, so a direct cross-file name would add a `name-defined` error |
+| `scene_state_module.py` | `scene_tools.py` (`extra_source_paths` + the `scene_snapshot` and `scene_rollback` tools, and their shared `_read_scene_modified` host helper), `cos_formatter.py` (the `MODIFIED=` marker in the header), `tests/maya_stub/__init__.py`, `tests/test_mayapy_smoke.py`, `tests/test_scene_tools_json.py` (the flag's tool contract), `tests/test_checkpoint_rollback.py` (read-back ignores the flag), `tests/test_cos_formatter.py` + `tests/test_scene_tools.py` (formatter call sites), `tests/test_zone_geometry_module.py` (assembly order), READMEs | Its source is concatenated into the `_mcp_scene` payload after `zone_geometry_module.py` (order: `maya_scene_module.py` → introspect → validator → zone geometry → scene state); both fake-Maya-layer assemblers must list it and the assembled bytes must match the host write. It only reads Maya's unsaved-changes flag: no tool refuses to run because of its value. `scene_rollback` reads the flag on the host side, before the call that swaps the scene, because `maya_scene_module.py` is line-capped, and a call from that file to a function in another file of the same injected module is invisible to mypy, which type-checks each file on its own (it would add a hard `name-defined` type error) |
+| `scene_light_module.py` | `scene_tools.py` (`extra_source_paths`), `scene_module_types.py` (`LightPayload`), `tests/maya_stub/__init__.py`, `tests/test_mayapy_smoke.py`, `tests/test_zone_geometry_module.py` (assembly order), `tests/test_scene_light_module.py` | Its source is concatenated into the `_mcp_scene` payload after `scene_state_module.py` (order: `maya_scene_module.py` → introspect → validator → zone geometry → scene state → light payload); both fake-Maya-layer assemblers must list it and the assembled bytes must match the host write. It is the one builder both `analyze_aesthetics` and `scene_review`'s lighting check use, reached from `maya_scene_module.py` through `globals()` for the same mypy reason as the scene-state row: each file is checked on its own, so a direct cross-file name would add a hard `name-defined` type error |
 | `scene_cache.py` | `scene_tools.py`, `session_manager.py` | Cache invalidation consistency |
 | `security.py` | `pipeline.py`, `tests/test_security.py`, `tests/test_pipeline.py` | Rules enforced by the middleware pipeline |
 | `security.py` (`safe_mode` rule table: `SAFE_IMPORT_ROOTS`/`SAFE_NODE_TYPES`/denied builtins) | `docs/threat-model.md` §2/§3, `GLOSSARY.md`, `README.md` + `README.zh-CN.md`, `server.py` docstrings, `tests/test_security.py::TestScanSafeModeCode`, `tests/test_pipeline.py::TestSafeModeGate`, the error-code registry under `docs/guide/` | The v1 deny-by-default matrix is the single source — docs, tool docstrings, and pin tests restate it; every rule change propagates |
@@ -109,34 +109,15 @@ PR body, which is how the three asset fixes before this cleanup landed.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (feat / fix / docs / refactor / test / chore).
 - CI gates (`.github/workflows/ci.yml`): `pytest` must be green on ubuntu + windows; the ruff budget
   (`.github/ruff-baseline.json`) may only go down — above budget fails, and a lower count may be
-  budgeted down in the same PR commit with the reason stated. `mypy` is baseline-gated in CI
-  (`mypy-baseline.txt`; empty as of the final type-precision batch (#257), so
-  the file accepts zero historic errors and every finding is red; it stays
-  because `run_mypy_gate.py` requires the file to exist — retiring it is the
-  separate baseline-decision ticket's call. The last 10 entries were annotation
-  gaps in nine public functions, cleared after the container-type batch (#255)
-  took the file down from 184 through three added-annotation batches
-  (#225, #230, #227), the stub-mismatch batch, the scene_plan organization
-  batch (#252) and the aesthetic-chain batch (#251);
-  the closing inventory behind that empty file is
-  `docs/reference/type-precision-inventory-257.md`;
-  baseline counts are sensitive to the fake Maya environment;
-  drift trail 221→223→212→223→184→168→152→85→67→45→20→10→0 across formatter, fake-Maya-environment changes,
-  D-124's removal of the code that was not wired up, and the annotation/container batches):
-  the type-check row in
-  Development setup above is that gate — `run_mypy_gate.py` runs mypy and the
-  filter on the same report, verifies the report shape and the checked scope,
-  and fails closed on a crash, an empty or garbage report (empty baseline
-  included), a module dropping out of `src/`, or a weakened strict config;
-  the filter still fails only on NEW errors.
-  After resolving errors, regenerate the baseline —
-  `uv run mypy-baseline sync < mypy-report.txt` (the gate writes the guarded
-  report to `mypy-report.txt`) once the filter reports zero NEW errors in
-  the gate's output — the gate's red on a stale baseline is the resolved-
-  violations notice and is expected until the baseline is refreshed — and
-  commit the refreshed baseline in the same PR.
-  `run_mypy_gate.py` requires the baseline file to exist; retiring it means
-  editing that gate (see `docs/ci-wiring.md`).
+  budgeted down in the same PR commit with the reason stated. `mypy` is a hard gate in CI:
+  unfiltered strict mypy must exit 0 over the whole `src/` tree, and every type error is red.
+  The historic baseline was retired in #258 after the final type-precision batch (#257) took it
+  to zero, so the tool and its file are gone and `run_mypy_gate.py` reports any well-formed
+  error report as a `type_fault` red. The gate still checks the report shape and the live
+  `src/` scope, and refuses a weakened strict config, an overrides table, or a reintroduced
+  mypy-baseline filter config. Do not re-add a baseline to turn a red run green: fix the
+  error or explain why the check itself is wrong. The closing measurement and the #222
+  criteria mapping are in `docs/reference/mypy-baseline-retirement-258.md`.
   The ruff budget is per-rule
   (`{segment:{rule:count}}`) since T-10b — rules cannot subsidise each other.
   Budget gates are judged on the checked commit's tip (the PR's end state); a
