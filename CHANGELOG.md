@@ -361,7 +361,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Evidence:
   `tests/test_scene_light_module.py::TestOneSharedPayload::test_both_consumers_call_the_shared_builder`,
   `tests/test_scene_light_module.py::TestOneSharedPayload::test_the_payload_carries_every_field_for_every_light_type`,
-  `tests/test_scene_light_module.py::TestOneSharedPayload::test_a_light_without_shadow_attributes_counts_as_shadowing`.
+  `tests/test_scene_light_module.py::TestOneSharedPayload::test_a_light_without_shadow_attributes_counts_as_shadowing`,
+  `tests/test_maya_scene_module.py::TestSceneReviewLightingPayload::test_review_lighting_score_and_subscores`.
 
 - **Scene and workflow terms now say what they mean** — group 1 of the
   plain-language pass (#188): `ICEV`, `看图复查`, `scene_snapshot`, `CoS`,

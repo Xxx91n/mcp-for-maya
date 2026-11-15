@@ -52,7 +52,7 @@ class TestOneSharedPayload:
 
     def test_the_payload_carries_every_field_for_every_light_type(self, maya_env):
         scene = maya_env.scene
-        scene.add_light("LGT_spot", ltype="spotLight", t=(1, 2, 3), r=(0, 45, 0))
+        scene.add_light("LGT_spot", ltype="spotLight", t=(1.26, 2, 3), r=(0, 45, 0))
         scene.add_light("LGT_area", ltype="areaLight", t=(4, 5, 6))
         scene.add_light("LGT_dir", ltype="directionalLight", t=(7, 8, 9))
 
@@ -63,7 +63,7 @@ class TestOneSharedPayload:
             assert set(payload) == _LIGHT_PAYLOAD_KEYS
             json.dumps(payload, allow_nan=False)
 
-        assert payloads["LGT_spot"]["position"] == [1.0, 2.0, 3.0]
+        assert payloads["LGT_spot"]["position"] == [1.3, 2.0, 3.0]
         assert payloads["LGT_spot"]["rotation"] == [0.0, 45.0, 0.0]
         assert payloads["LGT_spot"]["cone_angle"] == 40.0
         assert payloads["LGT_spot"]["penumbra"] == 10.0

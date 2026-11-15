@@ -80,14 +80,14 @@ def build_light_payload(shape_name: str) -> LightPayload | None:
         # Spotlight cone angle (degrees) and soft edge.
         cone_angle = None
         penumbra = None
-        if ltype in ("spotLight",) and cmds.objExists(f"{shape_name}.coneAngle"):
+        if ltype == "spotLight" and cmds.objExists(f"{shape_name}.coneAngle"):
             cone_angle = cmds.getAttr(f"{shape_name}.coneAngle")
             if cmds.objExists(f"{shape_name}.penumbraAngle"):
                 penumbra = cmds.getAttr(f"{shape_name}.penumbraAngle")
 
         # Area light size; Maya reports width and height as separate attrs.
         area_size = None
-        if ltype in ("areaLight",) and cmds.objExists(f"{shape_name}.areaWidth"):
+        if ltype == "areaLight" and cmds.objExists(f"{shape_name}.areaWidth"):
             aw = cmds.getAttr(f"{shape_name}.areaWidth")
             ah = (
                 cmds.getAttr(f"{shape_name}.areaHeight")
