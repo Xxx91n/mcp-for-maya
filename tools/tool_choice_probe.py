@@ -231,16 +231,25 @@ def summarise(
 
 
 def build_arm_b(
-    tools: list[dict[str, Any]], tool_name: str, description: str
+    tools: list[dict[str, Any]], tool_name: str, description: str, append: str
 ) -> list[dict[str, Any]]:
-    """Return a copy of the tool list with one tool's description replaced."""
+    """Return a copy of the tool list with one tool's description changed.
+
+    A non-empty ``append`` extends the shipped description; a non-empty
+    ``description`` replaces it. One of the two, never both, so an arm tests a
+    single edit.
+    """
     out: list[dict[str, Any]] = []
     for tool in tools:
         fn = tool["function"]
-        if fn["name"] == tool_name:
-            out.append({"type": "function", "function": {**fn, "description": description}})
-        else:
+        if fn["name"] != tool_name:
             out.append(tool)
+            continue
+        if append:
+            changed = f"{fn.get('description') or ''}\n\n{append}"
+        else:
+            changed = description
+        out.append({"type": "function", "function": {**fn, "description": changed}})
     return out
 
 
@@ -283,7 +292,7 @@ def run(args: argparse.Namespace, base: str, key: str, tools: list[dict[str, Any
         items = [i for i in items if i["id"] in wanted]
     arms: dict[str, list[dict[str, Any]]] = {"A": tools}
     if args.ab_tool:
-        arms["B"] = build_arm_b(tools, args.ab_tool, args.ab_description)
+        arms["B"] = build_arm_b(tools, args.ab_tool, args.ab_description, args.ab_append)
     names = [t["function"]["name"] for t in tools]
     records: list[dict[str, Any]] = []
     for index, item in enumerate(items):
@@ -340,6 +349,7 @@ def run(args: argparse.Namespace, base: str, key: str, tools: list[dict[str, Any
         "arms": sorted(arms),
         "ab_tool": args.ab_tool,
         "ab_description": args.ab_description,
+        "ab_append": args.ab_append,
         "temperature": "endpoint default; this judge rejects a non-default value",
         "tools_source": "maya_mcp_server.server.mcp.list_tools() at HEAD of the run tree",
         "variant": args.variant,
@@ -411,6 +421,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--ab-tool", default="", help="tool whose description arm B replaces")
     parser.add_argument("--ab-description", default="", help="description arm B uses for it")
+    parser.add_argument(
+        "--ab-append", default="", help="text arm B appends to that tool description"
+    )
     parser.add_argument("--variant", default="as shipped")
     args = parser.parse_args(argv)
     base = os.environ.get(BASE_URL_ENV)
@@ -418,8 +431,11 @@ def main(argv: list[str] | None = None) -> int:
     if not base or not key:
         print(f"set {BASE_URL_ENV} and {API_KEY_ENV} first", file=sys.stderr)
         return 2
-    if bool(args.ab_tool) != bool(args.ab_description):
-        print("--ab-tool and --ab-description go together", file=sys.stderr)
+    if bool(args.ab_description) and bool(args.ab_append):
+        print("pick --ab-description or --ab-append, not both", file=sys.stderr)
+        return 2
+    if args.ab_tool and not (args.ab_description or args.ab_append):
+        print("--ab-tool needs a description or an append", file=sys.stderr)
         return 2
     tools = asyncio.run(tool_payload())
     print(f"{len(tools)} tools offered")
