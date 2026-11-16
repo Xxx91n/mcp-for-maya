@@ -119,7 +119,7 @@ Story 5 (duplicate messages must not hide a replacement error) and story 8
 records as they ran; this ticket does not re-verify each batch. The final state
 makes them moot for the gate: the baseline is empty and then removed, so no
 duplicate message is hidden by it. No dependency upgrade was made during the
-cleanup (stories 18–19), and no exception growth was accepted.
+cleanup (story 18), and no exception growth was accepted (story 19).
 
 The table after this one re-checks the final conditions only.
 
@@ -190,7 +190,7 @@ decision and must not be cited as existing.
 | --- | --- |
 | Parent main SHA | `6b5a84e2fc215f43de3357658d96869becdd7113` |
 | Baseline-retirement PR | #286 |
-| This record's PR | branch `ticket-259-closeout`; its URL will be added in the final Issue comment |
+| This record's PR | #288 — https://github.com/Xxx91n/mcp-for-maya/pull/288 ; its merge SHA is pending because the owner decides whether to merge |
 | Normal CI on main | run 43754350484 |
 | Normal CI on the retirement PR | run 43751203949 |
 | Negative injection | PR #287, run 43750680182 |
