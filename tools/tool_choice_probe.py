@@ -230,57 +230,172 @@ def summarise(
     }
 
 
-def run(args: argparse.Namespace, base: str, key: str, tools: list[dict[str, Any]]) -> int:
-    """Run every item once and write the report.
+def build_arm_b(
+    tools: list[dict[str, Any]], tool_name: str, description: str
+) -> list[dict[str, Any]]:
+    """Return a copy of the tool list with one tool's description replaced."""
+    out: list[dict[str, Any]] = []
+    for tool in tools:
+        fn = tool["function"]
+        if fn["name"] == tool_name:
+            out.append({"type": "function", "function": {**fn, "description": description}})
+        else:
+            out.append(tool)
+    return out
 
-    The tool order is reshuffled per item from a fixed seed, and the position the
-    model picked is recorded. A model that answers the same tool whatever the
-    order is position-biased or catch-all-biased; a model that answers per
-    meaning is not, and the two cases must be separable from the report alone.
+
+def summarise_ab(records: list[dict[str, Any]], watched: str) -> dict[str, Any]:
+    """Per-arm count of how often the watched tool was the first call."""
+    arms: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        arms.setdefault(str(record["arm"]), []).append(record)
+    out: dict[str, Any] = {}
+    for arm, rows in sorted(arms.items()):
+        picks = sum(1 for r in rows if r["actual"] == watched)
+        out[arm] = {
+            "observations": len(rows),
+            "watched_tool_picks": picks,
+            "watched_tool_share": round(picks / len(rows), 4) if rows else 0.0,
+        }
+    per_item: dict[str, dict[str, int]] = {}
+    for record in records:
+        slot = per_item.setdefault(str(record["id"]), {})
+        if record["actual"] == watched:
+            slot[str(record["arm"])] = slot.get(str(record["arm"]), 0) + 1
+    out["per_item_watched_picks"] = per_item
+    return out
+
+
+def run(args: argparse.Namespace, base: str, key: str, tools: list[dict[str, Any]]) -> int:
+    """Run the items, optionally over two arms, with repeats.
+
+    Both arms see the same shuffled order for a given item and repeat, so the
+    watched tool sits in the same position in both and position bias cancels
+    instead of becoming noise.
     """
     items = load_items(Path(args.items))
+    if args.ids:
+        wanted = {x.strip() for x in args.ids.split(",") if x.strip()}
+        missing = wanted - {i["id"] for i in items}
+        if missing:
+            print(f"unknown ids: {sorted(missing)}", file=sys.stderr)
+            return 2
+        items = [i for i in items if i["id"] in wanted]
+    arms: dict[str, list[dict[str, Any]]] = {"A": tools}
+    if args.ab_tool:
+        arms["B"] = build_arm_b(tools, args.ab_tool, args.ab_description)
     names = [t["function"]["name"] for t in tools]
     records: list[dict[str, Any]] = []
     for index, item in enumerate(items):
-        order = list(names)
-        random.Random(args.seed + index).shuffle(order)
-        by_name = {t["function"]["name"]: t for t in tools}
-        offered = [by_name[name] for name in order]
-        try:
-            actual, finish = ask(base, key, args.model, item["request"], offered)
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", "replace")[:300]
-            print(f"{item['id']} HTTP {exc.code}: {detail}", file=sys.stderr)
-            return 1
-        except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-            print(f"{item['id']} failed: {exc}", file=sys.stderr)
-            return 1
-        expected = item["expected"]
-        if actual is None:
-            verdict = "no_call"
-        else:
-            verdict = "correct" if actual == expected else "misroute"
-        records.append(
-            {
-                **item,
-                "actual": actual,
-                "verdict": verdict,
-                "finish_reason": finish,
-                "chosen_index": order.index(actual) if actual in order else None,
-                "expected_index": order.index(expected) if expected in order else None,
-            }
-        )
-        print(f"{item['id']} {verdict:8s} expected={expected} actual={actual}")
+        for repeat in range(args.repeats):
+            order = list(names)
+            random.Random(args.seed + index).shuffle(order)
+            for arm, arm_tools in arms.items():
+                by_name = {t["function"]["name"]: t for t in arm_tools}
+                offered = [by_name[name] for name in order]
+                try:
+                    actual, finish = ask(base, key, args.model, item["request"], offered)
+                except urllib.error.HTTPError as exc:
+                    detail = exc.read().decode("utf-8", "replace")[:300]
+                    print(f"{item['id']}/{arm}/{repeat} HTTP {exc.code}: {detail}", file=sys.stderr)
+                    return 1
+                except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+                    print(f"{item['id']}/{arm}/{repeat} failed: {exc}", file=sys.stderr)
+                    return 1
+                expected = item["expected"]
+                if actual is None:
+                    verdict = "no_call"
+                elif actual == expected:
+                    verdict = "correct"
+                else:
+                    verdict = "misroute"
+                records.append(
+                    {
+                        **item,
+                        "arm": arm,
+                        "repeat": repeat,
+                        "actual": actual,
+                        "verdict": verdict,
+                        "finish_reason": finish,
+                        "chosen_index": order.index(actual) if actual in order else None,
+                        "expected_index": order.index(expected) if expected in order else None,
+                    }
+                )
+                print(f"{item['id']} r{repeat} arm{arm} {verdict:8s} actual={actual}")
 
-    report = summarise(records, args.model, len(tools), args.seed, base, args.items, args.variant)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(
-        f"\n{report['items']} items: correct={report['correct']} "
-        f"misroute={report['misroute']} no_call={report['no_call']}"
+    meta = {
+        "date": "2026-11-16",
+        "host": platform.platform(),
+        "python": sys.version.split()[0],
+        "pid": os.getpid(),
+        "endpoint_host": urllib.parse.urlsplit(base).netloc,
+        "model": args.model,
+        "seed": args.seed,
+        "script": "tools/tool_choice_probe.py",
+        "items_file": args.items,
+        "items_used": [i["id"] for i in items],
+        "repeats": args.repeats,
+        "arms": sorted(arms),
+        "ab_tool": args.ab_tool,
+        "ab_description": args.ab_description,
+        "temperature": "endpoint default; this judge rejects a non-default value",
+        "tools_source": "maya_mcp_server.server.mcp.list_tools() at HEAD of the run tree",
+        "variant": args.variant,
+    }
+    boundary = (
+        "Supports: for the model in meta, on these written requests, with the tool "
+        "order reshuffled per item, which tool the first call named, and how that "
+        "differs between the two arms over the stated repeats. Does not support: any "
+        "statement about other models or real client applications, anything about "
+        "argument correctness, or any claim about the tool surface beyond the items "
+        "listed in meta."
     )
-    print(f"misroute rate={report['misroute_rate']} pairs={report['misroute_pairs']}")
+    if len(arms) == 1:
+        report = summarise(
+            records, args.model, len(tools), args.seed, base, args.items, args.variant
+        )
+    else:
+        report = {
+            "probe": "tool choice: watched-tool share across two arms",
+            "date": "2026-11-16",
+            "model": args.model,
+            "seed": args.seed,
+            "items": len(items),
+            "repeats": args.repeats,
+            "ab_tool": args.ab_tool,
+            "ab_description": args.ab_description,
+            "meta": meta,
+            "claim_boundary": boundary,
+            "ab": summarise_ab(records, args.ab_tool or ""),
+            "arms": {
+                arm: summarise(
+                    [r for r in records if r["arm"] == arm],
+                    args.model,
+                    len(tools),
+                    args.seed,
+                    base,
+                    args.items,
+                    f"arm {arm}: {args.variant}",
+                )
+                for arm in sorted(arms)
+            },
+            "records": records,
+        }
+    out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if len(arms) == 1:
+        print(
+            f"\n{report['items']} items: correct={report['correct']} "
+            f"misroute={report['misroute']} no_call={report['no_call']}"
+        )
+        print(f"misroute rate={report['misroute_rate']} pairs={report['misroute_pairs']}")
+    else:
+        for arm, stats in report["ab"].items():
+            if arm == "per_item_watched_picks":
+                continue
+            print(f"arm {arm}: {stats['watched_tool_picks']}/{stats['observations']} watched")
+        print(f"per item: {report['ab']['per_item_watched_picks']}")
     print(f"report -> {out}")
     return 0
 
@@ -290,14 +405,21 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", default=os.environ.get("TOOL_CHOICE_MODEL", DEFAULT_MODEL))
     parser.add_argument("--items", default=str(ITEMS_FILE))
+    parser.add_argument("--ids", default="", help="comma-separated item ids to run")
     parser.add_argument("--out", default="tool-choice-report.json")
     parser.add_argument("--seed", type=int, default=80)
+    parser.add_argument("--repeats", type=int, default=1)
+    parser.add_argument("--ab-tool", default="", help="tool whose description arm B replaces")
+    parser.add_argument("--ab-description", default="", help="description arm B uses for it")
     parser.add_argument("--variant", default="as shipped")
     args = parser.parse_args(argv)
     base = os.environ.get(BASE_URL_ENV)
     key = os.environ.get(API_KEY_ENV)
     if not base or not key:
         print(f"set {BASE_URL_ENV} and {API_KEY_ENV} first", file=sys.stderr)
+        return 2
+    if bool(args.ab_tool) != bool(args.ab_description):
+        print("--ab-tool and --ab-description go together", file=sys.stderr)
         return 2
     tools = asyncio.run(tool_payload())
     print(f"{len(tools)} tools offered")
