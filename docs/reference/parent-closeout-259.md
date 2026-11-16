@@ -3,10 +3,10 @@
 **Verdict: the owner resolved the blocking condition on 2026-11-16 by choosing
 退役 — keep the baseline retired and waive #222's exit rule.** The independent
 CI guard still does not exist, and this record does not pretend it does. The
-matrix is now closable: no condition blocks it, and the missing guard sits in
-the owner-accepted-boundary column. The close actions themselves — the final
-comments and the parent Issue closure — still have to be posted after this
-record lands. Until then, #222 and #259 stay open.
+matrix is closable: no condition blocks it, and the missing guard sits in the
+owner-accepted-boundary column. The close actions were completed on 2026-11-16:
+the final comments were posted and #222 and #259 were closed. The #221 comment
+was posted without reopening it, since #221 was already closed `not planned`.
 
 **What this file is:** the one place that maps each acceptance condition of
 #221 and #222 to its current evidence, its owner-accepted boundary, or the
@@ -133,7 +133,7 @@ The table after this one re-checks the final conditions only.
 | 6 | Behaviour tests and real-Maya evidence are present, with skips not counted as passes | 已通过 | Four pytest legs on 3.10/3.13 × ubuntu/windows: ubuntu 3.13 1599 passed / 28 skipped; ubuntu 3.10 1598 / 29; windows 3.13 1599 / 28; windows 3.10 1598 / 29. The skips are reported as skips in every leg. #253's Maya 2024 GUI run: 6/6 call forms pass (xform, rename, keyTangent, playbackOptions, aimConstraint, MFnMesh.getPoint). Artifact: `docs/evidence/probes/probe-253-six-callforms-gui-maya2024-v2.json`. The mayapy/standalone lane is recorded as blocked by a DLL initialisation failure, not as a skip-pass. |
 | 7 | The final result is one of the two named outcomes, with a check against #222's close criteria | 已通过 | Result: `baseline retired, strict gate retained`. #258's record lists the close criteria and marks the CI-guard row as unmet; the owner waived that row on 2026-11-16 (next row). |
 | 8 | No branch-protection edit in this ticket | 已通过 | No ruleset or protection change was made by #258 or #259. |
-| 9 | #222's exit rule: a separate CI guard proves the check cannot silently disappear before the baseline is retired | owner 已接受边界 | Owner decision 2026-11-16: 退役 — keep the baseline retired and waive this exit rule, with the residual risks below accepted. The guard is still absent, and #258's table still says `Not met`; this is a waiver, not a pass. The final #222 comment will restate the decision. |
+| 9 | #222's exit rule: a separate CI guard proves the check cannot silently disappear before the baseline is retired | owner 已接受边界 | Owner decision 2026-11-16: 退役 — keep the baseline retired and waive this exit rule, with the residual risks below accepted. The guard is still absent, and #258's table still says `Not met`; this is a waiver, not a pass. The final #222 comment records the decision. |
 
 Why row 9 blocked the closeout before 2026-11-16: #221's closing comment says
 its administrative closure must not be read as permission to delete the
@@ -170,7 +170,7 @@ decision and must not be cited as existing.
 | #221 execution effect (run, fail closed, scope, strictness) | Rows 1–11, 14–16, 18–19 | Row 17 | — |
 | #221 live configuration | Row 12 (read 2026-11-16T03:48:50Z), row 13 | Rows 20–21 | — |
 | #222 type cleanup and retirement | Rows 1–8 | Row 9 (CI guard waived 2026-11-16) | — |
-| #259 audit itself | Items 1–4, 6–7 of its acceptance list | — | Item 5 (final comments and parent close still pending) |
+| #259 audit itself | Items 1–7 of its acceptance list | — | — |
 
 ### Ticket #259 acceptance list, item by item
 
@@ -180,7 +180,7 @@ decision and must not be cited as existing.
 | 2 | Re-check #256's four merge constraints and the latest protection config; record the time and the responsible party | 已通过 | #256 four-case table; row 12; frozen artifact |
 | 3 | Re-check #258's conclusion, strict scope, negative test, full test results and #253's Maya evidence; do not count skip as pass | 已通过 | #222 rows 1–8; #253 artifact; pytest leg counts |
 | 4 | Check for extra blocking fix tickets or unmerged required PRs | 已通过 | "What was checked for stray blockers" |
-| 5 | Post final comments and close the parents once every key constraint is met; otherwise keep them open with the next action | 未完成 | Decision recorded; the comments and closures wait for this PR to land and for the owner's explicit authorization |
+| 5 | Post final comments and close the parents once every key constraint is met; otherwise keep them open with the next action | 已通过 | Comments posted: [#221](https://github.com/Xxx91n/mcp-for-maya/issues/221#issuecomment-6907054225), [#222](https://github.com/Xxx91n/mcp-for-maya/issues/222#issuecomment-6907055030), [#259](https://github.com/Xxx91n/mcp-for-maya/issues/259#issuecomment-6907056041). #222 and #259 closed `completed`; #221 stayed closed `not planned`. |
 | 6 | Record #212, #223–#229 and #178; do not claim permanent immunity | 已通过 | "What was checked for stray blockers"; residual risk |
 | 7 | Deliver the status table with PR, merge SHA, tests, real-Maya and settings-read links | 已通过 | This table, the evidence index and the artifact list below |
 
@@ -190,8 +190,9 @@ decision and must not be cited as existing.
 | --- | --- |
 | Parent main SHA | `6b5a84e2fc215f43de3357658d96869becdd7113` |
 | Baseline-retirement PR | #286 |
-| This record's PR | #288 — https://github.com/Xxx91n/mcp-for-maya/pull/288 ; its merge SHA is pending because the owner decides whether to merge |
+| This record's PR | #288 — https://github.com/Xxx91n/mcp-for-maya/pull/288 ; squash merge `4db5a556111bdc07c3146db163039c93e98368bc` |
 | Normal CI on main | run 43754350484 |
+| Post-closeout main CI | run 43802336391 — `ci` aggregate `lint=success mypy=success test=success`, four pytest legs, mypy and ruff pass |
 | Normal CI on the retirement PR | run 43751203949 |
 | Negative injection | PR #287, run 43750680182 |
 | Automated tests | Four pytest legs: 1598–1599 passed, 28–29 skipped |
@@ -218,26 +219,25 @@ decision and must not be cited as existing.
 - No future CI run, type error or Maya version is permanently covered. This
   file records one point in time.
 
-## Recorded decision and remaining steps
+## Recorded decision and closeout steps
 
 On 2026-11-16 the owner chose **退役**: keep the baseline retired, waive the
 #222 exit rule, and accept the risks above. This is a waiver, not a guard. It
 must not be cited as proof that the check cannot silently disappear.
 
 Source: the owner's direction in the #259 implementation session on
-2026-11-16. This pull request body and this file carry it until the final #222
-comment is posted; that comment repeats it on GitHub.
+2026-11-16. The pull request body, this file and the final #222 comment record
+it on GitHub.
 
-Remaining closeout steps, in order:
+Closeout steps, completed on 2026-11-16:
 
-1. Land this record (the pull request that carries it).
-2. Post a factual final comment to #221 and #222. Each comment repeats the
-   verdict, the evidence links, the accepted boundary and the reason for
-   closing. Neither comment claims the independent guard exists.
-3. Close #222, then #259. These are GitHub writes and happen only when the
-   owner authorizes them.
-
-Until steps 1–3 are done, #222 and #259 stay open.
+1. Landed this record: PR #288, squash merge `4db5a556`.
+2. Posted the final comments to #221, #222 and #259. Each repeats the verdict,
+   the evidence links, the accepted boundary and the reason for closing.
+   Neither parent comment claims the independent guard exists.
+3. Closed #222 and #259. #222 was already `closed / completed` right after the
+   merge; #259 was closed by the closeout run. #221 stayed
+   `closed / not planned`.
 
 ## Evidence index
 
