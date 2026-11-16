@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-16
+
+Maya correctness plus governance release. World bounding boxes now match Maya's
+own for geometry that fills its box, and stop widening with hierarchy depth;
+camera framing, zone geometry and query payloads report lengths in the scene's
+working unit; `scene_plan` recommendations recognize all seven zones and search
+the four with a query table (entrance, display, furniture, lighting), survive a
+partially measured zone envelope, and run off the event loop under a 5 s soft
+budget with offline circuit-breaking. The security audit's remaining sanitizer
+and checkout gaps are closed, `safe_mode` gets a deny-by-default allowlist
+matrix, and validator registration answers hostile `str` subclasses with its own
+error envelope. CI now fails closed on an untrustworthy mypy run and checks the
+key jobs' wiring; the historical mypy baseline is retired and the MCP tool set
+is unchanged.
+
 ### Fixed
 
 - **World bounding boxes no longer widen layer by layer when a rotated child
@@ -38,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still measure up to one axis-alignment too wide, but no longer by layer;
   the `scene_snapshot`, `scene_measure`, `scene_assert` and `scene_inspect`
   tool descriptions state that boundary.
-  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Broken version: 0.7.0 and earlier; fixed version: 0.8.0.
   Evidence:
   `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_child_rotation_cancelling_the_parent_reports_the_true_width`,
   `tests/test_maya_stub.py::TestSceneGraph::test_cached_box_is_loose_but_the_module_walks_shapes`,
@@ -61,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directory name containing a space keeps its tail; that is the shape still
   visible. The drive-letter rule gained a path boundary: it read the `s://` in
   `https://host/a` as drive `s:` and mangled URLs in error text.
-  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Broken version: 0.7.0 and earlier; fixed version: 0.8.0.
   Evidence:
   `tests/test_security.py::TestSanitizeErrorMessagePaths::test_absolute_unix_path_outside_home`,
   `tests/test_security.py::TestSanitizeErrorMessagePaths::test_single_segment_absolute_path`,
@@ -78,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unit, and the `camera_create` description names it. A centimetre scene keeps
   its old numbers and 0.1 cm rounding; other units report no coarser than
   0.1 cm.
-  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Broken version: 0.7.0 and earlier; fixed version: 0.8.0.
   Evidence:
   `tests/test_maya_scene_module.py::TestCameraShotUnits::test_metre_scene_frames_the_target`,
   `tests/test_maya_scene_module.py::TestCameraShotUnits::test_metre_scene_adds_the_target_offset`,
@@ -104,7 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (translate-only chains, and box-shaped geometry) and conservative for
   rotated geometry that does not fill its own box.
   Broken version: 0.7.0 and earlier for the double transform, the zone
-  geometry read is unreleased; fixed version: [Unreleased].
+  geometry read is unreleased; fixed version: 0.8.0.
   Evidence:
   `tests/test_maya_scene_module.py::TestWorldBboxMatchesExactBox::test_translate_is_applied_once`,
   `tests/test_maya_scene_module.py::TestReportedBoxIsWorldSpace::test_scene_graph_reports_the_world_box_of_a_nested_object`,
@@ -126,7 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scene_validate`'s `min_clearance` keeps its internal-centimetre rule values
   and reports `actual` in the same centimetres. Centimetre scenes keep their
   exact previous numbers.
-  Broken version: 0.7.0 and earlier; fixed version: [Unreleased].
+  Broken version: 0.7.0 and earlier; fixed version: 0.8.0.
   Evidence:
   `tests/test_maya_scene_module.py::TestWorkingUnitLengths::test_scene_graph_reports_working_unit_lengths`,
   `tests/test_maya_scene_module.py::TestWorkingUnitLengths::test_measure_modes_convert_every_length`,
@@ -155,7 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exclusion; explicit-object three-axis tolerance is unchanged; fully
   unmeasurable zones are still skipped without searching.
   Broken version: unreleased (introduced with the still-unreleased
-  recommendations feature, never shipped); fixed version: [Unreleased].
+  recommendations feature, never shipped); fixed version: 0.8.0.
   Evidence:
   `tests/test_asset_recommendation.py::TestPartialZoneEnvelopeCandidates::test_partial_zone_keeps_model_larger_than_measured_bbox_as_unverified`,
   `tests/test_asset_recommendation.py::TestPartialZoneEnvelopeCandidates::test_complete_zone_still_excludes_model_larger_than_bbox`,
@@ -596,7 +611,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hand-maintained, no gate resolves its anchors, and it sits outside the
   doc-claims gate's surfaces — the same ruling the rule files already carry.
   Every anchor node the page names still collects and passes. Broken version:
-  0.7.0; fixed version: [Unreleased]. Evidence — the 11 nodes pinning the
+  0.7.0; fixed version: 0.8.0. Evidence — the 11 nodes pinning the
   page's 12 codes, each collectible and passing:
   `tests/test_security.py::TestErrorCodeContract::test_base_pipeline_error_carries_pipeline_error`,
   `tests/test_pipeline.py::TestPipelineValidation::test_bad_session_key_rejected`,
