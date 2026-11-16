@@ -71,7 +71,7 @@ comment already describes.
 | 14 | A clean ordinary PR stays green | 已通过 | PR #286 at final head `8ed81334`: every check-run that is meant to run on a pull request is green, including `ci`, `mypy baseline gate`, `ruff budget gate`, the four pytest legs, coverage (separate workflow run) and the Semgrep app scan. The two scheduled drift canaries are `skipped` by their trigger condition, as designed. Actions run: https://github.com/Xxx91n/mcp-for-maya/actions/runs/43751203949 ; coverage: https://github.com/Xxx91n/mcp-for-maya/actions/runs/43751203951 ; Semgrep: https://github.com/Xxx91n/mcp-for-maya/runs/132925320352 |
 | 15 | CI failures name which check was lost or bypassed | 已通过 | The gate prints a tagged `::error` (`config_fault`, `checker_fault`, `execution_fault`, `scope_fault`, `type_fault`). The wiring checker prints its own finding tag and path. |
 | 16 | The negative test suite is repeatable | 已通过 | The gate and wiring pins are registered and run in CI. The disposable PRs (#242, #246, #261, #287) were closed without merging; #287's remote branch was deleted. |
-| 17 | No branch-protection change without approval | 已通过 | The 2026-11-14 A3 (#228) work under #221 did add `ruff budget gate` and `mypy baseline gate` to the required contexts. Its `PATCH` and read-back are recorded in `docs/ci-wiring.md`; that was the approved change this condition allows. #256, #258 and #259 made no further protection edits, and the 2026-11-16 read matches the recorded contexts. The job name stayed `mypy baseline gate` because it is a required context. |
+| 17 | No branch-protection change without approval | owner 已接受边界 | The 2026-11-14 A3 (#228) work under #221 added `ruff budget gate` and `mypy baseline gate` to the required contexts. `docs/ci-wiring.md` records the `PATCH` and the read-back, but the immutable record does not quote a prior explicit approval. The owner later closed #228 and #221 with that setting in place, and the 2026-11-16 read confirms it; that is an accepted boundary, not proof of prior approval. #256, #258 and #259 made no further edits; the job name stayed `mypy baseline gate`. |
 | 18 | No Maya runtime change from the governance work | 已通过 | The #258 diff touches the gate, its tests, docs, CI config, dependency metadata and two small references; no file under `src/maya_mcp_server/` changed. |
 | 19 | Existing vocabulary and test conventions are respected | 已通过 | The work extends the existing gate registry, wiring checker and pytest seams; it does not add a second registry or a parallel checker framework. |
 | 20 | An independent merge anchor exists, so the check cannot silently disappear | owner 已接受边界 | Not implemented. #250/PR #261 showed that keeping the three required names while replacing the real tool with an unconditional success still produced a green, mergeable PR. #254 and #256 were closed `not planned`; the owner accepted the risk in the #256 closeout comment (https://github.com/Xxx91n/mcp-for-maya/issues/256#issuecomment-6890139942). |
@@ -114,10 +114,12 @@ rule not to repeat closed tasks; it records where each one landed.
 | #257 | #274 | `96ffd83a` | Last untyped calls typed, raw mypy to zero |
 | #258 (decision) | #286 | `6b5a84e2` | Baseline retired, strict gate retained |
 
-With the baseline empty and then removed, the duplicate-message accounting
-(story 5) and baseline-regeneration (story 8) conditions no longer have an
-object. No dependency upgrade was made during the cleanup (stories 18–19), and
-no exception growth was accepted.
+Story 5 (duplicate messages must not hide a replacement error) and story 8
+(baseline regeneration only from a valid full report) were handled in the batch
+records as they ran; this ticket does not re-verify each batch. The final state
+makes them moot for the gate: the baseline is empty and then removed, so no
+duplicate message is hidden by it. No dependency upgrade was made during the
+cleanup (stories 18–19), and no exception growth was accepted.
 
 The table after this one re-checks the final conditions only.
 
@@ -165,7 +167,7 @@ decision and must not be cited as existing.
 
 | Area | 已通过 | owner 已接受边界 | 未完成 |
 | --- | --- | --- | --- |
-| #221 execution effect (run, fail closed, scope, strictness) | Rows 1–11, 14–19 | — | — |
+| #221 execution effect (run, fail closed, scope, strictness) | Rows 1–11, 14–16, 18–19 | Row 17 | — |
 | #221 live configuration | Row 12 (read 2026-11-16T03:48:50Z), row 13 | Rows 20–21 | — |
 | #222 type cleanup and retirement | Rows 1–8 | Row 9 (CI guard waived 2026-11-16) | — |
 | #259 audit itself | Items 1–4, 6–7 of its acceptance list | — | Item 5 (final comments and parent close still pending) |
