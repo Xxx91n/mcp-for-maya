@@ -165,6 +165,7 @@ def summarise(
     seed: int,
     base: str,
     items_file: str,
+    variant: str,
 ) -> dict[str, Any]:
     """Build the report body from the per-item records.
 
@@ -216,6 +217,7 @@ def summarise(
             "items_file": items_file,
             "temperature": "endpoint default; this judge rejects a non-default value",
             "tools_source": "maya_mcp_server.server.mcp.list_tools() at HEAD of the run tree",
+            "variant": variant,
         },
         "claim_boundary": (
             "Supports: for the model in meta, on these 60 written requests, with the "
@@ -270,7 +272,7 @@ def run(args: argparse.Namespace, base: str, key: str, tools: list[dict[str, Any
         )
         print(f"{item['id']} {verdict:8s} expected={expected} actual={actual}")
 
-    report = summarise(records, args.model, len(tools), args.seed, base, args.items)
+    report = summarise(records, args.model, len(tools), args.seed, base, args.items, args.variant)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -290,6 +292,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--items", default=str(ITEMS_FILE))
     parser.add_argument("--out", default="tool-choice-report.json")
     parser.add_argument("--seed", type=int, default=80)
+    parser.add_argument("--variant", default="as shipped")
     args = parser.parse_args(argv)
     base = os.environ.get(BASE_URL_ENV)
     key = os.environ.get(API_KEY_ENV)
