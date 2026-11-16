@@ -10,15 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.8.0] - 2026-11-16
 
 Maya correctness plus governance release. World bounding boxes now match Maya's
-own and stop widening with hierarchy depth; camera framing, zone geometry and
-query payloads report lengths in the scene's working unit; `scene_plan`
-recommendations cover all seven zones, survive a partially measured zone
-envelope, and run off the event loop under a 5 s soft budget with offline
-circuit-breaking. The security audit's remaining sanitizer and checkout gaps are
-closed, `safe_mode` gets a deny-by-default allowlist matrix, and validator
-registration answers hostile `str` subclasses with its own error envelope. CI
-now fails closed on an untrustworthy mypy run and checks the key jobs' wiring;
-the historical mypy baseline is retired and the MCP tool set is unchanged.
+own for geometry that fills its box, and stop widening with hierarchy depth;
+camera framing, zone geometry and query payloads report lengths in the scene's
+working unit; `scene_plan` recommendations recognize all seven zones and search
+the four with a query table (entrance, display, furniture, lighting), survive a
+partially measured zone envelope, and run off the event loop under a 5 s soft
+budget with offline circuit-breaking. The security audit's remaining sanitizer
+and checkout gaps are closed, `safe_mode` gets a deny-by-default allowlist
+matrix, and validator registration answers hostile `str` subclasses with its own
+error envelope. CI now fails closed on an untrustworthy mypy run and checks the
+key jobs' wiring; the historical mypy baseline is retired and the MCP tool set
+is unchanged.
 
 ### Fixed
 
