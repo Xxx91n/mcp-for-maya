@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "date": "2026-11-16T03:48:50Z",
+    "ticket": "Xxx91n/mcp-for-maya#259",
+    "purpose": "Point-in-time read of the main branch protection and rulesets, so the #259 closeout does not rely on the 2026-11-14 values or the 2026-11-15 403.",
+    "commands": [
+      "gh api repos/Xxx91n/mcp-for-maya/branches/main/protection",
+      "gh api repos/Xxx91n/mcp-for-maya/rulesets"
+    ],
+    "account": "Xxx91n",
+    "actor": "agent working ticket #259, in the owner's gh session",
+    "versions": {
+      "gh": "2.103.3 (2026-10-26)",
+      "api": "GitHub REST API"
+    },
+    "host": "Windows 11 10.0.26100 x64, Git Bash",
+    "pid": 30248,
+    "previous_read": {
+      "date": "2026-11-16T03:04:36Z",
+      "same_values": true,
+      "note": "The first read in this ticket returned the same protection object and an empty rulesets list. This artifact keeps the re-read because it captured a PID as the evidence store asks."
+    },
+    "no_changes_made": true
+  },
+  "protection": {
+    "url": "https://api.github.com/repos/Xxx91n/mcp-for-maya/branches/main/protection",
+    "required_status_checks": {
+      "url": "https://api.github.com/repos/Xxx91n/mcp-for-maya/branches/main/protection/required_status_checks",
+      "strict": false,
+      "contexts": [
+        "ci",
+        "ruff budget gate",
+        "mypy baseline gate"
+      ],
+      "contexts_url": "https://api.github.com/repos/Xxx91n/mcp-for-maya/branches/main/protection/required_status_checks/contexts",
+      "checks": [
+        {
+          "context": "ci",
+          "app_id": 15368
+        },
+        {
+          "context": "ruff budget gate",
+          "app_id": 15368
+        },
+        {
+          "context": "mypy baseline gate",
+          "app_id": 15368
+        }
+      ]
+    },
+    "required_signatures": {
+      "url": "https://api.github.com/repos/Xxx91n/mcp-for-maya/branches/main/protection/required_signatures",
+      "enabled": false
+    },
+    "enforce_admins": {
+      "url": "https://api.github.com/repos/Xxx91n/mcp-for-maya/branches/main/protection/enforce_admins",
+      "enabled": false
+    },
+    "required_linear_history": {
+      "enabled": false
+    },
+    "allow_force_pushes": {
+      "enabled": false
+    },
+    "allow_deletions": {
+      "enabled": false
+    },
+    "block_creations": {
+      "enabled": false
+    },
+    "required_conversation_resolution": {
+      "enabled": true
+    },
+    "lock_branch": {
+      "enabled": false
+    },
+    "allow_fork_syncing": {
+      "enabled": false
+    }
+  },
+  "rulesets": [],
+  "claim_boundary": "This is one read at 2026-11-16T03:48:50Z. It proves what the settings were at that moment, not what they will be later. Admins can change branch protection and rulesets, so this does not prove the gate cannot be bypassed and does not prove future enforcement. No setting was modified by this read or by ticket #259."
+}
